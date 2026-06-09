@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>プラウド船橋コミュニティ図書館</title>
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#3d6b4f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="プラウド図書館">
+  <link rel="apple-touch-icon" href="/static/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <!-- Header -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-icon">📚</span>
+        <div class="logo-text">
+          <h1>プラウド船橋</h1>
+          <span>コミュニティ図書館</span>
+        </div>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="searchInput" placeholder="タイトル・著者で検索…" />
+        <button id="searchBtn">検索</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Navigation tabs -->
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="books">蔵書一覧</button>
+    <button class="tab-btn" data-tab="new">新着図書</button>
+    <button class="tab-btn" data-tab="info">開館情報</button>
+  </nav>
+
+  <main class="main-content">
+    <!-- Books tab -->
+    <div id="tab-books" class="tab-panel active">
+      <div class="controls-row">
+        <span id="totalCount" class="total-count"></span>
+        <div class="pagination" id="paginationTop"></div>
+      </div>
+      <div class="book-grid" id="bookGrid">
+        <div class="loading">読み込み中…</div>
+      </div>
+      <div class="pagination" id="paginationBottom"></div>
+    </div>
+
+    <!-- New arrivals tab -->
+    <div id="tab-new" class="tab-panel">
+      <h2 class="section-title">新着図書</h2>
+      <div class="book-grid" id="newGrid">
+        <div class="loading">読み込み中…</div>
+      </div>
+    </div>
+
+    <!-- Library info tab -->
+    <div id="tab-info" class="tab-panel">
+      <div class="info-card" id="infoCard">
+        <div class="loading">読み込み中…</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Book detail modal -->
+  <div id="modal" class="modal-overlay" style="display:none">
+    <div class="modal-box">
+      <button class="modal-close" id="modalClose">✕</button>
+      <div id="modalContent" class="modal-content">
+        <div class="loading">読み込み中…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rating modal -->
+  <div id="rateModal" class="modal-overlay" style="display:none">
+    <div class="modal-box modal-small">
+      <button class="modal-close" id="rateClose">✕</button>
+      <h3>この本を評価する</h3>
+      <div class="star-select" id="starSelect">
+        <span class="star-opt" data-v="1">★</span>
+        <span class="star-opt" data-v="2">★</span>
+        <span class="star-opt" data-v="3">★</span>
+        <span class="star-opt" data-v="4">★</span>
+        <span class="star-opt" data-v="5">★</span>
+      </div>
+      <textarea id="reviewText" placeholder="一言コメント（任意）" rows="3"></textarea>
+      <button id="submitRate" class="btn-primary">投稿する</button>
+      <p id="rateMsg" class="rate-msg"></p>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/static/sw.js');
+    }
+  </script>
+</body>
+</html>
