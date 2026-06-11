@@ -245,6 +245,7 @@
       <button class="board-tab" data-btab="calendar">📅 活動カレンダー</button>
       <button class="board-tab" data-btab="analysis">📈 集計・分析</button>
       <button class="board-tab" data-btab="swot">💡 強み・弱み</button>
+      <button class="board-tab" data-btab="settings">⚙️ 設定</button>
     </div>
     <div class="board-body">
 
@@ -480,6 +481,37 @@
             <div class="swot-item-title">⑤ 蔵書データの整備と活用</div>
             <div class="swot-item-body">ISBNが未登録の書籍（約250冊）について、ISBN登録・書誌情報の整備を行う。本ファイルのような蔵書データベースを定期的に更新し、住民がオンラインで蔵書検索できる環境を整える。書評・おすすめ度・年齢層の情報を貸出カードや書架POPとして活用することで、利用者が本を選びやすい環境をつくる。統計データを活用して人気ジャンルや回転率を分析し、蔵書選定に活かす。</div>
           </div>
+        </div>
+      </div>
+
+      <!-- Settings -->
+      <div id="btab-settings" class="board-tab-panel">
+        <h3 style="margin-bottom:20px">⚙️ パスワード変更</h3>
+        <div class="pw-change-form">
+          <p class="pw-change-note">変更するには現在の理事・管理者パスワードが必要です。</p>
+          <div class="pw-group">
+            <label>現在のパスワード（理事・管理者）</label>
+            <input type="password" id="pwCurrent" placeholder="board2025など" />
+          </div>
+          <hr class="pw-divider">
+          <div class="pw-group">
+            <label>変更対象</label>
+            <select id="pwTarget">
+              <option value="resident">🏠 住民パスワード（ログイン用）</option>
+              <option value="admin">🔑 管理者パスワード（お知らせ投稿用）</option>
+              <option value="board">🏛️ 理事・管理者パスワード（このメニュー）</option>
+            </select>
+          </div>
+          <div class="pw-group">
+            <label>新しいパスワード（4文字以上）</label>
+            <input type="password" id="pwNew" placeholder="新しいパスワード" />
+          </div>
+          <div class="pw-group">
+            <label>確認（もう一度入力）</label>
+            <input type="password" id="pwConfirm" placeholder="確認入力" />
+          </div>
+          <button class="btn-primary" id="pwChangeBtn" style="margin-top:6px">🔐 パスワードを変更する</button>
+          <p id="pwMsg" class="rate-msg" style="margin-top:10px"></p>
         </div>
       </div>
 

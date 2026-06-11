@@ -82,9 +82,32 @@ LIBRARY_INFO = {
     "note": "最新情報はlibrarlife.netをご確認ください。",
 }
 
-ADMIN_PASSWORD   = os.environ.get("ADMIN_PASSWORD",   "proud2024")
-RESIDENT_PASSWORD = os.environ.get("RESIDENT_PASSWORD", "proudfunabashi")
-BOARD_PASSWORD   = os.environ.get("BOARD_PASSWORD",   "board2025")
+_ADMIN_PASSWORD_ENV    = os.environ.get("ADMIN_PASSWORD",    "proud2024")
+_RESIDENT_PASSWORD_ENV = os.environ.get("RESIDENT_PASSWORD", "proudfunabashi")
+_BOARD_PASSWORD_ENV    = os.environ.get("BOARD_PASSWORD",    "board2025")
+
+
+def get_setting(key, default=""):
+    """settings テーブルから値を取得。なければ default を返す。"""
+    try:
+        con = get_con()
+        row = fetchone(con, "SELECT value FROM settings WHERE key=?", (key,))
+        con.close()
+        if row:
+            return row["value"]
+    except Exception:
+        pass
+    return default
+
+
+def get_admin_password():
+    return get_setting("admin_password", _ADMIN_PASSWORD_ENV)
+
+def get_resident_password():
+    return get_setting("resident_password", _RESIDENT_PASSWORD_ENV)
+
+def get_board_password():
+    return get_setting("board_password", _BOARD_PASSWORD_ENV)
 
 
 # ── DB初期化 ─────────────────────────────────────────────────────────────
@@ -142,6 +165,12 @@ def init_db():
                 minutes TEXT DEFAULT '',
                 sort_order INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
             )
         """)
         con.commit()
@@ -207,6 +236,12 @@ def init_db():
                 con.execute(f"ALTER TABLE {tbl} ADD COLUMN sort_order INTEGER DEFAULT 0")
             except Exception:
                 pass
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+        """)
         con.commit()
     con.close()
 
@@ -347,7 +382,7 @@ def index():
 @app.route("/api/auth", methods=["POST"])
 def api_auth():
     body = request.get_json()
-    if body.get("password") == RESIDENT_PASSWORD:
+    if body.get("password") == get_resident_password():
         return jsonify({"ok": True})
     return jsonify({"error": "unauthorized"}), 401
 
@@ -355,7 +390,7 @@ def api_auth():
 @app.route("/api/board/auth", methods=["POST"])
 def api_board_auth():
     body = request.get_json()
-    if body.get("password") == BOARD_PASSWORD:
+    if body.get("password") == get_board_password():
         return jsonify({"ok": True})
     return jsonify({"error": "unauthorized"}), 401
 
@@ -372,7 +407,7 @@ def api_issues():
 @app.route("/api/issues", methods=["POST"])
 def api_post_issue():
     body = request.get_json()
-    if body.get("password") != BOARD_PASSWORD:
+    if body.get("password") != get_board_password():
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     row = fetchone(con, "SELECT MIN(sort_order) as m FROM issues")
@@ -387,7 +422,7 @@ def api_post_issue():
 @app.route("/api/issues/reorder", methods=["POST"])
 def api_reorder_issues():
     body = request.get_json()
-    if body.get("password") != BOARD_PASSWORD:
+    if body.get("password") != get_board_password():
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     for item in body.get("order", []):
@@ -399,7 +434,7 @@ def api_reorder_issues():
 @app.route("/api/issues/<int:issue_id>", methods=["PATCH"])
 def api_update_issue(issue_id):
     body = request.get_json()
-    if body.get("password") != BOARD_PASSWORD:
+    if body.get("password") != get_board_password():
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     if "title" in body:
@@ -414,7 +449,7 @@ def api_update_issue(issue_id):
 @app.route("/api/issues/<int:issue_id>", methods=["DELETE"])
 def api_delete_issue(issue_id):
     body = request.get_json()
-    if body.get("password") != BOARD_PASSWORD:
+    if body.get("password") != get_board_password():
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     execute(con, "DELETE FROM issues WHERE id=?", (issue_id,))
@@ -434,7 +469,7 @@ def api_calendar():
 @app.route("/api/calendar", methods=["POST"])
 def api_post_calendar():
     body = request.get_json()
-    if body.get("password") != BOARD_PASSWORD:
+    if body.get("password") != get_board_password():
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     row = fetchone(con, "SELECT MIN(sort_order) as m FROM calendar_events")
@@ -449,7 +484,7 @@ def api_post_calendar():
 @app.route("/api/calendar/reorder", methods=["POST"])
 def api_reorder_calendar():
     body = request.get_json()
-    if body.get("password") != BOARD_PASSWORD:
+    if body.get("password") != get_board_password():
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     for item in body.get("order", []):
@@ -461,7 +496,7 @@ def api_reorder_calendar():
 @app.route("/api/calendar/<int:ev_id>", methods=["PATCH"])
 def api_update_calendar(ev_id):
     body = request.get_json()
-    if body.get("password") != BOARD_PASSWORD:
+    if body.get("password") != get_board_password():
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     execute(con, "UPDATE calendar_events SET title=?,event_date=?,body=?,minutes=? WHERE id=?",
@@ -474,7 +509,7 @@ def api_update_calendar(ev_id):
 @app.route("/api/calendar/<int:ev_id>", methods=["DELETE"])
 def api_delete_calendar(ev_id):
     body = request.get_json()
-    if body.get("password") != BOARD_PASSWORD:
+    if body.get("password") != get_board_password():
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     execute(con, "DELETE FROM calendar_events WHERE id=?", (ev_id,))
@@ -592,7 +627,7 @@ def api_announcements():
 @app.route("/api/announcements", methods=["POST"])
 def api_post_announcement():
     body = request.get_json()
-    if body.get("password") != ADMIN_PASSWORD:
+    if body.get("password") != get_admin_password():
         return jsonify({"error": "unauthorized"}), 401
     title = body.get("title", "").strip()
     text = body.get("body", "").strip()
@@ -608,7 +643,7 @@ def api_post_announcement():
 @app.route("/api/announcements/<int:ann_id>", methods=["DELETE"])
 def api_delete_announcement(ann_id):
     body = request.get_json()
-    if body.get("password") != ADMIN_PASSWORD:
+    if body.get("password") != get_admin_password():
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     execute(con, "DELETE FROM announcements WHERE id=?", (ann_id,))
@@ -628,7 +663,7 @@ def api_requests():
 @app.route("/api/requests", methods=["POST"])
 def api_post_request():
     body = request.get_json()
-    if body.get("password") not in (RESIDENT_PASSWORD, ADMIN_PASSWORD, BOARD_PASSWORD):
+    if body.get("password") not in (get_resident_password(), get_admin_password(), get_board_password()):
         return jsonify({"error": "unauthorized"}), 401
     title = body.get("title", "").strip()
     if not title:
@@ -643,7 +678,7 @@ def api_post_request():
 @app.route("/api/requests/<int:req_id>", methods=["PATCH"])
 def api_update_request(req_id):
     body = request.get_json()
-    if body.get("password") != ADMIN_PASSWORD:
+    if body.get("password") != get_admin_password():
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     if "status" in body:
@@ -657,12 +692,63 @@ def api_update_request(req_id):
 @app.route("/api/requests/<int:req_id>", methods=["DELETE"])
 def api_delete_request(req_id):
     body = request.get_json()
-    if body.get("password") != ADMIN_PASSWORD:
+    if body.get("password") != get_admin_password():
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     execute(con, "DELETE FROM book_requests WHERE id=?", (req_id,))
     con.commit(); con.close()
     return jsonify({"ok": True})
+
+
+# --- Password change ---
+@app.route("/api/admin/change-password", methods=["POST"])
+def api_change_password():
+    body = request.get_json()
+    if body.get("current_password") != get_board_password():
+        return jsonify({"error": "現在のパスワードが違います"}), 401
+    target = body.get("target")
+    new_pw = body.get("new_password", "").strip()
+    if not new_pw or len(new_pw) < 4:
+        return jsonify({"error": "4文字以上で入力してください"}), 400
+    key_map = {"resident": "resident_password", "admin": "admin_password", "board": "board_password"}
+    if target not in key_map:
+        return jsonify({"error": "不正なターゲット"}), 400
+    db_key = key_map[target]
+    con = get_con()
+    if USE_PG:
+        execute(con, "INSERT INTO settings (key, value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value",
+                (db_key, new_pw))
+    else:
+        execute(con, "INSERT OR REPLACE INTO settings (key, value) VALUES (?,?)", (db_key, new_pw))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+
+# --- Quick availability check ---
+@app.route("/api/availability/<isbn>")
+def api_availability(isbn):
+    """本の在架状況のみを高速取得（詳細ページをスクレイピング）"""
+    try:
+        url = f"{LIBRARYLIFE_BASE}/booksearch/detail/{isbn}"
+        resp = requests.get(url, timeout=8)
+        soup = BeautifulSoup(resp.text, "html.parser")
+        availability = []
+        for row in soup.select("table.table tbody tr"):
+            tds = row.find_all("td")
+            if len(tds) >= 3 and tds[1].text.strip() and tds[2].text.strip():
+                availability.append({"library": tds[1].text.strip(), "status": tds[2].text.strip()})
+        if not availability:
+            return jsonify({"status": "unknown"})
+        # 在架があれば available、全て貸出中なら loaned
+        statuses = [a["status"] for a in availability]
+        if any(s in ("利用可能", "在架") for s in statuses):
+            return jsonify({"status": "available", "items": availability})
+        elif any("貸出中" in s for s in statuses):
+            return jsonify({"status": "loaned", "items": availability})
+        else:
+            return jsonify({"status": "unknown", "items": availability})
+    except Exception as e:
+        return jsonify({"status": "error"}), 500
 
 
 _ensure_db()
