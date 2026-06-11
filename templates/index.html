@@ -45,6 +45,7 @@
         <input type="text" id="searchInput" placeholder="タイトル・著者で検索…" />
         <button id="searchBtn">検索</button>
       </div>
+      <button id="boardMenuBtn" class="board-menu-btn">🏛️ 理事メニュー</button>
     </div>
   </header>
 
@@ -160,6 +161,96 @@
       <textarea id="reviewText" placeholder="一言コメント（任意）" rows="3"></textarea>
       <button id="submitRate" class="btn-primary">投稿する</button>
       <p id="rateMsg" class="rate-msg"></p>
+    </div>
+  </div>
+
+  <!-- Board login modal -->
+  <div id="boardLoginModal" class="modal-overlay" style="display:none">
+    <div class="modal-box modal-small">
+      <button class="modal-close" id="boardLoginClose">✕</button>
+      <div style="text-align:center;padding:10px 0">
+        <div style="font-size:2rem;margin-bottom:8px">🏛️</div>
+        <h3 style="margin-bottom:8px">理事・管理者メニュー</h3>
+        <p style="font-size:0.85rem;color:#888;margin-bottom:20px">専用パスワードを入力してください</p>
+        <input type="password" id="boardPass" class="login-input" placeholder="パスワード" style="margin-bottom:10px">
+        <button id="boardLoginBtn" class="btn-primary" style="width:100%">ログイン</button>
+        <p id="boardLoginError" class="login-error"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Board panel -->
+  <div id="boardPanel" class="board-panel" style="display:none">
+    <div class="board-header">
+      <div class="board-header-left">
+        <span style="font-size:1.4rem">🏛️</span>
+        <span class="board-title">理事・管理者メニュー</span>
+      </div>
+      <button id="boardClose" class="board-close">✕ 閉じる</button>
+    </div>
+    <div class="board-tabs">
+      <button class="board-tab active" data-btab="issues">📋 課題管理</button>
+      <button class="board-tab" data-btab="stats">📊 蔵書統計</button>
+      <button class="board-tab" data-btab="calendar">📅 活動カレンダー</button>
+    </div>
+    <div class="board-body">
+
+      <!-- Issues -->
+      <div id="btab-issues" class="board-tab-panel active">
+        <div class="board-section-header">
+          <h3>図書館の課題</h3>
+          <button class="btn-board-add" id="issueFormToggle">＋ 新規追加</button>
+        </div>
+        <div id="issueForm" class="board-form" style="display:none">
+          <input type="text" id="issueTitle" placeholder="課題タイトル" />
+          <textarea id="issueBody" placeholder="詳細・内容" rows="3"></textarea>
+          <div class="board-form-row">
+            <select id="issuePriority">
+              <option value="高">🔴 優先度：高</option>
+              <option value="中" selected>🟡 優先度：中</option>
+              <option value="低">🟢 優先度：低</option>
+            </select>
+            <select id="issueStatus">
+              <option value="未対応">未対応</option>
+              <option value="対応中">対応中</option>
+              <option value="完了">完了</option>
+            </select>
+          </div>
+          <button class="btn-primary" id="submitIssue">登録する</button>
+          <p id="issueMsg" class="rate-msg"></p>
+        </div>
+        <div class="issue-filters">
+          <button class="issue-filter-btn active" data-filter="all">すべて</button>
+          <button class="issue-filter-btn" data-filter="未対応">未対応</button>
+          <button class="issue-filter-btn" data-filter="対応中">対応中</button>
+          <button class="issue-filter-btn" data-filter="完了">完了</button>
+        </div>
+        <div id="issueList" class="issue-list"><div class="loading">読み込み中…</div></div>
+      </div>
+
+      <!-- Stats -->
+      <div id="btab-stats" class="board-tab-panel">
+        <h3 style="margin-bottom:16px">蔵書統計・分析</h3>
+        <div id="statsContent"><div class="loading">読み込み中…</div></div>
+      </div>
+
+      <!-- Calendar -->
+      <div id="btab-calendar" class="board-tab-panel">
+        <div class="board-section-header">
+          <h3>活動カレンダー・議事録</h3>
+          <button class="btn-board-add" id="calFormToggle">＋ 追加</button>
+        </div>
+        <div id="calForm" class="board-form" style="display:none">
+          <input type="text" id="calTitle" placeholder="イベント・会議名" />
+          <input type="date" id="calDate" />
+          <textarea id="calBody" placeholder="内容・メモ" rows="2"></textarea>
+          <textarea id="calMinutes" placeholder="議事録（任意）" rows="4"></textarea>
+          <button class="btn-primary" id="submitCal">登録する</button>
+          <p id="calMsg" class="rate-msg"></p>
+        </div>
+        <div id="calList" class="cal-list"><div class="loading">読み込み中…</div></div>
+      </div>
+
     </div>
   </div>
 

@@ -34,6 +34,7 @@ LIBRARY_INFO = {
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "proud2024")
 RESIDENT_PASSWORD = os.environ.get("RESIDENT_PASSWORD", "proudfunabashi")
+BOARD_PASSWORD = os.environ.get("BOARD_PASSWORD", "board2025")
 
 def init_db():
     con = sqlite3.connect(DB_PATH)
@@ -61,6 +62,26 @@ def init_db():
         con.commit()
     except Exception:
         pass
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS issues (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            body TEXT NOT NULL,
+            priority TEXT DEFAULT '中',
+            status TEXT DEFAULT '未対応',
+            created_at TEXT DEFAULT (datetime('now', 'localtime'))
+        )
+    """)
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS calendar_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            event_date TEXT NOT NULL,
+            body TEXT DEFAULT '',
+            minutes TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now', 'localtime'))
+        )
+    """)
     con.commit()
     con.close()
 
@@ -249,6 +270,106 @@ def api_auth():
     if body.get("password") == RESIDENT_PASSWORD:
         return jsonify({"ok": True})
     return jsonify({"error": "unauthorized"}), 401
+
+
+@app.route("/api/board/auth", methods=["POST"])
+def api_board_auth():
+    body = request.get_json()
+    if body.get("password") == BOARD_PASSWORD:
+        return jsonify({"ok": True})
+    return jsonify({"error": "unauthorized"}), 401
+
+
+# --- Issues ---
+@app.route("/api/issues")
+def api_issues():
+    con = sqlite3.connect(DB_PATH)
+    rows = con.execute("SELECT id,title,body,priority,status,created_at FROM issues ORDER BY id DESC").fetchall()
+    con.close()
+    return jsonify([{"id":r[0],"title":r[1],"body":r[2],"priority":r[3],"status":r[4],"created_at":r[5]} for r in rows])
+
+@app.route("/api/issues", methods=["POST"])
+def api_post_issue():
+    body = request.get_json()
+    if body.get("password") != BOARD_PASSWORD:
+        return jsonify({"error": "unauthorized"}), 401
+    con = sqlite3.connect(DB_PATH)
+    con.execute("INSERT INTO issues (title,body,priority,status) VALUES (?,?,?,?)",
+        (body.get("title","").strip(), body.get("body","").strip(),
+         body.get("priority","中"), body.get("status","未対応")))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+@app.route("/api/issues/<int:issue_id>", methods=["PATCH"])
+def api_update_issue(issue_id):
+    body = request.get_json()
+    if body.get("password") != BOARD_PASSWORD:
+        return jsonify({"error": "unauthorized"}), 401
+    con = sqlite3.connect(DB_PATH)
+    if "status" in body:
+        con.execute("UPDATE issues SET status=? WHERE id=?", (body["status"], issue_id))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+@app.route("/api/issues/<int:issue_id>", methods=["DELETE"])
+def api_delete_issue(issue_id):
+    body = request.get_json()
+    if body.get("password") != BOARD_PASSWORD:
+        return jsonify({"error": "unauthorized"}), 401
+    con = sqlite3.connect(DB_PATH)
+    con.execute("DELETE FROM issues WHERE id=?", (issue_id,))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+
+# --- Calendar ---
+@app.route("/api/calendar")
+def api_calendar():
+    con = sqlite3.connect(DB_PATH)
+    rows = con.execute("SELECT id,title,event_date,body,minutes,created_at FROM calendar_events ORDER BY event_date DESC").fetchall()
+    con.close()
+    return jsonify([{"id":r[0],"title":r[1],"event_date":r[2],"body":r[3],"minutes":r[4],"created_at":r[5]} for r in rows])
+
+@app.route("/api/calendar", methods=["POST"])
+def api_post_calendar():
+    body = request.get_json()
+    if body.get("password") != BOARD_PASSWORD:
+        return jsonify({"error": "unauthorized"}), 401
+    con = sqlite3.connect(DB_PATH)
+    con.execute("INSERT INTO calendar_events (title,event_date,body,minutes) VALUES (?,?,?,?)",
+        (body.get("title","").strip(), body.get("event_date",""),
+         body.get("body","").strip(), body.get("minutes","").strip()))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+@app.route("/api/calendar/<int:ev_id>", methods=["DELETE"])
+def api_delete_calendar(ev_id):
+    body = request.get_json()
+    if body.get("password") != BOARD_PASSWORD:
+        return jsonify({"error": "unauthorized"}), 401
+    con = sqlite3.connect(DB_PATH)
+    con.execute("DELETE FROM calendar_events WHERE id=?", (ev_id,))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+
+# --- Stats ---
+@app.route("/api/stats")
+def api_stats():
+    try:
+        data = fetch_books("", 1)
+        total = data["total"]
+        publishers = {}
+        formats = {}
+        for b in data["books"]:
+            p = b.get("publisher","不明") or "不明"
+            publishers[p] = publishers.get(p, 0) + 1
+            f = b.get("format","不明") or "不明"
+            formats[f] = formats.get(f, 0) + 1
+        top_pub = sorted(publishers.items(), key=lambda x: -x[1])[:10]
+        return jsonify({"total": total, "publishers": top_pub, "formats": list(formats.items())})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/books")

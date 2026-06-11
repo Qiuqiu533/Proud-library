@@ -458,6 +458,291 @@ document.getElementById("newsImage").addEventListener("input", e => {
   }
 });
 
+// ===== Board (理事メニュー) =====
+let boardPassword = "";
+let issueFilter = "all";
+
+document.getElementById("boardMenuBtn").addEventListener("click", () => {
+  if (sessionStorage.getItem("board_auth") === "1") {
+    openBoardPanel();
+  } else {
+    document.getElementById("boardLoginModal").style.display = "flex";
+    document.getElementById("boardPass").focus();
+  }
+});
+
+document.getElementById("boardLoginClose").addEventListener("click", () => {
+  document.getElementById("boardLoginModal").style.display = "none";
+});
+
+document.getElementById("boardLoginBtn").addEventListener("click", async () => {
+  const pass = document.getElementById("boardPass").value;
+  const err = document.getElementById("boardLoginError");
+  if (!pass) { err.textContent = "パスワードを入力してください"; return; }
+  const res = await fetch("/api/board/auth", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({password: pass})
+  });
+  if (res.ok) {
+    boardPassword = pass;
+    sessionStorage.setItem("board_auth", "1");
+    sessionStorage.setItem("board_pass", pass);
+    document.getElementById("boardLoginModal").style.display = "none";
+    document.getElementById("boardPass").value = "";
+    openBoardPanel();
+  } else {
+    err.textContent = "❌ パスワードが違います";
+    document.getElementById("boardPass").value = "";
+  }
+});
+document.getElementById("boardPass").addEventListener("keydown", e => {
+  if (e.key === "Enter") document.getElementById("boardLoginBtn").click();
+});
+
+document.getElementById("boardClose").addEventListener("click", () => {
+  document.getElementById("boardPanel").style.display = "none";
+});
+
+function openBoardPanel() {
+  boardPassword = sessionStorage.getItem("board_pass") || "";
+  document.getElementById("boardPanel").style.display = "flex";
+  loadIssues();
+}
+
+// Board tabs
+document.querySelectorAll(".board-tab").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".board-tab").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".board-tab-panel").forEach(p => p.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("btab-" + btn.dataset.btab).classList.add("active");
+    if (btn.dataset.btab === "stats") loadStats();
+    if (btn.dataset.btab === "calendar") loadCalendar();
+    if (btn.dataset.btab === "issues") loadIssues();
+  });
+});
+
+// ===== Issues =====
+document.getElementById("issueFormToggle").addEventListener("click", () => {
+  const f = document.getElementById("issueForm");
+  f.style.display = f.style.display === "none" ? "block" : "none";
+});
+
+document.querySelectorAll(".issue-filter-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".issue-filter-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    issueFilter = btn.dataset.filter;
+    loadIssues();
+  });
+});
+
+async function loadIssues() {
+  const list = document.getElementById("issueList");
+  list.innerHTML = '<div class="loading">読み込み中…</div>';
+  const res = await fetch("/api/issues");
+  let items = await res.json();
+  if (issueFilter !== "all") items = items.filter(i => i.status === issueFilter);
+  if (!items.length) { list.innerHTML = '<div class="loading">課題はありません</div>'; return; }
+  const priMap = {"高":"🔴","中":"🟡","低":"🟢"};
+  const stMap = {"未対応":"issue-new","対応中":"issue-wip","完了":"issue-done"};
+  list.innerHTML = items.map(item => `
+    <div class="issue-card ${stMap[item.status]||''}" data-id="${item.id}">
+      <div class="issue-meta">
+        <span class="issue-pri">${priMap[item.priority]||""} ${item.priority}</span>
+        <span class="issue-status-badge">${item.status}</span>
+        <span class="issue-date">${item.created_at.slice(0,10)}</span>
+        <button class="news-del issue-del" data-id="${item.id}" title="削除">🗑</button>
+      </div>
+      <div class="issue-title">${item.title}</div>
+      <div class="issue-body">${item.body.replace(/\n/g,"<br>")}</div>
+      <div class="issue-actions">
+        <button class="issue-act-btn" data-id="${item.id}" data-status="未対応">未対応</button>
+        <button class="issue-act-btn" data-id="${item.id}" data-status="対応中">対応中</button>
+        <button class="issue-act-btn" data-id="${item.id}" data-status="完了">完了</button>
+      </div>
+    </div>`).join("");
+  list.querySelectorAll(".issue-act-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      await fetch(`/api/issues/${btn.dataset.id}`, {
+        method: "PATCH", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({password: boardPassword, status: btn.dataset.status})
+      });
+      loadIssues();
+    });
+  });
+  list.querySelectorAll(".issue-del").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("この課題を削除しますか？")) return;
+      await fetch(`/api/issues/${btn.dataset.id}`, {
+        method: "DELETE", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({password: boardPassword})
+      });
+      loadIssues();
+    });
+  });
+}
+
+document.getElementById("submitIssue").addEventListener("click", async () => {
+  const title = document.getElementById("issueTitle").value.trim();
+  const body = document.getElementById("issueBody").value.trim();
+  const priority = document.getElementById("issuePriority").value;
+  const status = document.getElementById("issueStatus").value;
+  if (!title) { document.getElementById("issueMsg").textContent = "タイトルを入力してください"; return; }
+  const res = await fetch("/api/issues", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({password: boardPassword, title, body, priority, status})
+  });
+  if (res.ok) {
+    document.getElementById("issueMsg").textContent = "✅ 登録しました";
+    document.getElementById("issueTitle").value = "";
+    document.getElementById("issueBody").value = "";
+    loadIssues();
+  }
+});
+
+// ===== Stats =====
+async function loadStats() {
+  const el = document.getElementById("statsContent");
+  el.innerHTML = '<div class="loading">蔵書データを分析中…</div>';
+  const res = await fetch("/api/stats");
+  const data = await res.json();
+  if (data.error) { el.innerHTML = `<div class="loading">エラー: ${data.error}</div>`; return; }
+
+  el.innerHTML = `
+    <div class="stats-summary">
+      <div class="stat-card"><div class="stat-num">${data.total.toLocaleString()}</div><div class="stat-label">総蔵書数</div></div>
+    </div>
+    <div class="stats-charts">
+      <div class="chart-box">
+        <h4>出版社別冊数（上位10社・今ページ分）</h4>
+        <canvas id="pubChart" height="220"></canvas>
+      </div>
+      <div class="chart-box">
+        <h4>形式別冊数</h4>
+        <canvas id="fmtChart" height="220"></canvas>
+      </div>
+    </div>`;
+
+  drawBarChart("pubChart", data.publishers.map(p=>p[0]), data.publishers.map(p=>p[1]));
+  drawPieChart("fmtChart", data.formats.map(f=>f[0]), data.formats.map(f=>f[1]));
+}
+
+function drawBarChart(id, labels, values) {
+  const canvas = document.getElementById(id);
+  const ctx = canvas.getContext("2d");
+  const W = canvas.offsetWidth || 400;
+  canvas.width = W; canvas.height = 220;
+  const max = Math.max(...values);
+  const barH = 20, gap = 6, labelW = 120, padding = 20;
+  const totalH = (barH + gap) * labels.length + padding * 2;
+  canvas.height = totalH;
+  ctx.clearRect(0, 0, W, totalH);
+  const chartW = W - labelW - padding - 40;
+  labels.forEach((label, i) => {
+    const y = padding + i * (barH + gap);
+    ctx.fillStyle = "#555";
+    ctx.font = "11px sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText(label.length > 12 ? label.slice(0,12)+"…" : label, labelW, y + barH - 4);
+    const bw = (values[i] / max) * chartW;
+    ctx.fillStyle = "#3d6b4f";
+    ctx.fillRect(labelW + 4, y, bw, barH);
+    ctx.fillStyle = "#333";
+    ctx.textAlign = "left";
+    ctx.fillText(values[i], labelW + 4 + bw + 4, y + barH - 4);
+  });
+}
+
+function drawPieChart(id, labels, values) {
+  const canvas = document.getElementById(id);
+  const ctx = canvas.getContext("2d");
+  const W = canvas.offsetWidth || 300;
+  canvas.width = W; canvas.height = 220;
+  const total = values.reduce((a,b)=>a+b, 0);
+  const cx = 90, cy = 100, r = 80;
+  const colors = ["#3d6b4f","#f0a500","#e05050","#5080e0","#a050c0","#50b0a0","#c08030","#707070"];
+  let angle = -Math.PI / 2;
+  values.forEach((v, i) => {
+    const slice = (v / total) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, angle, angle + slice);
+    ctx.closePath();
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fill();
+    ctx.strokeStyle = "white";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    angle += slice;
+  });
+  ctx.font = "11px sans-serif";
+  ctx.textAlign = "left";
+  labels.forEach((label, i) => {
+    const lx = cx * 2 + 20, ly = 20 + i * 22;
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fillRect(lx, ly - 10, 14, 14);
+    ctx.fillStyle = "#333";
+    ctx.fillText(`${label} (${values[i]})`, lx + 18, ly);
+  });
+}
+
+// ===== Calendar =====
+document.getElementById("calFormToggle").addEventListener("click", () => {
+  const f = document.getElementById("calForm");
+  f.style.display = f.style.display === "none" ? "block" : "none";
+  if (f.style.display === "block") {
+    document.getElementById("calDate").value = new Date().toISOString().slice(0,10);
+  }
+});
+
+async function loadCalendar() {
+  const list = document.getElementById("calList");
+  list.innerHTML = '<div class="loading">読み込み中…</div>';
+  const res = await fetch("/api/calendar");
+  const items = await res.json();
+  if (!items.length) { list.innerHTML = '<div class="loading">活動記録はまだありません</div>'; return; }
+  list.innerHTML = items.map(item => `
+    <div class="cal-card">
+      <div class="cal-header">
+        <span class="cal-date">📅 ${item.event_date}</span>
+        <span class="cal-title-text">${item.title}</span>
+        <button class="news-del cal-del" data-id="${item.id}" title="削除">🗑</button>
+      </div>
+      ${item.body ? `<div class="cal-body">${item.body.replace(/\n/g,"<br>")}</div>` : ""}
+      ${item.minutes ? `<details class="cal-minutes"><summary>📝 議事録を見る</summary><div class="cal-minutes-body">${item.minutes.replace(/\n/g,"<br>")}</div></details>` : ""}
+    </div>`).join("");
+  list.querySelectorAll(".cal-del").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("この記録を削除しますか？")) return;
+      await fetch(`/api/calendar/${btn.dataset.id}`, {
+        method: "DELETE", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({password: boardPassword})
+      });
+      loadCalendar();
+    });
+  });
+}
+
+document.getElementById("submitCal").addEventListener("click", async () => {
+  const title = document.getElementById("calTitle").value.trim();
+  const event_date = document.getElementById("calDate").value;
+  const body = document.getElementById("calBody").value.trim();
+  const minutes = document.getElementById("calMinutes").value.trim();
+  if (!title || !event_date) { document.getElementById("calMsg").textContent = "タイトルと日付を入力してください"; return; }
+  const res = await fetch("/api/calendar", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({password: boardPassword, title, event_date, body, minutes})
+  });
+  if (res.ok) {
+    document.getElementById("calMsg").textContent = "✅ 登録しました";
+    document.getElementById("calTitle").value = "";
+    document.getElementById("calBody").value = "";
+    document.getElementById("calMinutes").value = "";
+    loadCalendar();
+  }
+});
+
 // Initial load
 checkAuth();
 loadBooks();
