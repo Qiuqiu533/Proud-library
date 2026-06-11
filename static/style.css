@@ -266,3 +266,34 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
   .stats-charts { grid-template-columns: 1fr; }
   .board-body { padding: 14px 12px; }
 }
+
+/* ===== Analysis tab ===== */
+.analysis-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.analysis-stat-card { background: white; border-radius: 12px; padding: 16px 12px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.analysis-stat-num { font-size: 1.6rem; font-weight: 700; color: #2a4a37; }
+.analysis-stat-label { font-size: 0.75rem; color: #666; margin-top: 4px; line-height: 1.4; }
+.analysis-section { background: white; border-radius: 12px; padding: 16px; margin-bottom: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+.analysis-section h4 { font-size: 0.95rem; font-weight: 700; color: #2a4a37; margin-bottom: 12px; }
+.analysis-table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+.analysis-table th { background: #f0f4f0; text-align: left; padding: 6px 10px; font-weight: 600; color: #444; }
+.analysis-table td { padding: 5px 10px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+.analysis-table tr:last-child td { border-bottom: none; }
+.bar-cell { display: flex; align-items: center; gap: 8px; }
+.bar-fill { height: 10px; border-radius: 5px; background: #3d6b4f; min-width: 2px; flex-shrink: 0; }
+.bar-fill.bar-gold { background: #c0962a; }
+.bar-fill.bar-blue { background: #2a4a8a; }
+.bar-cell span { font-size: 0.78rem; color: #666; white-space: nowrap; }
+
+/* ===== SWOT tab ===== */
+.swot-section { border-radius: 12px; padding: 16px; margin-bottom: 18px; }
+.swot-section h4 { font-size: 1rem; font-weight: 700; margin-bottom: 12px; }
+.swot-strength { background: #f0f7f0; border-left: 4px solid #3d8a4f; }
+.swot-strength h4 { color: #2a5a37; }
+.swot-weakness { background: #fff7f0; border-left: 4px solid #c06020; }
+.swot-weakness h4 { color: #904010; }
+.swot-recommend { background: #f0f4ff; border-left: 4px solid #2a4a9a; }
+.swot-recommend h4 { color: #2a4a9a; }
+.swot-item { background: white; border-radius: 8px; padding: 12px 14px; margin-bottom: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+.swot-item:last-child { margin-bottom: 0; }
+.swot-item-title { font-size: 0.9rem; font-weight: 700; color: #2c2c2c; margin-bottom: 6px; }
+.swot-item-body { font-size: 0.83rem; color: #555; line-height: 1.75; }
