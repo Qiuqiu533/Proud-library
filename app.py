@@ -26,6 +26,7 @@ LIBRARY_INFO = {
 
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "proud2024")
+RESIDENT_PASSWORD = os.environ.get("RESIDENT_PASSWORD", "proudfunabashi")
 
 def init_db():
     con = sqlite3.connect(DB_PATH)
@@ -233,6 +234,14 @@ def save_rating(isbn: str, score: int, review: str = ""):
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/api/auth", methods=["POST"])
+def api_auth():
+    body = request.get_json()
+    if body.get("password") == RESIDENT_PASSWORD:
+        return jsonify({"ok": True})
+    return jsonify({"error": "unauthorized"}), 401
 
 
 @app.route("/api/books")

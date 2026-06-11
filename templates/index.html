@@ -15,6 +15,22 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+
+  <!-- Login screen -->
+  <div id="loginScreen" class="login-screen">
+    <div class="login-box">
+      <div class="login-logo">📚</div>
+      <h1 class="login-title">プラウド船橋<br>コミュニティ図書館</h1>
+      <p class="login-desc">ご入居者専用サービスです。<br>パスワードを入力してください。</p>
+      <div class="login-form">
+        <input type="password" id="residentPass" placeholder="パスワード" class="login-input" />
+        <button id="loginBtn" class="login-btn">入室する</button>
+      </div>
+      <p id="loginError" class="login-error"></p>
+      <p class="login-note">パスワードは管理組合よりお知らせしています</p>
+    </div>
+  </div>
+
   <!-- Header -->
   <header class="site-header">
     <div class="header-inner">
