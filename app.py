@@ -69,6 +69,7 @@ def init_db():
             body TEXT NOT NULL,
             priority TEXT DEFAULT '中',
             status TEXT DEFAULT '未対応',
+            sort_order INTEGER DEFAULT 0,
             created_at TEXT DEFAULT (datetime('now', 'localtime'))
         )
     """)
@@ -79,9 +80,17 @@ def init_db():
             event_date TEXT NOT NULL,
             body TEXT DEFAULT '',
             minutes TEXT DEFAULT '',
+            sort_order INTEGER DEFAULT 0,
             created_at TEXT DEFAULT (datetime('now', 'localtime'))
         )
     """)
+    # Add sort_order column if upgrading from old schema
+    for tbl in ("issues", "calendar_events"):
+        try:
+            con.execute(f"ALTER TABLE {tbl} ADD COLUMN sort_order INTEGER DEFAULT 0")
+            con.commit()
+        except Exception:
+            pass
     con.commit()
     con.close()
 
@@ -284,9 +293,9 @@ def api_board_auth():
 @app.route("/api/issues")
 def api_issues():
     con = sqlite3.connect(DB_PATH)
-    rows = con.execute("SELECT id,title,body,priority,status,created_at FROM issues ORDER BY id DESC").fetchall()
+    rows = con.execute("SELECT id,title,body,priority,status,sort_order,created_at FROM issues ORDER BY sort_order ASC, id DESC").fetchall()
     con.close()
-    return jsonify([{"id":r[0],"title":r[1],"body":r[2],"priority":r[3],"status":r[4],"created_at":r[5]} for r in rows])
+    return jsonify([{"id":r[0],"title":r[1],"body":r[2],"priority":r[3],"status":r[4],"sort_order":r[5],"created_at":r[6]} for r in rows])
 
 @app.route("/api/issues", methods=["POST"])
 def api_post_issue():
@@ -294,9 +303,23 @@ def api_post_issue():
     if body.get("password") != BOARD_PASSWORD:
         return jsonify({"error": "unauthorized"}), 401
     con = sqlite3.connect(DB_PATH)
-    con.execute("INSERT INTO issues (title,body,priority,status) VALUES (?,?,?,?)",
+    # New items go to top (sort_order = min - 1)
+    row = con.execute("SELECT MIN(sort_order) FROM issues").fetchone()
+    new_order = (row[0] or 0) - 1
+    con.execute("INSERT INTO issues (title,body,priority,status,sort_order) VALUES (?,?,?,?,?)",
         (body.get("title","").strip(), body.get("body","").strip(),
-         body.get("priority","中"), body.get("status","未対応")))
+         body.get("priority","中"), body.get("status","未対応"), new_order))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+@app.route("/api/issues/reorder", methods=["POST"])
+def api_reorder_issues():
+    body = request.get_json()
+    if body.get("password") != BOARD_PASSWORD:
+        return jsonify({"error": "unauthorized"}), 401
+    con = sqlite3.connect(DB_PATH)
+    for item in body.get("order", []):
+        con.execute("UPDATE issues SET sort_order=? WHERE id=?", (item["sort_order"], item["id"]))
     con.commit(); con.close()
     return jsonify({"ok": True})
 
@@ -330,9 +353,9 @@ def api_delete_issue(issue_id):
 @app.route("/api/calendar")
 def api_calendar():
     con = sqlite3.connect(DB_PATH)
-    rows = con.execute("SELECT id,title,event_date,body,minutes,created_at FROM calendar_events ORDER BY event_date DESC").fetchall()
+    rows = con.execute("SELECT id,title,event_date,body,minutes,sort_order,created_at FROM calendar_events ORDER BY sort_order ASC, event_date DESC").fetchall()
     con.close()
-    return jsonify([{"id":r[0],"title":r[1],"event_date":r[2],"body":r[3],"minutes":r[4],"created_at":r[5]} for r in rows])
+    return jsonify([{"id":r[0],"title":r[1],"event_date":r[2],"body":r[3],"minutes":r[4],"sort_order":r[5],"created_at":r[6]} for r in rows])
 
 @app.route("/api/calendar", methods=["POST"])
 def api_post_calendar():
@@ -340,9 +363,22 @@ def api_post_calendar():
     if body.get("password") != BOARD_PASSWORD:
         return jsonify({"error": "unauthorized"}), 401
     con = sqlite3.connect(DB_PATH)
-    con.execute("INSERT INTO calendar_events (title,event_date,body,minutes) VALUES (?,?,?,?)",
+    row = con.execute("SELECT MIN(sort_order) FROM calendar_events").fetchone()
+    new_order = (row[0] or 0) - 1
+    con.execute("INSERT INTO calendar_events (title,event_date,body,minutes,sort_order) VALUES (?,?,?,?,?)",
         (body.get("title","").strip(), body.get("event_date",""),
-         body.get("body","").strip(), body.get("minutes","").strip()))
+         body.get("body","").strip(), body.get("minutes","").strip(), new_order))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+@app.route("/api/calendar/reorder", methods=["POST"])
+def api_reorder_calendar():
+    body = request.get_json()
+    if body.get("password") != BOARD_PASSWORD:
+        return jsonify({"error": "unauthorized"}), 401
+    con = sqlite3.connect(DB_PATH)
+    for item in body.get("order", []):
+        con.execute("UPDATE calendar_events SET sort_order=? WHERE id=?", (item["sort_order"], item["id"]))
     con.commit(); con.close()
     return jsonify({"ok": True})
 
