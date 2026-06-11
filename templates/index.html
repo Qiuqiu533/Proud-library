@@ -63,6 +63,26 @@
   <main class="main-content">
     <!-- Books tab -->
     <div id="tab-books" class="tab-panel active">
+
+      <!-- 今日の1冊 -->
+      <div class="today-book-section" id="todayBookSection" style="display:none">
+        <div class="today-book-label">📖 今日の1冊</div>
+        <div id="todayBookCard"></div>
+      </div>
+
+      <!-- ジャンルフィルター -->
+      <div class="genre-filter-row">
+        <span class="genre-filter-label">ジャンル：</span>
+        <button class="genre-btn active" data-genre="">すべて</button>
+        <button class="genre-btn" data-genre="ミステリ">🔍 ミステリ</button>
+        <button class="genre-btn" data-genre="恋愛">💕 恋愛</button>
+        <button class="genre-btn" data-genre="ファンタジー">🧙 ファンタジー</button>
+        <button class="genre-btn" data-genre="歴史">⚔️ 歴史</button>
+        <button class="genre-btn" data-genre="絵本">🎨 絵本</button>
+        <button class="genre-btn" data-genre="児童">👦 児童</button>
+        <button class="genre-btn" data-genre="エッセイ">✍️ エッセイ</button>
+      </div>
+
       <div class="controls-row">
         <span id="totalCount" class="total-count"></span>
         <div class="filter-bar">

@@ -178,6 +178,42 @@ async function loadBooks(keyword = "", page = 1) {
   renderPagination("paginationBottom", data.total, page, p => loadBooks(keyword, p));
 }
 
+// ===== 今日の1冊 =====
+async function loadTodayBook() {
+  try {
+    const res = await fetch("/api/today-book");
+    const book = await res.json();
+    if (!book) return;
+    const section = document.getElementById("todayBookSection");
+    const card = document.getElementById("todayBookCard");
+    const img = book.cover
+      ? `<img class="today-book-cover" src="${book.cover}" alt="${book.title}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'today-book-cover-placeholder',textContent:'📖'}))">`
+      : `<div class="today-book-cover-placeholder">📖</div>`;
+    card.innerHTML = `
+      <div class="today-book-inner" data-isbn="${book.isbn}">
+        ${img}
+        <div class="today-book-info">
+          <div class="today-book-title">${book.title}</div>
+          <div class="today-book-author">${book.author || "著者不明"}</div>
+          <div class="today-book-meta">${book.publisher || ""}</div>
+        </div>
+      </div>`;
+    card.querySelector(".today-book-inner").addEventListener("click", () => openModal(book.isbn));
+    section.style.display = "block";
+  } catch (e) {}
+}
+
+// ===== ジャンルフィルター =====
+document.querySelectorAll(".genre-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".genre-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    const genre = btn.dataset.genre;
+    document.getElementById("searchInput").value = genre;
+    loadBooks(genre, 1);
+  });
+});
+
 // ===== New arrivals =====
 async function loadNew() {
   document.getElementById("newGrid").innerHTML = '<div class="loading">読み込み中…</div>';
@@ -957,6 +993,10 @@ document.getElementById("submitCal").addEventListener("click", async () => {
 // Initial load
 checkAuth();
 loadBooks();
+loadTodayBook();
+
+// #44 スリープ対策: 4分ごとにpingしてサービスを起こしておく
+setInterval(() => fetch("/ping").catch(() => {}), 4 * 60 * 1000);
 
 // ===== Book Requests =====
 let residentPassword = "";
