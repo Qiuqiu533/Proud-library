@@ -306,3 +306,9 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
 .btn-secondary:hover { background: #eee; }
 .issue-edit-form input, .issue-edit-form textarea, .issue-edit-form select { width: 100%; margin-bottom: 6px; padding: 8px 10px; border: 1.5px solid #ddd; border-radius: 8px; font-family: inherit; font-size: 0.86rem; }
 .cal-edit-form input, .cal-edit-form textarea { width: 100%; margin-bottom: 6px; padding: 8px 10px; border: 1.5px solid #ddd; border-radius: 8px; font-family: inherit; font-size: 0.86rem; }
+
+/* ===== Move buttons ===== */
+.move-btns { display: flex; flex-direction: column; gap: 1px; flex-shrink: 0; }
+.btn-move { background: none; border: 1px solid #ddd; border-radius: 4px; padding: 0 5px; cursor: pointer; font-size: 0.65rem; line-height: 1.4; color: #888; transition: background .15s; }
+.btn-move:hover:not(:disabled) { background: #e8e8e8; color: #333; }
+.btn-move:disabled { opacity: 0.25; cursor: default; }

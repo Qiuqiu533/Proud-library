@@ -537,21 +537,32 @@ document.querySelectorAll(".issue-filter-btn").forEach(btn => {
   });
 });
 
+let allIssues = [];
+
 async function loadIssues() {
   const list = document.getElementById("issueList");
   list.innerHTML = '<div class="loading">読み込み中…</div>';
   const res = await fetch("/api/issues");
-  let items = await res.json();
-  if (issueFilter !== "all") items = items.filter(i => i.status === issueFilter);
+  allIssues = await res.json();
+  renderIssues();
+}
+
+function renderIssues() {
+  const list = document.getElementById("issueList");
+  let items = issueFilter === "all" ? [...allIssues] : allIssues.filter(i => i.status === issueFilter);
   if (!items.length) { list.innerHTML = '<div class="loading">課題はありません</div>'; return; }
   const priMap = {"高":"🔴","中":"🟡","低":"🟢"};
   const stMap = {"未対応":"issue-new","対応中":"issue-wip","完了":"issue-done"};
-  list.innerHTML = items.map(item => `
+  list.innerHTML = items.map((item, idx) => `
     <div class="issue-card ${stMap[item.status]||''}" data-id="${item.id}">
       <div class="issue-meta">
         <span class="issue-pri">${priMap[item.priority]||""} ${item.priority}</span>
         <span class="issue-status-badge">${item.status}</span>
         <span class="issue-date">${item.created_at.slice(0,10)}</span>
+        <div class="move-btns">
+          <button class="btn-move issue-up" data-id="${item.id}" ${idx===0?"disabled":""} title="上へ">▲</button>
+          <button class="btn-move issue-down" data-id="${item.id}" ${idx===items.length-1?"disabled":""} title="下へ">▼</button>
+        </div>
         <button class="btn-edit issue-edit-btn" data-id="${item.id}" title="編集">✏️</button>
         <button class="news-del issue-del" data-id="${item.id}" title="削除">🗑</button>
       </div>
@@ -583,6 +594,46 @@ async function loadIssues() {
         <button class="issue-act-btn" data-id="${item.id}" data-status="完了">完了</button>
       </div>
     </div>`).join("");
+
+  // Move up/down handlers (operate on allIssues array)
+  list.querySelectorAll(".issue-up").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = parseInt(btn.dataset.id);
+      const visibleIds = items.map(i => i.id);
+      const idx = visibleIds.indexOf(id);
+      if (idx <= 0) return;
+      // Swap sort_order values in allIssues
+      const aIdx = allIssues.findIndex(i => i.id === visibleIds[idx]);
+      const bIdx = allIssues.findIndex(i => i.id === visibleIds[idx - 1]);
+      [allIssues[aIdx].sort_order, allIssues[bIdx].sort_order] = [allIssues[bIdx].sort_order, allIssues[aIdx].sort_order];
+      // Re-sort allIssues
+      allIssues.sort((a,b) => a.sort_order - b.sort_order);
+      await fetch("/api/issues/reorder", {
+        method: "POST", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({password: boardPassword, order: allIssues.map((it,i) => ({id:it.id, sort_order:i}))})
+      });
+      allIssues.forEach((it,i) => it.sort_order = i);
+      renderIssues();
+    });
+  });
+  list.querySelectorAll(".issue-down").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = parseInt(btn.dataset.id);
+      const visibleIds = items.map(i => i.id);
+      const idx = visibleIds.indexOf(id);
+      if (idx >= visibleIds.length - 1) return;
+      const aIdx = allIssues.findIndex(i => i.id === visibleIds[idx]);
+      const bIdx = allIssues.findIndex(i => i.id === visibleIds[idx + 1]);
+      [allIssues[aIdx].sort_order, allIssues[bIdx].sort_order] = [allIssues[bIdx].sort_order, allIssues[aIdx].sort_order];
+      allIssues.sort((a,b) => a.sort_order - b.sort_order);
+      await fetch("/api/issues/reorder", {
+        method: "POST", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({password: boardPassword, order: allIssues.map((it,i) => ({id:it.id, sort_order:i}))})
+      });
+      allIssues.forEach((it,i) => it.sort_order = i);
+      renderIssues();
+    });
+  });
 
   list.querySelectorAll(".issue-edit-btn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -763,15 +814,27 @@ document.getElementById("calFormToggle").addEventListener("click", () => {
   }
 });
 
+let allCalItems = [];
+
 async function loadCalendar() {
   const list = document.getElementById("calList");
   list.innerHTML = '<div class="loading">読み込み中…</div>';
   const res = await fetch("/api/calendar");
-  const items = await res.json();
+  allCalItems = await res.json();
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const list = document.getElementById("calList");
+  const items = allCalItems;
   if (!items.length) { list.innerHTML = '<div class="loading">活動記録はまだありません</div>'; return; }
-  list.innerHTML = items.map(item => `
+  list.innerHTML = items.map((item, idx) => `
     <div class="cal-card">
       <div class="cal-header">
+        <div class="move-btns">
+          <button class="btn-move cal-up" data-id="${item.id}" ${idx===0?"disabled":""} title="上へ">▲</button>
+          <button class="btn-move cal-down" data-id="${item.id}" ${idx===items.length-1?"disabled":""} title="下へ">▼</button>
+        </div>
         <span class="cal-date cal-view-date" data-id="${item.id}">📅 ${item.event_date}</span>
         <span class="cal-title-text cal-view-title" data-id="${item.id}">${item.title}</span>
         <button class="btn-edit cal-edit-btn" data-id="${item.id}" title="編集">✏️</button>
@@ -790,6 +853,37 @@ async function loadCalendar() {
         </div>
       </div>
     </div>`).join("");
+
+  list.querySelectorAll(".cal-up").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = parseInt(btn.dataset.id);
+      const idx = allCalItems.findIndex(i => i.id === id);
+      if (idx <= 0) return;
+      [allCalItems[idx].sort_order, allCalItems[idx-1].sort_order] = [allCalItems[idx-1].sort_order, allCalItems[idx].sort_order];
+      allCalItems.sort((a,b) => a.sort_order - b.sort_order);
+      await fetch("/api/calendar/reorder", {
+        method: "POST", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({password: boardPassword, order: allCalItems.map((it,i) => ({id:it.id, sort_order:i}))})
+      });
+      allCalItems.forEach((it,i) => it.sort_order = i);
+      renderCalendar();
+    });
+  });
+  list.querySelectorAll(".cal-down").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = parseInt(btn.dataset.id);
+      const idx = allCalItems.findIndex(i => i.id === id);
+      if (idx >= allCalItems.length - 1) return;
+      [allCalItems[idx].sort_order, allCalItems[idx+1].sort_order] = [allCalItems[idx+1].sort_order, allCalItems[idx].sort_order];
+      allCalItems.sort((a,b) => a.sort_order - b.sort_order);
+      await fetch("/api/calendar/reorder", {
+        method: "POST", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({password: boardPassword, order: allCalItems.map((it,i) => ({id:it.id, sort_order:i}))})
+      });
+      allCalItems.forEach((it,i) => it.sort_order = i);
+      renderCalendar();
+    });
+  });
 
   list.querySelectorAll(".cal-edit-btn").forEach(btn => {
     btn.addEventListener("click", () => {
