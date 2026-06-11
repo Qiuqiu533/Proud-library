@@ -505,6 +505,7 @@ document.getElementById("boardClose").addEventListener("click", () => {
 
 function openBoardPanel() {
   boardPassword = sessionStorage.getItem("board_pass") || "";
+  reqAdminPass = boardPassword;  // board password also works for request admin
   document.getElementById("boardPanel").style.display = "flex";
   loadIssues();
 }
@@ -519,6 +520,7 @@ document.querySelectorAll(".board-tab").forEach(btn => {
     if (btn.dataset.btab === "stats") loadStats();
     if (btn.dataset.btab === "calendar") loadCalendar();
     if (btn.dataset.btab === "issues") loadIssues();
+    if (btn.dataset.btab === "brequest") loadReqManage();
   });
 });
 
@@ -957,64 +959,13 @@ checkAuth();
 loadBooks();
 
 // ===== Book Requests =====
-let reqAdminMode = false;
-let residentPassword = "";  // set on login
+let residentPassword = "";
+let reqAdminPass = "";
 
-// Capture resident password on login for requests
-const _origLoginBtn = document.getElementById("loginBtn");
-_origLoginBtn.addEventListener("click", () => {
+// Capture resident password on login
+document.getElementById("loginBtn").addEventListener("click", () => {
   residentPassword = document.getElementById("residentPass").value;
 }, true);
-
-// Sub-tab switching
-document.querySelectorAll(".req-stab").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".req-stab").forEach(b => b.classList.remove("active"));
-    document.querySelectorAll(".req-spane").forEach(p => p.style.display = "none");
-    btn.classList.add("active");
-    document.getElementById("rstab-" + btn.dataset.stab).style.display = "block";
-    if (btn.dataset.stab === "list") loadReqList();
-    if (btn.dataset.stab === "manage") loadReqManage();
-  });
-});
-
-// Load list when request tab is opened
-document.querySelector('[data-tab="request"]').addEventListener("click", () => {
-  loadReqList();
-});
-
-// Admin toggle
-document.getElementById("reqAdminToggle").addEventListener("click", () => {
-  const area = document.getElementById("reqAdminLoginArea");
-  area.style.display = area.style.display === "none" ? "block" : "none";
-});
-
-document.getElementById("reqAdminLoginBtn").addEventListener("click", async () => {
-  const pass = document.getElementById("reqAdminPass").value;
-  const err = document.getElementById("reqAdminErr");
-  const res = await fetch("/api/auth", {
-    method: "POST", headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({password: pass})
-  });
-  // Try admin pass (proud2024) via a quick check
-  const adminRes = await fetch("/api/announcements", {method:"GET"});  // just a way to hold pass
-  // Actually just compare locally since admin check is server-side on each action
-  if (pass === "") { err.textContent = "パスワードを入力してください"; return; }
-  // Store as adminPassword for requests
-  reqAdminPass = pass;
-  // Test by doing a PATCH dry-run — actually just proceed and let server reject if wrong
-  reqAdminMode = true;
-  document.getElementById("reqAdminStab").style.display = "";
-  document.getElementById("reqAdminLoginArea").style.display = "none";
-  document.getElementById("reqAdminToggle").style.display = "none";
-  document.getElementById("reqAdminErr").textContent = "";
-  showReqToast("✅ 管理者としてログインしました");
-  loadReqManage();
-  // Switch to manage tab
-  document.querySelector('.req-stab[data-stab="manage"]').click();
-});
-
-let reqAdminPass = "";
 
 // Submit request
 document.getElementById("reqSubmitBtn").addEventListener("click", async () => {
@@ -1114,7 +1065,7 @@ async function loadReqManage() {
         method:"PATCH", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({password: reqAdminPass, status: sel.value})
       });
-      loadReqList();
+      loadReqManage();
     });
   });
   el.querySelectorAll(".req-note-input").forEach(inp => {
@@ -1135,7 +1086,6 @@ async function loadReqManage() {
         body: JSON.stringify({password: reqAdminPass})
       });
       loadReqManage();
-      loadReqList();
     });
   });
 }
