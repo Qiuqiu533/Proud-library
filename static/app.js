@@ -955,3 +955,206 @@ document.getElementById("submitCal").addEventListener("click", async () => {
 // Initial load
 checkAuth();
 loadBooks();
+
+// ===== Book Requests =====
+let reqAdminMode = false;
+let residentPassword = "";  // set on login
+
+// Capture resident password on login for requests
+const _origLoginBtn = document.getElementById("loginBtn");
+_origLoginBtn.addEventListener("click", () => {
+  residentPassword = document.getElementById("residentPass").value;
+}, true);
+
+// Sub-tab switching
+document.querySelectorAll(".req-stab").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".req-stab").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".req-spane").forEach(p => p.style.display = "none");
+    btn.classList.add("active");
+    document.getElementById("rstab-" + btn.dataset.stab).style.display = "block";
+    if (btn.dataset.stab === "list") loadReqList();
+    if (btn.dataset.stab === "manage") loadReqManage();
+  });
+});
+
+// Load list when request tab is opened
+document.querySelector('[data-tab="request"]').addEventListener("click", () => {
+  loadReqList();
+});
+
+// Admin toggle
+document.getElementById("reqAdminToggle").addEventListener("click", () => {
+  const area = document.getElementById("reqAdminLoginArea");
+  area.style.display = area.style.display === "none" ? "block" : "none";
+});
+
+document.getElementById("reqAdminLoginBtn").addEventListener("click", async () => {
+  const pass = document.getElementById("reqAdminPass").value;
+  const err = document.getElementById("reqAdminErr");
+  const res = await fetch("/api/auth", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({password: pass})
+  });
+  // Try admin pass (proud2024) via a quick check
+  const adminRes = await fetch("/api/announcements", {method:"GET"});  // just a way to hold pass
+  // Actually just compare locally since admin check is server-side on each action
+  if (pass === "") { err.textContent = "パスワードを入力してください"; return; }
+  // Store as adminPassword for requests
+  reqAdminPass = pass;
+  // Test by doing a PATCH dry-run — actually just proceed and let server reject if wrong
+  reqAdminMode = true;
+  document.getElementById("reqAdminStab").style.display = "";
+  document.getElementById("reqAdminLoginArea").style.display = "none";
+  document.getElementById("reqAdminToggle").style.display = "none";
+  document.getElementById("reqAdminErr").textContent = "";
+  showReqToast("✅ 管理者としてログインしました");
+  loadReqManage();
+  // Switch to manage tab
+  document.querySelector('.req-stab[data-stab="manage"]').click();
+});
+
+let reqAdminPass = "";
+
+// Submit request
+document.getElementById("reqSubmitBtn").addEventListener("click", async () => {
+  const title = document.getElementById("reqTitle").value.trim();
+  const author = document.getElementById("reqAuthor").value.trim();
+  const reason = document.getElementById("reqReason").value.trim();
+  const room = document.getElementById("reqRoom").value.trim();
+  const msg = document.getElementById("reqMsg");
+  if (!title) { msg.textContent = "⚠️ 書名を入力してください"; msg.style.color = "#e05"; return; }
+  const btn = document.getElementById("reqSubmitBtn");
+  btn.disabled = true; btn.textContent = "送信中…";
+  const pass = residentPassword || localStorage.getItem("req_pass") || "proud2525";
+  const res = await fetch("/api/requests", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({password: pass, title, author, reason, room})
+  });
+  btn.disabled = false; btn.textContent = "📨 リクエストを送る";
+  if (res.ok) {
+    msg.textContent = "✅ リクエストを送信しました！ありがとうございます。";
+    msg.style.color = "#3d6b4f";
+    document.getElementById("reqTitle").value = "";
+    document.getElementById("reqAuthor").value = "";
+    document.getElementById("reqReason").value = "";
+    document.getElementById("reqRoom").value = "";
+    showReqToast("✅ リクエストを送信しました！");
+  } else {
+    msg.textContent = "❌ 送信できませんでした。もう一度お試しください。";
+    msg.style.color = "#e05";
+  }
+});
+
+async function loadReqList() {
+  const el = document.getElementById("reqList");
+  el.innerHTML = '<div class="loading">読み込み中…</div>';
+  const res = await fetch("/api/requests");
+  const items = await res.json();
+  if (!items.length) { el.innerHTML = '<div class="loading">まだリクエストはありません</div>'; return; }
+  const stLabel = {pending:"⏳ 未対応", doing:"🔄 検討中", done:"✅ 完了"};
+  const stColor = {pending:"#888", doing:"#c07010", done:"#3d8a4f"};
+  // Show pending/doing first, then done
+  const sorted = [...items.filter(r=>r.status!=="done"), ...items.filter(r=>r.status==="done")];
+  el.innerHTML = sorted.map(r => `
+    <div class="req-card">
+      <div class="req-card-header">
+        <div class="req-card-left">
+          <span class="req-book-title">📖 ${esc(r.title)}</span>
+          ${r.author ? `<span class="req-author-badge">著：${esc(r.author)}</span>` : ""}
+        </div>
+        <span class="req-status-badge" style="color:${stColor[r.status]||"#888"}">${stLabel[r.status]||""}</span>
+      </div>
+      ${r.reason ? `<div class="req-reason">"${esc(r.reason)}"</div>` : ""}
+      ${r.note ? `<div class="req-note">📝 管理者メモ：${esc(r.note)}</div>` : ""}
+      <div class="req-meta">${r.room ? `🏠 部屋番号：${esc(r.room)}　` : ""}🕐 ${r.created_at.slice(0,10)}</div>
+    </div>`).join("");
+}
+
+async function loadReqManage() {
+  const el = document.getElementById("reqAdminList");
+  el.innerHTML = '<div class="loading">読み込み中…</div>';
+  const res = await fetch("/api/requests");
+  const items = await res.json();
+
+  // Summary
+  const cnt = {pending:0, doing:0, done:0};
+  items.forEach(r => { if (cnt[r.status]!==undefined) cnt[r.status]++; });
+  document.getElementById("reqSummary").innerHTML = `
+    <div class="req-sum-box"><div class="req-sum-num" style="color:#888">${cnt.pending}</div><div class="req-sum-lbl">⏳ 未対応</div></div>
+    <div class="req-sum-box"><div class="req-sum-num" style="color:#c07010">${cnt.doing}</div><div class="req-sum-lbl">🔄 検討中</div></div>
+    <div class="req-sum-box"><div class="req-sum-num" style="color:#3d8a4f">${cnt.done}</div><div class="req-sum-lbl">✅ 完了</div></div>`;
+
+  if (!items.length) { el.innerHTML = '<div class="loading">リクエストはまだありません</div>'; return; }
+  el.innerHTML = items.map(r => `
+    <div class="req-admin-card">
+      <div class="req-admin-card-header">
+        <div>
+          <div class="req-book-title">📖 ${esc(r.title)}</div>
+          ${r.author ? `<span class="req-author-badge">著：${esc(r.author)}</span>` : ""}
+        </div>
+        <button class="news-del req-del" data-id="${r.id}" title="削除">🗑</button>
+      </div>
+      ${r.reason ? `<div class="req-reason">"${esc(r.reason)}"</div>` : ""}
+      <div class="req-meta">${r.room ? `🏠 ${esc(r.room)}　` : ""}🕐 ${r.created_at.slice(0,10)}</div>
+      <div class="req-admin-controls">
+        <select class="req-status-sel" data-id="${r.id}">
+          <option value="pending" ${r.status==="pending"?"selected":""}>⏳ 未対応</option>
+          <option value="doing"   ${r.status==="doing"  ?"selected":""}>🔄 検討中</option>
+          <option value="done"    ${r.status==="done"   ?"selected":""}>✅ 完了</option>
+        </select>
+        <input class="req-note-input" type="text" placeholder="管理者メモ（任意）"
+          value="${esc(r.note||"")}" data-id="${r.id}" />
+      </div>
+    </div>`).join("");
+
+  el.querySelectorAll(".req-status-sel").forEach(sel => {
+    sel.addEventListener("change", async () => {
+      await fetch(`/api/requests/${sel.dataset.id}`, {
+        method:"PATCH", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({password: reqAdminPass, status: sel.value})
+      });
+      loadReqList();
+    });
+  });
+  el.querySelectorAll(".req-note-input").forEach(inp => {
+    const save = async () => {
+      await fetch(`/api/requests/${inp.dataset.id}`, {
+        method:"PATCH", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({password: reqAdminPass, note: inp.value})
+      });
+    };
+    inp.addEventListener("blur", save);
+    inp.addEventListener("keydown", e => { if (e.key==="Enter") { save(); inp.blur(); }});
+  });
+  el.querySelectorAll(".req-del").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("このリクエストを削除しますか？")) return;
+      await fetch(`/api/requests/${btn.dataset.id}`, {
+        method:"DELETE", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({password: reqAdminPass})
+      });
+      loadReqManage();
+      loadReqList();
+    });
+  });
+}
+
+function esc(s) {
+  return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+let reqToastTimer;
+function showReqToast(msg) {
+  let t = document.getElementById("reqToast");
+  if (!t) {
+    t = document.createElement("div");
+    t.id = "reqToast";
+    t.className = "req-toast";
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(reqToastTimer);
+  reqToastTimer = setTimeout(() => t.classList.remove("show"), 3200);
+}

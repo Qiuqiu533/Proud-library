@@ -74,6 +74,18 @@ def init_db():
         )
     """)
     con.execute("""
+        CREATE TABLE IF NOT EXISTS book_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            author TEXT DEFAULT '',
+            reason TEXT DEFAULT '',
+            room TEXT DEFAULT '',
+            status TEXT DEFAULT 'pending',
+            note TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now', 'localtime'))
+        )
+    """)
+    con.execute("""
         CREATE TABLE IF NOT EXISTS calendar_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
@@ -524,6 +536,59 @@ def api_delete_announcement(ann_id):
     con.execute("DELETE FROM announcements WHERE id=?", (ann_id,))
     con.commit()
     con.close()
+    return jsonify({"ok": True})
+
+
+# --- Book Requests ---
+@app.route("/api/requests")
+def api_requests():
+    con = sqlite3.connect(DB_PATH)
+    rows = con.execute(
+        "SELECT id,title,author,reason,room,status,note,created_at FROM book_requests ORDER BY id DESC"
+    ).fetchall()
+    con.close()
+    return jsonify([{
+        "id":r[0],"title":r[1],"author":r[2],"reason":r[3],
+        "room":r[4],"status":r[5],"note":r[6],"created_at":r[7]
+    } for r in rows])
+
+@app.route("/api/requests", methods=["POST"])
+def api_post_request():
+    body = request.get_json()
+    if body.get("password") not in (RESIDENT_PASSWORD, ADMIN_PASSWORD, BOARD_PASSWORD):
+        return jsonify({"error": "unauthorized"}), 401
+    title = body.get("title", "").strip()
+    if not title:
+        return jsonify({"error": "title required"}), 400
+    con = sqlite3.connect(DB_PATH)
+    con.execute(
+        "INSERT INTO book_requests (title,author,reason,room) VALUES (?,?,?,?)",
+        (title, body.get("author","").strip(), body.get("reason","").strip(), body.get("room","").strip())
+    )
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+@app.route("/api/requests/<int:req_id>", methods=["PATCH"])
+def api_update_request(req_id):
+    body = request.get_json()
+    if body.get("password") != ADMIN_PASSWORD:
+        return jsonify({"error": "unauthorized"}), 401
+    con = sqlite3.connect(DB_PATH)
+    if "status" in body:
+        con.execute("UPDATE book_requests SET status=? WHERE id=?", (body["status"], req_id))
+    if "note" in body:
+        con.execute("UPDATE book_requests SET note=? WHERE id=?", (body["note"], req_id))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+@app.route("/api/requests/<int:req_id>", methods=["DELETE"])
+def api_delete_request(req_id):
+    body = request.get_json()
+    if body.get("password") != ADMIN_PASSWORD:
+        return jsonify({"error": "unauthorized"}), 401
+    con = sqlite3.connect(DB_PATH)
+    con.execute("DELETE FROM book_requests WHERE id=?", (req_id,))
+    con.commit(); con.close()
     return jsonify({"ok": True})
 
 

@@ -57,6 +57,7 @@
     <button class="tab-btn" data-tab="log">📝 読書記録</button>
     <button class="tab-btn" data-tab="news">📢 お知らせ</button>
     <button class="tab-btn" data-tab="info">🏛️ 開館情報</button>
+    <button class="tab-btn" data-tab="request">📬 リクエスト</button>
   </nav>
 
   <main class="main-content">
@@ -135,6 +136,68 @@
     <!-- Library info tab -->
     <div id="tab-info" class="tab-panel">
       <div class="info-card" id="infoCard"><div class="loading">読み込み中…</div></div>
+    </div>
+
+    <!-- Request tab -->
+    <div id="tab-request" class="tab-panel">
+      <div class="req-page">
+
+        <!-- Sub tabs -->
+        <div class="req-subtabs">
+          <button class="req-stab active" data-stab="form">📨 リクエスト</button>
+          <button class="req-stab" data-stab="list">📋 一覧</button>
+          <button class="req-stab req-stab-admin" id="reqAdminStab" data-stab="manage" style="display:none">🏛️ 管理</button>
+        </div>
+
+        <!-- Form sub-tab -->
+        <div class="req-spane active" id="rstab-form">
+          <div class="req-form-card">
+            <h3>📬 入荷リクエストを送る</h3>
+            <p class="req-form-desc">読みたい本・入荷してほしい本をリクエストできます。<br>ご要望は図書館委員会で検討し、できる限り対応します。</p>
+            <div class="req-field">
+              <label>書名 <span class="req-required">*</span></label>
+              <input type="text" id="reqTitle" placeholder="例：ハリー・ポッターと秘密の部屋" maxlength="100" />
+            </div>
+            <div class="req-field">
+              <label>著者名（任意）</label>
+              <input type="text" id="reqAuthor" placeholder="例：J.K.ローリング" maxlength="60" />
+            </div>
+            <div class="req-field">
+              <label>リクエスト理由・一言（任意）</label>
+              <textarea id="reqReason" placeholder="例：子どもと一緒に読みたいです。シリーズ全巻揃えてほしいです。" rows="3" maxlength="200"></textarea>
+            </div>
+            <div class="req-field">
+              <label>部屋番号（任意）</label>
+              <input type="text" id="reqRoom" placeholder="例：503" maxlength="10" />
+            </div>
+            <button class="btn-primary req-submit-btn" id="reqSubmitBtn">📨 リクエストを送る</button>
+            <p id="reqMsg" class="rate-msg" style="margin-top:10px"></p>
+          </div>
+          <p class="req-footer-note">※ リクエストは入荷を保証するものではありません。ご了承のうえご利用ください。</p>
+
+          <!-- Admin unlock (small link at bottom) -->
+          <div style="text-align:center;margin-top:20px">
+            <button class="req-admin-toggle-btn" id="reqAdminToggle">🏛️ 管理者の方はこちら</button>
+          </div>
+          <div id="reqAdminLoginArea" style="display:none;max-width:360px;margin:12px auto 0">
+            <input type="password" id="reqAdminPass" class="login-input" placeholder="管理者パスワード" style="margin-bottom:8px" />
+            <button class="btn-primary" id="reqAdminLoginBtn" style="width:100%">管理者ログイン</button>
+            <p id="reqAdminErr" class="login-error"></p>
+          </div>
+        </div>
+
+        <!-- List sub-tab -->
+        <div class="req-spane" id="rstab-list" style="display:none">
+          <div id="reqList"><div class="loading">読み込み中…</div></div>
+        </div>
+
+        <!-- Manage sub-tab (admin only) -->
+        <div class="req-spane" id="rstab-manage" style="display:none">
+          <div class="req-admin-summary" id="reqSummary"></div>
+          <div id="reqAdminList"><div class="loading">読み込み中…</div></div>
+        </div>
+
+      </div>
     </div>
   </main>
 
