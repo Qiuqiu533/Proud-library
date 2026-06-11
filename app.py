@@ -7,6 +7,13 @@ import os
 
 app = Flask(__name__)
 DB_PATH = os.path.join(os.path.dirname(__file__), "data.db")
+
+# Initialize DB on import (works with gunicorn)
+def _ensure_db():
+    try:
+        init_db()
+    except Exception as e:
+        print(f"DB init error: {e}")
 LIBRARY_CODE = "0011"
 LIBRARYLIFE_BASE = "https://www2.librarylife.net"
 OPENBD_API = "https://api.openbd.jp/v1/get"
@@ -325,8 +332,8 @@ def api_delete_announcement(ann_id):
     return jsonify({"ok": True})
 
 
+_ensure_db()
+
 if __name__ == "__main__":
-    init_db()
-    import os
     port = int(os.environ.get("PORT", 5050))
     app.run(debug=(port == 5050), host="0.0.0.0", port=port)
