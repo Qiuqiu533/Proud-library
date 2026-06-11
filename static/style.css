@@ -386,3 +386,22 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
 .genre-btn { padding: 5px 12px; border: 1.5px solid #ccd9d2; border-radius: 20px; background: white; color: #556b5a; font-size: 0.8rem; font-weight: 500; cursor: pointer; transition: all .18s; font-family: inherit; white-space: nowrap; }
 .genre-btn:hover { background: #e8f3ec; border-color: #3d6b4f; color: #3d6b4f; }
 .genre-btn.active { background: #3d6b4f; border-color: #3d6b4f; color: white; font-weight: 700; }
+
+/* ===== 在架確認 ===== */
+.avail-check-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.avail-check-btn { padding: 3px 9px; font-size: 0.73rem; border: 1.5px solid #c8ddd0; border-radius: 10px; background: white; color: #3d6b4f; cursor: pointer; font-family: inherit; transition: all .15s; white-space: nowrap; }
+.avail-check-btn:hover { background: #e8f3ec; }
+.avail-check-btn:disabled { opacity: 0.6; cursor: default; }
+.avail-badge { font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+.avail-ok { background: #d4f0dd; color: #1a7a3a; }
+.avail-ng { background: #fde8e8; color: #c02020; }
+.avail-unknown { background: #f0f0f0; color: #888; }
+
+/* ===== パスワード変更 ===== */
+.pw-change-form { max-width: 460px; }
+.pw-change-note { font-size: 0.82rem; color: #888; margin-bottom: 18px; line-height: 1.6; }
+.pw-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+.pw-group label { font-size: 0.82rem; font-weight: 600; color: #444; }
+.pw-group input, .pw-group select { padding: 9px 12px; border: 1.5px solid #ddd; border-radius: 8px; font-family: inherit; font-size: 0.9rem; outline: none; }
+.pw-group input:focus { border-color: #3d6b4f; }
+.pw-divider { border: none; border-top: 1px solid #eee; margin: 6px 0 18px; }

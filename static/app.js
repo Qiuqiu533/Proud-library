@@ -115,12 +115,38 @@ function renderCard(book, opts = {}) {
       <div class="book-author">${book.author || "著者不明"}</div>
       <div class="book-meta">${book.publisher || ""}</div>
       <div class="card-stars">${starsHtml(rating.score)}</div>
+      <div class="avail-check-row">
+        <button class="avail-check-btn" data-isbn="${book.isbn}" title="在架状況を確認">📚 在架確認</button>
+        <span class="avail-check-result" id="avail-${book.isbn}"></span>
+      </div>
     </div>`;
 
   div.querySelector(".fav-btn").addEventListener("click", e => {
     e.stopPropagation();
     toggleFav(book.isbn);
     e.currentTarget.classList.toggle("active");
+  });
+  div.querySelector(".avail-check-btn").addEventListener("click", async e => {
+    e.stopPropagation();
+    const isbn = e.currentTarget.dataset.isbn;
+    const result = document.getElementById("avail-" + isbn);
+    e.currentTarget.textContent = "確認中…";
+    e.currentTarget.disabled = true;
+    try {
+      const res = await fetch(`/api/availability/${isbn}`);
+      const data = await res.json();
+      e.currentTarget.style.display = "none";
+      if (data.status === "available") {
+        result.innerHTML = '<span class="avail-badge avail-ok">✅ 在架</span>';
+      } else if (data.status === "loaned") {
+        result.innerHTML = '<span class="avail-badge avail-ng">📤 貸出中</span>';
+      } else {
+        result.innerHTML = '<span class="avail-badge avail-unknown">❓ 不明</span>';
+      }
+    } catch {
+      e.currentTarget.textContent = "📚 在架確認";
+      e.currentTarget.disabled = false;
+    }
   });
   div.addEventListener("click", () => openModal(book.isbn));
   return div;
@@ -1129,6 +1155,38 @@ async function loadReqManage() {
     });
   });
 }
+
+// ===== パスワード変更 =====
+document.getElementById("pwChangeBtn").addEventListener("click", async () => {
+  const current = document.getElementById("pwCurrent").value;
+  const target = document.getElementById("pwTarget").value;
+  const newPw = document.getElementById("pwNew").value;
+  const confirm = document.getElementById("pwConfirm").value;
+  const msg = document.getElementById("pwMsg");
+  if (!current) { msg.textContent = "⚠️ 現在のパスワードを入力してください"; msg.style.color = "#e05"; return; }
+  if (!newPw || newPw.length < 4) { msg.textContent = "⚠️ 新しいパスワードは4文字以上で入力してください"; msg.style.color = "#e05"; return; }
+  if (newPw !== confirm) { msg.textContent = "⚠️ 確認パスワードが一致しません"; msg.style.color = "#e05"; return; }
+  const res = await fetch("/api/admin/change-password", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({current_password: current, target, new_password: newPw})
+  });
+  const data = await res.json();
+  if (res.ok) {
+    msg.textContent = "✅ パスワードを変更しました";
+    msg.style.color = "#3d6b4f";
+    document.getElementById("pwCurrent").value = "";
+    document.getElementById("pwNew").value = "";
+    document.getElementById("pwConfirm").value = "";
+    // If board password was changed, update session
+    if (target === "board") {
+      boardPassword = newPw;
+      sessionStorage.setItem("board_pass", newPw);
+    }
+  } else {
+    msg.textContent = "❌ " + (data.error || "変更できませんでした");
+    msg.style.color = "#e05";
+  }
+});
 
 function esc(s) {
   return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
