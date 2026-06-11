@@ -25,6 +25,8 @@ LIBRARY_INFO = {
 }
 
 
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "proud2024")
+
 def init_db():
     con = sqlite3.connect(DB_PATH)
     con.execute("""
@@ -35,6 +37,22 @@ def init_db():
             reviews TEXT DEFAULT '[]'
         )
     """)
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS announcements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            body TEXT NOT NULL,
+            category TEXT DEFAULT 'お知らせ',
+            image_url TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now', 'localtime'))
+        )
+    """)
+    # Add image_url column if upgrading from old schema
+    try:
+        con.execute("ALTER TABLE announcements ADD COLUMN image_url TEXT DEFAULT ''")
+        con.commit()
+    except Exception:
+        pass
     con.commit()
     con.close()
 
@@ -250,6 +268,52 @@ def api_rate():
 @app.route("/api/library-info")
 def api_library_info():
     return jsonify(LIBRARY_INFO)
+
+
+@app.route("/api/announcements")
+def api_announcements():
+    con = sqlite3.connect(DB_PATH)
+    rows = con.execute(
+        "SELECT id, title, body, category, image_url, created_at FROM announcements ORDER BY id DESC"
+    ).fetchall()
+    con.close()
+    return jsonify([
+        {"id": r[0], "title": r[1], "body": r[2], "category": r[3], "image_url": r[4] or "", "created_at": r[5]}
+        for r in rows
+    ])
+
+
+@app.route("/api/announcements", methods=["POST"])
+def api_post_announcement():
+    body = request.get_json()
+    if body.get("password") != ADMIN_PASSWORD:
+        return jsonify({"error": "unauthorized"}), 401
+    title = body.get("title", "").strip()
+    text = body.get("body", "").strip()
+    category = body.get("category", "お知らせ")
+    image_url = body.get("image_url", "").strip()
+    if not title or not text:
+        return jsonify({"error": "invalid"}), 400
+    con = sqlite3.connect(DB_PATH)
+    con.execute(
+        "INSERT INTO announcements (title, body, category, image_url) VALUES (?,?,?,?)",
+        (title, text, category, image_url)
+    )
+    con.commit()
+    con.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/announcements/<int:ann_id>", methods=["DELETE"])
+def api_delete_announcement(ann_id):
+    body = request.get_json()
+    if body.get("password") != ADMIN_PASSWORD:
+        return jsonify({"error": "unauthorized"}), 401
+    con = sqlite3.connect(DB_PATH)
+    con.execute("DELETE FROM announcements WHERE id=?", (ann_id,))
+    con.commit()
+    con.close()
+    return jsonify({"ok": True})
 
 
 if __name__ == "__main__":

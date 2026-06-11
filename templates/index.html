@@ -34,9 +34,12 @@
 
   <!-- Navigation tabs -->
   <nav class="tab-nav">
-    <button class="tab-btn active" data-tab="books">蔵書一覧</button>
-    <button class="tab-btn" data-tab="new">新着図書</button>
-    <button class="tab-btn" data-tab="info">開館情報</button>
+    <button class="tab-btn active" data-tab="books">📖 蔵書</button>
+    <button class="tab-btn" data-tab="new">🆕 新着</button>
+    <button class="tab-btn" data-tab="fav">❤️ お気に入り</button>
+    <button class="tab-btn" data-tab="log">📝 読書記録</button>
+    <button class="tab-btn" data-tab="news">📢 お知らせ</button>
+    <button class="tab-btn" data-tab="info">🏛️ 開館情報</button>
   </nav>
 
   <main class="main-content">
@@ -44,27 +47,77 @@
     <div id="tab-books" class="tab-panel active">
       <div class="controls-row">
         <span id="totalCount" class="total-count"></span>
-        <div class="pagination" id="paginationTop"></div>
+        <div class="filter-bar">
+          <select id="sortSelect">
+            <option value="">並び順（デフォルト）</option>
+            <option value="title">タイトル順</option>
+            <option value="author">著者順</option>
+            <option value="fav">お気に入り順</option>
+          </select>
+        </div>
       </div>
-      <div class="book-grid" id="bookGrid">
-        <div class="loading">読み込み中…</div>
-      </div>
+      <div class="pagination" id="paginationTop"></div>
+      <div class="book-grid" id="bookGrid"><div class="loading">読み込み中…</div></div>
       <div class="pagination" id="paginationBottom"></div>
     </div>
 
     <!-- New arrivals tab -->
     <div id="tab-new" class="tab-panel">
-      <h2 class="section-title">新着図書</h2>
-      <div class="book-grid" id="newGrid">
-        <div class="loading">読み込み中…</div>
+      <h2 class="section-title">🆕 新着図書</h2>
+      <p class="section-desc">最新の入荷本をご紹介します</p>
+      <div class="book-grid" id="newGrid"><div class="loading">読み込み中…</div></div>
+    </div>
+
+    <!-- Favorites tab -->
+    <div id="tab-fav" class="tab-panel">
+      <h2 class="section-title">❤️ お気に入り</h2>
+      <p class="section-desc">ハートを押した本の一覧です（このデバイスに保存）</p>
+      <div class="book-grid" id="favGrid"><div class="loading">読み込み中…</div></div>
+    </div>
+
+    <!-- Reading log tab -->
+    <div id="tab-log" class="tab-panel">
+      <h2 class="section-title">📝 読書記録</h2>
+      <p class="section-desc">本のステータスを記録できます（このデバイスに保存）</p>
+      <div class="log-filters">
+        <button class="log-filter-btn active" data-status="all">すべて</button>
+        <button class="log-filter-btn" data-status="読んだ">✅ 読んだ</button>
+        <button class="log-filter-btn" data-status="読書中">📖 読書中</button>
+        <button class="log-filter-btn" data-status="読みたい">🔖 読みたい</button>
       </div>
+      <div class="book-grid" id="logGrid"><div class="loading">読み込み中…</div></div>
+    </div>
+
+    <!-- News tab -->
+    <div id="tab-news" class="tab-panel">
+      <div class="news-header">
+        <h2 class="section-title">📢 お知らせ・イベント</h2>
+        <button class="btn-admin-toggle" id="adminToggle">管理者</button>
+      </div>
+      <div id="adminPanel" class="admin-panel" style="display:none">
+        <h3>お知らせを投稿</h3>
+        <select id="newsCat">
+          <option value="お知らせ">📌 お知らせ</option>
+          <option value="イベント">🎉 イベント</option>
+          <option value="休館">🚫 休館</option>
+          <option value="新着">📚 新着</option>
+        </select>
+        <input type="text" id="newsTitle" placeholder="タイトル" />
+        <textarea id="newsBody" placeholder="内容" rows="3"></textarea>
+        <input type="url" id="newsImage" placeholder="画像URL（任意）例: https://i.imgur.com/xxxxx.jpg" />
+        <div id="newsImagePreview" style="display:none;margin-top:6px;">
+          <img id="newsPreviewImg" style="max-width:100%;max-height:200px;border-radius:8px;object-fit:contain;" alt="プレビュー">
+        </div>
+        <input type="password" id="adminPass" placeholder="管理者パスワード" />
+        <button class="btn-primary" id="postNews">投稿する</button>
+        <p id="newsMsg" class="rate-msg"></p>
+      </div>
+      <div id="newsList" class="news-list"><div class="loading">読み込み中…</div></div>
     </div>
 
     <!-- Library info tab -->
     <div id="tab-info" class="tab-panel">
-      <div class="info-card" id="infoCard">
-        <div class="loading">読み込み中…</div>
-      </div>
+      <div class="info-card" id="infoCard"><div class="loading">読み込み中…</div></div>
     </div>
   </main>
 
@@ -72,9 +125,7 @@
   <div id="modal" class="modal-overlay" style="display:none">
     <div class="modal-box">
       <button class="modal-close" id="modalClose">✕</button>
-      <div id="modalContent" class="modal-content">
-        <div class="loading">読み込み中…</div>
-      </div>
+      <div id="modalContent" class="modal-content"><div class="loading">読み込み中…</div></div>
     </div>
   </div>
 
