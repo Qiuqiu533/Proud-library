@@ -19,6 +19,7 @@ document.getElementById("loginBtn").addEventListener("click", async () => {
   if (res.ok) {
     localStorage.setItem("resident_auth", "1");
     document.getElementById("loginScreen").style.display = "none";
+    loadBooks();
   } else {
     err.textContent = "❌ パスワードが違います";
     document.getElementById("residentPass").value = "";
