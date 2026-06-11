@@ -367,3 +367,22 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
 /* Toast */
 .req-toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(80px); background: #1a1a1a; color: white; padding: 12px 22px; border-radius: 24px; font-size: 0.88rem; font-weight: 600; z-index: 9999; opacity: 0; transition: all .3s; pointer-events: none; white-space: nowrap; max-width: 90vw; }
 .req-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ===== 今日の1冊 ===== */
+.today-book-section { background: linear-gradient(135deg, #f0faf4 0%, #e8f5ec 100%); border: 2px solid #b8ddc4; border-radius: 14px; padding: 14px 16px; margin-bottom: 18px; }
+.today-book-label { font-size: 0.78rem; font-weight: 700; color: #3d6b4f; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 10px; }
+.today-book-inner { display: flex; gap: 14px; cursor: pointer; }
+.today-book-inner:hover { opacity: 0.88; }
+.today-book-cover { width: 64px; height: 88px; object-fit: cover; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); flex-shrink: 0; }
+.today-book-cover-placeholder { width: 64px; height: 88px; background: #d0e8d8; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; flex-shrink: 0; }
+.today-book-info { display: flex; flex-direction: column; justify-content: center; gap: 4px; }
+.today-book-title { font-size: 0.95rem; font-weight: 700; color: #1a3a28; line-height: 1.4; }
+.today-book-author { font-size: 0.82rem; color: #556b5a; }
+.today-book-meta { font-size: 0.75rem; color: #889e90; }
+
+/* ===== ジャンルフィルター ===== */
+.genre-filter-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 14px; padding: 0 2px; }
+.genre-filter-label { font-size: 0.78rem; color: #888; font-weight: 600; flex-shrink: 0; }
+.genre-btn { padding: 5px 12px; border: 1.5px solid #ccd9d2; border-radius: 20px; background: white; color: #556b5a; font-size: 0.8rem; font-weight: 500; cursor: pointer; transition: all .18s; font-family: inherit; white-space: nowrap; }
+.genre-btn:hover { background: #e8f3ec; border-color: #3d6b4f; color: #3d6b4f; }
+.genre-btn.active { background: #3d6b4f; border-color: #3d6b4f; color: white; font-weight: 700; }

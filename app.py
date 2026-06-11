@@ -518,9 +518,33 @@ FULL_STATS = {
     ],
 }
 
+@app.route("/ping")
+def ping():
+    return "ok", 200
+
+
 @app.route("/api/stats")
 def api_stats():
     return jsonify(FULL_STATS)
+
+
+@app.route("/api/today-book")
+def api_today_book():
+    import random, datetime
+    today = datetime.date.today()
+    seed = int(today.strftime("%Y%m%d"))
+    rng = random.Random(seed)
+    total_pages = 109
+    page = rng.randint(1, total_pages)
+    try:
+        data = fetch_books("", page)
+        if data["books"]:
+            book = data["books"][rng.randint(0, len(data["books"]) - 1)]
+            book["rating"] = get_rating(book["isbn"])
+            return jsonify(book)
+    except Exception:
+        pass
+    return jsonify(None)
 
 
 @app.route("/api/books")
