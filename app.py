@@ -1,25 +1,76 @@
 from flask import Flask, render_template, jsonify, request
 import requests
 from bs4 import BeautifulSoup
-import sqlite3
 import json
 import os
 
 app = Flask(__name__)
-DB_PATH = os.path.join(os.path.dirname(__file__), "data.db")
 
-# Initialize DB on import (works with gunicorn)
-def _ensure_db():
-    try:
-        init_db()
-    except Exception as e:
-        print(f"DB init error: {e}")
+# ── DB設定 ──────────────────────────────────────────────────────────────
+# DATABASE_URL が設定されていればPostgreSQL、なければSQLite（ローカル開発用）
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+USE_PG = bool(DATABASE_URL)
+
+if USE_PG:
+    import psycopg2
+    import psycopg2.extras
+    # Render の postgres:// を postgresql:// に正規化
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+else:
+    import sqlite3
+    DB_PATH = os.path.join(os.path.dirname(__file__), "data.db")
+
+
+def get_con():
+    """DB接続を返す。PostgreSQL or SQLite を自動切り替え。"""
+    if USE_PG:
+        con = psycopg2.connect(DATABASE_URL)
+        return con
+    else:
+        con = sqlite3.connect(DB_PATH)
+        con.row_factory = sqlite3.Row
+        return con
+
+
+def execute(con, sql, params=()):
+    """SQLiteの ? をPostgreSQLの %s に変換して実行する。"""
+    if USE_PG:
+        sql = sql.replace("?", "%s")
+        # AUTOINCREMENT / INTEGER PRIMARY KEY → SERIAL PRIMARY KEY
+    cur = con.cursor()
+    cur.execute(sql, params)
+    return cur
+
+
+def fetchall(con, sql, params=()):
+    cur = execute(con, sql, params)
+    rows = cur.fetchall()
+    if USE_PG:
+        cols = [d[0] for d in cur.description]
+        return [dict(zip(cols, r)) for r in rows]
+    else:
+        return [dict(r) for r in rows]
+
+
+def fetchone(con, sql, params=()):
+    cur = execute(con, sql, params)
+    row = cur.fetchone()
+    if row is None:
+        return None
+    if USE_PG:
+        cols = [d[0] for d in cur.description]
+        return dict(zip(cols, row))
+    else:
+        return dict(row)
+
+
+# ── 定数 ────────────────────────────────────────────────────────────────
 LIBRARY_CODE = "0011"
 LIBRARYLIFE_BASE = "https://www2.librarylife.net"
 OPENBD_API = "https://api.openbd.jp/v1/get"
 NDL_THUMB = "https://ndlsearch.ndl.go.jp/thumbnail/{isbn}.jpg"
 
-# Opening hours (edit as needed)
 LIBRARY_INFO = {
     "name": "プラウド船橋コミュニティ図書館",
     "hours": [
@@ -31,100 +82,156 @@ LIBRARY_INFO = {
     "note": "最新情報はlibrarlife.netをご確認ください。",
 }
 
-
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "proud2024")
+ADMIN_PASSWORD   = os.environ.get("ADMIN_PASSWORD",   "proud2024")
 RESIDENT_PASSWORD = os.environ.get("RESIDENT_PASSWORD", "proudfunabashi")
-BOARD_PASSWORD = os.environ.get("BOARD_PASSWORD", "board2025")
+BOARD_PASSWORD   = os.environ.get("BOARD_PASSWORD",   "board2025")
 
+
+# ── DB初期化 ─────────────────────────────────────────────────────────────
 def init_db():
-    con = sqlite3.connect(DB_PATH)
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS ratings (
-            isbn TEXT PRIMARY KEY,
-            score REAL,
-            votes INTEGER,
-            reviews TEXT DEFAULT '[]'
-        )
-    """)
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS announcements (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            body TEXT NOT NULL,
-            category TEXT DEFAULT 'お知らせ',
-            image_url TEXT DEFAULT '',
-            created_at TEXT DEFAULT (datetime('now', 'localtime'))
-        )
-    """)
-    # Add image_url column if upgrading from old schema
-    try:
-        con.execute("ALTER TABLE announcements ADD COLUMN image_url TEXT DEFAULT ''")
+    con = get_con()
+    if USE_PG:
+        cur = con.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS ratings (
+                isbn TEXT PRIMARY KEY,
+                score REAL,
+                votes INTEGER,
+                reviews TEXT DEFAULT '[]'
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS announcements (
+                id SERIAL PRIMARY KEY,
+                title TEXT NOT NULL,
+                body TEXT NOT NULL,
+                category TEXT DEFAULT 'お知らせ',
+                image_url TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS issues (
+                id SERIAL PRIMARY KEY,
+                title TEXT NOT NULL,
+                body TEXT NOT NULL,
+                priority TEXT DEFAULT '中',
+                status TEXT DEFAULT '未対応',
+                sort_order INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS book_requests (
+                id SERIAL PRIMARY KEY,
+                title TEXT NOT NULL,
+                author TEXT DEFAULT '',
+                reason TEXT DEFAULT '',
+                room TEXT DEFAULT '',
+                status TEXT DEFAULT 'pending',
+                note TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS calendar_events (
+                id SERIAL PRIMARY KEY,
+                title TEXT NOT NULL,
+                event_date TEXT NOT NULL,
+                body TEXT DEFAULT '',
+                minutes TEXT DEFAULT '',
+                sort_order INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
         con.commit()
-    except Exception:
-        pass
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS issues (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            body TEXT NOT NULL,
-            priority TEXT DEFAULT '中',
-            status TEXT DEFAULT '未対応',
-            sort_order INTEGER DEFAULT 0,
-            created_at TEXT DEFAULT (datetime('now', 'localtime'))
-        )
-    """)
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS book_requests (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            author TEXT DEFAULT '',
-            reason TEXT DEFAULT '',
-            room TEXT DEFAULT '',
-            status TEXT DEFAULT 'pending',
-            note TEXT DEFAULT '',
-            created_at TEXT DEFAULT (datetime('now', 'localtime'))
-        )
-    """)
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS calendar_events (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            event_date TEXT NOT NULL,
-            body TEXT DEFAULT '',
-            minutes TEXT DEFAULT '',
-            sort_order INTEGER DEFAULT 0,
-            created_at TEXT DEFAULT (datetime('now', 'localtime'))
-        )
-    """)
-    # Add sort_order column if upgrading from old schema
-    for tbl in ("issues", "calendar_events"):
+    else:
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS ratings (
+                isbn TEXT PRIMARY KEY,
+                score REAL,
+                votes INTEGER,
+                reviews TEXT DEFAULT '[]'
+            )
+        """)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS announcements (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                body TEXT NOT NULL,
+                category TEXT DEFAULT 'お知らせ',
+                image_url TEXT DEFAULT '',
+                created_at TEXT DEFAULT (datetime('now', 'localtime'))
+            )
+        """)
         try:
-            con.execute(f"ALTER TABLE {tbl} ADD COLUMN sort_order INTEGER DEFAULT 0")
-            con.commit()
+            con.execute("ALTER TABLE announcements ADD COLUMN image_url TEXT DEFAULT ''")
         except Exception:
             pass
-    con.commit()
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS issues (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                body TEXT NOT NULL,
+                priority TEXT DEFAULT '中',
+                status TEXT DEFAULT '未対応',
+                sort_order INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT (datetime('now', 'localtime'))
+            )
+        """)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS book_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                author TEXT DEFAULT '',
+                reason TEXT DEFAULT '',
+                room TEXT DEFAULT '',
+                status TEXT DEFAULT 'pending',
+                note TEXT DEFAULT '',
+                created_at TEXT DEFAULT (datetime('now', 'localtime'))
+            )
+        """)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS calendar_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                event_date TEXT NOT NULL,
+                body TEXT DEFAULT '',
+                minutes TEXT DEFAULT '',
+                sort_order INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT (datetime('now', 'localtime'))
+            )
+        """)
+        for tbl in ("issues", "calendar_events"):
+            try:
+                con.execute(f"ALTER TABLE {tbl} ADD COLUMN sort_order INTEGER DEFAULT 0")
+            except Exception:
+                pass
+        con.commit()
     con.close()
 
 
-def get_cover_url(isbn13: str, isbn10: str = "") -> str:
-    # Try NDL thumbnail first, fall back to Amazon
-    ndl = NDL_THUMB.format(isbn=isbn13)
+def _ensure_db():
+    try:
+        init_db()
+    except Exception as e:
+        print(f"DB init error: {e}")
+
+
+# ── 蔵書スクレイピング ────────────────────────────────────────────────────
+def get_cover_url(isbn13, isbn10=""):
     if isbn10:
-        amazon = f"https://images-na.ssl-images-amazon.com/images/P/{isbn10}.09.LZZZZZZZ.jpg"
-        return amazon
-    return ndl
+        return f"https://images-na.ssl-images-amazon.com/images/P/{isbn10}.09.LZZZZZZZ.jpg"
+    return NDL_THUMB.format(isbn=isbn13)
 
 
-def isbn13_to_isbn10(isbn13: str) -> str:
-    """Convert ISBN-13 (978...) to ISBN-10."""
+def isbn13_to_isbn10(isbn13):
     if not isbn13 or not isbn13.startswith("978") or len(isbn13) < 13:
         return ""
     digits = isbn13[3:12]
     total = sum((10 - i) * int(d) for i, d in enumerate(digits))
     check = (11 - (total % 11)) % 11
-    check_char = "X" if check == 10 else str(check)
-    return digits + check_char
+    return digits + ("X" if check == 10 else str(check))
 
 
 def fetch_books(keyword="", page=1):
@@ -132,18 +239,14 @@ def fetch_books(keyword="", page=1):
     params = {"location": LIBRARY_CODE, "keyword": keyword, "page": page}
     resp = requests.get(url, params=params, timeout=10)
     soup = BeautifulSoup(resp.text, "html.parser")
-
-    # Total count
-    page_data = soup.select_one(".page-data")
     total = 0
+    page_data = soup.select_one(".page-data")
     if page_data:
         strong = page_data.find("strong")
         if strong:
             total = int(strong.text.replace(",", ""))
-
     books = []
-    rows = soup.select("table.table tr")[1:]  # skip header
-    for row in rows:
+    for row in soup.select("table.table tr")[1:]:
         cols = row.find_all("td")
         if len(cols) < 4:
             continue
@@ -153,74 +256,40 @@ def fetch_books(keyword="", page=1):
         href = title_a["href"] if title_a else ""
         isbn = href.split("/")[-1] if href else ""
         author = author_a.text.strip() if author_a else ""
-        publisher = cols[2].text.strip()
-        fmt = cols[3].text.strip()
-
         isbn10 = isbn13_to_isbn10(isbn) if isbn.startswith("978") else ""
-        cover = get_cover_url(isbn, isbn10)
-
         books.append({
-            "isbn": isbn,
-            "isbn10": isbn10,
-            "title": title,
-            "author": author,
-            "publisher": publisher,
-            "format": fmt,
-            "cover": cover,
+            "isbn": isbn, "isbn10": isbn10, "title": title, "author": author,
+            "publisher": cols[2].text.strip(), "format": cols[3].text.strip(),
+            "cover": get_cover_url(isbn, isbn10),
         })
-
     return {"books": books, "total": total, "page": page}
 
 
-def fetch_book_detail(isbn: str):
+def fetch_book_detail(isbn):
     url = f"{LIBRARYLIFE_BASE}/booksearch/detail/{isbn}"
     resp = requests.get(url, timeout=10)
     soup = BeautifulSoup(resp.text, "html.parser")
-
     result = {"isbn": isbn}
     result["title"] = soup.find("h1").text.strip() if soup.find("h1") else ""
-
-    # Parse detail table
-    rows = soup.select("#detail-area table.table tbody tr")
-    for row in rows:
-        ths = row.find_all("th")
-        tds = row.find_all("td")
-        for th, td in zip(ths, tds):
-            key = th.text.strip()
-            val = td.text.strip()
-            if key == "著者":
-                result["author"] = val
-            elif key == "出版社":
-                result["publisher"] = val
-            elif key == "形式":
-                result["format"] = val
-            elif key == "出版年月日":
-                result["pubdate"] = val
-            elif key == "ISBN13":
-                result["isbn13"] = val
-            elif key == "ISBN10":
-                result["isbn10"] = val
-            elif key == "ページ数":
-                result["pages"] = val
-
-    # Availability
-    status_rows = soup.select("table.table tbody tr")
+    for row in soup.select("#detail-area table.table tbody tr"):
+        for th, td in zip(row.find_all("th"), row.find_all("td")):
+            key, val = th.text.strip(), td.text.strip()
+            if key == "著者":      result["author"] = val
+            elif key == "出版社":  result["publisher"] = val
+            elif key == "形式":    result["format"] = val
+            elif key == "出版年月日": result["pubdate"] = val
+            elif key == "ISBN13":  result["isbn13"] = val
+            elif key == "ISBN10":  result["isbn10"] = val
+            elif key == "ページ数": result["pages"] = val
     availability = []
-    for row in status_rows:
+    for row in soup.select("table.table tbody tr"):
         tds = row.find_all("td")
-        if len(tds) >= 3:
-            lib = tds[1].text.strip()
-            status = tds[2].text.strip()
-            if lib and status:
-                availability.append({"library": lib, "status": status})
+        if len(tds) >= 3 and tds[1].text.strip() and tds[2].text.strip():
+            availability.append({"library": tds[1].text.strip(), "status": tds[2].text.strip()})
     result["availability"] = availability
-
-    # Cover
     isbn10 = result.get("isbn10", "")
     isbn13 = result.get("isbn13", isbn)
     result["cover"] = get_cover_url(isbn13, isbn10)
-
-    # Enrich with OpenBD
     if isbn13 and isbn13.startswith("978"):
         try:
             ob = requests.get(OPENBD_API, params={"isbn": isbn13}, timeout=5).json()
@@ -232,54 +301,44 @@ def fetch_book_detail(isbn: str):
                     result["publisher"] = summary["publisher"]
                 if summary.get("cover"):
                     result["cover"] = summary["cover"]
-                # Description from onix
-                onix = ob[0].get("onix", {})
-                collateral = onix.get("CollateralDetail", {})
-                texts = collateral.get("TextContent", [])
-                for t in texts:
+                for t in ob[0].get("onix", {}).get("CollateralDetail", {}).get("TextContent", []):
                     if t.get("TextType") in ("02", "03", "04"):
                         result["description"] = t.get("Text", "")
                         break
         except Exception:
             pass
-
     return result
 
 
-def get_rating(isbn: str):
-    con = sqlite3.connect(DB_PATH)
-    row = con.execute("SELECT score, votes, reviews FROM ratings WHERE isbn=?", (isbn,)).fetchone()
+def get_rating(isbn):
+    con = get_con()
+    row = fetchone(con, "SELECT score, votes, reviews FROM ratings WHERE isbn=?", (isbn,))
     con.close()
     if row:
-        return {"score": row[0], "votes": row[1], "reviews": json.loads(row[2])}
+        return {"score": row["score"], "votes": row["votes"], "reviews": json.loads(row["reviews"])}
     return {"score": 0, "votes": 0, "reviews": []}
 
 
-def save_rating(isbn: str, score: int, review: str = ""):
-    con = sqlite3.connect(DB_PATH)
-    existing = con.execute("SELECT score, votes, reviews FROM ratings WHERE isbn=?", (isbn,)).fetchone()
+def save_rating(isbn, score, review=""):
+    con = get_con()
+    existing = fetchone(con, "SELECT score, votes, reviews FROM ratings WHERE isbn=?", (isbn,))
     if existing:
-        new_votes = existing[1] + 1
-        new_score = round((existing[0] * existing[1] + score) / new_votes, 1)
-        reviews = json.loads(existing[2])
+        new_votes = existing["votes"] + 1
+        new_score = round((existing["score"] * existing["votes"] + score) / new_votes, 1)
+        reviews = json.loads(existing["reviews"])
         if review:
             reviews.append(review)
-        con.execute(
-            "UPDATE ratings SET score=?, votes=?, reviews=? WHERE isbn=?",
-            (new_score, new_votes, json.dumps(reviews, ensure_ascii=False), isbn),
-        )
+        execute(con, "UPDATE ratings SET score=?, votes=?, reviews=? WHERE isbn=?",
+                (new_score, new_votes, json.dumps(reviews, ensure_ascii=False), isbn))
     else:
         reviews = [review] if review else []
-        con.execute(
-            "INSERT INTO ratings (isbn, score, votes, reviews) VALUES (?,?,?,?)",
-            (isbn, float(score), 1, json.dumps(reviews, ensure_ascii=False)),
-        )
+        execute(con, "INSERT INTO ratings (isbn, score, votes, reviews) VALUES (?,?,?,?)",
+                (isbn, float(score), 1, json.dumps(reviews, ensure_ascii=False)))
     con.commit()
     con.close()
 
 
-# --- Routes ---
-
+# ── ルート ───────────────────────────────────────────────────────────────
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -304,59 +363,61 @@ def api_board_auth():
 # --- Issues ---
 @app.route("/api/issues")
 def api_issues():
-    con = sqlite3.connect(DB_PATH)
-    rows = con.execute("SELECT id,title,body,priority,status,sort_order,created_at FROM issues ORDER BY sort_order ASC, id DESC").fetchall()
+    con = get_con()
+    rows = fetchall(con, "SELECT id,title,body,priority,status,sort_order,created_at FROM issues ORDER BY sort_order ASC, id DESC")
     con.close()
-    return jsonify([{"id":r[0],"title":r[1],"body":r[2],"priority":r[3],"status":r[4],"sort_order":r[5],"created_at":r[6]} for r in rows])
+    return jsonify([{**r, "created_at": str(r["created_at"])[:10]} for r in rows])
+
 
 @app.route("/api/issues", methods=["POST"])
 def api_post_issue():
     body = request.get_json()
     if body.get("password") != BOARD_PASSWORD:
         return jsonify({"error": "unauthorized"}), 401
-    con = sqlite3.connect(DB_PATH)
-    # New items go to top (sort_order = min - 1)
-    row = con.execute("SELECT MIN(sort_order) FROM issues").fetchone()
-    new_order = (row[0] or 0) - 1
-    con.execute("INSERT INTO issues (title,body,priority,status,sort_order) VALUES (?,?,?,?,?)",
+    con = get_con()
+    row = fetchone(con, "SELECT MIN(sort_order) as m FROM issues")
+    new_order = ((row["m"] or 0) - 1) if row else -1
+    execute(con, "INSERT INTO issues (title,body,priority,status,sort_order) VALUES (?,?,?,?,?)",
         (body.get("title","").strip(), body.get("body","").strip(),
          body.get("priority","中"), body.get("status","未対応"), new_order))
     con.commit(); con.close()
     return jsonify({"ok": True})
+
 
 @app.route("/api/issues/reorder", methods=["POST"])
 def api_reorder_issues():
     body = request.get_json()
     if body.get("password") != BOARD_PASSWORD:
         return jsonify({"error": "unauthorized"}), 401
-    con = sqlite3.connect(DB_PATH)
+    con = get_con()
     for item in body.get("order", []):
-        con.execute("UPDATE issues SET sort_order=? WHERE id=?", (item["sort_order"], item["id"]))
+        execute(con, "UPDATE issues SET sort_order=? WHERE id=?", (item["sort_order"], item["id"]))
     con.commit(); con.close()
     return jsonify({"ok": True})
+
 
 @app.route("/api/issues/<int:issue_id>", methods=["PATCH"])
 def api_update_issue(issue_id):
     body = request.get_json()
     if body.get("password") != BOARD_PASSWORD:
         return jsonify({"error": "unauthorized"}), 401
-    con = sqlite3.connect(DB_PATH)
-    # Full edit
+    con = get_con()
     if "title" in body:
-        con.execute("UPDATE issues SET title=?,body=?,priority=?,status=? WHERE id=?",
+        execute(con, "UPDATE issues SET title=?,body=?,priority=?,status=? WHERE id=?",
             (body["title"], body.get("body",""), body.get("priority","中"), body.get("status","未対応"), issue_id))
     elif "status" in body:
-        con.execute("UPDATE issues SET status=? WHERE id=?", (body["status"], issue_id))
+        execute(con, "UPDATE issues SET status=? WHERE id=?", (body["status"], issue_id))
     con.commit(); con.close()
     return jsonify({"ok": True})
+
 
 @app.route("/api/issues/<int:issue_id>", methods=["DELETE"])
 def api_delete_issue(issue_id):
     body = request.get_json()
     if body.get("password") != BOARD_PASSWORD:
         return jsonify({"error": "unauthorized"}), 401
-    con = sqlite3.connect(DB_PATH)
-    con.execute("DELETE FROM issues WHERE id=?", (issue_id,))
+    con = get_con()
+    execute(con, "DELETE FROM issues WHERE id=?", (issue_id,))
     con.commit(); con.close()
     return jsonify({"ok": True})
 
@@ -364,55 +425,59 @@ def api_delete_issue(issue_id):
 # --- Calendar ---
 @app.route("/api/calendar")
 def api_calendar():
-    con = sqlite3.connect(DB_PATH)
-    rows = con.execute("SELECT id,title,event_date,body,minutes,sort_order,created_at FROM calendar_events ORDER BY sort_order ASC, event_date DESC").fetchall()
+    con = get_con()
+    rows = fetchall(con, "SELECT id,title,event_date,body,minutes,sort_order,created_at FROM calendar_events ORDER BY sort_order ASC, event_date DESC")
     con.close()
-    return jsonify([{"id":r[0],"title":r[1],"event_date":r[2],"body":r[3],"minutes":r[4],"sort_order":r[5],"created_at":r[6]} for r in rows])
+    return jsonify([{**r, "created_at": str(r["created_at"])[:10]} for r in rows])
+
 
 @app.route("/api/calendar", methods=["POST"])
 def api_post_calendar():
     body = request.get_json()
     if body.get("password") != BOARD_PASSWORD:
         return jsonify({"error": "unauthorized"}), 401
-    con = sqlite3.connect(DB_PATH)
-    row = con.execute("SELECT MIN(sort_order) FROM calendar_events").fetchone()
-    new_order = (row[0] or 0) - 1
-    con.execute("INSERT INTO calendar_events (title,event_date,body,minutes,sort_order) VALUES (?,?,?,?,?)",
+    con = get_con()
+    row = fetchone(con, "SELECT MIN(sort_order) as m FROM calendar_events")
+    new_order = ((row["m"] or 0) - 1) if row else -1
+    execute(con, "INSERT INTO calendar_events (title,event_date,body,minutes,sort_order) VALUES (?,?,?,?,?)",
         (body.get("title","").strip(), body.get("event_date",""),
          body.get("body","").strip(), body.get("minutes","").strip(), new_order))
     con.commit(); con.close()
     return jsonify({"ok": True})
+
 
 @app.route("/api/calendar/reorder", methods=["POST"])
 def api_reorder_calendar():
     body = request.get_json()
     if body.get("password") != BOARD_PASSWORD:
         return jsonify({"error": "unauthorized"}), 401
-    con = sqlite3.connect(DB_PATH)
+    con = get_con()
     for item in body.get("order", []):
-        con.execute("UPDATE calendar_events SET sort_order=? WHERE id=?", (item["sort_order"], item["id"]))
+        execute(con, "UPDATE calendar_events SET sort_order=? WHERE id=?", (item["sort_order"], item["id"]))
     con.commit(); con.close()
     return jsonify({"ok": True})
+
 
 @app.route("/api/calendar/<int:ev_id>", methods=["PATCH"])
 def api_update_calendar(ev_id):
     body = request.get_json()
     if body.get("password") != BOARD_PASSWORD:
         return jsonify({"error": "unauthorized"}), 401
-    con = sqlite3.connect(DB_PATH)
-    con.execute("UPDATE calendar_events SET title=?,event_date=?,body=?,minutes=? WHERE id=?",
+    con = get_con()
+    execute(con, "UPDATE calendar_events SET title=?,event_date=?,body=?,minutes=? WHERE id=?",
         (body.get("title","").strip(), body.get("event_date",""),
          body.get("body","").strip(), body.get("minutes","").strip(), ev_id))
     con.commit(); con.close()
     return jsonify({"ok": True})
+
 
 @app.route("/api/calendar/<int:ev_id>", methods=["DELETE"])
 def api_delete_calendar(ev_id):
     body = request.get_json()
     if body.get("password") != BOARD_PASSWORD:
         return jsonify({"error": "unauthorized"}), 401
-    con = sqlite3.connect(DB_PATH)
-    con.execute("DELETE FROM calendar_events WHERE id=?", (ev_id,))
+    con = get_con()
+    execute(con, "DELETE FROM calendar_events WHERE id=?", (ev_id,))
     con.commit(); con.close()
     return jsonify({"ok": True})
 
@@ -463,7 +528,6 @@ def api_books():
     keyword = request.args.get("keyword", "")
     page = int(request.args.get("page", 1))
     data = fetch_books(keyword, page)
-    # Attach ratings
     for book in data["books"]:
         book["rating"] = get_rating(book["isbn"])
     return jsonify(data)
@@ -495,15 +559,10 @@ def api_library_info():
 
 @app.route("/api/announcements")
 def api_announcements():
-    con = sqlite3.connect(DB_PATH)
-    rows = con.execute(
-        "SELECT id, title, body, category, image_url, created_at FROM announcements ORDER BY id DESC"
-    ).fetchall()
+    con = get_con()
+    rows = fetchall(con, "SELECT id, title, body, category, image_url, created_at FROM announcements ORDER BY id DESC")
     con.close()
-    return jsonify([
-        {"id": r[0], "title": r[1], "body": r[2], "category": r[3], "image_url": r[4] or "", "created_at": r[5]}
-        for r in rows
-    ])
+    return jsonify([{**r, "image_url": r.get("image_url") or "", "created_at": str(r["created_at"])[:16]} for r in rows])
 
 
 @app.route("/api/announcements", methods=["POST"])
@@ -513,17 +572,12 @@ def api_post_announcement():
         return jsonify({"error": "unauthorized"}), 401
     title = body.get("title", "").strip()
     text = body.get("body", "").strip()
-    category = body.get("category", "お知らせ")
-    image_url = body.get("image_url", "").strip()
     if not title or not text:
         return jsonify({"error": "invalid"}), 400
-    con = sqlite3.connect(DB_PATH)
-    con.execute(
-        "INSERT INTO announcements (title, body, category, image_url) VALUES (?,?,?,?)",
-        (title, text, category, image_url)
-    )
-    con.commit()
-    con.close()
+    con = get_con()
+    execute(con, "INSERT INTO announcements (title, body, category, image_url) VALUES (?,?,?,?)",
+        (title, text, body.get("category","お知らせ"), body.get("image_url","").strip()))
+    con.commit(); con.close()
     return jsonify({"ok": True})
 
 
@@ -532,25 +586,20 @@ def api_delete_announcement(ann_id):
     body = request.get_json()
     if body.get("password") != ADMIN_PASSWORD:
         return jsonify({"error": "unauthorized"}), 401
-    con = sqlite3.connect(DB_PATH)
-    con.execute("DELETE FROM announcements WHERE id=?", (ann_id,))
-    con.commit()
-    con.close()
+    con = get_con()
+    execute(con, "DELETE FROM announcements WHERE id=?", (ann_id,))
+    con.commit(); con.close()
     return jsonify({"ok": True})
 
 
 # --- Book Requests ---
 @app.route("/api/requests")
 def api_requests():
-    con = sqlite3.connect(DB_PATH)
-    rows = con.execute(
-        "SELECT id,title,author,reason,room,status,note,created_at FROM book_requests ORDER BY id DESC"
-    ).fetchall()
+    con = get_con()
+    rows = fetchall(con, "SELECT id,title,author,reason,room,status,note,created_at FROM book_requests ORDER BY id DESC")
     con.close()
-    return jsonify([{
-        "id":r[0],"title":r[1],"author":r[2],"reason":r[3],
-        "room":r[4],"status":r[5],"note":r[6],"created_at":r[7]
-    } for r in rows])
+    return jsonify([{**r, "created_at": str(r["created_at"])[:10]} for r in rows])
+
 
 @app.route("/api/requests", methods=["POST"])
 def api_post_request():
@@ -560,34 +609,34 @@ def api_post_request():
     title = body.get("title", "").strip()
     if not title:
         return jsonify({"error": "title required"}), 400
-    con = sqlite3.connect(DB_PATH)
-    con.execute(
-        "INSERT INTO book_requests (title,author,reason,room) VALUES (?,?,?,?)",
-        (title, body.get("author","").strip(), body.get("reason","").strip(), body.get("room","").strip())
-    )
+    con = get_con()
+    execute(con, "INSERT INTO book_requests (title,author,reason,room) VALUES (?,?,?,?)",
+        (title, body.get("author","").strip(), body.get("reason","").strip(), body.get("room","").strip()))
     con.commit(); con.close()
     return jsonify({"ok": True})
+
 
 @app.route("/api/requests/<int:req_id>", methods=["PATCH"])
 def api_update_request(req_id):
     body = request.get_json()
     if body.get("password") != ADMIN_PASSWORD:
         return jsonify({"error": "unauthorized"}), 401
-    con = sqlite3.connect(DB_PATH)
+    con = get_con()
     if "status" in body:
-        con.execute("UPDATE book_requests SET status=? WHERE id=?", (body["status"], req_id))
+        execute(con, "UPDATE book_requests SET status=? WHERE id=?", (body["status"], req_id))
     if "note" in body:
-        con.execute("UPDATE book_requests SET note=? WHERE id=?", (body["note"], req_id))
+        execute(con, "UPDATE book_requests SET note=? WHERE id=?", (body["note"], req_id))
     con.commit(); con.close()
     return jsonify({"ok": True})
+
 
 @app.route("/api/requests/<int:req_id>", methods=["DELETE"])
 def api_delete_request(req_id):
     body = request.get_json()
     if body.get("password") != ADMIN_PASSWORD:
         return jsonify({"error": "unauthorized"}), 401
-    con = sqlite3.connect(DB_PATH)
-    con.execute("DELETE FROM book_requests WHERE id=?", (req_id,))
+    con = get_con()
+    execute(con, "DELETE FROM book_requests WHERE id=?", (req_id,))
     con.commit(); con.close()
     return jsonify({"ok": True})
 
