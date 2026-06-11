@@ -306,7 +306,11 @@ def api_update_issue(issue_id):
     if body.get("password") != BOARD_PASSWORD:
         return jsonify({"error": "unauthorized"}), 401
     con = sqlite3.connect(DB_PATH)
-    if "status" in body:
+    # Full edit
+    if "title" in body:
+        con.execute("UPDATE issues SET title=?,body=?,priority=?,status=? WHERE id=?",
+            (body["title"], body.get("body",""), body.get("priority","中"), body.get("status","未対応"), issue_id))
+    elif "status" in body:
         con.execute("UPDATE issues SET status=? WHERE id=?", (body["status"], issue_id))
     con.commit(); con.close()
     return jsonify({"ok": True})
@@ -342,6 +346,18 @@ def api_post_calendar():
     con.commit(); con.close()
     return jsonify({"ok": True})
 
+@app.route("/api/calendar/<int:ev_id>", methods=["PATCH"])
+def api_update_calendar(ev_id):
+    body = request.get_json()
+    if body.get("password") != BOARD_PASSWORD:
+        return jsonify({"error": "unauthorized"}), 401
+    con = sqlite3.connect(DB_PATH)
+    con.execute("UPDATE calendar_events SET title=?,event_date=?,body=?,minutes=? WHERE id=?",
+        (body.get("title","").strip(), body.get("event_date",""),
+         body.get("body","").strip(), body.get("minutes","").strip(), ev_id))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
 @app.route("/api/calendar/<int:ev_id>", methods=["DELETE"])
 def api_delete_calendar(ev_id):
     body = request.get_json()
@@ -353,23 +369,45 @@ def api_delete_calendar(ev_id):
     return jsonify({"ok": True})
 
 
-# --- Stats ---
+# --- Stats (pre-computed from full collection 2026-04-12) ---
+FULL_STATS = {
+    "total": 5470,
+    "publishers": [
+        ("講談社", 615), ("文藝春秋", 515), ("新潮社", 423), ("角川書店", 325),
+        ("登録無し(ISBN無の為)", 290), ("集英社", 223), ("小学館", 185), ("朝日新聞社", 174),
+        ("幻冬舎", 161), ("福音館書店", 142), ("光文社", 130), ("ポプラ社", 118),
+        ("偕成社", 108), ("中央公論社", 91), ("双葉社", 82), ("PHP研究所", 61),
+        ("早川書房", 61), ("学習研究社", 60), ("徳間書店", 58), ("岩崎書店", 57),
+    ],
+    "authors": [
+        ("平岩 弓枝", 68), ("塩野 七生", 66), ("宮部 みゆき", 60), ("東野 圭吾", 59),
+        ("韓 賢東", 49), ("藤沢 周平", 44), ("司馬 遼太郎", 43), ("佐伯 泰英", 37),
+        ("村上 春樹", 33), ("赤川 次郎", 32), ("洪 在徹", 30), ("百田 尚樹", 30),
+        ("池波 正太郎", 29), ("北方 謙三", 24), ("今野 敏", 23), ("あさの あつこ", 22),
+        ("内田 康夫", 22), ("奥田 英朗", 21), ("廣嶋 玲子", 20), ("柚月 裕子", 20),
+    ],
+    "genres": [
+        ("文芸小説", 4645), ("その他（要分類）", 261), ("児童学習漫画", 101),
+        ("絵本・児童書", 78), ("時代小説・歴史小説", 56), ("児童文学", 56),
+        ("ミステリ・推理", 54), ("実用・ハウツー", 47), ("児童学習書", 45),
+        ("ファンタジー・SF", 31), ("絵本", 28), ("児童文学・YA", 24),
+        ("翻訳小説", 13), ("エッセイ・評論", 8), ("社会・ノンフィクション", 7),
+        ("英語絵本", 6), ("科学・学術", 5), ("恋愛・青春小説", 5),
+    ],
+    "age_groups": [
+        ("一般（18歳以上）", 5096), ("小学生（6-12歳）", 202),
+        ("幼児〜低学年（0-8歳）", 112), ("中高生以上（15歳以上）", 36),
+        ("小学生〜中学生（8-15歳）", 24),
+    ],
+    "formats": [
+        ("その他", 4477), ("文庫", 509), ("不明", 310),
+        ("単行本", 158), ("ハードカバー", 9), ("新書", 5),
+    ],
+}
+
 @app.route("/api/stats")
 def api_stats():
-    try:
-        data = fetch_books("", 1)
-        total = data["total"]
-        publishers = {}
-        formats = {}
-        for b in data["books"]:
-            p = b.get("publisher","不明") or "不明"
-            publishers[p] = publishers.get(p, 0) + 1
-            f = b.get("format","不明") or "不明"
-            formats[f] = formats.get(f, 0) + 1
-        top_pub = sorted(publishers.items(), key=lambda x: -x[1])[:10]
-        return jsonify({"total": total, "publishers": top_pub, "formats": list(formats.items())})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify(FULL_STATS)
 
 
 @app.route("/api/books")

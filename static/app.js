@@ -552,16 +552,72 @@ async function loadIssues() {
         <span class="issue-pri">${priMap[item.priority]||""} ${item.priority}</span>
         <span class="issue-status-badge">${item.status}</span>
         <span class="issue-date">${item.created_at.slice(0,10)}</span>
+        <button class="btn-edit issue-edit-btn" data-id="${item.id}" title="編集">✏️</button>
         <button class="news-del issue-del" data-id="${item.id}" title="削除">🗑</button>
       </div>
-      <div class="issue-title">${item.title}</div>
-      <div class="issue-body">${item.body.replace(/\n/g,"<br>")}</div>
-      <div class="issue-actions">
+      <div class="issue-title issue-view-title" data-id="${item.id}">${item.title}</div>
+      <div class="issue-body issue-view-body" data-id="${item.id}">${item.body.replace(/\n/g,"<br>")}</div>
+      <div class="issue-edit-form" id="iedit-${item.id}" style="display:none">
+        <input class="ie-title" value="${item.title.replace(/"/g,'&quot;')}" placeholder="課題タイトル" />
+        <textarea class="ie-body" rows="3">${item.body}</textarea>
+        <div class="board-form-row">
+          <select class="ie-priority">
+            <option value="高" ${item.priority==="高"?"selected":""}>🔴 高</option>
+            <option value="中" ${item.priority==="中"?"selected":""}>🟡 中</option>
+            <option value="低" ${item.priority==="低"?"selected":""}>🟢 低</option>
+          </select>
+          <select class="ie-status">
+            <option value="未対応" ${item.status==="未対応"?"selected":""}>未対応</option>
+            <option value="対応中" ${item.status==="対応中"?"selected":""}>対応中</option>
+            <option value="完了" ${item.status==="完了"?"selected":""}>完了</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <button class="btn-primary ie-save" data-id="${item.id}" style="font-size:0.83rem;padding:6px 14px">保存</button>
+          <button class="ie-cancel btn-secondary" data-id="${item.id}" style="font-size:0.83rem;padding:6px 14px">キャンセル</button>
+        </div>
+      </div>
+      <div class="issue-actions issue-view-actions" data-id="${item.id}">
         <button class="issue-act-btn" data-id="${item.id}" data-status="未対応">未対応</button>
         <button class="issue-act-btn" data-id="${item.id}" data-status="対応中">対応中</button>
         <button class="issue-act-btn" data-id="${item.id}" data-status="完了">完了</button>
       </div>
     </div>`).join("");
+
+  list.querySelectorAll(".issue-edit-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.id;
+      document.getElementById(`iedit-${id}`).style.display = "block";
+      list.querySelector(`.issue-view-title[data-id="${id}"]`).style.display = "none";
+      list.querySelector(`.issue-view-body[data-id="${id}"]`).style.display = "none";
+      list.querySelector(`.issue-view-actions[data-id="${id}"]`).style.display = "none";
+    });
+  });
+  list.querySelectorAll(".ie-cancel").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.id;
+      document.getElementById(`iedit-${id}`).style.display = "none";
+      list.querySelector(`.issue-view-title[data-id="${id}"]`).style.display = "";
+      list.querySelector(`.issue-view-body[data-id="${id}"]`).style.display = "";
+      list.querySelector(`.issue-view-actions[data-id="${id}"]`).style.display = "";
+    });
+  });
+  list.querySelectorAll(".ie-save").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.id;
+      const form = document.getElementById(`iedit-${id}`);
+      const title = form.querySelector(".ie-title").value.trim();
+      const body = form.querySelector(".ie-body").value.trim();
+      const priority = form.querySelector(".ie-priority").value;
+      const status = form.querySelector(".ie-status").value;
+      if (!title) return;
+      await fetch(`/api/issues/${id}`, {
+        method: "PATCH", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({password: boardPassword, title, body, priority, status})
+      });
+      loadIssues();
+    });
+  });
   list.querySelectorAll(".issue-act-btn").forEach(btn => {
     btn.addEventListener("click", async () => {
       await fetch(`/api/issues/${btn.dataset.id}`, {
@@ -604,19 +660,28 @@ document.getElementById("submitIssue").addEventListener("click", async () => {
 // ===== Stats =====
 async function loadStats() {
   const el = document.getElementById("statsContent");
-  el.innerHTML = '<div class="loading">蔵書データを分析中…</div>';
+  el.innerHTML = '<div class="loading">読み込み中…</div>';
   const res = await fetch("/api/stats");
   const data = await res.json();
   if (data.error) { el.innerHTML = `<div class="loading">エラー: ${data.error}</div>`; return; }
 
   el.innerHTML = `
+    <p style="font-size:0.8rem;color:#888;margin-bottom:12px">データ取得日：2026年4月12日（全蔵書5,470冊のデータより）</p>
     <div class="stats-summary">
       <div class="stat-card"><div class="stat-num">${data.total.toLocaleString()}</div><div class="stat-label">総蔵書数</div></div>
     </div>
     <div class="stats-charts">
       <div class="chart-box">
-        <h4>出版社別冊数（上位10社・今ページ分）</h4>
-        <canvas id="pubChart" height="220"></canvas>
+        <h4>出版社別冊数（上位20社・全蔵書）</h4>
+        <canvas id="pubChart"></canvas>
+      </div>
+      <div class="chart-box">
+        <h4>著者別冊数（上位20名・全蔵書）</h4>
+        <canvas id="authChart"></canvas>
+      </div>
+      <div class="chart-box">
+        <h4>ジャンル別冊数（全蔵書）</h4>
+        <canvas id="genreChart"></canvas>
       </div>
       <div class="chart-box">
         <h4>形式別冊数</h4>
@@ -625,6 +690,8 @@ async function loadStats() {
     </div>`;
 
   drawBarChart("pubChart", data.publishers.map(p=>p[0]), data.publishers.map(p=>p[1]));
+  drawBarChart("authChart", data.authors.map(a=>a[0]), data.authors.map(a=>a[1]));
+  drawBarChart("genreChart", data.genres.map(g=>g[0]), data.genres.map(g=>g[1]));
   drawPieChart("fmtChart", data.formats.map(f=>f[0]), data.formats.map(f=>f[1]));
 }
 
@@ -705,13 +772,61 @@ async function loadCalendar() {
   list.innerHTML = items.map(item => `
     <div class="cal-card">
       <div class="cal-header">
-        <span class="cal-date">📅 ${item.event_date}</span>
-        <span class="cal-title-text">${item.title}</span>
+        <span class="cal-date cal-view-date" data-id="${item.id}">📅 ${item.event_date}</span>
+        <span class="cal-title-text cal-view-title" data-id="${item.id}">${item.title}</span>
+        <button class="btn-edit cal-edit-btn" data-id="${item.id}" title="編集">✏️</button>
         <button class="news-del cal-del" data-id="${item.id}" title="削除">🗑</button>
       </div>
-      ${item.body ? `<div class="cal-body">${item.body.replace(/\n/g,"<br>")}</div>` : ""}
-      ${item.minutes ? `<details class="cal-minutes"><summary>📝 議事録を見る</summary><div class="cal-minutes-body">${item.minutes.replace(/\n/g,"<br>")}</div></details>` : ""}
+      ${item.body ? `<div class="cal-body cal-view-body" data-id="${item.id}">${item.body.replace(/\n/g,"<br>")}</div>` : `<div class="cal-view-body" data-id="${item.id}" style="display:none"></div>`}
+      ${item.minutes ? `<details class="cal-minutes cal-view-mins" data-id="${item.id}"><summary>📝 議事録を見る</summary><div class="cal-minutes-body">${item.minutes.replace(/\n/g,"<br>")}</div></details>` : `<div class="cal-view-mins" data-id="${item.id}" style="display:none"></div>`}
+      <div class="cal-edit-form" id="cedit-${item.id}" style="display:none">
+        <input class="ce-title" value="${item.title.replace(/"/g,'&quot;')}" placeholder="イベント名" style="margin-bottom:6px" />
+        <input type="date" class="ce-date" value="${item.event_date}" style="margin-bottom:6px" />
+        <textarea class="ce-body" rows="2" placeholder="内容・メモ" style="margin-bottom:6px">${item.body||""}</textarea>
+        <textarea class="ce-minutes" rows="4" placeholder="議事録（任意）">${item.minutes||""}</textarea>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <button class="btn-primary ce-save" data-id="${item.id}" style="font-size:0.83rem;padding:6px 14px">保存</button>
+          <button class="ce-cancel btn-secondary" data-id="${item.id}" style="font-size:0.83rem;padding:6px 14px">キャンセル</button>
+        </div>
+      </div>
     </div>`).join("");
+
+  list.querySelectorAll(".cal-edit-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.id;
+      document.getElementById(`cedit-${id}`).style.display = "block";
+      list.querySelector(`.cal-view-date[data-id="${id}"]`).style.display = "none";
+      list.querySelector(`.cal-view-title[data-id="${id}"]`).style.display = "none";
+      list.querySelector(`.cal-view-body[data-id="${id}"]`).style.display = "none";
+      list.querySelector(`.cal-view-mins[data-id="${id}"]`).style.display = "none";
+    });
+  });
+  list.querySelectorAll(".ce-cancel").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.id;
+      document.getElementById(`cedit-${id}`).style.display = "none";
+      list.querySelector(`.cal-view-date[data-id="${id}"]`).style.display = "";
+      list.querySelector(`.cal-view-title[data-id="${id}"]`).style.display = "";
+      list.querySelector(`.cal-view-body[data-id="${id}"]`).style.display = "";
+      list.querySelector(`.cal-view-mins[data-id="${id}"]`).style.display = "";
+    });
+  });
+  list.querySelectorAll(".ce-save").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.id;
+      const form = document.getElementById(`cedit-${id}`);
+      const title = form.querySelector(".ce-title").value.trim();
+      const event_date = form.querySelector(".ce-date").value;
+      const body = form.querySelector(".ce-body").value.trim();
+      const minutes = form.querySelector(".ce-minutes").value.trim();
+      if (!title || !event_date) return;
+      await fetch(`/api/calendar/${id}`, {
+        method: "PATCH", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({password: boardPassword, title, event_date, body, minutes})
+      });
+      loadCalendar();
+    });
+  });
   list.querySelectorAll(".cal-del").forEach(btn => {
     btn.addEventListener("click", async () => {
       if (!confirm("この記録を削除しますか？")) return;
