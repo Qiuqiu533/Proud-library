@@ -1,3 +1,34 @@
+// ===== Auth =====
+async function checkAuth() {
+  const loginScreen = document.getElementById("loginScreen");
+  if (localStorage.getItem("resident_auth") === "1") {
+    loginScreen.style.display = "none";
+    return;
+  }
+  loginScreen.style.display = "flex";
+}
+
+document.getElementById("loginBtn").addEventListener("click", async () => {
+  const pass = document.getElementById("residentPass").value;
+  const err = document.getElementById("loginError");
+  if (!pass) { err.textContent = "パスワードを入力してください"; return; }
+  const res = await fetch("/api/auth", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password: pass })
+  });
+  if (res.ok) {
+    localStorage.setItem("resident_auth", "1");
+    document.getElementById("loginScreen").style.display = "none";
+  } else {
+    err.textContent = "❌ パスワードが違います";
+    document.getElementById("residentPass").value = "";
+  }
+});
+
+document.getElementById("residentPass").addEventListener("keydown", e => {
+  if (e.key === "Enter") document.getElementById("loginBtn").click();
+});
+
 // ===== State =====
 let currentPage = 1;
 let currentKeyword = "";
@@ -427,4 +458,5 @@ document.getElementById("newsImage").addEventListener("input", e => {
 });
 
 // Initial load
+checkAuth();
 loadBooks();

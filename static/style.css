@@ -1,6 +1,20 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2c2c; min-height: 100vh; }
 
+/* ===== Login screen ===== */
+.login-screen { position: fixed; inset: 0; background: linear-gradient(160deg, #2a4a37 0%, #3d6b4f 50%, #5a8a6a 100%); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.login-box { background: white; border-radius: 24px; padding: 48px 40px; max-width: 400px; width: 100%; text-align: center; box-shadow: 0 32px 80px rgba(0,0,0,0.3); }
+.login-logo { font-size: 3.5rem; margin-bottom: 16px; }
+.login-title { font-size: 1.4rem; font-weight: 700; color: #2a4a37; line-height: 1.5; margin-bottom: 16px; }
+.login-desc { font-size: 0.88rem; color: #666; line-height: 1.8; margin-bottom: 28px; }
+.login-form { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
+.login-input { padding: 14px 16px; border: 2px solid #ddd; border-radius: 12px; font-family: inherit; font-size: 1rem; outline: none; text-align: center; letter-spacing: 3px; transition: border-color .2s; }
+.login-input:focus { border-color: #3d6b4f; }
+.login-btn { padding: 14px; background: linear-gradient(135deg, #3d6b4f, #2a4a37); color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 1rem; font-weight: 700; cursor: pointer; transition: opacity .2s; }
+.login-btn:hover { opacity: 0.88; }
+.login-error { color: #e05; font-size: 0.85rem; min-height: 1.2em; margin-bottom: 8px; }
+.login-note { font-size: 0.75rem; color: #bbb; margin-top: 16px; }
+
 /* ===== Header ===== */
 .site-header { background: linear-gradient(135deg, #3d6b4f 0%, #2a4a37 100%); color: white; padding: 14px 24px; box-shadow: 0 2px 12px rgba(0,0,0,0.2); position: sticky; top: 0; z-index: 100; }
 .header-inner { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
