@@ -1338,69 +1338,6 @@ document.getElementById("syncLogoutBtn").addEventListener("click", () => {
 cloudUser = getCloudUser();
 updateSyncUI();
 
-// ===== 蔵書Excelアップロード =====
-document.getElementById("excelPickBtn").addEventListener("click", () => {
-  document.getElementById("excelFileInput").click();
-});
-
-document.getElementById("excelFileInput").addEventListener("change", e => {
-  const file = e.target.files[0];
-  const nameEl = document.getElementById("excelFileName");
-  const uploadBtn = document.getElementById("excelUploadBtn");
-  if (file) {
-    nameEl.textContent = file.name;
-    nameEl.style.color = "#3d6b4f";
-    uploadBtn.disabled = false;
-  } else {
-    nameEl.textContent = "ファイル未選択";
-    nameEl.style.color = "";
-    uploadBtn.disabled = true;
-  }
-});
-
-document.getElementById("excelUploadBtn").addEventListener("click", async () => {
-  const file = document.getElementById("excelFileInput").files[0];
-  const msg = document.getElementById("excelUploadMsg");
-  const progress = document.getElementById("excelUploadProgress");
-  const bar = document.getElementById("excelProgressBar");
-  if (!file) return;
-
-  const btn = document.getElementById("excelUploadBtn");
-  btn.disabled = true;
-  btn.textContent = "アップロード中…";
-  progress.style.display = "block";
-  bar.style.width = "30%";
-  msg.textContent = "";
-
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("password", boardPassword);
-
-  try {
-    bar.style.width = "60%";
-    const res = await fetch("/api/admin/upload-excel", { method: "POST", body: formData });
-    bar.style.width = "100%";
-    const data = await res.json();
-    if (res.ok) {
-      msg.textContent = `✅ 更新完了！${data.genres}ジャンル・${data.books.toLocaleString()}冊のデータを登録しました。`;
-      msg.style.color = "#3d6b4f";
-      document.getElementById("excelFileName").textContent = "ファイル未選択";
-      document.getElementById("excelFileName").style.color = "";
-      document.getElementById("excelFileInput").value = "";
-    } else {
-      msg.textContent = "❌ " + (data.error || "エラーが発生しました");
-      msg.style.color = "#e05";
-    }
-  } catch {
-    msg.textContent = "❌ 通信エラーが発生しました";
-    msg.style.color = "#e05";
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "⬆️ アップロードして更新";
-    setTimeout(() => { progress.style.display = "none"; bar.style.width = "0%"; }, 1000);
-  }
-});
-
 // ===== パスワード変更 =====
 document.getElementById("pwChangeBtn").addEventListener("click", async () => {
   const current = document.getElementById("pwCurrent").value;

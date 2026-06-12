@@ -3,7 +3,6 @@ import requests
 from bs4 import BeautifulSoup
 import json
 import os
-import io
 
 # ── ジャンル別蔵書データ（Excelから事前生成）──────────────────────────────
 _GENRE_MAP_PATH = os.path.join(os.path.dirname(__file__), "static", "genre_map.json")
@@ -676,53 +675,6 @@ def api_books_by_genre():
     return jsonify({"books": result, "total": total, "page": page, "genre": genre})
 
 
-@app.route("/api/admin/upload-excel", methods=["POST"])
-def api_upload_excel():
-    """蔵書一覧Excelをアップロードしてジャンルデータを更新"""
-    password = request.form.get("password", "")
-    if password != get_board_password():
-        return jsonify({"error": "unauthorized"}), 401
-    if "file" not in request.files:
-        return jsonify({"error": "ファイルが選択されていません"}), 400
-    f = request.files["file"]
-    if not f.filename.endswith(".xlsx"):
-        return jsonify({"error": ".xlsxファイルを選択してください"}), 400
-    try:
-        import openpyxl
-        wb = openpyxl.load_workbook(io.BytesIO(f.read()), read_only=True, data_only=True)
-        ws = wb["蔵書一覧"]
-        headers = [str(c.value).strip() if c.value else "" for c in next(ws.iter_rows(min_row=1, max_row=1))]
-        col = {h: i for i, h in enumerate(headers)}
-        required = {"ISBN", "タイトル", "著者", "出版社", "形式", "ジャンル"}
-        missing = required - set(col.keys())
-        if missing:
-            return jsonify({"error": f"必須列が見つかりません: {missing}"}), 400
-
-        genre_map_new = {}
-        for row in ws.iter_rows(min_row=2, values_only=True):
-            isbn = str(row[col["ISBN"]] or "").strip().replace(".0","")
-            if not isbn or isbn == "nan":
-                continue
-            genre = str(row[col["ジャンル"]] or "").strip() or "その他"
-            if genre not in genre_map_new:
-                genre_map_new[genre] = []
-            genre_map_new[genre].append({
-                "isbn": isbn,
-                "title":     str(row[col["タイトル"]]  or "").strip(),
-                "author":    str(row[col["著者"]]      or "").strip(),
-                "publisher": str(row[col["出版社"]]    or "").strip(),
-                "format":    str(row[col["形式"]]      or "").strip(),
-            })
-        wb.close()
-
-        con = get_con()
-        _insert_genre_books(con, genre_map_new)
-        con.commit(); con.close()
-
-        total = sum(len(v) for v in genre_map_new.values())
-        return jsonify({"ok": True, "genres": len(genre_map_new), "books": total})
-    except Exception as e:
-        return jsonify({"error": f"読み込みエラー: {str(e)}"}), 500
 
 
 @app.route("/api/stats")
