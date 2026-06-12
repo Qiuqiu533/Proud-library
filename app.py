@@ -923,7 +923,164 @@ def api_availability(isbn):
         return jsonify({"status": "error"}), 500
 
 
+# ── ジャンル自動分類 ──────────────────────────────────────────────────────
+
+def _classify_genre(ndc, title="", description=""):
+    """NDCコード＋キーワードでジャンルを自動判定"""
+    combined = (title or "") + " " + (description or "")
+    # キーワード優先（NDCより精度が高い）
+    kw = {
+        "ミステリ・推理":    ["ミステリ","推理","探偵","殺人事件","謎解き","サスペンス","刑事","犯罪"],
+        "ファンタジー・SF":  ["ファンタジー","SF","魔法","異世界","宇宙","ロボット","タイムトラベル","ドラゴン"],
+        "時代小説・歴史小説":["時代小説","歴史小説","江戸","武士","侍","幕府","戦国","剣客","忍者","藩"],
+        "恋愛・青春小説":    ["恋愛小説","青春小説","ラブストーリー","純愛"],
+        "エッセイ・評論":    ["エッセイ","随筆","評論","コラム"],
+        "実用・ハウツー":    ["料理","レシピ","ダイエット","健康","投資","資産","育児","子育て","勉強法"],
+        "社会・ノンフィクション": ["ノンフィクション","ルポ","ドキュメンタリー","事件","経済","政治","歴史的事件"],
+    }
+    for genre, words in kw.items():
+        if any(w in combined for w in words):
+            return genre
+    # NDCコードで判定
+    n = str(ndc or "")
+    if n.startswith("726"):   return "絵本・児童書"
+    if n.startswith("72"):    return "絵本・児童書"
+    if n.startswith("916"):   return "エッセイ・評論"
+    if n.startswith("913"):   return "文芸小説"
+    if n.startswith("91"):    return "文芸小説"
+    if n[:1] == "9":          return "翻訳小説"
+    if n[:1] in ("4","5","6","0","1","2","3"):  return "実用・ハウツー"
+    return "文芸小説"  # デフォルト
+
+
+def _auto_classify_new_books():
+    """バックグラウンド：新しい本を自動検出してジャンル分類（週1回）"""
+    import time, datetime, threading
+
+    def _run():
+        try:
+            # 前回更新から7日未満ならスキップ
+            last = get_setting("genre_last_update", "")
+            if last:
+                try:
+                    last_dt = datetime.datetime.fromisoformat(last)
+                    if (datetime.datetime.now() - last_dt).days < 7:
+                        print("ジャンル自動更新: 前回から7日未満のためスキップ")
+                        return
+                except Exception:
+                    pass
+
+            print("ジャンル自動更新: 開始...")
+            # DB上の既知ISBNを取得
+            con = get_con()
+            rows = fetchall(con, "SELECT isbn FROM genre_books")
+            con.close()
+            known = {r["isbn"] for r in rows}
+
+            # librarylife.net から全ISBNを収集
+            new_books = []
+            page = 1
+            while True:
+                try:
+                    data = fetch_books("", page)
+                    if not data["books"]:
+                        break
+                    for b in data["books"]:
+                        if b["isbn"] and b["isbn"] not in known:
+                            new_books.append(b)
+                    if page * 50 >= data.get("total", 0):
+                        break
+                    page += 1
+                    time.sleep(0.8)
+                except Exception as e:
+                    print(f"ジャンル自動更新: ページ{page}取得エラー {e}")
+                    break
+
+            if not new_books:
+                print("ジャンル自動更新: 新しい本なし")
+                _save_genre_update_time()
+                return
+
+            print(f"ジャンル自動更新: {len(new_books)}冊の新しい本を分類中...")
+
+            # OpenBD で NDC コードを取得してジャンル分類
+            batch_size = 100
+            classified = 0
+            for i in range(0, len(new_books), batch_size):
+                batch = new_books[i:i + batch_size]
+                isbns = [b["isbn"] for b in batch]
+                ndc_map = {}
+                desc_map = {}
+                try:
+                    resp = requests.get(OPENBD_API,
+                                        params={"isbn": ",".join(isbns)}, timeout=15)
+                    for isbn, ob in zip(isbns, resp.json()):
+                        if not ob:
+                            continue
+                        for subj in ob.get("onix", {}).get("DescriptiveDetail", {}).get("Subject", []):
+                            if subj.get("SubjectSchemeIdentifier") == "78":
+                                ndc_map[isbn] = subj.get("SubjectCode", "")
+                                break
+                        for t in ob.get("onix", {}).get("CollateralDetail", {}).get("TextContent", []):
+                            if t.get("TextType") in ("02", "03", "04"):
+                                desc_map[isbn] = t.get("Text", "")
+                                break
+                except Exception as e:
+                    print(f"OpenBD バッチエラー: {e}")
+
+                con = get_con()
+                for b in batch:
+                    isbn = b["isbn"]
+                    genre = _classify_genre(
+                        ndc_map.get(isbn, ""),
+                        b.get("title", ""),
+                        desc_map.get(isbn, "")
+                    )
+                    if USE_PG:
+                        execute(con,
+                            "INSERT INTO genre_books (isbn,genre,title,author,publisher,format) "
+                            "VALUES (?,?,?,?,?,?) ON CONFLICT(isbn) DO NOTHING",
+                            (isbn, genre, b.get("title",""), b.get("author",""),
+                             b.get("publisher",""), b.get("format","")))
+                    else:
+                        execute(con,
+                            "INSERT OR IGNORE INTO genre_books "
+                            "(isbn,genre,title,author,publisher,format) VALUES (?,?,?,?,?,?)",
+                            (isbn, genre, b.get("title",""), b.get("author",""),
+                             b.get("publisher",""), b.get("format","")))
+                    classified += 1
+                con.commit(); con.close()
+                time.sleep(0.5)
+
+            _save_genre_update_time()
+            print(f"ジャンル自動更新: 完了 ({classified}冊追加)")
+        except Exception as e:
+            print(f"ジャンル自動更新エラー: {e}")
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
+def _save_genre_update_time():
+    import datetime
+    now = datetime.datetime.now().isoformat()
+    try:
+        con = get_con()
+        if USE_PG:
+            execute(con,
+                "INSERT INTO settings (key,value) VALUES (?,?) "
+                "ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value",
+                ("genre_last_update", now))
+        else:
+            execute(con,
+                "INSERT OR REPLACE INTO settings (key,value) VALUES (?,?)",
+                ("genre_last_update", now))
+        con.commit(); con.close()
+    except Exception as e:
+        print(f"_save_genre_update_time error: {e}")
+
+
 _ensure_db()
+_auto_classify_new_books()   # バックグラウンドで週1回実行
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5050))
