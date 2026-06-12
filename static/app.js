@@ -249,15 +249,41 @@ async function loadTodayBook() {
 }
 
 // ===== ジャンルフィルター =====
+let currentGenre = "";  // "" = 通常検索, それ以外 = ジャンルモード
+
 document.querySelectorAll(".genre-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".genre-btn").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
     const genre = btn.dataset.genre;
-    document.getElementById("searchInput").value = genre;
-    loadBooks(genre, 1);
+    const mode  = btn.dataset.mode;
+    currentGenre = (mode === "genre") ? genre : "";
+    if (mode === "genre") {
+      document.getElementById("searchInput").value = "";
+      loadBooksByGenre(genre, 1);
+    } else {
+      document.getElementById("searchInput").value = "";
+      loadBooks("", 1);
+    }
   });
 });
+
+async function loadBooksByGenre(genre, page = 1) {
+  currentPage = page;
+  document.getElementById("bookGrid").innerHTML = '<div class="loading">読み込み中…</div>';
+  document.getElementById("totalCount").textContent = "";
+  const res = await fetch(`/api/books/by-genre?genre=${encodeURIComponent(genre)}&page=${page}`);
+  const data = await res.json();
+  currentTotal = data.total;
+  let books = data.books.map(b => ({ ...b, rating: b.rating || getRating(b.isbn) }));
+  if (currentSort === "title") books.sort((a, b) => a.title.localeCompare(b.title, "ja"));
+  if (currentSort === "author") books.sort((a, b) => a.author.localeCompare(b.author, "ja"));
+  if (currentSort === "fav") books.sort((a, b) => (isFav(b.isbn) ? 1 : 0) - (isFav(a.isbn) ? 1 : 0));
+  document.getElementById("totalCount").textContent = `全 ${data.total.toLocaleString()} 件（${genre}）`;
+  renderGrid("bookGrid", books);
+  renderPagination("paginationTop",    data.total, page, p => loadBooksByGenre(genre, p));
+  renderPagination("paginationBottom", data.total, page, p => loadBooksByGenre(genre, p));
+}
 
 // ===== New arrivals =====
 async function loadNew() {
