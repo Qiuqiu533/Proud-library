@@ -3,6 +3,7 @@ import requests
 from bs4 import BeautifulSoup
 import json
 import os
+import threading
 
 # ── ジャンル別蔵書データ（Excelから事前生成）──────────────────────────────
 _GENRE_MAP_PATH = os.path.join(os.path.dirname(__file__), "static", "genre_map.json")
