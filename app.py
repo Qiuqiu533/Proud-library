@@ -173,6 +173,15 @@ def init_db():
                 value TEXT NOT NULL
             )
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS user_accounts (
+                room TEXT PRIMARY KEY,
+                pin TEXT NOT NULL,
+                favorites TEXT DEFAULT '[]',
+                reading_log TEXT DEFAULT '{}',
+                updated_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
         con.commit()
     else:
         con.execute("""
@@ -240,6 +249,15 @@ def init_db():
             CREATE TABLE IF NOT EXISTS settings (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
+            )
+        """)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS user_accounts (
+                room TEXT PRIMARY KEY,
+                pin TEXT NOT NULL,
+                favorites TEXT DEFAULT '[]',
+                reading_log TEXT DEFAULT '{}',
+                updated_at TEXT DEFAULT (datetime('now','localtime'))
             )
         """)
         con.commit()
@@ -696,6 +714,59 @@ def api_delete_request(req_id):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     execute(con, "DELETE FROM book_requests WHERE id=?", (req_id,))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+
+# --- Cloud Sync ---
+@app.route("/api/user/login", methods=["POST"])
+def api_user_login():
+    body = request.get_json()
+    room = (body.get("room") or "").strip()
+    pin  = (body.get("pin")  or "").strip()
+    if not room or not pin or len(pin) < 4:
+        return jsonify({"error": "部屋番号と4桁以上のPINを入力してください"}), 400
+    con = get_con()
+    user = fetchone(con, "SELECT room, pin, favorites, reading_log FROM user_accounts WHERE room=?", (room,))
+    if user is None:
+        # 新規作成
+        if USE_PG:
+            execute(con, "INSERT INTO user_accounts (room, pin) VALUES (?,?)", (room, pin))
+        else:
+            execute(con, "INSERT INTO user_accounts (room, pin) VALUES (?,?)", (room, pin))
+        con.commit(); con.close()
+        return jsonify({"ok": True, "is_new": True, "favorites": [], "reading_log": {}})
+    if user["pin"] != pin:
+        con.close()
+        return jsonify({"error": "PINが違います"}), 401
+    con.close()
+    return jsonify({
+        "ok": True, "is_new": False,
+        "favorites": json.loads(user["favorites"] or "[]"),
+        "reading_log": json.loads(user["reading_log"] or "{}")
+    })
+
+
+@app.route("/api/user/sync", methods=["POST"])
+def api_user_sync():
+    body = request.get_json()
+    room = (body.get("room") or "").strip()
+    pin  = (body.get("pin")  or "").strip()
+    if not room or not pin:
+        return jsonify({"error": "unauthorized"}), 401
+    con = get_con()
+    user = fetchone(con, "SELECT pin FROM user_accounts WHERE room=?", (room,))
+    if not user or user["pin"] != pin:
+        con.close()
+        return jsonify({"error": "unauthorized"}), 401
+    favs = json.dumps(body.get("favorites", []), ensure_ascii=False)
+    rlog = json.dumps(body.get("reading_log", {}), ensure_ascii=False)
+    if USE_PG:
+        execute(con, "UPDATE user_accounts SET favorites=?, reading_log=?, updated_at=NOW() WHERE room=?",
+                (favs, rlog, room))
+    else:
+        execute(con, "UPDATE user_accounts SET favorites=?, reading_log=?, updated_at=datetime('now','localtime') WHERE room=?",
+                (favs, rlog, room))
     con.commit(); con.close()
     return jsonify({"ok": True})
 

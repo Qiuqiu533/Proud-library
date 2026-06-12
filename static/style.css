@@ -405,3 +405,60 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
 .pw-group input, .pw-group select { padding: 9px 12px; border: 1.5px solid #ddd; border-radius: 8px; font-family: inherit; font-size: 0.9rem; outline: none; }
 .pw-group input:focus { border-color: #3d6b4f; }
 .pw-divider { border: none; border-top: 1px solid #eee; margin: 6px 0 18px; }
+
+/* ===== クラウド同期ボタン ===== */
+.sync-menu-btn { background: rgba(255,255,255,0.18); color: white; border: 1.5px solid rgba(255,255,255,0.4); border-radius: 8px; padding: 7px 12px; font-size: 1rem; cursor: pointer; transition: all .2s; font-family: inherit; white-space: nowrap; }
+.sync-menu-btn:hover { background: rgba(255,255,255,0.28); }
+
+/* 同期状態グリッド */
+.sync-status-grid { display: flex; gap: 12px; margin-bottom: 4px; }
+.sync-stat { flex: 1; background: #f0faf4; border-radius: 10px; padding: 12px 8px; text-align: center; display: flex; flex-direction: column; gap: 4px; }
+.sync-stat span:first-child { font-size: 1.6rem; font-weight: 800; color: #3d6b4f; line-height: 1; }
+.sync-stat span:last-child { font-size: 0.73rem; color: #888; }
+
+/* ===== 著者リンク (#11) ===== */
+.author-link { cursor: pointer; transition: color .15s; }
+.author-link:hover { color: #3d6b4f; text-decoration: underline; }
+
+/* ===== モバイル最適化 (#13) ===== */
+@media (max-width: 600px) {
+  .header-inner { gap: 10px; padding: 0; }
+  .logo-text h1 { font-size: 0.95rem; }
+  .logo-text span { display: none; }
+  .search-bar { min-width: 0; flex: 1; }
+  .search-bar input { font-size: 0.85rem; padding: 8px 10px; }
+  .search-bar button { padding: 8px 12px; font-size: 0.82rem; }
+  .sync-menu-btn { padding: 7px 8px; font-size: 0.9rem; }
+  .board-menu-btn { font-size: 0.78rem; padding: 7px 10px; }
+
+  .tab-nav { overflow-x: auto; -webkit-overflow-scrolling: touch; gap: 2px; padding: 0 8px; }
+  .tab-btn { font-size: 0.78rem; padding: 9px 10px; white-space: nowrap; flex-shrink: 0; }
+
+  .book-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .book-card { min-width: 0; }
+  .book-cover { height: 130px; }
+  .book-title { font-size: 0.8rem; -webkit-line-clamp: 2; }
+  .book-author { font-size: 0.73rem; }
+  .book-meta { font-size: 0.7rem; }
+  .avail-check-btn { font-size: 0.68rem; padding: 2px 6px; }
+
+  .genre-filter-row { gap: 4px; }
+  .genre-btn { font-size: 0.75rem; padding: 4px 9px; }
+
+  .today-book-cover { width: 54px; height: 74px; }
+  .today-book-title { font-size: 0.88rem; }
+
+  .modal-box { margin: 12px; max-height: 90vh; overflow-y: auto; }
+
+  .board-panel { padding: 0; }
+  .board-tabs { gap: 2px; padding: 8px 8px 0; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .board-tab { font-size: 0.76rem; padding: 7px 10px; white-space: nowrap; flex-shrink: 0; }
+  .board-body { padding: 12px; }
+
+  .controls-row { flex-wrap: wrap; gap: 6px; }
+}
+
+@media (max-width: 400px) {
+  .book-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .site-header { padding: 10px 12px; }
+}

@@ -1,4 +1,4 @@
-const CACHE = "proud-library-v1";
+const CACHE = "proud-library-v3";
 const STATIC = ["/", "/static/style.css", "/static/app.js", "/static/manifest.json"];
 
 self.addEventListener("install", e => {
