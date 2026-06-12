@@ -45,6 +45,7 @@
         <input type="text" id="searchInput" placeholder="タイトル・著者で検索…" />
         <button id="searchBtn">検索</button>
       </div>
+      <button id="syncMenuBtn" class="sync-menu-btn" title="クラウド同期">☁️</button>
       <button id="boardMenuBtn" class="board-menu-btn">🏛️ 管理者メニュー</button>
     </div>
   </header>
@@ -211,6 +212,50 @@
       <textarea id="reviewText" placeholder="一言コメント（任意）" rows="3"></textarea>
       <button id="submitRate" class="btn-primary">投稿する</button>
       <p id="rateMsg" class="rate-msg"></p>
+    </div>
+  </div>
+
+  <!-- Cloud Sync modal -->
+  <div id="syncModal" class="modal-overlay" style="display:none">
+    <div class="modal-box modal-small">
+      <button class="modal-close" id="syncModalClose">✕</button>
+      <div id="syncLoginView">
+        <div style="text-align:center;padding:8px 0 16px">
+          <div style="font-size:2rem;margin-bottom:8px">☁️</div>
+          <h3 style="margin-bottom:6px">クラウド同期</h3>
+          <p style="font-size:0.82rem;color:#888;line-height:1.6;margin-bottom:18px">
+            お気に入り・読書記録を複数端末で共有できます。<br>
+            部屋番号とPINで登録・ログインしてください。
+          </p>
+        </div>
+        <div class="pw-group">
+          <label>部屋番号</label>
+          <input type="text" id="syncRoom" placeholder="例：503" maxlength="10" inputmode="numeric" />
+        </div>
+        <div class="pw-group">
+          <label>PIN（4桁以上の数字）</label>
+          <input type="password" id="syncPin" placeholder="例：1234" maxlength="8" inputmode="numeric" />
+        </div>
+        <button class="btn-primary" id="syncLoginBtn" style="width:100%;margin-top:4px">ログイン / 新規登録</button>
+        <p id="syncLoginMsg" class="rate-msg" style="margin-top:8px;text-align:center"></p>
+        <p style="font-size:0.73rem;color:#bbb;text-align:center;margin-top:12px">
+          ※ 初めての場合は自動的に登録されます
+        </p>
+      </div>
+      <div id="syncLoggedView" style="display:none">
+        <div style="text-align:center;padding:8px 0 16px">
+          <div style="font-size:2rem;margin-bottom:8px">✅</div>
+          <h3 style="margin-bottom:4px">同期中</h3>
+          <p id="syncRoomLabel" style="font-size:0.85rem;color:#3d6b4f;font-weight:700;margin-bottom:16px"></p>
+        </div>
+        <div class="sync-status-grid">
+          <div class="sync-stat"><span id="syncFavCount">0</span><span>お気に入り</span></div>
+          <div class="sync-stat"><span id="syncLogCount">0</span><span>読書記録</span></div>
+        </div>
+        <button class="btn-primary" id="syncNowBtn" style="width:100%;margin:14px 0 8px">🔄 今すぐ同期</button>
+        <button class="btn-secondary" id="syncLogoutBtn" style="width:100%;font-size:0.82rem">ログアウト</button>
+        <p id="syncMsg" class="rate-msg" style="margin-top:8px;text-align:center"></p>
+      </div>
     </div>
   </div>
 

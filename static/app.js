@@ -112,7 +112,7 @@ function renderCard(book, opts = {}) {
     </div>
     <div class="book-info">
       <div class="book-title">${book.title}</div>
-      <div class="book-author">${book.author || "著者不明"}</div>
+      <div class="book-author author-link" data-author="${(book.author||"").replace(/"/g,'&quot;')}">${book.author || "著者不明"}</div>
       <div class="book-meta">${book.publisher || ""}</div>
       <div class="card-stars">${starsHtml(rating.score)}</div>
       <div class="avail-check-row">
@@ -126,6 +126,25 @@ function renderCard(book, opts = {}) {
     toggleFav(book.isbn);
     e.currentTarget.classList.toggle("active");
   });
+  // 著者名クリックで検索 (#11)
+  const authorEl = div.querySelector(".author-link");
+  if (authorEl && authorEl.dataset.author) {
+    authorEl.addEventListener("click", e => {
+      e.stopPropagation();
+      const author = authorEl.dataset.author;
+      document.getElementById("searchInput").value = author;
+      // ジャンルフィルターをリセット
+      document.querySelectorAll(".genre-btn").forEach(b => b.classList.remove("active"));
+      document.querySelector('.genre-btn[data-genre=""]').classList.add("active");
+      loadBooks(author, 1);
+      // 蔵書タブに切り替え
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+      document.querySelector('.tab-btn[data-tab="books"]').classList.add("active");
+      document.getElementById("tab-books").classList.add("active");
+    });
+  }
+
   div.querySelector(".avail-check-btn").addEventListener("click", async e => {
     e.stopPropagation();
     const isbn = e.currentTarget.dataset.isbn;
@@ -1155,6 +1174,143 @@ async function loadReqManage() {
     });
   });
 }
+
+// ===== クラウド同期 (#6) =====
+let cloudUser = null; // {room, pin}
+
+function getCloudUser() {
+  try { return JSON.parse(localStorage.getItem("cloud_user")); } catch { return null; }
+}
+function setCloudUser(u) {
+  if (u) localStorage.setItem("cloud_user", JSON.stringify(u));
+  else localStorage.removeItem("cloud_user");
+  cloudUser = u;
+}
+
+function updateSyncUI() {
+  const u = getCloudUser();
+  const btn = document.getElementById("syncMenuBtn");
+  if (u) {
+    btn.textContent = "☁️✓";
+    btn.title = `同期中（部屋番号：${u.room}）`;
+    btn.style.color = "#3d6b4f";
+  } else {
+    btn.textContent = "☁️";
+    btn.title = "クラウド同期";
+    btn.style.color = "";
+  }
+}
+
+async function cloudSync() {
+  const u = getCloudUser();
+  if (!u) return;
+  const favs = getFavIsbns();
+  const rlog = {};
+  getLogEntries().forEach(e => { rlog[e.isbn] = e.status; });
+  try {
+    await fetch("/api/user/sync", {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({room: u.room, pin: u.pin, favorites: favs, reading_log: rlog})
+    });
+    document.getElementById("syncFavCount").textContent = favs.length;
+    document.getElementById("syncLogCount").textContent = Object.keys(rlog).length;
+  } catch {}
+}
+
+// お気に入り・読書ステータス変更時に自動同期
+const _origToggleFav = toggleFav;
+function toggleFav(isbn) {
+  _origToggleFav(isbn);
+  setTimeout(cloudSync, 500);
+}
+const _origSetReadStatus = setReadStatus;
+function setReadStatus(isbn, status) {
+  _origSetReadStatus(isbn, status);
+  setTimeout(cloudSync, 500);
+}
+
+document.getElementById("syncMenuBtn").addEventListener("click", () => {
+  const u = getCloudUser();
+  if (u) {
+    document.getElementById("syncLoginView").style.display = "none";
+    document.getElementById("syncLoggedView").style.display = "block";
+    document.getElementById("syncRoomLabel").textContent = `部屋番号：${u.room}`;
+    const favs = getFavIsbns();
+    const rlog = getLogEntries();
+    document.getElementById("syncFavCount").textContent = favs.length;
+    document.getElementById("syncLogCount").textContent = rlog.length;
+  } else {
+    document.getElementById("syncLoginView").style.display = "block";
+    document.getElementById("syncLoggedView").style.display = "none";
+  }
+  document.getElementById("syncModal").style.display = "flex";
+});
+
+document.getElementById("syncModalClose").addEventListener("click", () => {
+  document.getElementById("syncModal").style.display = "none";
+});
+
+document.getElementById("syncLoginBtn").addEventListener("click", async () => {
+  const room = document.getElementById("syncRoom").value.trim();
+  const pin  = document.getElementById("syncPin").value.trim();
+  const msg  = document.getElementById("syncLoginMsg");
+  if (!room || !pin) { msg.textContent = "部屋番号とPINを入力してください"; msg.style.color="#e05"; return; }
+  document.getElementById("syncLoginBtn").disabled = true;
+  document.getElementById("syncLoginBtn").textContent = "確認中…";
+  const res = await fetch("/api/user/login", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({room, pin})
+  });
+  document.getElementById("syncLoginBtn").disabled = false;
+  document.getElementById("syncLoginBtn").textContent = "ログイン / 新規登録";
+  const data = await res.json();
+  if (!res.ok) { msg.textContent = "❌ " + (data.error || "エラー"); msg.style.color="#e05"; return; }
+
+  setCloudUser({room, pin});
+  updateSyncUI();
+
+  // クラウドデータをローカルにマージ
+  if (!data.is_new) {
+    (data.favorites || []).forEach(isbn => localStorage.setItem("fav_" + isbn, "1"));
+    Object.entries(data.reading_log || {}).forEach(([isbn, status]) => {
+      if (status) localStorage.setItem("read_" + isbn, status);
+    });
+    msg.textContent = `✅ ログイン成功！${data.favorites.length}冊のデータを同期しました`;
+    msg.style.color = "#3d6b4f";
+  } else {
+    // 初回: ローカルデータをクラウドにアップロード
+    await cloudSync();
+    msg.textContent = "✅ 登録完了！データをクラウドに保存しました";
+    msg.style.color = "#3d6b4f";
+  }
+  setTimeout(() => {
+    document.getElementById("syncModal").style.display = "none";
+    document.getElementById("syncLoginView").style.display = "block";
+    document.getElementById("syncLoggedView").style.display = "none";
+    document.getElementById("syncRoom").value = "";
+    document.getElementById("syncPin").value = "";
+    msg.textContent = "";
+  }, 1800);
+});
+
+document.getElementById("syncNowBtn").addEventListener("click", async () => {
+  const msg = document.getElementById("syncMsg");
+  msg.textContent = "同期中…"; msg.style.color = "#888";
+  await cloudSync();
+  msg.textContent = "✅ 同期しました"; msg.style.color = "#3d6b4f";
+  setTimeout(() => { msg.textContent = ""; }, 2000);
+});
+
+document.getElementById("syncLogoutBtn").addEventListener("click", () => {
+  if (!confirm("クラウド同期をログアウトしますか？\nローカルのデータは残ります。")) return;
+  setCloudUser(null);
+  updateSyncUI();
+  document.getElementById("syncModal").style.display = "none";
+});
+
+// 起動時にクラウドユーザー状態を反映
+cloudUser = getCloudUser();
+updateSyncUI();
 
 // ===== パスワード変更 =====
 document.getElementById("pwChangeBtn").addEventListener("click", async () => {
