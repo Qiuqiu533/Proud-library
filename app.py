@@ -441,6 +441,20 @@ def get_rating(isbn):
     return {"score": 0, "votes": 0, "reviews": []}
 
 
+def get_ratings_bulk(isbns):
+    """複数ISBNのレーティングを一括取得"""
+    if not isbns:
+        return {}
+    con = get_con()
+    placeholders = ",".join(["?" for _ in isbns])
+    rows = fetchall(con, f"SELECT isbn, score, votes, reviews FROM ratings WHERE isbn IN ({placeholders})", tuple(isbns))
+    con.close()
+    result = {}
+    for row in rows:
+        result[row["isbn"]] = {"score": row["score"], "votes": row["votes"], "reviews": json.loads(row["reviews"])}
+    return result
+
+
 def save_rating(isbn, score, review=""):
     con = get_con()
     existing = fetchone(con, "SELECT score, votes, reviews FROM ratings WHERE isbn=?", (isbn,))
@@ -707,8 +721,10 @@ def api_books():
     keyword = request.args.get("keyword", "")
     page = int(request.args.get("page", 1))
     data = fetch_books(keyword, page)
+    isbns = [b["isbn"] for b in data["books"] if b.get("isbn")]
+    ratings = get_ratings_bulk(isbns)
     for book in data["books"]:
-        book["rating"] = get_rating(book["isbn"])
+        book["rating"] = ratings.get(book["isbn"], {"score": 0, "votes": 0, "reviews": []})
     return jsonify(data)
 
 
