@@ -52,9 +52,9 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
 .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 16px; margin: 12px 0; }
 .book-card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.07); cursor: pointer; transition: transform .2s, box-shadow .2s; display: flex; flex-direction: column; }
 .book-card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.13); }
-.card-cover-wrap { position: relative; }
-.book-cover { width: 100%; aspect-ratio: 2/3; object-fit: cover; background: #e8e4dc; display: block; }
-.book-cover-placeholder { width: 100%; aspect-ratio: 2/3; background: linear-gradient(135deg, #c8d8c0, #a0b89a); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; }
+.card-cover-wrap { position: relative; overflow: hidden; height: 200px; }
+.book-cover { width: 100%; height: 100%; object-fit: cover; background: #e8e4dc; display: block; }
+.book-cover-placeholder { width: 100%; height: 100%; background: linear-gradient(135deg, #c8d8c0, #a0b89a); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; }
 .fav-btn { position: absolute; top: 6px; right: 6px; background: rgba(255,255,255,0.85); border: none; border-radius: 50%; width: 30px; height: 30px; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #ccc; transition: all .2s; backdrop-filter: blur(4px); }
 .fav-btn.active { color: #e05; }
 .fav-btn:hover { transform: scale(1.2); }
@@ -436,7 +436,7 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
 
   .book-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .book-card { min-width: 0; }
-  .book-cover { height: 130px; }
+  .card-cover-wrap { height: 130px; }
   .book-title { font-size: 0.8rem; -webkit-line-clamp: 2; }
   .book-author { font-size: 0.73rem; }
   .book-meta { font-size: 0.7rem; }
