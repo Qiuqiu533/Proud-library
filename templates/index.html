@@ -607,7 +607,7 @@
               <tr><td>サイトURL</td><td><a href="https://proud-library.onrender.com" target="_blank">https://proud-library.onrender.com</a></td></tr>
               <tr><td>サーバー管理</td><td><a href="https://dashboard.render.com" target="_blank">https://dashboard.render.com</a></td></tr>
               <tr><td>コード管理</td><td><a href="https://github.com/Qiuqiu533/Proud-library" target="_blank">https://github.com/Qiuqiu533/Proud-library</a></td></tr>
-              <tr><td>データベース</td><td>PostgreSQL（Render上）自動バックアップなし※無料プランは2026年7月期限</td></tr>
+              <tr><td>データベース</td><td>PostgreSQL（<a href="https://neon.tech" target="_blank">Neon</a>）無料・無期限プラン使用</td></tr>
             </table>
           </div>
 
@@ -750,9 +750,19 @@
                 <li>「Manual Deploy」→「Deploy latest commit」で手動デプロイ</li>
               </ol>
             </div>
-            <div class="guide-warning-box">
-              ⚠️ <strong>データベースの期限（2026年7月）</strong><br>
-              Renderの無料PostgreSQLは作成から90日で削除されます。期限が近づいたら有料プランへのアップグレードか、新しいデータベースへの移行が必要です。有料プランはBasic（$7/月）から利用可能です。
+            <div class="guide-info-box">
+              ✅ <strong>データベースはNeon（無料・無期限）を使用</strong><br>
+              Renderの無料PostgreSQLは90日で削除されますが、このサイトでは<a href="https://neon.tech" target="_blank">Neon</a>の無料PostgreSQLに移行済みです。Neonは期限なく無料で使えるため、データベースの移行作業は不要です。
+            </div>
+            <div class="guide-step-box" style="margin-top:10px">
+              <strong>もし将来Neonのデータベースを作り直す必要が生じた場合：</strong>
+              <ol class="guide-ol">
+                <li><a href="https://neon.tech" target="_blank">neon.tech</a> にGitHubアカウントでログイン</li>
+                <li>「Create a project」→ Region: Asia Pacific (Singapore) で作成</li>
+                <li>表示された「Connection string」をコピー</li>
+                <li>Render → proud-library → Environment → <code>DATABASE_URL</code> の値を貼り替えて保存</li>
+                <li>自動再デプロイ後、ジャンルデータが自動的に復元されます</li>
+              </ol>
             </div>
           </div>
 
@@ -766,7 +776,7 @@
             </div>
             <div class="guide-faq-item">
               <div class="guide-faq-q">Q. 登録したお知らせや課題が消えた</div>
-              <div class="guide-faq-a">PostgreSQLに移行済みのため、通常は消えません。消えた場合はRenderのLogsでエラーを確認してください。データベースの期限切れの可能性もあります（上記参照）。</div>
+              <div class="guide-faq-a">PostgreSQL（Neon・無期限）に移行済みのため、通常は消えません。消えた場合はRenderのLogsでエラーを確認してください。</div>
             </div>
             <div class="guide-faq-item">
               <div class="guide-faq-q">Q. パスワードを忘れた</div>
