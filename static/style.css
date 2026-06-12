@@ -462,3 +462,15 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
   .book-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
   .site-header { padding: 10px 12px; }
 }
+
+/* ===== 設定セクション ===== */
+.settings-section { background: #f8faf9; border: 1.5px solid #d8e8dd; border-radius: 12px; padding: 18px 20px; margin-bottom: 20px; }
+.settings-section h4 { font-size: 0.95rem; font-weight: 700; margin-bottom: 10px; color: #2a4a37; }
+
+/* Excelアップロード */
+.excel-upload-area { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.excel-upload-btn { padding: 8px 16px; background: white; border: 1.5px solid #3d6b4f; color: #3d6b4f; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: all .18s; }
+.excel-upload-btn:hover { background: #e8f3ec; }
+.excel-file-name { font-size: 0.82rem; color: #888; }
+.upload-progress { height: 6px; background: #e0e0e0; border-radius: 3px; margin-top: 8px; overflow: hidden; }
+.upload-progress-bar { height: 100%; background: linear-gradient(90deg, #3d6b4f, #5a8a6a); border-radius: 3px; transition: width .4s ease; width: 0%; }

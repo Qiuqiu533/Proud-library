@@ -533,7 +533,27 @@
 
       <!-- Settings -->
       <div id="btab-settings" class="board-tab-panel">
-        <h3 style="margin-bottom:20px">⚙️ パスワード変更</h3>
+        <h3 style="margin-bottom:20px">⚙️ 設定</h3>
+
+        <!-- 蔵書Excelアップロード -->
+        <div class="settings-section">
+          <h4>📚 蔵書データ更新</h4>
+          <p class="pw-change-note">蔵書一覧Excelファイル（プラウド船橋_蔵書一覧_完全版.xlsx）をアップロードすると、ジャンルフィルターのデータが自動更新されます。</p>
+          <div class="excel-upload-area" id="excelUploadArea">
+            <input type="file" id="excelFileInput" accept=".xlsx" style="display:none">
+            <button class="excel-upload-btn" id="excelPickBtn">📂 Excelファイルを選択</button>
+            <span id="excelFileName" class="excel-file-name">ファイル未選択</span>
+          </div>
+          <button class="btn-primary" id="excelUploadBtn" style="margin-top:10px" disabled>⬆️ アップロードして更新</button>
+          <div id="excelUploadProgress" style="display:none" class="upload-progress">
+            <div class="upload-progress-bar" id="excelProgressBar"></div>
+          </div>
+          <p id="excelUploadMsg" class="rate-msg" style="margin-top:8px"></p>
+        </div>
+
+        <hr class="pw-divider" style="margin:24px 0">
+
+        <h4 style="margin-bottom:16px">🔐 パスワード変更</h4>
         <div class="pw-change-form">
           <p class="pw-change-note">変更するには現在の理事・管理者パスワードが必要です。</p>
           <div class="pw-group">
