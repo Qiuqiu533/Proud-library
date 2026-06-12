@@ -4,6 +4,14 @@ from bs4 import BeautifulSoup
 import json
 import os
 
+# ── ジャンル別蔵書データ（Excelから事前生成）──────────────────────────────
+_GENRE_MAP_PATH = os.path.join(os.path.dirname(__file__), "static", "genre_map.json")
+try:
+    with open(_GENRE_MAP_PATH, encoding="utf-8") as _f:
+        GENRE_MAP = json.load(_f)
+except Exception:
+    GENRE_MAP = {}
+
 app = Flask(__name__)
 
 # ── DB設定 ──────────────────────────────────────────────────────────────
@@ -574,6 +582,35 @@ FULL_STATS = {
 @app.route("/ping")
 def ping():
     return "ok", 200
+
+
+@app.route("/api/genres")
+def api_genres():
+    """ジャンル一覧と件数を返す"""
+    return jsonify([
+        {"genre": g, "count": len(books)}
+        for g, books in sorted(GENRE_MAP.items(), key=lambda x: -len(x[1]))
+    ])
+
+
+@app.route("/api/books/by-genre")
+def api_books_by_genre():
+    """ジャンル別書籍一覧（ページネーション付き）"""
+    genre = request.args.get("genre", "")
+    page  = int(request.args.get("page", 1))
+    per   = 50
+    books = GENRE_MAP.get(genre, [])
+    total = len(books)
+    start = (page - 1) * per
+    page_books = books[start:start + per]
+    result = []
+    for b in page_books:
+        isbn13 = b["isbn"]
+        isbn10 = isbn13_to_isbn10(isbn13) if isbn13.startswith("978") else ""
+        cover  = get_cover_url(isbn13, isbn10)
+        result.append({**b, "isbn10": isbn10, "cover": cover,
+                       "rating": get_rating(isbn13)})
+    return jsonify({"books": result, "total": total, "page": page, "genre": genre})
 
 
 @app.route("/api/stats")
