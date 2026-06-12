@@ -295,9 +295,9 @@ def init_db():
 def _ensure_db():
     try:
         init_db()
-        _migrate_genre_map_to_db()
     except Exception as e:
         print(f"DB init error: {e}")
+    threading.Thread(target=_migrate_genre_map_to_db, daemon=True).start()
 
 
 def _migrate_genre_map_to_db():
