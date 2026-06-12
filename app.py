@@ -93,7 +93,7 @@ LIBRARY_INFO = {
 
 _ADMIN_PASSWORD_ENV    = os.environ.get("ADMIN_PASSWORD",    "[REDACTED-4]")
 _RESIDENT_PASSWORD_ENV = os.environ.get("RESIDENT_PASSWORD", "[REDACTED-2]")
-_BOARD_PASSWORD_ENV    = os.environ.get("BOARD_PASSWORD",    "[REDACTED-5]")
+_BOARD_PASSWORD_ENV    = os.environ.get("BOARD_PASSWORD",    "[REDACTED-1]")
 
 
 def get_setting(key, default=""):
