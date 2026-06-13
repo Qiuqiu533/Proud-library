@@ -1176,15 +1176,14 @@ function setupRoomInput(id) {
   const el = document.getElementById(id);
   if (!el) return;
   el.addEventListener("input", (e) => {
-    let val = e.target.value.replace(/\D/g, ""); // 数字のみ残す
-    if (val.length >= 1 && val[0] >= "1" && val[0] <= "5") {
-      const formatted = val.length >= 2 ? `${val[0]}-${val.slice(1)}` : `${val[0]}-`;
-      e.target.value = formatted;
-    } else {
-      e.target.value = val;
+    const val = e.target.value;
+    // 先頭が1〜5の数字のみの場合だけハイフン自動挿入
+    if (/^\d/.test(val) && val[0] >= "1" && val[0] <= "5" && !val.includes("-")) {
+      const digits = val.replace(/\D/g, "");
+      e.target.value = digits.length >= 2 ? `${digits[0]}-${digits.slice(1)}` : `${digits[0]}-`;
     }
+    // 名前など数字以外の入力はそのまま通す
   });
-  // バックスペースでハイフン削除しやすくする
   el.addEventListener("keydown", (e) => {
     if (e.key === "Backspace" && el.value.endsWith("-")) {
       e.preventDefault();
