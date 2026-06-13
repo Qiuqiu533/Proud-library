@@ -233,7 +233,7 @@ async function loadBooks(keyword = "", page = 1) {
   currentTotal = data.total;
   let books = data.books.map(b => ({ ...b, rating: getRating(b.isbn) }));
   if (currentSort === "title") books.sort((a, b) => a.title.localeCompare(b.title, "ja"));
-  if (currentSort === "author") books.sort((a, b) => a.author.localeCompare(b.author, "ja"));
+  if (currentSort === "author") books.sort((a, b) => authorSortKey(a.author).localeCompare(authorSortKey(b.author), "ja"));
   if (currentSort === "fav") books.sort((a, b) => (isFav(b.isbn) ? 1 : 0) - (isFav(a.isbn) ? 1 : 0));
   document.getElementById("totalCount").textContent = `全 ${data.total.toLocaleString()} 件`;
   renderGrid("bookGrid", books);
@@ -261,6 +261,13 @@ async function loadTodayBook() {
     });
     section.style.display = "block";
   } catch (e) {}
+}
+
+function authorSortKey(author) {
+  if (!author || author === "著者不明") return "￿"; // 末尾へ
+  // アルファベット始まりは日本語の後ろへ（先頭に"z"プレフィックス）
+  if (/^[A-Za-z]/.test(author)) return "z" + author.toLowerCase();
+  return author;
 }
 
 // ===== ジャンルフィルター =====
@@ -302,7 +309,7 @@ async function loadBooksByGenre(genre, page = 1) {
   currentTotal = data.total;
   let books = data.books.map(b => ({ ...b, rating: b.rating || getRating(b.isbn) }));
   if (currentSort === "title") books.sort((a, b) => a.title.localeCompare(b.title, "ja"));
-  if (currentSort === "author") books.sort((a, b) => a.author.localeCompare(b.author, "ja"));
+  if (currentSort === "author") books.sort((a, b) => authorSortKey(a.author).localeCompare(authorSortKey(b.author), "ja"));
   if (currentSort === "fav") books.sort((a, b) => (isFav(b.isbn) ? 1 : 0) - (isFav(a.isbn) ? 1 : 0));
   document.getElementById("totalCount").textContent = `全 ${data.total.toLocaleString()} 件（${genre}）`;
   renderGrid("bookGrid", books);
