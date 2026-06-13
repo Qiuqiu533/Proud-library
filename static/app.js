@@ -512,6 +512,7 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
     if (btn.dataset.tab === "new") loadNew();
     if (btn.dataset.tab === "fav") loadFavorites();
     if (btn.dataset.tab === "log") loadLog("all");
+    if (btn.dataset.tab === "loaned") loadLoanedResident();
     if (btn.dataset.tab === "news") loadNews();
     if (btn.dataset.tab === "info") loadInfo();
   });
@@ -1400,7 +1401,30 @@ document.getElementById("pwChangeBtn").addEventListener("click", async () => {
   }
 });
 
-// ===== 貸出中一覧 =====
+// ===== 貸出中一覧（入居者タブ） =====
+async function loadLoanedResident() {
+  const grid = document.getElementById("loanedResGrid");
+  if (!grid) return;
+  grid.innerHTML = '<div class="loading">読み込み中…</div>';
+  const res = await fetch("/api/availability/loaned");
+  const items = await res.json();
+  if (!items.length) {
+    grid.innerHTML = '<div class="loading">貸出中の記録がありません。<br>本の詳細を開くと在架状況が自動で記録されます。</div>';
+    return;
+  }
+  // ISBNで本の詳細を取得してカード表示
+  const books = await Promise.all(items.map(r =>
+    fetch(`/api/book/${r.isbn}`).then(res => res.json()).catch(() => ({
+      isbn: r.isbn, title: r.title || r.isbn, author: r.author || "", publisher: "", cover: null,
+      rating: { score: 0, votes: 0, reviews: [] }
+    }))
+  ));
+  grid.innerHTML = "";
+  books.forEach(b => grid.appendChild(renderCard(b)));
+  applyAvailCache(books.map(b => b.isbn).filter(Boolean));
+}
+
+// ===== 貸出中一覧（管理者パネル） =====
 async function loadLoanedBooks() {
   const el = document.getElementById("loanedList");
   if (!el) return;
