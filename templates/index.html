@@ -180,8 +180,8 @@
             <textarea id="reqReason" placeholder="例：子どもと一緒に読みたいです。シリーズ全巻揃えてほしいです。" rows="3" maxlength="200"></textarea>
           </div>
           <div class="req-field">
-            <label>部屋番号（任意）</label>
-            <input type="text" id="reqRoom" placeholder="例：503" maxlength="10" />
+            <label>部屋番号（任意・数字のみ・ハイフン不要）</label>
+            <input type="text" id="reqRoom" placeholder="例：5533（5街区533室）、11203（1街区1203室）" maxlength="6" inputmode="numeric" />
           </div>
           <button class="btn-primary req-submit-btn" id="reqSubmitBtn">📨 リクエストを送る</button>
           <p id="reqMsg" class="rate-msg" style="margin-top:10px"></p>
