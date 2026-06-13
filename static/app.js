@@ -555,12 +555,77 @@ document.getElementById("submitRate").addEventListener("click", () => {
   }, 800);
 });
 
+// 画像をCanvas経由でリサイズしてbase64に変換（最大幅1000px、JPEG品質0.82）
+function resizeImageFile(file, maxWidth = 1000) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxWidth / img.width);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+let newsImageData = ""; // URL or base64
+
+function clearNewsImage() {
+  newsImageData = "";
+  document.getElementById("newsImage").value = "";
+  document.getElementById("newsImageFile").value = "";
+  document.getElementById("newsImageFileName").textContent = "未選択";
+  document.getElementById("newsImagePreview").style.display = "none";
+  document.getElementById("newsPreviewImg").src = "";
+}
+
+function showNewsPreview(src) {
+  const preview = document.getElementById("newsImagePreview");
+  const img = document.getElementById("newsPreviewImg");
+  img.src = src;
+  img.onload = () => { preview.style.display = "block"; };
+  img.onerror = () => { preview.style.display = "none"; };
+}
+
+// URL入力でプレビュー
+document.getElementById("newsImage").addEventListener("input", e => {
+  const url = e.target.value.trim();
+  if (url) {
+    newsImageData = url;
+    newsImageFile.value = "";
+    document.getElementById("newsImageFileName").textContent = "未選択";
+    showNewsPreview(url);
+  } else {
+    newsImageData = "";
+    document.getElementById("newsImagePreview").style.display = "none";
+  }
+});
+
+// ファイル選択でプレビュー
+document.getElementById("newsImageFile").addEventListener("change", async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  document.getElementById("newsImageFileName").textContent = file.name;
+  document.getElementById("newsImage").value = "";
+  newsImageData = await resizeImageFile(file);
+  showNewsPreview(newsImageData);
+});
+
+document.getElementById("newsClearImg")?.addEventListener("click", clearNewsImage);
+
 document.getElementById("postNews")?.addEventListener("click", async () => {
   const title = document.getElementById("newsTitle").value.trim();
   const body = document.getElementById("newsBody").value.trim();
   const pass = document.getElementById("adminPass").value;
   const cat = document.getElementById("newsCat").value;
-  const image_url = document.getElementById("newsImage").value.trim();
+  const image_url = newsImageData || document.getElementById("newsImage").value.trim();
   if (!title || !body) { document.getElementById("newsMsg").textContent = "タイトルと内容を入力してください"; return; }
   const res = await fetch("/api/announcements", {
     method: "POST", headers: { "Content-Type": "application/json" },
@@ -570,26 +635,11 @@ document.getElementById("postNews")?.addEventListener("click", async () => {
     document.getElementById("newsMsg").textContent = "✅ 投稿しました！";
     document.getElementById("newsTitle").value = "";
     document.getElementById("newsBody").value = "";
-    document.getElementById("newsImage").value = "";
-    document.getElementById("newsImagePreview").style.display = "none";
+    clearNewsImage();
     loadAdminNews();
     loadNews();
   } else {
     document.getElementById("newsMsg").textContent = "❌ パスワードが違います";
-  }
-});
-
-// Image URL preview
-document.getElementById("newsImage").addEventListener("input", e => {
-  const url = e.target.value.trim();
-  const preview = document.getElementById("newsImagePreview");
-  const img = document.getElementById("newsPreviewImg");
-  if (url) {
-    img.src = url;
-    img.onload = () => { preview.style.display = "block"; };
-    img.onerror = () => { preview.style.display = "none"; };
-  } else {
-    preview.style.display = "none";
   }
 });
 
