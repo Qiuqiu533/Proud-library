@@ -797,41 +797,37 @@ function renderIssues() {
 
   // Move up/down handlers (operate on allIssues array)
   list.querySelectorAll(".issue-up").forEach(btn => {
-    btn.addEventListener("click", async () => {
+    btn.addEventListener("click", () => {
       const id = parseInt(btn.dataset.id);
       const visibleIds = items.map(i => i.id);
       const idx = visibleIds.indexOf(id);
       if (idx <= 0) return;
-      // Swap sort_order values in allIssues
       const aIdx = allIssues.findIndex(i => i.id === visibleIds[idx]);
       const bIdx = allIssues.findIndex(i => i.id === visibleIds[idx - 1]);
-      [allIssues[aIdx].sort_order, allIssues[bIdx].sort_order] = [allIssues[bIdx].sort_order, allIssues[aIdx].sort_order];
-      // Re-sort allIssues
-      allIssues.sort((a,b) => a.sort_order - b.sort_order);
-      await fetch("/api/issues/reorder", {
+      [allIssues[aIdx], allIssues[bIdx]] = [allIssues[bIdx], allIssues[aIdx]];
+      allIssues.forEach((it,i) => it.sort_order = i);
+      renderIssues();
+      fetch("/api/issues/reorder", {
         method: "POST", headers: {"Content-Type":"application/json"},
         body: JSON.stringify({password: boardPassword, order: allIssues.map((it,i) => ({id:it.id, sort_order:i}))})
       });
-      allIssues.forEach((it,i) => it.sort_order = i);
-      renderIssues();
     });
   });
   list.querySelectorAll(".issue-down").forEach(btn => {
-    btn.addEventListener("click", async () => {
+    btn.addEventListener("click", () => {
       const id = parseInt(btn.dataset.id);
       const visibleIds = items.map(i => i.id);
       const idx = visibleIds.indexOf(id);
       if (idx >= visibleIds.length - 1) return;
       const aIdx = allIssues.findIndex(i => i.id === visibleIds[idx]);
       const bIdx = allIssues.findIndex(i => i.id === visibleIds[idx + 1]);
-      [allIssues[aIdx].sort_order, allIssues[bIdx].sort_order] = [allIssues[bIdx].sort_order, allIssues[aIdx].sort_order];
-      allIssues.sort((a,b) => a.sort_order - b.sort_order);
-      await fetch("/api/issues/reorder", {
+      [allIssues[aIdx], allIssues[bIdx]] = [allIssues[bIdx], allIssues[aIdx]];
+      allIssues.forEach((it,i) => it.sort_order = i);
+      renderIssues();
+      fetch("/api/issues/reorder", {
         method: "POST", headers: {"Content-Type":"application/json"},
         body: JSON.stringify({password: boardPassword, order: allIssues.map((it,i) => ({id:it.id, sort_order:i}))})
       });
-      allIssues.forEach((it,i) => it.sort_order = i);
-      renderIssues();
     });
   });
 
@@ -1055,33 +1051,31 @@ function renderCalendar() {
     </div>`).join("");
 
   list.querySelectorAll(".cal-up").forEach(btn => {
-    btn.addEventListener("click", async () => {
+    btn.addEventListener("click", () => {
       const id = parseInt(btn.dataset.id);
       const idx = allCalItems.findIndex(i => i.id === id);
       if (idx <= 0) return;
-      [allCalItems[idx].sort_order, allCalItems[idx-1].sort_order] = [allCalItems[idx-1].sort_order, allCalItems[idx].sort_order];
-      allCalItems.sort((a,b) => a.sort_order - b.sort_order);
-      await fetch("/api/calendar/reorder", {
+      [allCalItems[idx], allCalItems[idx-1]] = [allCalItems[idx-1], allCalItems[idx]];
+      allCalItems.forEach((it,i) => it.sort_order = i);
+      renderCalendar();
+      fetch("/api/calendar/reorder", {
         method: "POST", headers: {"Content-Type":"application/json"},
         body: JSON.stringify({password: boardPassword, order: allCalItems.map((it,i) => ({id:it.id, sort_order:i}))})
       });
-      allCalItems.forEach((it,i) => it.sort_order = i);
-      renderCalendar();
     });
   });
   list.querySelectorAll(".cal-down").forEach(btn => {
-    btn.addEventListener("click", async () => {
+    btn.addEventListener("click", () => {
       const id = parseInt(btn.dataset.id);
       const idx = allCalItems.findIndex(i => i.id === id);
       if (idx >= allCalItems.length - 1) return;
-      [allCalItems[idx].sort_order, allCalItems[idx+1].sort_order] = [allCalItems[idx+1].sort_order, allCalItems[idx].sort_order];
-      allCalItems.sort((a,b) => a.sort_order - b.sort_order);
-      await fetch("/api/calendar/reorder", {
+      [allCalItems[idx], allCalItems[idx+1]] = [allCalItems[idx+1], allCalItems[idx]];
+      allCalItems.forEach((it,i) => it.sort_order = i);
+      renderCalendar();
+      fetch("/api/calendar/reorder", {
         method: "POST", headers: {"Content-Type":"application/json"},
         body: JSON.stringify({password: boardPassword, order: allCalItems.map((it,i) => ({id:it.id, sort_order:i}))})
       });
-      allCalItems.forEach((it,i) => it.sort_order = i);
-      renderCalendar();
     });
   });
 
