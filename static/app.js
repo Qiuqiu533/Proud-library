@@ -30,6 +30,17 @@ document.getElementById("residentPass").addEventListener("keydown", e => {
   if (e.key === "Enter") document.getElementById("loginBtn").click();
 });
 
+document.getElementById("logoutBtn").addEventListener("click", () => {
+  if (!confirm("ログアウトしますか？")) return;
+  localStorage.removeItem("resident_auth");
+  sessionStorage.removeItem("resident_pass");
+  sessionStorage.removeItem("board_auth");
+  sessionStorage.removeItem("board_pass");
+  document.getElementById("loginScreen").style.display = "flex";
+  document.getElementById("residentPass").value = "";
+  document.getElementById("loginError").textContent = "";
+});
+
 // ===== State =====
 let currentPage = 1;
 let currentKeyword = "";
