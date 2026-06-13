@@ -199,6 +199,8 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
 /* ===== Board menu button ===== */
 .board-menu-btn { padding: 8px 14px; background: rgba(255,255,255,0.15); color: white; border: 1.5px solid rgba(255,255,255,0.4); border-radius: 8px; font-family: inherit; font-size: 0.82rem; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: background .2s; }
 .board-menu-btn:hover { background: rgba(255,255,255,0.25); }
+.logout-btn { padding: 8px 12px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.75); border: 1.5px solid rgba(255,255,255,0.25); border-radius: 8px; font-family: inherit; font-size: 0.78rem; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: all .2s; }
+.logout-btn:hover { background: rgba(255,80,80,0.25); border-color: rgba(255,120,120,0.5); color: white; }
 
 /* ===== Board panel ===== */
 .board-panel { position: fixed; inset: 0; background: #f5f3ef; z-index: 300; flex-direction: column; overflow: hidden; }
