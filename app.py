@@ -681,12 +681,14 @@ def api_books_by_genre():
     rows = fetchall(con, "SELECT isbn,genre,title,author,publisher,format FROM genre_books WHERE genre=? LIMIT ? OFFSET ?",
                     (genre, per, offset))
     con.close()
+    isbns = [b["isbn"] for b in rows]
+    ratings = get_ratings_bulk(isbns)
     result = []
     for b in rows:
         isbn13 = b["isbn"]
         isbn10 = isbn13_to_isbn10(isbn13) if isbn13.startswith("978") else ""
         cover  = get_cover_url(isbn13, isbn10)
-        result.append({**b, "isbn10": isbn10, "cover": cover, "rating": get_rating(isbn13)})
+        result.append({**b, "isbn10": isbn10, "cover": cover, "rating": ratings.get(isbn13, {"score": 0, "votes": 0, "reviews": []})})
     return jsonify({"books": result, "total": total, "page": page, "genre": genre})
 
 
