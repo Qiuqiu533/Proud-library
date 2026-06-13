@@ -91,7 +91,7 @@ LIBRARY_INFO = {
     "note": "最新情報はlibrarlife.netをご確認ください。",
 }
 
-_ADMIN_PASSWORD_ENV    = os.environ.get("ADMIN_PASSWORD",    "[REDACTED-4]")
+_ADMIN_PASSWORD_ENV    = os.environ.get("ADMIN_PASSWORD",    "[REDACTED-1]")
 _RESIDENT_PASSWORD_ENV = os.environ.get("RESIDENT_PASSWORD", "[REDACTED-2]")
 _BOARD_PASSWORD_ENV    = os.environ.get("BOARD_PASSWORD",    "[REDACTED-1]")
 
