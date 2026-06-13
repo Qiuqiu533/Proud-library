@@ -289,6 +289,7 @@
     <div class="board-tabs">
       <button class="board-tab active" data-btab="issues">📋 課題管理</button>
       <button class="board-tab" data-btab="brequest">📬 リクエスト</button>
+      <button class="board-tab" data-btab="loaned">📤 貸出中一覧</button>
       <button class="board-tab" data-btab="stats">📊 蔵書統計</button>
       <button class="board-tab" data-btab="calendar">📅 活動カレンダー</button>
       <button class="board-tab" data-btab="analysis">📈 集計・分析</button>
@@ -335,6 +336,13 @@
       <div id="btab-brequest" class="board-tab-panel">
         <div class="req-admin-summary" id="reqSummary"></div>
         <div id="reqAdminList"><div class="loading">読み込み中…</div></div>
+      </div>
+
+      <!-- Loaned books -->
+      <div id="btab-loaned" class="board-tab-panel">
+        <h3 style="margin-bottom:8px">📤 貸出中書籍一覧</h3>
+        <p style="font-size:0.82rem;color:#888;margin-bottom:14px">蔵書ページを閲覧すると自動で在架状況を確認し、貸出中の本をここに記録します（48時間以内）。</p>
+        <div id="loanedList"><div class="loading">読み込み中…</div></div>
       </div>
 
       <!-- Stats -->

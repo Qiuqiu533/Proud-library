@@ -201,6 +201,15 @@ def init_db():
                 format TEXT DEFAULT ''
             )
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS availability_cache (
+                isbn TEXT PRIMARY KEY,
+                status TEXT,
+                title TEXT DEFAULT '',
+                author TEXT DEFAULT '',
+                updated_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
         con.commit()
     else:
         con.execute("""
@@ -287,6 +296,15 @@ def init_db():
                 author TEXT DEFAULT '',
                 publisher TEXT DEFAULT '',
                 format TEXT DEFAULT ''
+            )
+        """)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS availability_cache (
+                isbn TEXT PRIMARY KEY,
+                status TEXT,
+                title TEXT DEFAULT '',
+                author TEXT DEFAULT '',
+                updated_at TEXT DEFAULT (datetime('now','localtime'))
             )
         """)
         con.commit()
@@ -934,7 +952,21 @@ def api_change_password():
 # --- Quick availability check ---
 @app.route("/api/availability/<isbn>")
 def api_availability(isbn):
-    """本の在架状況のみを高速取得（詳細ページをスクレイピング）"""
+    """本の在架状況のみを高速取得（2時間以内のキャッシュがあればそれを返す）"""
+    con = get_con()
+    try:
+        # キャッシュチェック（2時間以内）
+        if USE_PG:
+            cached = fetchone(con, "SELECT status, updated_at FROM availability_cache WHERE isbn=%s AND updated_at > NOW() - INTERVAL '2 hours'", (isbn,))
+        else:
+            cached = fetchone(con, "SELECT status, updated_at FROM availability_cache WHERE isbn=? AND updated_at > datetime('now','-2 hours','localtime')", (isbn,))
+        if cached:
+            con.close()
+            return jsonify({"status": cached["status"], "cached": True})
+    except Exception:
+        pass
+
+    # スクレイピング
     try:
         url = f"{LIBRARYLIFE_BASE}/booksearch/detail/{isbn}"
         resp = requests.get(url, timeout=8)
@@ -945,17 +977,65 @@ def api_availability(isbn):
             if len(tds) >= 3 and tds[1].text.strip() and tds[2].text.strip():
                 availability.append({"library": tds[1].text.strip(), "status": tds[2].text.strip()})
         if not availability:
+            con.close()
             return jsonify({"status": "unknown"})
-        # 在架があれば available、全て貸出中なら loaned
         statuses = [a["status"] for a in availability]
         if any(s in ("利用可能", "在架") for s in statuses):
-            return jsonify({"status": "available", "items": availability})
+            result_status = "available"
         elif any("貸出中" in s for s in statuses):
-            return jsonify({"status": "loaned", "items": availability})
+            result_status = "loaned"
         else:
-            return jsonify({"status": "unknown", "items": availability})
-    except Exception as e:
+            result_status = "unknown"
+
+        # キャッシュ保存（title/authorはgenre_booksから取得）
+        try:
+            book_row = fetchone(con, "SELECT title, author FROM genre_books WHERE isbn=?", (isbn,))
+            title = book_row["title"] if book_row else ""
+            author = book_row["author"] if book_row else ""
+            if USE_PG:
+                execute(con, """
+                    INSERT INTO availability_cache (isbn, status, title, author, updated_at)
+                    VALUES (%s, %s, %s, %s, NOW())
+                    ON CONFLICT (isbn) DO UPDATE SET status=EXCLUDED.status, title=EXCLUDED.title, author=EXCLUDED.author, updated_at=NOW()
+                """, (isbn, result_status, title, author))
+            else:
+                execute(con, """
+                    INSERT OR REPLACE INTO availability_cache (isbn, status, title, author, updated_at)
+                    VALUES (?, ?, ?, ?, datetime('now','localtime'))
+                """, (isbn, result_status, title, author))
+            con.commit()
+        except Exception:
+            pass
+
+        con.close()
+        return jsonify({"status": result_status, "items": availability})
+    except Exception:
+        con.close()
         return jsonify({"status": "error"}), 500
+
+
+@app.route("/api/availability/loaned")
+def api_availability_loaned():
+    """貸出中としてキャッシュされた書籍一覧（最新48時間）"""
+    con = get_con()
+    try:
+        if USE_PG:
+            rows = fetchall(con, """
+                SELECT isbn, title, author, updated_at FROM availability_cache
+                WHERE status='loaned' AND updated_at > NOW() - INTERVAL '48 hours'
+                ORDER BY updated_at DESC
+            """)
+        else:
+            rows = fetchall(con, """
+                SELECT isbn, title, author, updated_at FROM availability_cache
+                WHERE status='loaned' AND updated_at > datetime('now','-48 hours','localtime')
+                ORDER BY updated_at DESC
+            """)
+        con.close()
+        return jsonify(rows)
+    except Exception as e:
+        con.close()
+        return jsonify([]), 500
 
 
 # ── ジャンル自動分類 ──────────────────────────────────────────────────────

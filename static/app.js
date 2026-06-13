@@ -115,10 +115,7 @@ function renderCard(book, opts = {}) {
       <div class="book-author author-link" data-author="${(book.author||"").replace(/"/g,'&quot;')}">${book.author || "著者不明"}</div>
       <div class="book-meta">${book.publisher || ""}</div>
       <div class="card-stars">${starsHtml(rating.score)}</div>
-      <div class="avail-check-row">
-        <button class="avail-check-btn" data-isbn="${book.isbn}" title="在架状況を確認">📚 在架確認</button>
-        <span class="avail-check-result" id="avail-${book.isbn}"></span>
-      </div>
+      <div class="avail-status" id="avail-${book.isbn}"><span class="avail-badge avail-checking">確認中…</span></div>
     </div>`;
 
   div.querySelector(".fav-btn").addEventListener("click", e => {
@@ -145,31 +142,37 @@ function renderCard(book, opts = {}) {
     });
   }
 
-  div.querySelector(".avail-check-btn").addEventListener("click", async e => {
-    e.stopPropagation();
-    const isbn = e.currentTarget.dataset.isbn;
-    const result = document.getElementById("avail-" + isbn);
-    e.currentTarget.textContent = "確認中…";
-    e.currentTarget.disabled = true;
-    try {
-      const res = await fetch(`/api/availability/${isbn}`);
-      const data = await res.json();
-      e.currentTarget.style.display = "none";
-      if (data.status === "available") {
-        result.innerHTML = '<span class="avail-badge avail-ok">✅ 在架</span>';
-      } else if (data.status === "loaned") {
-        result.innerHTML = '<span class="avail-badge avail-ng">📤 貸出中</span>';
-      } else {
-        result.innerHTML = '<span class="avail-badge avail-unknown">❓ 不明</span>';
-      }
-    } catch {
-      e.currentTarget.textContent = "📚 在架確認";
-      e.currentTarget.disabled = false;
-    }
-  });
   div.addEventListener("click", () => openModal(book.isbn));
+  availObserver.observe(div);
   return div;
 }
+
+// IntersectionObserver: カードが画面に入ったら自動で在架確認
+const _availFetching = new Set();
+const availObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (!entry.isIntersecting) return;
+    const card = entry.target;
+    const statusEl = card.querySelector(".avail-status[id^='avail-']");
+    if (!statusEl) return;
+    const isbn = statusEl.id.replace("avail-", "");
+    if (_availFetching.has(isbn)) return;
+    _availFetching.add(isbn);
+    availObserver.unobserve(card);
+    fetch(`/api/availability/${isbn}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.status === "available") {
+          statusEl.innerHTML = '<span class="avail-badge avail-ok">✅ 在架</span>';
+        } else if (data.status === "loaned") {
+          statusEl.innerHTML = '<span class="avail-badge avail-ng">📤 貸出中</span>';
+        } else {
+          statusEl.innerHTML = '';
+        }
+      })
+      .catch(() => { statusEl.innerHTML = ''; });
+  });
+}, { threshold: 0.1 });
 
 function renderGrid(containerId, books) {
   const grid = document.getElementById(containerId);
@@ -628,6 +631,7 @@ document.querySelectorAll(".board-tab").forEach(btn => {
     if (btn.dataset.btab === "calendar") loadCalendar();
     if (btn.dataset.btab === "issues") loadIssues();
     if (btn.dataset.btab === "brequest") loadReqManage();
+    if (btn.dataset.btab === "loaned") loadLoanedBooks();
   });
 });
 
@@ -1383,6 +1387,30 @@ document.getElementById("pwChangeBtn").addEventListener("click", async () => {
     msg.style.color = "#e05";
   }
 });
+
+// ===== 貸出中一覧 =====
+async function loadLoanedBooks() {
+  const el = document.getElementById("loanedList");
+  if (!el) return;
+  el.innerHTML = '<div class="loading">読み込み中…</div>';
+  const res = await fetch("/api/availability/loaned");
+  const items = await res.json();
+  if (!items.length) {
+    el.innerHTML = '<div class="loading">貸出中の記録がありません。<br>蔵書ページで本を表示すると自動的に在架状況を確認し、ここに記録されます。</div>';
+    return;
+  }
+  el.innerHTML = items.map(r => `
+    <div class="req-card" style="cursor:pointer" onclick="openModal('${esc(r.isbn)}');document.getElementById('boardPanel').style.display='none'">
+      <div class="req-card-header">
+        <div class="req-card-left">
+          <span class="req-book-title">📤 ${esc(r.title || r.isbn)}</span>
+          ${r.author ? `<span class="req-author-badge">${esc(r.author)}</span>` : ""}
+        </div>
+        <span class="avail-badge avail-ng" style="font-size:0.78rem">貸出中</span>
+      </div>
+      <div class="req-meta">ISBN: ${esc(r.isbn)}　🕐 確認日時: ${r.updated_at ? r.updated_at.slice(0,16) : ""}</div>
+    </div>`).join("");
+}
 
 function esc(s) {
   return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");

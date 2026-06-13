@@ -388,13 +388,11 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
 .genre-btn.active { background: #3d6b4f; border-color: #3d6b4f; color: white; font-weight: 700; }
 
 /* ===== 在架確認 ===== */
-.avail-check-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
-.avail-check-btn { padding: 3px 9px; font-size: 0.73rem; border: 1.5px solid #c8ddd0; border-radius: 10px; background: white; color: #3d6b4f; cursor: pointer; font-family: inherit; transition: all .15s; white-space: nowrap; }
-.avail-check-btn:hover { background: #e8f3ec; }
-.avail-check-btn:disabled { opacity: 0.6; cursor: default; }
+.avail-status { min-height: 22px; margin-top: 6px; }
 .avail-badge { font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
 .avail-ok { background: #d4f0dd; color: #1a7a3a; }
 .avail-ng { background: #fde8e8; color: #c02020; }
+.avail-checking { background: #f0f0f0; color: #aaa; font-weight: 400; }
 .avail-unknown { background: #f0f0f0; color: #888; }
 
 /* ===== パスワード変更 ===== */
@@ -440,7 +438,6 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
   .book-title { font-size: 0.8rem; -webkit-line-clamp: 2; }
   .book-author { font-size: 0.73rem; }
   .book-meta { font-size: 0.7rem; }
-  .avail-check-btn { font-size: 0.68rem; padding: 2px 6px; }
 
   .genre-filter-row { gap: 4px; }
   .genre-btn { font-size: 0.75rem; padding: 4px 9px; }
