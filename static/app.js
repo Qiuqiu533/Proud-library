@@ -246,29 +246,36 @@ async function loadBooks(keyword = "", page = 1) {
 async function loadTodayBook() {
   try {
     const res = await fetch("/api/today-book");
-    const book = await res.json();
-    if (!book) return;
+    const books = await res.json();
+    if (!books || !books.length) return;
     const section = document.getElementById("todayBookSection");
     const card = document.getElementById("todayBookCard");
-    const img = book.cover
-      ? `<img class="today-book-cover" src="${book.cover}" alt="${book.title}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'today-book-cover-placeholder',textContent:'📖'}))">`
-      : `<div class="today-book-cover-placeholder">📖</div>`;
-    card.innerHTML = `
-      <div class="today-book-inner" data-isbn="${book.isbn}">
-        ${img}
-        <div class="today-book-info">
-          <div class="today-book-title">${book.title}</div>
-          <div class="today-book-author">${book.author || "著者不明"}</div>
-          <div class="today-book-meta">${book.publisher || ""}</div>
-        </div>
-      </div>`;
-    card.querySelector(".today-book-inner").addEventListener("click", () => openModal(book.isbn));
+    card.innerHTML = books.map(b => {
+      const img = b.cover
+        ? `<img class="today-book-cover" src="${b.cover}" alt="${b.title}" onerror="this.style.display='none'">`
+        : `<div class="today-book-cover-placeholder">📖</div>`;
+      return `<div class="today-book-inner" data-isbn="${b.isbn}">${img}<div class="today-book-info"><div class="today-book-title">${b.title}</div><div class="today-book-author">${b.author || ""}</div></div></div>`;
+    }).join("");
+    card.querySelectorAll(".today-book-inner").forEach(el => {
+      el.addEventListener("click", () => openModal(el.dataset.isbn));
+    });
     section.style.display = "block";
   } catch (e) {}
 }
 
 // ===== ジャンルフィルター =====
 let currentGenre = "";  // "" = 通常検索, それ以外 = ジャンルモード
+
+document.getElementById("genreSelect").addEventListener("change", e => {
+  const [genre, mode] = e.target.value.split("|");
+  currentGenre = (mode === "genre") ? genre : "";
+  document.querySelectorAll(".genre-btn").forEach(b => b.classList.remove("active"));
+  const matchBtn = document.querySelector(`.genre-btn[data-genre="${genre}"]`);
+  if (matchBtn) matchBtn.classList.add("active");
+  document.getElementById("searchInput").value = "";
+  if (mode === "genre") loadBooksByGenre(genre, 1);
+  else loadBooks("", 1);
+});
 
 document.querySelectorAll(".genre-btn").forEach(btn => {
   btn.addEventListener("click", () => {
@@ -277,13 +284,12 @@ document.querySelectorAll(".genre-btn").forEach(btn => {
     const genre = btn.dataset.genre;
     const mode  = btn.dataset.mode;
     currentGenre = (mode === "genre") ? genre : "";
-    if (mode === "genre") {
-      document.getElementById("searchInput").value = "";
-      loadBooksByGenre(genre, 1);
-    } else {
-      document.getElementById("searchInput").value = "";
-      loadBooks("", 1);
-    }
+    const sel = document.getElementById("genreSelect");
+    const matchOpt = [...sel.options].find(o => o.value === `${genre}|${mode}`);
+    if (matchOpt) sel.value = matchOpt.value;
+    document.getElementById("searchInput").value = "";
+    if (mode === "genre") loadBooksByGenre(genre, 1);
+    else loadBooks("", 1);
   });
 });
 

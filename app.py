@@ -800,23 +800,68 @@ def api_books_new():
         return jsonify({"books": [], "error": str(e)}), 500
 
 
+_recent_isbns_cache = {"isbns": [], "date": None}
+
+def get_recent_isbns():
+    import datetime
+    today = datetime.date.today()
+    cache = _recent_isbns_cache
+    if cache["date"] == today and cache["isbns"]:
+        return cache["isbns"]
+    try:
+        con = get_con()
+        rows = fetchall(con, "SELECT isbn, title, author, publisher FROM genre_books")
+        con.close()
+        if not rows:
+            return []
+        isbns = [r["isbn"] for r in rows]
+        info_map = {r["isbn"]: r for r in rows}
+        cutoff_year = str(today.year - 5)
+        recent = []
+        batch_size = 1000
+        for i in range(0, len(isbns), batch_size):
+            batch = isbns[i:i+batch_size]
+            resp = requests.get(OPENBD_API, params={"isbn": ",".join(batch)}, timeout=15)
+            for item in resp.json():
+                if not item:
+                    continue
+                try:
+                    pubdate = item["summary"].get("pubdate", "") or ""
+                    isbn = item["summary"].get("isbn", "")
+                    if pubdate >= cutoff_year and isbn in info_map:
+                        cover = item["summary"].get("cover", "")
+                        rec = dict(info_map[isbn])
+                        rec["cover"] = cover or get_cover_url(isbn, isbn13_to_isbn10(isbn))
+                        recent.append(rec)
+                except Exception:
+                    pass
+        cache["isbns"] = recent
+        cache["date"] = today
+        return recent
+    except Exception:
+        return []
+
 @app.route("/api/today-book")
 def api_today_book():
     import random, datetime
     today = datetime.date.today()
     seed = int(today.strftime("%Y%m%d"))
     rng = random.Random(seed)
+    recent = get_recent_isbns()
+    if recent:
+        rng.shuffle(recent)
+        books = recent[:4]
+        return jsonify(books)
     total_pages = 109
     page = rng.randint(1, total_pages)
     try:
         data = fetch_books("", page)
         if data["books"]:
             book = data["books"][rng.randint(0, len(data["books"]) - 1)]
-            book["rating"] = get_rating(book["isbn"])
-            return jsonify(book)
+            return jsonify([book])
     except Exception:
         pass
-    return jsonify(None)
+    return jsonify([])
 
 
 @app.route("/api/books")

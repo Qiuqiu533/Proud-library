@@ -47,8 +47,8 @@
       </div>
       <div class="header-btns">
         <button id="syncMenuBtn" class="sync-menu-btn" title="クラウド同期">☁️</button>
-        <button id="logoutBtn" class="logout-btn" title="ログアウト">🔓 ログアウト</button>
-        <button id="boardMenuBtn" class="board-menu-btn">🏛️ 管理者メニュー</button>
+        <button id="logoutBtn" class="logout-btn" title="ログアウト">🔓<span class="logout-text"> ログアウト</span></button>
+        <button id="boardMenuBtn" class="board-menu-btn">🏛️<span class="board-menu-text"> 管理者メニュー</span></button>
       </div>
     </div>
   </header>
@@ -94,8 +94,20 @@
       <div class="controls-row">
         <span id="totalCount" class="total-count"></span>
         <div class="filter-bar">
+          <select id="genreSelect" class="genre-select">
+            <option value="|search">すべて</option>
+            <option value="文芸小説|genre">📚 文芸小説</option>
+            <option value="ミステリ・推理|genre">🔍 ミステリ</option>
+            <option value="時代小説・歴史小説|genre">⚔️ 時代・歴史</option>
+            <option value="ファンタジー・SF|genre">🧙 ファンタジー</option>
+            <option value="実用・ハウツー|genre">💡 実用</option>
+            <option value="翻訳小説|genre">🌍 翻訳</option>
+            <option value="エッセイ・評論|genre">✍️ エッセイ</option>
+            <option value="絵本・児童書|genre">🎨 絵本・児童</option>
+            <option value="児童文学|genre">👦 児童文学</option>
+          </select>
           <select id="sortSelect">
-            <option value="">並び順（デフォルト）</option>
+            <option value="">並び順</option>
             <option value="title">タイトル順</option>
             <option value="author">著者順</option>
             <option value="fav">お気に入り順</option>

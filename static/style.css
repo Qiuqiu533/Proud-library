@@ -372,18 +372,20 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
 .req-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 /* ===== 今日の1冊 ===== */
-.today-book-section { background: linear-gradient(135deg, #f0faf4 0%, #e8f5ec 100%); border: 2px solid #b8ddc4; border-radius: 14px; padding: 14px 16px; margin-bottom: 18px; }
-.today-book-label { font-size: 0.78rem; font-weight: 700; color: #3d6b4f; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 10px; }
-.today-book-inner { display: flex; gap: 14px; cursor: pointer; }
-.today-book-inner:hover { opacity: 0.88; }
-.today-book-cover { width: 64px; height: 88px; object-fit: cover; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); flex-shrink: 0; }
-.today-book-cover-placeholder { width: 64px; height: 88px; background: #d0e8d8; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; flex-shrink: 0; }
-.today-book-info { display: flex; flex-direction: column; justify-content: center; gap: 4px; }
-.today-book-title { font-size: 0.95rem; font-weight: 700; color: #1a3a28; line-height: 1.4; }
-.today-book-author { font-size: 0.82rem; color: #556b5a; }
-.today-book-meta { font-size: 0.75rem; color: #889e90; }
+.today-book-section { background: linear-gradient(135deg, #f0faf4 0%, #e8f5ec 100%); border: 2px solid #b8ddc4; border-radius: 12px; padding: 10px 12px; margin-bottom: 14px; }
+.today-book-label { font-size: 0.72rem; font-weight: 700; color: #3d6b4f; letter-spacing: 0.05em; margin-bottom: 8px; }
+#todayBookCard { display: flex; gap: 10px; overflow-x: auto; }
+.today-book-inner { display: flex; gap: 8px; cursor: pointer; flex-shrink: 0; max-width: 200px; }
+.today-book-inner:hover { opacity: 0.85; }
+.today-book-cover { width: 44px; height: 62px; object-fit: cover; border-radius: 4px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); flex-shrink: 0; }
+.today-book-cover-placeholder { width: 44px; height: 62px; background: #d0e8d8; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0; }
+.today-book-info { display: flex; flex-direction: column; justify-content: center; gap: 2px; overflow: hidden; }
+.today-book-title { font-size: 0.78rem; font-weight: 700; color: #1a3a28; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.today-book-author { font-size: 0.7rem; color: #556b5a; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.today-book-meta { font-size: 0.68rem; color: #889e90; }
 
 /* ===== ジャンルフィルター ===== */
+.genre-select { display: none; padding: 7px 10px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; font-size: 0.85rem; outline: none; background: white; cursor: pointer; }
 .genre-filter-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 14px; padding: 0 2px; }
 .genre-filter-label { font-size: 0.78rem; color: #888; font-weight: 600; flex-shrink: 0; }
 .genre-btn { padding: 5px 12px; border: 1.5px solid #ccd9d2; border-radius: 20px; background: white; color: #556b5a; font-size: 0.8rem; font-weight: 500; cursor: pointer; transition: all .18s; font-family: inherit; white-space: nowrap; }
@@ -430,12 +432,14 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
   .logo-icon { font-size: 1.4rem; }
   .search-bar { min-width: 0; flex: 1 1 100%; order: 2; }
   .logo { order: 1; }
-  .header-btns { order: 3; margin-left: auto; gap: 6px; }
+  .header-btns { order: 1; margin-left: auto; gap: 4px; }
   .search-bar input { font-size: 0.85rem; padding: 8px 10px; }
   .search-bar button { padding: 8px 12px; font-size: 0.82rem; }
-  .sync-menu-btn { padding: 6px 8px; font-size: 0.85rem; }
-  .logout-btn { padding: 6px 8px; font-size: 0.72rem; }
-  .board-menu-btn { font-size: 0.72rem; padding: 6px 8px; }
+  .sync-menu-btn { padding: 5px 7px; font-size: 0.8rem; }
+  .logout-btn { padding: 5px 7px; font-size: 0.7rem; }
+  .logout-btn .logout-text { display: none; }
+  .board-menu-btn { font-size: 0.7rem; padding: 5px 7px; }
+  .board-menu-btn .board-menu-text { display: none; }
 
   .tab-nav { overflow-x: auto; -webkit-overflow-scrolling: touch; gap: 2px; padding: 0 8px; }
   .tab-btn { font-size: 0.78rem; padding: 9px 10px; white-space: nowrap; flex-shrink: 0; }
@@ -447,14 +451,10 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
   .book-author { font-size: 0.73rem; }
   .book-meta { font-size: 0.7rem; }
 
-  .genre-filter-row { gap: 4px; padding: 6px 0; }
-  .genre-btn { font-size: 0.72rem; padding: 3px 8px; }
+  .genre-filter-row { display: none; }
+  .genre-select { display: inline-block; font-size: 0.82rem; padding: 6px 8px; }
 
-  .today-card { padding: 10px 12px; margin-bottom: 10px; }
-  .today-book-cover { width: 46px; height: 64px; }
-  .today-book-title { font-size: 0.82rem; }
-  .today-book-author { font-size: 0.72rem; }
-  .today-label { font-size: 0.72rem; }
+  .today-book-section { padding: 8px 10px; margin-bottom: 10px; }
 
   .modal-box { margin: 12px; max-height: 90vh; overflow-y: auto; }
 
