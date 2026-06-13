@@ -232,7 +232,12 @@ async function loadBooks(keyword = "", page = 1) {
   const data = await res.json();
   currentTotal = data.total;
   let books = data.books.map(b => ({ ...b, rating: getRating(b.isbn) }));
-  if (currentSort === "title") books.sort((a, b) => a.title.localeCompare(b.title, "ja"));
+  if (currentSort === "title") books.sort((a, b) => {
+    const noA = !a.author || a.author === "著者不明";
+    const noB = !b.author || b.author === "著者不明";
+    if (noA !== noB) return noA ? 1 : -1;
+    return a.title.localeCompare(b.title, "ja");
+  });
   if (currentSort === "author") books.sort((a, b) => authorSortKey(a.author).localeCompare(authorSortKey(b.author), "ja"));
   if (currentSort === "fav") books.sort((a, b) => (isFav(b.isbn) ? 1 : 0) - (isFav(a.isbn) ? 1 : 0));
   document.getElementById("totalCount").textContent = `全 ${data.total.toLocaleString()} 件`;
@@ -308,7 +313,12 @@ async function loadBooksByGenre(genre, page = 1) {
   const data = await res.json();
   currentTotal = data.total;
   let books = data.books.map(b => ({ ...b, rating: b.rating || getRating(b.isbn) }));
-  if (currentSort === "title") books.sort((a, b) => a.title.localeCompare(b.title, "ja"));
+  if (currentSort === "title") books.sort((a, b) => {
+    const noA = !a.author || a.author === "著者不明";
+    const noB = !b.author || b.author === "著者不明";
+    if (noA !== noB) return noA ? 1 : -1;
+    return a.title.localeCompare(b.title, "ja");
+  });
   if (currentSort === "author") books.sort((a, b) => authorSortKey(a.author).localeCompare(authorSortKey(b.author), "ja"));
   if (currentSort === "fav") books.sort((a, b) => (isFav(b.isbn) ? 1 : 0) - (isFav(a.isbn) ? 1 : 0));
   document.getElementById("totalCount").textContent = `全 ${data.total.toLocaleString()} 件（${genre}）`;
