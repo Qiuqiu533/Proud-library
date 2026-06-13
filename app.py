@@ -360,7 +360,8 @@ def _insert_genre_books(con, genre_map):
 
 # ── 蔵書スクレイピング ────────────────────────────────────────────────────
 def get_cover_url(isbn13, isbn10=""):
-    # NDLサムネイルを優先（Amazonは誤った画像を返すことがあるため使用しない）
+    if isbn10:
+        return f"https://images-na.ssl-images-amazon.com/images/P/{isbn10}.09.LZZZZZZZ.jpg"
     return NDL_THUMB.format(isbn=isbn13)
 
 

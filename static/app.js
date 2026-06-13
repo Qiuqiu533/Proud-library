@@ -100,8 +100,9 @@ function renderCard(book, opts = {}) {
   const rating = book.rating || getRating(book.isbn);
   const fav = isFav(book.isbn);
   const readStatus = getReadStatus(book.isbn);
+  const ndlFallback = `https://ndlsearch.ndl.go.jp/thumbnail/${book.isbn}.jpg`;
   const img = book.cover
-    ? `<img class="book-cover" src="${book.cover}" alt="${book.title}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'book-cover-placeholder',textContent:'📖'}))">`
+    ? `<img class="book-cover" src="${book.cover}" alt="${book.title}" loading="lazy" onerror="if(this.src!=='${ndlFallback}'){this.src='${ndlFallback}';}else{this.replaceWith(Object.assign(document.createElement('div'),{className:'book-cover-placeholder',textContent:'📖'}));}">`
     : `<div class="book-cover-placeholder">📖</div>`;
 
   div.innerHTML = `
