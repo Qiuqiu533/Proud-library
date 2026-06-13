@@ -331,23 +331,38 @@ async function loadLog(filter = "all") {
 }
 
 // ===== Announcements =====
-async function loadNews() {
-  const list = document.getElementById("newsList");
-  list.innerHTML = '<div class="loading">読み込み中…</div>';
-  const res = await fetch("/api/announcements");
-  const items = await res.json();
-  if (!items.length) { list.innerHTML = '<div class="loading">お知らせはまだありません。</div>'; return; }
-  list.innerHTML = items.map(item => `
+function newsItemHtml(item, showDelete) {
+  return `
     <div class="news-card" data-id="${item.id}">
       <div class="news-meta">
         <span class="news-cat cat-${item.category}">${item.category}</span>
         <span class="news-date">${item.created_at.slice(0, 10)}</span>
-        <button class="news-del" data-id="${item.id}" title="削除">🗑</button>
+        ${showDelete ? `<button class="news-del" data-id="${item.id}" title="削除">🗑</button>` : ""}
       </div>
       <div class="news-title">${item.title}</div>
       <div class="news-body">${item.body.replace(/\n/g, "<br>")}</div>
       ${item.image_url ? `<img class="news-img" src="${item.image_url}" alt="画像" onerror="this.style.display='none'">` : ""}
-    </div>`).join("");
+    </div>`;
+}
+
+async function loadNews() {
+  const list = document.getElementById("newsList");
+  if (!list) return;
+  list.innerHTML = '<div class="loading">読み込み中…</div>';
+  const res = await fetch("/api/announcements");
+  const items = await res.json();
+  if (!items.length) { list.innerHTML = '<div class="loading">お知らせはまだありません。</div>'; return; }
+  list.innerHTML = items.map(item => newsItemHtml(item, false)).join("");
+}
+
+async function loadAdminNews() {
+  const list = document.getElementById("adminNewsList");
+  if (!list) return;
+  list.innerHTML = '<div class="loading">読み込み中…</div>';
+  const res = await fetch("/api/announcements");
+  const items = await res.json();
+  if (!items.length) { list.innerHTML = '<div class="loading">投稿済みのお知らせはありません。</div>'; return; }
+  list.innerHTML = items.map(item => newsItemHtml(item, true)).join("");
   list.querySelectorAll(".news-del").forEach(btn => {
     btn.addEventListener("click", async () => {
       const pass = prompt("管理者パスワードを入力してください");
@@ -356,7 +371,7 @@ async function loadNews() {
         method: "DELETE", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: pass })
       });
-      if (r.ok) loadNews(); else alert("パスワードが違います");
+      if (r.ok) loadAdminNews(); else alert("パスワードが違います");
     });
   });
 }
@@ -540,12 +555,7 @@ document.getElementById("submitRate").addEventListener("click", () => {
   }, 800);
 });
 
-// Admin panel
-document.getElementById("adminToggle").addEventListener("click", () => {
-  const p = document.getElementById("adminPanel");
-  p.style.display = p.style.display === "none" ? "block" : "none";
-});
-document.getElementById("postNews").addEventListener("click", async () => {
+document.getElementById("postNews")?.addEventListener("click", async () => {
   const title = document.getElementById("newsTitle").value.trim();
   const body = document.getElementById("newsBody").value.trim();
   const pass = document.getElementById("adminPass").value;
@@ -562,6 +572,7 @@ document.getElementById("postNews").addEventListener("click", async () => {
     document.getElementById("newsBody").value = "";
     document.getElementById("newsImage").value = "";
     document.getElementById("newsImagePreview").style.display = "none";
+    loadAdminNews();
     loadNews();
   } else {
     document.getElementById("newsMsg").textContent = "❌ パスワードが違います";
@@ -631,7 +642,7 @@ function openBoardPanel() {
   boardPassword = sessionStorage.getItem("board_pass") || "";
   reqAdminPass = boardPassword;  // board password also works for request admin
   document.getElementById("boardPanel").style.display = "flex";
-  loadIssues();
+  loadAdminNews();
 }
 
 // Board tabs
@@ -641,6 +652,7 @@ document.querySelectorAll(".board-tab").forEach(btn => {
     document.querySelectorAll(".board-tab-panel").forEach(p => p.classList.remove("active"));
     btn.classList.add("active");
     document.getElementById("btab-" + btn.dataset.btab).classList.add("active");
+    if (btn.dataset.btab === "adminnews") loadAdminNews();
     if (btn.dataset.btab === "stats") loadStats();
     if (btn.dataset.btab === "calendar") loadCalendar();
     if (btn.dataset.btab === "issues") loadIssues();

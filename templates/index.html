@@ -118,7 +118,7 @@
         <div class="card-view-inner">
           <!-- iframeで公式会員証URLを表示 -->
           <div id="cardIframeWrap" style="display:none">
-            <p class="card-hint">📱 カウンターでこの画面をお見せください</p>
+            <p class="card-hint">📱 本を借りるとき、返却するときにスキャンしてご利用ください</p>
             <iframe id="cardIframe" src="" scrolling="no" frameborder="0" class="card-iframe"></iframe>
             <p id="cardIframeError" class="card-iframe-error" style="display:none">
               ⚠️ ページを直接表示できません。
@@ -127,7 +127,7 @@
           </div>
           <!-- スクリーンショット画像を表示 -->
           <div id="cardImgWrap" style="display:none">
-            <p class="card-hint">📱 カウンターでこの画面をお見せください</p>
+            <p class="card-hint">📱 本を借りるとき、返却するときにスキャンしてご利用ください</p>
             <img id="cardImg" src="" alt="会員証" class="card-screenshot" />
           </div>
         </div>
@@ -194,25 +194,6 @@
     <div id="tab-news" class="tab-panel">
       <div class="news-header">
         <h2 class="section-title">📢 お知らせ・イベント</h2>
-        <button class="btn-admin-toggle" id="adminToggle">管理者</button>
-      </div>
-      <div id="adminPanel" class="admin-panel" style="display:none">
-        <h3>お知らせを投稿</h3>
-        <select id="newsCat">
-          <option value="お知らせ">📌 お知らせ</option>
-          <option value="イベント">🎉 イベント</option>
-          <option value="休館">🚫 休館</option>
-          <option value="新着">📚 新着</option>
-        </select>
-        <input type="text" id="newsTitle" placeholder="タイトル" />
-        <textarea id="newsBody" placeholder="内容" rows="3"></textarea>
-        <input type="url" id="newsImage" placeholder="画像URL（任意）例: https://i.imgur.com/xxxxx.jpg" />
-        <div id="newsImagePreview" style="display:none;margin-top:6px;">
-          <img id="newsPreviewImg" style="max-width:100%;max-height:200px;border-radius:8px;object-fit:contain;" alt="プレビュー">
-        </div>
-        <input type="password" id="adminPass" placeholder="管理者パスワード" />
-        <button class="btn-primary" id="postNews">投稿する</button>
-        <p id="newsMsg" class="rate-msg"></p>
       </div>
       <div id="newsList" class="news-list"><div class="loading">読み込み中…</div></div>
     </div>
@@ -364,7 +345,8 @@
       <button id="boardClose" class="board-close">✕ 閉じる</button>
     </div>
     <div class="board-tabs">
-      <button class="board-tab active" data-btab="issues">📋 課題管理</button>
+      <button class="board-tab active" data-btab="adminnews">📢 お知らせ</button>
+      <button class="board-tab" data-btab="issues">📋 課題管理</button>
       <button class="board-tab" data-btab="brequest">📬 リクエスト</button>
       <button class="board-tab" data-btab="loaned">📤 貸出中一覧</button>
       <button class="board-tab" data-btab="stats">📊 蔵書統計</button>
@@ -376,8 +358,34 @@
     </div>
     <div class="board-body">
 
+      <!-- Admin News -->
+      <div id="btab-adminnews" class="board-tab-panel active">
+        <div class="board-section-header">
+          <h3>お知らせを投稿</h3>
+        </div>
+        <div class="board-form" style="display:block">
+          <select id="newsCat">
+            <option value="お知らせ">📌 お知らせ</option>
+            <option value="イベント">🎉 イベント</option>
+            <option value="休館">🚫 休館</option>
+            <option value="新着">📚 新着</option>
+          </select>
+          <input type="text" id="newsTitle" placeholder="タイトル" />
+          <textarea id="newsBody" placeholder="内容" rows="3"></textarea>
+          <input type="url" id="newsImage" placeholder="画像URL（任意）例: https://i.imgur.com/xxxxx.jpg" />
+          <div id="newsImagePreview" style="display:none;margin-top:6px;">
+            <img id="newsPreviewImg" style="max-width:100%;max-height:200px;border-radius:8px;object-fit:contain;" alt="プレビュー">
+          </div>
+          <input type="password" id="adminPass" placeholder="管理者パスワード" />
+          <button class="btn-primary" id="postNews">投稿する</button>
+          <p id="newsMsg" class="rate-msg"></p>
+        </div>
+        <h3 style="margin:20px 0 10px">投稿済みお知らせ一覧</h3>
+        <div id="adminNewsList" class="news-list"><div class="loading">読み込み中…</div></div>
+      </div>
+
       <!-- Issues -->
-      <div id="btab-issues" class="board-tab-panel active">
+      <div id="btab-issues" class="board-tab-panel">
         <div class="board-section-header">
           <h3>図書館の課題</h3>
           <button class="btn-board-add" id="issueFormToggle">＋ 新規追加</button>
