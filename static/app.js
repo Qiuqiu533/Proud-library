@@ -1402,6 +1402,18 @@ document.getElementById("pwChangeBtn").addEventListener("click", async () => {
 });
 
 // ===== 貸出中一覧（入居者タブ） =====
+function isbn13ToCoverUrl(isbn13) {
+  if (isbn13 && isbn13.startsWith("978") && isbn13.length === 13) {
+    const digits = isbn13.slice(3, 12);
+    let total = 0;
+    for (let i = 0; i < digits.length; i++) total += (10 - i) * parseInt(digits[i]);
+    const check = (11 - (total % 11)) % 11;
+    const isbn10 = digits + (check === 10 ? "X" : String(check));
+    return `https://images-na.ssl-images-amazon.com/images/P/${isbn10}.09.LZZZZZZZ.jpg`;
+  }
+  return `https://ndlsearch.ndl.go.jp/thumbnail/${isbn13}.jpg`;
+}
+
 async function loadLoanedResident() {
   const grid = document.getElementById("loanedResGrid");
   if (!grid) return;
@@ -1412,16 +1424,22 @@ async function loadLoanedResident() {
     grid.innerHTML = '<div class="loading">貸出中の記録がありません。<br>本の詳細を開くと在架状況が自動で記録されます。</div>';
     return;
   }
-  // ISBNで本の詳細を取得してカード表示
-  const books = await Promise.all(items.map(r =>
-    fetch(`/api/book/${r.isbn}`).then(res => res.json()).catch(() => ({
-      isbn: r.isbn, title: r.title || r.isbn, author: r.author || "", publisher: "", cover: null,
-      rating: { score: 0, votes: 0, reviews: [] }
-    }))
-  ));
+  // キャッシュデータのみで表示（外部API呼び出しなし）
+  const books = items.map(r => ({
+    isbn: r.isbn,
+    title: r.title || r.isbn,
+    author: r.author || "",
+    publisher: "",
+    cover: isbn13ToCoverUrl(r.isbn),
+    rating: { score: 0, votes: 0, reviews: [] }
+  }));
   grid.innerHTML = "";
   books.forEach(b => grid.appendChild(renderCard(b)));
-  applyAvailCache(books.map(b => b.isbn).filter(Boolean));
+  // 在架バッジ（全件貸出中なので直接セット）
+  books.forEach(b => {
+    const el = document.getElementById("avail-" + b.isbn);
+    if (el) el.innerHTML = '<span class="avail-badge avail-ng">📤 貸出中</span>';
+  });
 }
 
 // ===== 貸出中一覧（管理者パネル） =====
