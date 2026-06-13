@@ -113,39 +113,52 @@
 
     <!-- Card tab -->
     <div id="tab-card" class="tab-panel">
+      <!-- 登録済み: 会員証表示 -->
       <div id="cardView" style="display:none">
-        <div class="lib-card">
-          <div class="lib-card-header">
-            <span class="lib-card-logo">📚</span>
-            <div>
-              <div class="lib-card-libname">プラウド船橋コミュニティ図書館</div>
-              <div class="lib-card-subtitle">図書館利用者カード</div>
-            </div>
+        <div class="card-view-inner">
+          <!-- iframeで公式会員証URLを表示 -->
+          <div id="cardIframeWrap" style="display:none">
+            <p class="card-hint">📱 カウンターでこの画面をお見せください</p>
+            <iframe id="cardIframe" src="" scrolling="no" frameborder="0" class="card-iframe"></iframe>
+            <p id="cardIframeError" class="card-iframe-error" style="display:none">
+              ⚠️ ページを直接表示できません。
+              <a id="cardOpenLink" href="#" target="_blank" rel="noopener" class="card-open-link">ブラウザで開く ↗</a>
+            </p>
           </div>
-          <svg id="cardBarcode"></svg>
-          <div class="lib-card-id" id="cardMemberId"></div>
-          <div class="lib-card-note">バーコードをカウンターでお見せください</div>
+          <!-- スクリーンショット画像を表示 -->
+          <div id="cardImgWrap" style="display:none">
+            <p class="card-hint">📱 カウンターでこの画面をお見せください</p>
+            <img id="cardImg" src="" alt="会員証" class="card-screenshot" />
+          </div>
         </div>
         <button class="btn-secondary" id="cardResetBtn" style="margin-top:16px;font-size:0.82rem">🔄 会員証を変更・削除する</button>
       </div>
 
+      <!-- 未登録: セットアップ画面 -->
       <div id="cardSetup">
         <h2 class="section-title">🪪 図書館利用者カード登録</h2>
-        <p class="section-desc">librarylife.netから届いたメールのURLを貼り付けるか、会員IDを直接入力してください。</p>
+        <p class="section-desc">会員登録メールのURLを貼り付けると、公式の会員証画面をそのまま表示します。<br>スクリーンショット画像をアップロードする方法もあります。</p>
         <div class="req-form-card" style="max-width:480px;margin:16px auto 0">
+
+          <!-- 方法①: URL -->
           <div class="req-field">
-            <label>📧 メールのURLを貼り付ける（自動で会員IDを取得）</label>
+            <label>① 📧 メールのURLを貼り付ける</label>
             <input type="text" id="cardUrl" placeholder="https://www2.librarylife.net/card/..." style="font-size:0.78rem" />
-            <button class="btn-primary" id="cardFetchBtn" style="margin-top:8px;width:100%">URLから会員IDを取得</button>
-            <p id="cardFetchMsg" style="font-size:0.8rem;margin-top:6px"></p>
+            <button class="btn-primary" id="cardSaveUrlBtn" style="margin-top:8px;width:100%">💾 URLで会員証を登録する</button>
+            <p id="cardUrlMsg" style="font-size:0.8rem;margin-top:6px"></p>
           </div>
-          <div style="text-align:center;color:#aaa;margin:8px 0;font-size:0.82rem">― または ―</div>
+
+          <div style="text-align:center;color:#aaa;margin:12px 0;font-size:0.82rem">― または ―</div>
+
+          <!-- 方法②: スクリーンショット -->
           <div class="req-field">
-            <label>🔢 会員IDを直接入力（メール記載の「会員ID」）</label>
-            <input type="text" id="cardIdInput" placeholder="例：5001006146" inputmode="numeric" maxlength="12" />
+            <label>② 📸 スクリーンショット画像をアップロード</label>
+            <p style="font-size:0.78rem;color:#888;margin:4px 0 8px">librarylife.netの会員証画面をスクリーンショットして保存し、アップロードしてください。</p>
+            <input type="file" id="cardImageInput" accept="image/*" style="font-size:0.82rem;width:100%" />
+            <button class="btn-primary" id="cardSaveImgBtn" style="margin-top:8px;width:100%">💾 画像で会員証を登録する</button>
+            <p id="cardImgMsg" style="font-size:0.8rem;margin-top:6px"></p>
           </div>
-          <button class="btn-primary" id="cardSaveBtn" style="width:100%;margin-top:4px">💾 会員証を登録する</button>
-          <p id="cardSaveMsg" style="font-size:0.8rem;margin-top:6px"></p>
+
         </div>
       </div>
     </div>
@@ -921,7 +934,6 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
   <script src="/static/app.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
