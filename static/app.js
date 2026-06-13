@@ -1096,6 +1096,30 @@ document.getElementById("loginBtn").addEventListener("click", () => {
 }, true);
 
 // Submit request
+// 部屋番号ハイフン自動挿入（1桁目1-5 → "X-"形式）
+function setupRoomInput(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener("input", (e) => {
+    let val = e.target.value.replace(/\D/g, ""); // 数字のみ残す
+    if (val.length >= 1 && val[0] >= "1" && val[0] <= "5") {
+      const formatted = val.length >= 2 ? `${val[0]}-${val.slice(1)}` : `${val[0]}-`;
+      e.target.value = formatted;
+    } else {
+      e.target.value = val;
+    }
+  });
+  // バックスペースでハイフン削除しやすくする
+  el.addEventListener("keydown", (e) => {
+    if (e.key === "Backspace" && el.value.endsWith("-")) {
+      e.preventDefault();
+      el.value = el.value.slice(0, -1);
+    }
+  });
+}
+setupRoomInput("reqRoom");
+setupRoomInput("fbRoom");
+
 document.getElementById("reqSubmitBtn").addEventListener("click", async () => {
   const title = document.getElementById("reqTitle").value.trim();
   const author = document.getElementById("reqAuthor").value.trim();
@@ -1119,6 +1143,32 @@ document.getElementById("reqSubmitBtn").addEventListener("click", async () => {
     document.getElementById("reqReason").value = "";
     document.getElementById("reqRoom").value = "";
     showReqToast("✅ リクエストを送信しました！");
+  } else {
+    msg.textContent = "❌ 送信できませんでした。もう一度お試しください。";
+    msg.style.color = "#e05";
+  }
+});
+
+// ===== 図書館へのご要望フォーム =====
+document.getElementById("fbSubmitBtn").addEventListener("click", async () => {
+  const body = document.getElementById("fbBody").value.trim();
+  const room = document.getElementById("fbRoom").value.trim();
+  const msg = document.getElementById("fbMsg");
+  if (!body) { msg.textContent = "⚠️ ご要望・ご意見を入力してください"; msg.style.color = "#e05"; return; }
+  const btn = document.getElementById("fbSubmitBtn");
+  btn.disabled = true; btn.textContent = "送信中…";
+  const pass = residentPassword || "proud2525";
+  const res = await fetch("/api/requests", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({password: pass, title: "【ご要望・ご意見】" + body.slice(0, 40), author: "", reason: body, room})
+  });
+  btn.disabled = false; btn.textContent = "📩 送信する";
+  if (res.ok) {
+    msg.textContent = "✅ 送信しました！ありがとうございます。";
+    msg.style.color = "#3d6b4f";
+    document.getElementById("fbBody").value = "";
+    document.getElementById("fbRoom").value = "";
+    showReqToast("✅ ご要望を送信しました！");
   } else {
     msg.textContent = "❌ 送信できませんでした。もう一度お試しください。";
     msg.style.color = "#e05";
@@ -1293,21 +1343,16 @@ document.getElementById("syncModalClose").addEventListener("click", () => {
   document.getElementById("syncModal").style.display = "none";
 });
 
-// 部屋番号自動フォーマット（5533→5-533、11203→1-1203）
-document.getElementById("syncRoom").addEventListener("input", (e) => {
-  const val = e.target.value.replace(/\D/g, "");
-  e.target.value = val;
+// クラウド同期の部屋番号もハイフン自動挿入
+setupRoomInput("syncRoom");
+document.getElementById("syncRoom").addEventListener("input", () => {
+  const val = document.getElementById("syncRoom").value;
   const preview = document.getElementById("syncRoomPreview");
-  if (val.length >= 2) {
-    preview.textContent = `→ ${val[0]}-${val.slice(1)}`;
-  } else {
-    preview.textContent = "";
-  }
+  preview.textContent = val.includes("-") && val.length >= 3 ? `→ ${val}` : "";
 });
 
 document.getElementById("syncLoginBtn").addEventListener("click", async () => {
-  const rawRoom = document.getElementById("syncRoom").value.replace(/\D/g, "");
-  const room = rawRoom.length >= 2 ? `${rawRoom[0]}-${rawRoom.slice(1)}` : rawRoom;
+  const room = document.getElementById("syncRoom").value.trim();
   const pin  = document.getElementById("syncPin").value.trim();
   const msg  = document.getElementById("syncLoginMsg");
   if (!room || !pin) { msg.textContent = "部屋番号とPINを入力してください"; msg.style.color="#e05"; return; }
