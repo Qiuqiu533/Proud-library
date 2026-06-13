@@ -231,12 +231,13 @@
           </p>
         </div>
         <div class="pw-group">
-          <label>部屋番号</label>
-          <input type="text" id="syncRoom" placeholder="例：503" maxlength="10" inputmode="numeric" />
+          <label>部屋番号（数字のみ・ハイフン不要）</label>
+          <input type="text" id="syncRoom" placeholder="例：5533（5街区533室）、11203（1街区1203室）" maxlength="6" inputmode="numeric" />
+          <div id="syncRoomPreview" style="font-size:0.8rem;color:#3d6b4f;margin-top:3px;min-height:1.1em"></div>
         </div>
         <div class="pw-group">
-          <label>PIN（4桁以上の数字）</label>
-          <input type="password" id="syncPin" placeholder="例：1234" maxlength="8" inputmode="numeric" />
+          <label>PIN（6桁の数字）</label>
+          <input type="password" id="syncPin" placeholder="例：123456" maxlength="6" inputmode="numeric" />
         </div>
         <button class="btn-primary" id="syncLoginBtn" style="width:100%;margin-top:4px">ログイン / 新規登録</button>
         <p id="syncLoginMsg" class="rate-msg" style="margin-top:8px;text-align:center"></p>
