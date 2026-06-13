@@ -511,3 +511,12 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
 .guide-faq-item { border: 1.5px solid #e0e8e4; border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
 .guide-faq-q { background: #f0faf4; padding: 10px 14px; font-size: 0.85rem; font-weight: 700; color: #2a4a37; }
 .guide-faq-a { padding: 10px 14px; font-size: 0.83rem; color: #555; line-height: 1.7; }
+
+.lib-card { background: linear-gradient(135deg, #2a4a37, #3d6b4f); color: white; border-radius: 16px; padding: 24px; max-width: 380px; margin: 20px auto; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+.lib-card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+.lib-card-logo { font-size: 2rem; }
+.lib-card-libname { font-size: 0.88rem; font-weight: 700; }
+.lib-card-subtitle { font-size: 0.72rem; opacity: 0.8; }
+#cardBarcode { background: white; border-radius: 8px; padding: 8px; width: 100%; display: block; }
+.lib-card-id { text-align: center; font-size: 1.1rem; font-weight: 700; letter-spacing: 2px; margin-top: 10px; }
+.lib-card-note { text-align: center; font-size: 0.72rem; opacity: 0.8; margin-top: 8px; }

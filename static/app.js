@@ -515,6 +515,7 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
     if (btn.dataset.tab === "loaned") loadLoanedResident();
     if (btn.dataset.tab === "news") loadNews();
     if (btn.dataset.tab === "info") loadInfo();
+    if (btn.dataset.tab === "card") loadCard();
   });
 });
 
@@ -1529,3 +1530,69 @@ function showReqToast(msg) {
   clearTimeout(reqToastTimer);
   reqToastTimer = setTimeout(() => t.classList.remove("show"), 3200);
 }
+
+// ===== 会員証タブ =====
+function renderBarcode(memberId) {
+  try {
+    JsBarcode("#cardBarcode", memberId, {
+      format: "CODE128",
+      width: 2,
+      height: 80,
+      displayValue: false,
+      margin: 8
+    });
+  } catch(e) {}
+}
+
+function loadCard() {
+  const memberId = localStorage.getItem("libraryMemberId");
+  if (memberId) {
+    document.getElementById("cardView").style.display = "";
+    document.getElementById("cardSetup").style.display = "none";
+    document.getElementById("cardMemberId").textContent = memberId;
+    renderBarcode(memberId);
+  } else {
+    document.getElementById("cardView").style.display = "none";
+    document.getElementById("cardSetup").style.display = "";
+  }
+}
+
+function saveCardId(memberId) {
+  if (!memberId) return;
+  localStorage.setItem("libraryMemberId", memberId);
+  loadCard();
+}
+
+document.getElementById("cardFetchBtn")?.addEventListener("click", async () => {
+  const url = document.getElementById("cardUrl").value.trim();
+  const msg = document.getElementById("cardFetchMsg");
+  if (!url) { msg.textContent = "URLを入力してください"; return; }
+  msg.textContent = "取得中...";
+  try {
+    const res = await fetch("/api/library-card-info?url=" + encodeURIComponent(url));
+    const data = await res.json();
+    if (data.error) {
+      msg.textContent = "❌ " + data.error;
+    } else if (data.member_id) {
+      msg.textContent = "✅ 会員ID: " + data.member_id;
+      document.getElementById("cardIdInput").value = data.member_id;
+    } else {
+      msg.textContent = "❌ 会員IDが取得できませんでした。直接入力してください。";
+    }
+  } catch(e) {
+    msg.textContent = "❌ 通信エラー。直接入力してください。";
+  }
+});
+
+document.getElementById("cardSaveBtn")?.addEventListener("click", () => {
+  const id = document.getElementById("cardIdInput").value.trim();
+  const msg = document.getElementById("cardSaveMsg");
+  if (!id) { msg.textContent = "会員IDを入力してください"; return; }
+  saveCardId(id);
+  msg.textContent = "✅ 登録しました";
+});
+
+document.getElementById("cardResetBtn")?.addEventListener("click", () => {
+  localStorage.removeItem("libraryMemberId");
+  loadCard();
+});

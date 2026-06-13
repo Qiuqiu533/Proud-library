@@ -1017,6 +1017,53 @@ def api_change_password():
 
 
 # --- Bulk cache lookup (no scraping) ---
+@app.route("/api/library-card-info")
+def api_library_card_info():
+    """librarylife.netの会員証URLから会員IDを取得"""
+    url = request.args.get("url", "").strip()
+    if not url or "librarylife.net/card/" not in url:
+        return jsonify({"error": "librarylife.netの会員証URLを入力してください"}), 400
+    try:
+        resp = requests.get(url, timeout=10)
+        soup = BeautifulSoup(resp.text, "html.parser")
+        # 会員IDを探す（数字のみの要素、または "会員ID" ラベルの隣）
+        member_id = ""
+        # パターン1: テキストに「会員ID」や「会員番号」が含まれる要素の隣
+        for el in soup.find_all(text=True):
+            t = el.strip()
+            if "会員ID" in t or "会員番号" in t or "Member" in t:
+                parent = el.parent
+                nxt = parent.find_next_sibling()
+                if nxt and nxt.text.strip().isdigit():
+                    member_id = nxt.text.strip()
+                    break
+                # 同じ要素内に数字があるか
+                import re
+                m = re.search(r'\d{7,12}', t)
+                if m:
+                    member_id = m.group()
+                    break
+        # パターン2: ページ全体から10桁程度の数字を探す
+        if not member_id:
+            import re
+            text = soup.get_text()
+            m = re.search(r'(?<!\d)(\d{10})(?!\d)', text)
+            if m:
+                member_id = m.group(1)
+        # パターン3: バーコード画像のsrc
+        barcode_url = ""
+        for img in soup.find_all("img"):
+            src = img.get("src", "")
+            if "barcode" in src.lower() or "bar" in src.lower():
+                barcode_url = src if src.startswith("http") else LIBRARYLIFE_BASE + src
+                break
+        if not member_id and not barcode_url:
+            return jsonify({"error": "会員IDが見つかりませんでした。IDを直接入力してください"}), 404
+        return jsonify({"member_id": member_id, "barcode_url": barcode_url})
+    except Exception as e:
+        return jsonify({"error": "読み込みに失敗しました。IDを直接入力してください"}), 500
+
+
 @app.route("/api/availability/cached")
 def api_availability_cached():
     """キャッシュ済みの在架状況を一括返却（スクレイピングなし）"""
