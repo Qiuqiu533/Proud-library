@@ -832,11 +832,11 @@ async function loadStats() {
     </div>
     <div class="stats-charts">
       <div class="chart-box">
-        <h4>出版社別冊数（上位20社・全蔵書）</h4>
+        <h4>出版社別冊数（上位50社・全蔵書）</h4>
         <canvas id="pubChart"></canvas>
       </div>
       <div class="chart-box">
-        <h4>著者別冊数（上位20名・全蔵書）</h4>
+        <h4>著者別冊数（上位50名・全蔵書）</h4>
         <canvas id="authChart"></canvas>
       </div>
       <div class="chart-box">
