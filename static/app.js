@@ -296,9 +296,12 @@ async function loadBooksByGenre(genre, page = 1) {
 // ===== New arrivals =====
 async function loadNew() {
   document.getElementById("newGrid").innerHTML = '<div class="loading">読み込み中…</div>';
-  const res = await fetch(`/api/books?keyword=&page=1`);
-  const data = await res.json();
-  const books = data.books.slice(0, 20);
+  const [res1, res2] = await Promise.all([
+    fetch(`/api/books?keyword=&page=1`),
+    fetch(`/api/books?keyword=&page=2`)
+  ]);
+  const [data1, data2] = await Promise.all([res1.json(), res2.json()]);
+  const books = [...data1.books, ...data2.books].slice(0, 100);
   renderGrid("newGrid", books);
   applyAvailCache(books.map(b => b.isbn).filter(Boolean));
 }
