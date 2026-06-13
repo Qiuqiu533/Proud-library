@@ -1100,12 +1100,13 @@ loadTodayBook();
 setInterval(() => fetch("/ping").catch(() => {}), 4 * 60 * 1000);
 
 // ===== Book Requests =====
-let residentPassword = "";
+let residentPassword = sessionStorage.getItem("resident_pass") || "";
 let reqAdminPass = "";
 
 // Capture resident password on login
 document.getElementById("loginBtn").addEventListener("click", () => {
   residentPassword = document.getElementById("residentPass").value;
+  sessionStorage.setItem("resident_pass", residentPassword);
 }, true);
 
 // Submit request
