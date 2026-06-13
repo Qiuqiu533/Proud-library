@@ -623,7 +623,7 @@ document.getElementById("newsClearImg")?.addEventListener("click", clearNewsImag
 document.getElementById("postNews")?.addEventListener("click", async () => {
   const title = document.getElementById("newsTitle").value.trim();
   const body = document.getElementById("newsBody").value.trim();
-  const pass = document.getElementById("adminPass").value;
+  const pass = boardPassword;
   const cat = document.getElementById("newsCat").value;
   const image_url = newsImageData || document.getElementById("newsImage").value.trim();
   if (!title || !body) { document.getElementById("newsMsg").textContent = "タイトルと内容を入力してください"; return; }
