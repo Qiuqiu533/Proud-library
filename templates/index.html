@@ -57,6 +57,7 @@
     <button class="tab-btn" data-tab="fav">❤️ お気に入り</button>
     <button class="tab-btn" data-tab="log">📝 読書記録</button>
     <button class="tab-btn" data-tab="loaned">📤 貸出中</button>
+    <button class="tab-btn" data-tab="card">🪪 会員証</button>
     <button class="tab-btn" data-tab="news">📢 お知らせ</button>
     <button class="tab-btn" data-tab="info">🏛️ 開館情報</button>
     <button class="tab-btn" data-tab="request">📬 リクエスト</button>
@@ -108,6 +109,45 @@
       <h2 class="section-title">🆕 新着図書（100冊）</h2>
       <p class="section-desc">ISBN発行日（出版年月日）の順番で100冊を表示しています</p>
       <div class="book-grid" id="newGrid"><div class="loading">読み込み中…</div></div>
+    </div>
+
+    <!-- Card tab -->
+    <div id="tab-card" class="tab-panel">
+      <div id="cardView" style="display:none">
+        <div class="lib-card">
+          <div class="lib-card-header">
+            <span class="lib-card-logo">📚</span>
+            <div>
+              <div class="lib-card-libname">プラウド船橋コミュニティ図書館</div>
+              <div class="lib-card-subtitle">図書館利用者カード</div>
+            </div>
+          </div>
+          <svg id="cardBarcode"></svg>
+          <div class="lib-card-id" id="cardMemberId"></div>
+          <div class="lib-card-note">バーコードをカウンターでお見せください</div>
+        </div>
+        <button class="btn-secondary" id="cardResetBtn" style="margin-top:16px;font-size:0.82rem">🔄 会員証を変更・削除する</button>
+      </div>
+
+      <div id="cardSetup">
+        <h2 class="section-title">🪪 図書館利用者カード登録</h2>
+        <p class="section-desc">librarylife.netから届いたメールのURLを貼り付けるか、会員IDを直接入力してください。</p>
+        <div class="req-form-card" style="max-width:480px;margin:16px auto 0">
+          <div class="req-field">
+            <label>📧 メールのURLを貼り付ける（自動で会員IDを取得）</label>
+            <input type="text" id="cardUrl" placeholder="https://www2.librarylife.net/card/..." style="font-size:0.78rem" />
+            <button class="btn-primary" id="cardFetchBtn" style="margin-top:8px;width:100%">URLから会員IDを取得</button>
+            <p id="cardFetchMsg" style="font-size:0.8rem;margin-top:6px"></p>
+          </div>
+          <div style="text-align:center;color:#aaa;margin:8px 0;font-size:0.82rem">― または ―</div>
+          <div class="req-field">
+            <label>🔢 会員IDを直接入力（メール記載の「会員ID」）</label>
+            <input type="text" id="cardIdInput" placeholder="例：5001006146" inputmode="numeric" maxlength="12" />
+          </div>
+          <button class="btn-primary" id="cardSaveBtn" style="width:100%;margin-top:4px">💾 会員証を登録する</button>
+          <p id="cardSaveMsg" style="font-size:0.8rem;margin-top:6px"></p>
+        </div>
+      </div>
     </div>
 
     <!-- Loaned tab -->
@@ -881,6 +921,7 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
   <script src="/static/app.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
