@@ -1532,67 +1532,86 @@ function showReqToast(msg) {
 }
 
 // ===== 会員証タブ =====
-function renderBarcode(memberId) {
-  try {
-    JsBarcode("#cardBarcode", memberId, {
-      format: "CODE128",
-      width: 2,
-      height: 80,
-      displayValue: false,
-      margin: 8
-    });
-  } catch(e) {}
-}
-
 function loadCard() {
-  const memberId = localStorage.getItem("libraryMemberId");
-  if (memberId) {
+  const cardUrl = localStorage.getItem("libraryCardUrl");
+  const cardImg = localStorage.getItem("libraryCardImage");
+
+  if (cardUrl || cardImg) {
     document.getElementById("cardView").style.display = "";
     document.getElementById("cardSetup").style.display = "none";
-    document.getElementById("cardMemberId").textContent = memberId;
-    renderBarcode(memberId);
+
+    if (cardUrl) {
+      const iframeWrap = document.getElementById("cardIframeWrap");
+      const imgWrap = document.getElementById("cardImgWrap");
+      iframeWrap.style.display = "";
+      imgWrap.style.display = "none";
+
+      const iframe = document.getElementById("cardIframe");
+      const errEl = document.getElementById("cardIframeError");
+      const openLink = document.getElementById("cardOpenLink");
+      openLink.href = cardUrl;
+      iframe.src = cardUrl;
+
+      // iframeがX-Frame-Optionsでブロックされた場合のフォールバック
+      iframe.onerror = () => {
+        iframe.style.display = "none";
+        errEl.style.display = "";
+      };
+      // タイムアウトでもロードできなければエラー表示
+      const iframeTimer = setTimeout(() => {
+        try {
+          const doc = iframe.contentDocument || iframe.contentWindow?.document;
+          if (!doc || doc.body === null) {
+            iframe.style.display = "none";
+            errEl.style.display = "";
+          }
+        } catch(e) {
+          // cross-origin → iframeは機能しているのでそのまま
+        }
+      }, 5000);
+      iframe.onload = () => clearTimeout(iframeTimer);
+
+    } else if (cardImg) {
+      document.getElementById("cardIframeWrap").style.display = "none";
+      const imgWrap = document.getElementById("cardImgWrap");
+      imgWrap.style.display = "";
+      document.getElementById("cardImg").src = cardImg;
+    }
   } else {
     document.getElementById("cardView").style.display = "none";
     document.getElementById("cardSetup").style.display = "";
   }
 }
 
-function saveCardId(memberId) {
-  if (!memberId) return;
-  localStorage.setItem("libraryMemberId", memberId);
-  loadCard();
-}
-
-document.getElementById("cardFetchBtn")?.addEventListener("click", async () => {
+// ① URLで登録
+document.getElementById("cardSaveUrlBtn")?.addEventListener("click", () => {
   const url = document.getElementById("cardUrl").value.trim();
-  const msg = document.getElementById("cardFetchMsg");
-  if (!url) { msg.textContent = "URLを入力してください"; return; }
-  msg.textContent = "取得中...";
-  try {
-    const res = await fetch("/api/library-card-info?url=" + encodeURIComponent(url));
-    const data = await res.json();
-    if (data.error) {
-      msg.textContent = "❌ " + data.error;
-    } else if (data.member_id) {
-      msg.textContent = "✅ 会員ID: " + data.member_id;
-      document.getElementById("cardIdInput").value = data.member_id;
-    } else {
-      msg.textContent = "❌ 会員IDが取得できませんでした。直接入力してください。";
-    }
-  } catch(e) {
-    msg.textContent = "❌ 通信エラー。直接入力してください。";
-  }
+  const msg = document.getElementById("cardUrlMsg");
+  if (!url || !url.startsWith("http")) { msg.textContent = "URLを正しく入力してください"; return; }
+  localStorage.setItem("libraryCardUrl", url);
+  localStorage.removeItem("libraryCardImage");
+  msg.textContent = "✅ 登録しました";
+  setTimeout(() => loadCard(), 400);
 });
 
-document.getElementById("cardSaveBtn")?.addEventListener("click", () => {
-  const id = document.getElementById("cardIdInput").value.trim();
-  const msg = document.getElementById("cardSaveMsg");
-  if (!id) { msg.textContent = "会員IDを入力してください"; return; }
-  saveCardId(id);
-  msg.textContent = "✅ 登録しました";
+// ② 画像で登録
+document.getElementById("cardSaveImgBtn")?.addEventListener("click", () => {
+  const input = document.getElementById("cardImageInput");
+  const msg = document.getElementById("cardImgMsg");
+  const file = input.files?.[0];
+  if (!file) { msg.textContent = "画像ファイルを選んでください"; return; }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    localStorage.setItem("libraryCardImage", e.target.result);
+    localStorage.removeItem("libraryCardUrl");
+    msg.textContent = "✅ 登録しました";
+    setTimeout(() => loadCard(), 400);
+  };
+  reader.readAsDataURL(file);
 });
 
 document.getElementById("cardResetBtn")?.addEventListener("click", () => {
-  localStorage.removeItem("libraryMemberId");
+  localStorage.removeItem("libraryCardUrl");
+  localStorage.removeItem("libraryCardImage");
   loadCard();
 });
