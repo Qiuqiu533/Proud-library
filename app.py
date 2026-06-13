@@ -757,6 +757,49 @@ def api_stats():
     return jsonify(FULL_STATS)
 
 
+@app.route("/api/books/new")
+def api_books_new():
+    """出版日順の新着100冊（OpenBD一括取得でソート）"""
+    try:
+        # librarylife から2ページ分取得
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
+            f1 = ex.submit(fetch_books, "", 1)
+            f2 = ex.submit(fetch_books, "", 2)
+            data1 = f1.result()
+            data2 = f2.result()
+        books = data1["books"] + data2["books"]
+
+        # ISBNリストを作成（ISBN13のみ）
+        isbns = [b["isbn"] for b in books if b.get("isbn") and len(b["isbn"]) == 13]
+
+        # OpenBD 一括取得
+        ob_resp = requests.get(OPENBD_API, params={"isbn": ",".join(isbns)}, timeout=10)
+        ob_data = ob_resp.json()
+
+        # isbn -> pubdate マップ作成
+        pubdate_map = {}
+        for item in ob_data:
+            if not item:
+                continue
+            summary = item.get("summary", {})
+            isbn = summary.get("isbn", "")
+            pubdate = summary.get("pubdate", "")
+            if isbn and pubdate:
+                pubdate_map[isbn] = pubdate
+
+        # 出版日をbookに付与
+        for b in books:
+            b["pubdate"] = pubdate_map.get(b["isbn"], "")
+
+        # 出版日降順ソート（不明は末尾）
+        books.sort(key=lambda b: b.get("pubdate") or "0", reverse=True)
+
+        return jsonify({"books": books[:100]})
+    except Exception as e:
+        return jsonify({"books": [], "error": str(e)}), 500
+
+
 @app.route("/api/today-book")
 def api_today_book():
     import random, datetime
