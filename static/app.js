@@ -1107,12 +1107,22 @@ function renderCalendar() {
       const event_date = form.querySelector(".ce-date").value;
       const body = form.querySelector(".ce-body").value.trim();
       const minutes = form.querySelector(".ce-minutes").value.trim();
-      if (!title || !event_date) return;
-      await fetch(`/api/calendar/${id}`, {
-        method: "PATCH", headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({password: boardPassword, title, event_date, body, minutes})
-      });
-      loadCalendar();
+      if (!title) { alert("タイトルを入力してください"); return; }
+      btn.textContent = "保存中…"; btn.disabled = true;
+      try {
+        const res = await fetch(`/api/calendar/${id}`, {
+          method: "PATCH", headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({password: boardPassword, title, event_date, body, minutes})
+        });
+        if (!res.ok) { alert("保存に失敗しました（認証エラー）"); btn.textContent = "保存"; btn.disabled = false; return; }
+        // 楽観的にローカルデータを更新してすぐ再描画
+        const item = allCalItems.find(i => String(i.id) === String(id));
+        if (item) { item.title = title; item.event_date = event_date; item.body = body; item.minutes = minutes; }
+        renderCalendar();
+      } catch(e) {
+        alert("通信エラーが発生しました");
+        btn.textContent = "保存"; btn.disabled = false;
+      }
     });
   });
   list.querySelectorAll(".cal-del").forEach(btn => {
