@@ -19,6 +19,7 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
 .site-header { background: linear-gradient(135deg, #3d6b4f 0%, #2a4a37 100%); color: white; padding: 14px 24px; box-shadow: 0 2px 12px rgba(0,0,0,0.2); position: sticky; top: 0; z-index: 100; }
 .header-inner { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
 .header-inner .board-menu-btn { margin-left: auto; }
+.header-btns { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-shrink: 0; }
 .logo { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .logo-icon { font-size: 1.8rem; }
 .logo-text h1 { font-size: 1.1rem; font-weight: 700; line-height: 1.2; }
@@ -178,8 +179,8 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
 
 /* ===== Mobile ===== */
 @media (max-width: 600px) {
-  .header-inner { flex-direction: column; align-items: stretch; gap: 10px; }
-  .search-bar { max-width: 100%; }
+  .header-inner { flex-wrap: wrap; gap: 8px; }
+  .search-bar { max-width: 100%; flex: 1 1 100%; }
   .tab-btn { padding: 10px 12px; font-size: 0.8rem; }
   .main-content { padding: 14px 12px; }
   .book-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
@@ -422,14 +423,19 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
 
 /* ===== モバイル最適化 (#13) ===== */
 @media (max-width: 600px) {
-  .header-inner { gap: 10px; padding: 0; }
+  .site-header { padding: 10px 14px; }
+  .header-inner { gap: 8px; }
   .logo-text h1 { font-size: 0.95rem; }
   .logo-text span { display: none; }
-  .search-bar { min-width: 0; flex: 1; }
+  .logo-icon { font-size: 1.4rem; }
+  .search-bar { min-width: 0; flex: 1 1 100%; order: 2; }
+  .logo { order: 1; }
+  .header-btns { order: 3; margin-left: auto; gap: 6px; }
   .search-bar input { font-size: 0.85rem; padding: 8px 10px; }
   .search-bar button { padding: 8px 12px; font-size: 0.82rem; }
-  .sync-menu-btn { padding: 7px 8px; font-size: 0.9rem; }
-  .board-menu-btn { font-size: 0.78rem; padding: 7px 10px; }
+  .sync-menu-btn { padding: 6px 8px; font-size: 0.85rem; }
+  .logout-btn { padding: 6px 8px; font-size: 0.72rem; }
+  .board-menu-btn { font-size: 0.72rem; padding: 6px 8px; }
 
   .tab-nav { overflow-x: auto; -webkit-overflow-scrolling: touch; gap: 2px; padding: 0 8px; }
   .tab-btn { font-size: 0.78rem; padding: 9px 10px; white-space: nowrap; flex-shrink: 0; }
@@ -441,11 +447,14 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
   .book-author { font-size: 0.73rem; }
   .book-meta { font-size: 0.7rem; }
 
-  .genre-filter-row { gap: 4px; }
-  .genre-btn { font-size: 0.75rem; padding: 4px 9px; }
+  .genre-filter-row { gap: 4px; padding: 6px 0; }
+  .genre-btn { font-size: 0.72rem; padding: 3px 8px; }
 
-  .today-book-cover { width: 54px; height: 74px; }
-  .today-book-title { font-size: 0.88rem; }
+  .today-card { padding: 10px 12px; margin-bottom: 10px; }
+  .today-book-cover { width: 46px; height: 64px; }
+  .today-book-title { font-size: 0.82rem; }
+  .today-book-author { font-size: 0.72rem; }
+  .today-label { font-size: 0.72rem; }
 
   .modal-box { margin: 12px; max-height: 90vh; overflow-y: auto; }
 
