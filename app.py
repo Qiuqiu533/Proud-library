@@ -427,6 +427,31 @@ def fetch_book_detail(isbn):
         if len(tds) >= 3 and tds[1].text.strip() and tds[2].text.strip():
             availability.append({"library": tds[1].text.strip(), "status": tds[2].text.strip()})
     result["availability"] = availability
+    # キャッシュ保存
+    if availability:
+        statuses = [a["status"] for a in availability]
+        if any(s in ("利用可能", "在架") for s in statuses):
+            avail_status = "available"
+        elif any("貸出中" in s for s in statuses):
+            avail_status = "loaned"
+        else:
+            avail_status = "unknown"
+        try:
+            _cache_con = get_con()
+            if USE_PG:
+                execute(_cache_con, """
+                    INSERT INTO availability_cache (isbn, status, title, author, updated_at)
+                    VALUES (%s, %s, %s, %s, NOW())
+                    ON CONFLICT (isbn) DO UPDATE SET status=EXCLUDED.status, title=EXCLUDED.title, author=EXCLUDED.author, updated_at=NOW()
+                """, (isbn, avail_status, result.get("title",""), result.get("author","")))
+            else:
+                execute(_cache_con, """
+                    INSERT OR REPLACE INTO availability_cache (isbn, status, title, author, updated_at)
+                    VALUES (?, ?, ?, ?, datetime('now','localtime'))
+                """, (isbn, avail_status, result.get("title",""), result.get("author","")))
+            _cache_con.commit(); _cache_con.close()
+        except Exception:
+            pass
     isbn10 = result.get("isbn10", "")
     isbn13 = result.get("isbn13", isbn)
     result["cover"] = get_cover_url(isbn13, isbn10)
@@ -947,6 +972,25 @@ def api_change_password():
         execute(con, "INSERT OR REPLACE INTO settings (key, value) VALUES (?,?)", (db_key, new_pw))
     con.commit(); con.close()
     return jsonify({"ok": True})
+
+
+# --- Bulk cache lookup (no scraping) ---
+@app.route("/api/availability/cached")
+def api_availability_cached():
+    """キャッシュ済みの在架状況を一括返却（スクレイピングなし）"""
+    isbns_param = request.args.get("isbns", "")
+    isbns = [i.strip() for i in isbns_param.split(",") if i.strip()]
+    if not isbns:
+        return jsonify({})
+    con = get_con()
+    try:
+        placeholders = ",".join(["%s" if USE_PG else "?" for _ in isbns])
+        rows = fetchall(con, f"SELECT isbn, status FROM availability_cache WHERE isbn IN ({placeholders})", tuple(isbns))
+        con.close()
+        return jsonify({r["isbn"]: r["status"] for r in rows})
+    except Exception:
+        con.close()
+        return jsonify({})
 
 
 # --- Quick availability check ---
