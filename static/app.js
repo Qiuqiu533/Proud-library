@@ -1689,19 +1689,33 @@ document.getElementById("cardSaveUrlBtn")?.addEventListener("click", () => {
   setTimeout(() => loadCard(), 400);
 });
 
-// ② 画像で登録
+// ② 画像で登録（Canvas で圧縮してから保存）
 document.getElementById("cardSaveImgBtn")?.addEventListener("click", () => {
   const input = document.getElementById("cardImageInput");
   const msg = document.getElementById("cardImgMsg");
   const file = input.files?.[0];
   if (!file) { msg.textContent = "画像ファイルを選んでください"; return; }
+  msg.textContent = "圧縮中…";
   const reader = new FileReader();
   reader.onload = (e) => {
-    localStorage.setItem("libraryCardImage", e.target.result);
-    localStorage.removeItem("libraryCardUrl");
-    msg.textContent = "✅ 登録しました";
-    setTimeout(cloudSync, 500);
-    setTimeout(() => loadCard(), 400);
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 1200;
+      let w = img.width, h = img.height;
+      if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+      if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; }
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      const compressed = canvas.toDataURL("image/jpeg", 0.75);
+      localStorage.setItem("libraryCardImage", compressed);
+      localStorage.removeItem("libraryCardUrl");
+      const kb = Math.round(compressed.length * 0.75 / 1024);
+      msg.textContent = `✅ 登録しました（${kb}KB）`;
+      setTimeout(cloudSync, 500);
+      setTimeout(() => loadCard(), 400);
+    };
+    img.src = e.target.result;
   };
   reader.readAsDataURL(file);
 });
