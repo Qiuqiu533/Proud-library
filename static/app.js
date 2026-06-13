@@ -1384,10 +1384,13 @@ async function cloudSync() {
   const favs = getFavIsbns();
   const rlog = {};
   getLogEntries().forEach(e => { rlog[e.isbn] = e.status; });
+  const card_url = localStorage.getItem("libraryCardUrl") || "";
+  const card_img = localStorage.getItem("libraryCardImage") || "";
   try {
     await fetch("/api/user/sync", {
       method: "POST", headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({room: u.room, pin: u.pin, favorites: favs, reading_log: rlog})
+      body: JSON.stringify({room: u.room, pin: u.pin, favorites: favs, reading_log: rlog,
+        library_card_url: card_url, library_card_image: card_img})
     });
     document.getElementById("syncFavCount").textContent = favs.length;
     document.getElementById("syncLogCount").textContent = Object.keys(rlog).length;
@@ -1461,6 +1464,13 @@ document.getElementById("syncLoginBtn").addEventListener("click", async () => {
     Object.entries(data.reading_log || {}).forEach(([isbn, status]) => {
       if (status) localStorage.setItem("read_" + isbn, status);
     });
+    if (data.library_card_url) {
+      localStorage.setItem("libraryCardUrl", data.library_card_url);
+      localStorage.removeItem("libraryCardImage");
+    } else if (data.library_card_image) {
+      localStorage.setItem("libraryCardImage", data.library_card_image);
+      localStorage.removeItem("libraryCardUrl");
+    }
     msg.textContent = `✅ ログイン成功！${data.favorites.length}冊のデータを同期しました`;
     msg.style.color = "#3d6b4f";
   } else {
@@ -1675,6 +1685,7 @@ document.getElementById("cardSaveUrlBtn")?.addEventListener("click", () => {
   localStorage.setItem("libraryCardUrl", url);
   localStorage.removeItem("libraryCardImage");
   msg.textContent = "✅ 登録しました";
+  setTimeout(cloudSync, 500);
   setTimeout(() => loadCard(), 400);
 });
 
@@ -1689,6 +1700,7 @@ document.getElementById("cardSaveImgBtn")?.addEventListener("click", () => {
     localStorage.setItem("libraryCardImage", e.target.result);
     localStorage.removeItem("libraryCardUrl");
     msg.textContent = "✅ 登録しました";
+    setTimeout(cloudSync, 500);
     setTimeout(() => loadCard(), 400);
   };
   reader.readAsDataURL(file);

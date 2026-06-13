@@ -188,6 +188,8 @@ def init_db():
                 pin TEXT NOT NULL,
                 favorites TEXT DEFAULT '[]',
                 reading_log TEXT DEFAULT '{}',
+                library_card_url TEXT DEFAULT '',
+                library_card_image TEXT DEFAULT '',
                 updated_at TIMESTAMP DEFAULT NOW()
             )
         """)
@@ -285,6 +287,8 @@ def init_db():
                 pin TEXT NOT NULL,
                 favorites TEXT DEFAULT '[]',
                 reading_log TEXT DEFAULT '{}',
+                library_card_url TEXT DEFAULT '',
+                library_card_image TEXT DEFAULT '',
                 updated_at TEXT DEFAULT (datetime('now','localtime'))
             )
         """)
@@ -311,11 +315,34 @@ def init_db():
     con.close()
 
 
+def _migrate_add_card_columns():
+    """user_accounts に library_card_url/image カラムを追加（既存DBへの後付け）"""
+    try:
+        con = get_con()
+        if USE_PG:
+            for col in ("library_card_url", "library_card_image"):
+                try:
+                    con.cursor().execute(f"ALTER TABLE user_accounts ADD COLUMN {col} TEXT DEFAULT ''")
+                    con.commit()
+                except Exception:
+                    pass
+        else:
+            for col in ("library_card_url", "library_card_image"):
+                try:
+                    con.execute(f"ALTER TABLE user_accounts ADD COLUMN {col} TEXT DEFAULT ''")
+                    con.commit()
+                except Exception:
+                    pass
+        con.close()
+    except Exception as e:
+        print(f"card column migration error: {e}")
+
 def _ensure_db():
     try:
         init_db()
     except Exception as e:
         print(f"DB init error: {e}")
+    threading.Thread(target=_migrate_add_card_columns, daemon=True).start()
     threading.Thread(target=_migrate_genre_map_to_db, daemon=True).start()
 
 
@@ -993,15 +1020,11 @@ def api_user_login():
     if not room or not pin or len(pin) < 4:
         return jsonify({"error": "部屋番号と4桁以上のPINを入力してください"}), 400
     con = get_con()
-    user = fetchone(con, "SELECT room, pin, favorites, reading_log FROM user_accounts WHERE room=?", (room,))
+    user = fetchone(con, "SELECT room, pin, favorites, reading_log, library_card_url, library_card_image FROM user_accounts WHERE room=?", (room,))
     if user is None:
-        # 新規作成
-        if USE_PG:
-            execute(con, "INSERT INTO user_accounts (room, pin) VALUES (?,?)", (room, pin))
-        else:
-            execute(con, "INSERT INTO user_accounts (room, pin) VALUES (?,?)", (room, pin))
+        execute(con, "INSERT INTO user_accounts (room, pin) VALUES (?,?)", (room, pin))
         con.commit(); con.close()
-        return jsonify({"ok": True, "is_new": True, "favorites": [], "reading_log": {}})
+        return jsonify({"ok": True, "is_new": True, "favorites": [], "reading_log": {}, "library_card_url": "", "library_card_image": ""})
     if user["pin"] != pin:
         con.close()
         return jsonify({"error": "PINが違います"}), 401
@@ -1009,7 +1032,9 @@ def api_user_login():
     return jsonify({
         "ok": True, "is_new": False,
         "favorites": json.loads(user["favorites"] or "[]"),
-        "reading_log": json.loads(user["reading_log"] or "{}")
+        "reading_log": json.loads(user["reading_log"] or "{}"),
+        "library_card_url": user.get("library_card_url") or "",
+        "library_card_image": user.get("library_card_image") or ""
     })
 
 
@@ -1027,12 +1052,14 @@ def api_user_sync():
         return jsonify({"error": "unauthorized"}), 401
     favs = json.dumps(body.get("favorites", []), ensure_ascii=False)
     rlog = json.dumps(body.get("reading_log", {}), ensure_ascii=False)
+    card_url = (body.get("library_card_url") or "")[:2000]
+    card_img = body.get("library_card_image") or ""
     if USE_PG:
-        execute(con, "UPDATE user_accounts SET favorites=?, reading_log=?, updated_at=NOW() WHERE room=?",
-                (favs, rlog, room))
+        execute(con, "UPDATE user_accounts SET favorites=?, reading_log=?, library_card_url=?, library_card_image=?, updated_at=NOW() WHERE room=?",
+                (favs, rlog, card_url, card_img, room))
     else:
-        execute(con, "UPDATE user_accounts SET favorites=?, reading_log=?, updated_at=datetime('now','localtime') WHERE room=?",
-                (favs, rlog, room))
+        execute(con, "UPDATE user_accounts SET favorites=?, reading_log=?, library_card_url=?, library_card_image=?, updated_at=datetime('now','localtime') WHERE room=?",
+                (favs, rlog, card_url, card_img, room))
     con.commit(); con.close()
     return jsonify({"ok": True})
 
