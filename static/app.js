@@ -1276,11 +1276,25 @@ document.getElementById("syncModalClose").addEventListener("click", () => {
   document.getElementById("syncModal").style.display = "none";
 });
 
+// 部屋番号自動フォーマット（5533→5-533、11203→1-1203）
+document.getElementById("syncRoom").addEventListener("input", (e) => {
+  const val = e.target.value.replace(/\D/g, "");
+  e.target.value = val;
+  const preview = document.getElementById("syncRoomPreview");
+  if (val.length >= 2) {
+    preview.textContent = `→ ${val[0]}-${val.slice(1)}`;
+  } else {
+    preview.textContent = "";
+  }
+});
+
 document.getElementById("syncLoginBtn").addEventListener("click", async () => {
-  const room = document.getElementById("syncRoom").value.trim();
+  const rawRoom = document.getElementById("syncRoom").value.replace(/\D/g, "");
+  const room = rawRoom.length >= 2 ? `${rawRoom[0]}-${rawRoom.slice(1)}` : rawRoom;
   const pin  = document.getElementById("syncPin").value.trim();
   const msg  = document.getElementById("syncLoginMsg");
   if (!room || !pin) { msg.textContent = "部屋番号とPINを入力してください"; msg.style.color="#e05"; return; }
+  if (pin.length !== 6) { msg.textContent = "PINは6桁の数字を入力してください"; msg.style.color="#e05"; return; }
   document.getElementById("syncLoginBtn").disabled = true;
   document.getElementById("syncLoginBtn").textContent = "確認中…";
   const res = await fetch("/api/user/login", {
