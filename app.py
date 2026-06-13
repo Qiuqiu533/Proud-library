@@ -1065,6 +1065,39 @@ def api_user_sync():
 
 
 # --- Password change ---
+@app.route("/api/admin/db-size")
+def api_db_size():
+    if request.args.get("password") != get_board_password():
+        return jsonify({"error": "unauthorized"}), 401
+    con = get_con()
+    try:
+        if USE_PG:
+            size_row = fetchone(con, "SELECT pg_database_size(current_database()) AS bytes")
+            total_bytes = size_row["bytes"]
+            rows = fetchall(con, """
+                SELECT relname AS name,
+                       pg_total_relation_size(relid) AS bytes
+                FROM pg_catalog.pg_statio_user_tables
+                ORDER BY bytes DESC
+            """)
+            tables = [{"name": r["name"], "mb": round(r["bytes"]/1024/1024, 2)} for r in rows]
+        else:
+            import os as _os
+            total_bytes = _os.path.getsize("data.db")
+            tables = []
+        con.close()
+        limit_bytes = 512 * 1024 * 1024
+        return jsonify({
+            "total_mb": round(total_bytes / 1024 / 1024, 2),
+            "limit_mb": 512,
+            "percent": round(total_bytes / limit_bytes * 100, 1),
+            "tables": tables
+        })
+    except Exception as e:
+        con.close()
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/admin/change-password", methods=["POST"])
 def api_change_password():
     body = request.get_json()
