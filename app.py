@@ -427,7 +427,7 @@ def fetch_book_detail(isbn):
         if len(tds) >= 3 and tds[1].text.strip() and tds[2].text.strip():
             availability.append({"library": tds[1].text.strip(), "status": tds[2].text.strip()})
     result["availability"] = availability
-    # キャッシュ保存
+    # キャッシュ保存（バックグラウンドで実行してレスポンスをブロックしない）
     if availability:
         statuses = [a["status"] for a in availability]
         if any(s in ("利用可能", "在架") for s in statuses):
@@ -436,22 +436,21 @@ def fetch_book_detail(isbn):
             avail_status = "loaned"
         else:
             avail_status = "unknown"
-        try:
-            _cache_con = get_con()
-            if USE_PG:
-                execute(_cache_con, """
-                    INSERT INTO availability_cache (isbn, status, title, author, updated_at)
-                    VALUES (%s, %s, %s, %s, NOW())
-                    ON CONFLICT (isbn) DO UPDATE SET status=EXCLUDED.status, title=EXCLUDED.title, author=EXCLUDED.author, updated_at=NOW()
-                """, (isbn, avail_status, result.get("title",""), result.get("author","")))
-            else:
-                execute(_cache_con, """
-                    INSERT OR REPLACE INTO availability_cache (isbn, status, title, author, updated_at)
-                    VALUES (?, ?, ?, ?, datetime('now','localtime'))
-                """, (isbn, avail_status, result.get("title",""), result.get("author","")))
-            _cache_con.commit(); _cache_con.close()
-        except Exception:
-            pass
+        def _save_cache(isbn_, status_, title_, author_):
+            try:
+                c = get_con()
+                if USE_PG:
+                    execute(c, """INSERT INTO availability_cache (isbn, status, title, author, updated_at)
+                        VALUES (%s,%s,%s,%s,NOW()) ON CONFLICT (isbn) DO UPDATE SET
+                        status=EXCLUDED.status, title=EXCLUDED.title, author=EXCLUDED.author, updated_at=NOW()
+                    """, (isbn_, status_, title_, author_))
+                else:
+                    execute(c, """INSERT OR REPLACE INTO availability_cache (isbn, status, title, author, updated_at)
+                        VALUES (?,?,?,?,datetime('now','localtime'))""", (isbn_, status_, title_, author_))
+                c.commit(); c.close()
+            except Exception:
+                pass
+        threading.Thread(target=_save_cache, args=(isbn, avail_status, result.get("title",""), result.get("author","")), daemon=True).start()
     isbn10 = result.get("isbn10", "")
     isbn13 = result.get("isbn13", isbn)
     result["cover"] = get_cover_url(isbn13, isbn10)

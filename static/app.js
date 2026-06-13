@@ -227,7 +227,7 @@ async function loadBooks(keyword = "", page = 1) {
   renderGrid("bookGrid", books);
   renderPagination("paginationTop", data.total, page, p => loadBooks(keyword, p));
   renderPagination("paginationBottom", data.total, page, p => loadBooks(keyword, p));
-  applyAvailCache(isbns);
+  applyAvailCache(data.books.map(b => b.isbn).filter(Boolean));
 }
 
 // ===== 今日の1冊 =====
