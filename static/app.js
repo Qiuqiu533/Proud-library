@@ -147,32 +147,35 @@ function renderCard(book, opts = {}) {
   return div;
 }
 
-// IntersectionObserver: カードが画面に入ったら自動で在架確認
-const _availFetching = new Set();
-const availObserver = new IntersectionObserver((entries) => {
-  entries.forEach(entry => {
-    if (!entry.isIntersecting) return;
-    const card = entry.target;
-    const statusEl = card.querySelector(".avail-status[id^='avail-']");
-    if (!statusEl) return;
-    const isbn = statusEl.id.replace("avail-", "");
-    if (_availFetching.has(isbn)) return;
-    _availFetching.add(isbn);
-    availObserver.unobserve(card);
-    fetch(`/api/availability/${isbn}`)
-      .then(r => r.json())
-      .then(data => {
-        if (data.status === "available") {
-          statusEl.innerHTML = '<span class="avail-badge avail-ok">✅ 在架</span>';
-        } else if (data.status === "loaned") {
-          statusEl.innerHTML = '<span class="avail-badge avail-ng">📤 貸出中</span>';
-        } else {
-          statusEl.innerHTML = '';
-        }
-      })
-      .catch(() => { statusEl.innerHTML = ''; });
-  });
-}, { threshold: 0.1 });
+// ダミーのObserver（使用しない）
+const availObserver = { observe: () => {} };
+
+// キャッシュ済みの在架状況をグリッドに反映（スクレイピングなし）
+async function applyAvailCache(isbns) {
+  if (!isbns || !isbns.length) return;
+  try {
+    const res = await fetch(`/api/availability/cached?isbns=${isbns.join(",")}`);
+    const cache = await res.json();
+    Object.entries(cache).forEach(([isbn, status]) => {
+      const el = document.getElementById("avail-" + isbn);
+      if (!el) return;
+      if (status === "available") {
+        el.innerHTML = '<span class="avail-badge avail-ok">✅ 在架</span>';
+      } else if (status === "loaned") {
+        el.innerHTML = '<span class="avail-badge avail-ng">📤 貸出中</span>';
+      } else {
+        el.innerHTML = '';
+      }
+    });
+    // キャッシュにない本は空欄に
+    isbns.forEach(isbn => {
+      if (!(isbn in cache)) {
+        const el = document.getElementById("avail-" + isbn);
+        if (el) el.innerHTML = '';
+      }
+    });
+  } catch {}
+}
 
 function renderGrid(containerId, books) {
   const grid = document.getElementById(containerId);
@@ -224,6 +227,7 @@ async function loadBooks(keyword = "", page = 1) {
   renderGrid("bookGrid", books);
   renderPagination("paginationTop", data.total, page, p => loadBooks(keyword, p));
   renderPagination("paginationBottom", data.total, page, p => loadBooks(keyword, p));
+  applyAvailCache(isbns);
 }
 
 // ===== 今日の1冊 =====
@@ -286,6 +290,7 @@ async function loadBooksByGenre(genre, page = 1) {
   renderGrid("bookGrid", books);
   renderPagination("paginationTop",    data.total, page, p => loadBooksByGenre(genre, p));
   renderPagination("paginationBottom", data.total, page, p => loadBooksByGenre(genre, p));
+  applyAvailCache(data.books.map(b => b.isbn).filter(Boolean));
 }
 
 // ===== New arrivals =====
@@ -466,7 +471,12 @@ async function openModal(isbn) {
   });
 }
 
-function closeModal() { document.getElementById("modal").style.display = "none"; }
+function closeModal() {
+  document.getElementById("modal").style.display = "none";
+  // モーダルで在架確認した結果をカードに反映
+  const isbns = [...document.querySelectorAll(".avail-status[id^='avail-']")].map(el => el.id.replace("avail-",""));
+  if (isbns.length) applyAvailCache(isbns);
+}
 function openRateModal() {
   ratingScore = 0;
   document.getElementById("reviewText").value = "";
