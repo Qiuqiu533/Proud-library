@@ -1563,10 +1563,11 @@ async function loadLoanedResident() {
     rating: { score: 0, votes: 0, reviews: [] }
   }));
   grid.innerHTML = "";
-  books.forEach(b => grid.appendChild(renderCard(b)));
-  // 在架バッジ（全件貸出中なので直接セット）
   books.forEach(b => {
-    const el = document.getElementById("avail-" + b.isbn);
+    const card = renderCard(b);
+    grid.appendChild(card);
+    // IDが他タブと重複するため、直接このカード内の要素を更新
+    const el = card.querySelector(".avail-status");
     if (el) el.innerHTML = '<span class="avail-badge avail-ng">📤 貸出中</span>';
   });
 }
