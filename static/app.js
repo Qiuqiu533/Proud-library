@@ -115,7 +115,7 @@ function renderCard(book, opts = {}) {
       <div class="book-author author-link" data-author="${(book.author||"").replace(/"/g,'&quot;')}">${book.author || "著者不明"}</div>
       <div class="book-meta">${book.publisher || ""}</div>
       <div class="card-stars">${starsHtml(rating.score)}</div>
-      <div class="avail-status" id="avail-${book.isbn}"><span class="avail-badge avail-checking">確認中…</span></div>
+      <div class="avail-status" id="avail-${book.isbn}"></div>
     </div>`;
 
   div.querySelector(".fav-btn").addEventListener("click", e => {
@@ -298,7 +298,9 @@ async function loadNew() {
   document.getElementById("newGrid").innerHTML = '<div class="loading">読み込み中…</div>';
   const res = await fetch(`/api/books?keyword=&page=1`);
   const data = await res.json();
-  renderGrid("newGrid", data.books.slice(0, 20));
+  const books = data.books.slice(0, 20);
+  renderGrid("newGrid", books);
+  applyAvailCache(books.map(b => b.isbn).filter(Boolean));
 }
 
 // ===== Favorites =====
