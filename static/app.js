@@ -1418,18 +1418,26 @@ document.getElementById("fbSubmitBtn").addEventListener("click", async () => {
   }
 });
 
+function getVotedIds() {
+  try { return JSON.parse(localStorage.getItem("voted_requests") || "[]"); } catch { return []; }
+}
+function saveVotedIds(ids) { localStorage.setItem("voted_requests", JSON.stringify(ids)); }
+
 async function loadReqList() {
   const el = document.getElementById("reqList");
   el.innerHTML = '<div class="loading">読み込み中…</div>';
   const res = await fetch("/api/requests");
   const items = await res.json();
   if (!items.length) { el.innerHTML = '<div class="loading">まだリクエストはありません</div>'; return; }
-  const stLabel = {pending:"⏳ 未対応", doing:"🔄 検討中", done:"✅ 完了"};
+  const stLabel = {pending:"⏳ 検討中", doing:"🔄 選定中", done:"✅ 入荷済"};
   const stColor = {pending:"#888", doing:"#c07010", done:"#3d8a4f"};
-  // Show pending/doing first, then done
+  const votedIds = getVotedIds();
   const sorted = [...items.filter(r=>r.status!=="done"), ...items.filter(r=>r.status==="done")];
-  el.innerHTML = sorted.map(r => `
-    <div class="req-card">
+  el.innerHTML = sorted.map(r => {
+    const voted = votedIds.includes(r.id);
+    const votes = r.votes || 0;
+    return `
+    <div class="req-card" data-id="${r.id}">
       <div class="req-card-header">
         <div class="req-card-left">
           <span class="req-book-title">📖 ${esc(r.title)}</span>
@@ -1438,9 +1446,30 @@ async function loadReqList() {
         <span class="req-status-badge" style="color:${stColor[r.status]||"#888"}">${stLabel[r.status]||""}</span>
       </div>
       ${r.reason ? `<div class="req-reason">"${esc(r.reason)}"</div>` : ""}
-      ${r.note ? `<div class="req-note">📝 管理者メモ：${esc(r.note)}</div>` : ""}
-      <div class="req-meta">${r.room ? `🏠 部屋番号：${esc(r.room)}　` : ""}🕐 ${r.created_at.slice(0,10)}</div>
-    </div>`).join("");
+      ${r.note ? `<div class="req-note">📝 ${esc(r.note)}</div>` : ""}
+      <div class="req-card-footer">
+        <div class="req-meta">${r.room ? `🏠 ${esc(r.room)}　` : ""}🕐 ${r.created_at.slice(0,10)}</div>
+        <button class="req-vote-btn${voted?" req-vote-done":""}" data-id="${r.id}" ${r.status==="done"?"disabled":""}>
+          👍 <span class="req-vote-count">${votes}</span>${voted?" 済":" 読みたい"}
+        </button>
+      </div>
+    </div>`;
+  }).join("");
+
+  el.querySelectorAll(".req-vote-btn:not([disabled]):not(.req-vote-done)").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = parseInt(btn.dataset.id);
+      btn.disabled = true;
+      const r = await fetch(`/api/requests/${id}/vote`, {method:"POST"});
+      if (r.ok) {
+        const data = await r.json();
+        btn.classList.add("req-vote-done");
+        btn.innerHTML = `👍 <span class="req-vote-count">${data.votes}</span> 済`;
+        const ids = getVotedIds();
+        if (!ids.includes(id)) { ids.push(id); saveVotedIds(ids); }
+      } else { btn.disabled = false; }
+    });
+  });
 }
 
 async function loadReqManage() {
@@ -1462,7 +1491,7 @@ async function loadReqManage() {
     <div class="req-admin-card">
       <div class="req-admin-card-header">
         <div>
-          <div class="req-book-title">📖 ${esc(r.title)}</div>
+          <div class="req-book-title">📖 ${esc(r.title)} <span class="req-vote-admin">👍 ${r.votes||0}</span></div>
           ${r.author ? `<span class="req-author-badge">著：${esc(r.author)}</span>` : ""}
         </div>
         <button class="news-del req-del" data-id="${r.id}" title="削除">🗑</button>
