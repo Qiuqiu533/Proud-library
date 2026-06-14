@@ -2196,6 +2196,28 @@ document.getElementById("pwChangeBtn").addEventListener("click", async () => {
   }
 });
 
+async function loadDbSize() {
+  const display = document.getElementById("dbSizeDisplay");
+  if (!display) return;
+  display.innerHTML = '<div class="loading">確認中…</div>';
+  const res = await fetch(`/api/admin/db-size?password=${encodeURIComponent(boardPassword)}`);
+  if (!res.ok) { display.innerHTML = '<p style="color:#e05">❌ 取得できませんでした</p>'; return; }
+  const d = await res.json();
+  const pct = d.percent;
+  const color = pct >= 80 ? "#c00" : pct >= 50 ? "#e07800" : "#3d6b4f";
+  const bar = `<div style="background:#eee;border-radius:6px;height:14px;margin:10px 0">
+    <div style="background:${color};width:${Math.min(pct,100)}%;height:14px;border-radius:6px;transition:width 0.4s"></div></div>`;
+  const tables = (d.tables||[]).map(t => `<tr><td>${t.name}</td><td style="text-align:right">${t.mb} MB</td></tr>`).join("");
+  display.innerHTML = `
+    <div style="font-size:1.1rem;font-weight:700;color:${color}">${d.total_mb} MB <span style="font-size:0.85rem;font-weight:400;color:#888">/ ${d.limit_mb} MB（${pct}% 使用中）</span></div>
+    ${bar}
+    ${pct >= 80 ? '<p style="color:#c00;font-size:0.85rem">⚠️ 使用量が80%を超えています。古いお知らせの削除などをご検討ください。</p>' : ''}
+    ${tables ? `<table class="guide-table" style="margin-top:12px"><tr><th>テーブル</th><th style="text-align:right">サイズ</th></tr>${tables}</table>` : ""}
+    <button class="btn-board-add" id="dbSizeBtn" style="margin-top:12px">🔄 再確認</button>`;
+  document.getElementById("dbSizeBtn").addEventListener("click", loadDbSize);
+}
+document.getElementById("dbSizeBtn").addEventListener("click", loadDbSize);
+
 // ===== 貸出中一覧（入居者タブ） =====
 function isbn13ToCoverUrl(isbn13) {
   if (isbn13 && isbn13.startsWith("978") && isbn13.length === 13) {
