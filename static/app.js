@@ -1750,60 +1750,42 @@ function getVotedIds() {
 }
 function saveVotedIds(ids) { localStorage.setItem("voted_requests", JSON.stringify(ids)); }
 
-async function loadReqList() {
-  const el = document.getElementById("reqList");
-  if (!el) return;
-  el.innerHTML = '<div class="loading">読み込み中…</div>';
-  try {
-  const res = await fetch("/api/requests");
-  const items = await res.json();
-  if (!items.length) { el.innerHTML = '<div class="loading">まだリクエストはありません</div>'; return; }
+function reqResidentCardHtml(r, votedIds) {
+  const isFb = r.type === "feedback";
   const stLabel = {pending:"⏳ 検討中", approved:"✅ 購入決定", rejected:"❌ 見送り", done:"📦 入荷済",
     fb_received:"📬 受付中", fb_checking:"🔍 確認中", fb_done:"✅ 対応済", fb_rejected:"❌ 見送り",
     fb_pending:"⏳ 検討中", fb_noted:"📝 参考意見として受理", fb_none:"➖ 対応なし"};
   const stColor = {pending:"#888", approved:"#3d8a4f", rejected:"#c00", done:"#555",
     fb_received:"#888", fb_checking:"#5b8dd9", fb_done:"#3d8a4f", fb_rejected:"#c00",
     fb_pending:"#888", fb_noted:"#7a5c9a", fb_none:"#aaa"};
-  const votedIds = getVotedIds();
-  const order = {pending:0, approved:1, rejected:2, done:3,
-    fb_received:0, fb_checking:1, fb_pending:1, fb_done:2, fb_noted:2, fb_rejected:3, fb_none:3};
-  const sorted = [...items].sort((a,b) => (order[a.status]??0) - (order[b.status]??0) || (b.votes||0) - (a.votes||0));
-  el.innerHTML = sorted.map(r => {
-    const isFeedback = r.type === "feedback";
-    const voted = votedIds.includes(r.id);
-    const votes = r.votes || 0;
-    const isFb = isFeedback;
-    const borderColor = isFb ? "#5b8dd9" : "#3d6b4f";
-    const bgColor = isFb ? "#f0f5ff" : "#f2f8f4";
-    const labelColor = isFb ? "#5b8dd9" : "#3d6b4f";
-    const labelBg = isFb ? "#dceaff" : "#d4ead9";
-    const label = isFb ? "💬 ご要望・ご意見" : "📖 本のリクエスト";
-    const voteBtn = isFb ? "" : `
-        <button class="req-vote-btn${voted?" req-vote-done":""}" data-id="${r.id}" ${(r.status==="done"||r.status==="rejected")?"disabled":""}>
-          👍 <span class="req-vote-count">${votes}</span>${voted?" 済":" 読みたい"}
-        </button>`;
-    return `
-    <div class="req-card" data-id="${r.id}" style="border-left:5px solid ${borderColor};background:${bgColor}">
-      <div style="margin-bottom:8px">
-        <span style="font-size:0.72rem;font-weight:700;color:${labelColor};background:${labelBg};padding:2px 8px;border-radius:10px">${label}</span>
+  const voted = votedIds.includes(r.id);
+  const votes = r.votes || 0;
+  const borderColor = isFb ? "#5b8dd9" : "#3d6b4f";
+  const bgColor = isFb ? "#f0f5ff" : "#f2f8f4";
+  const voteBtn = isFb ? "" : `
+    <button class="req-vote-btn${voted?" req-vote-done":""}" data-id="${r.id}" ${(r.status==="done"||r.status==="rejected")?"disabled":""}>
+      👍 <span class="req-vote-count">${votes}</span>${voted?" 済":" 読みたい"}
+    </button>`;
+  return `
+  <div class="req-card" data-id="${r.id}" style="border-left:5px solid ${borderColor};background:${bgColor}">
+    <div class="req-card-header">
+      <div class="req-card-left">
+        <span class="req-book-title">${esc(r.title)}</span>
+        ${r.author ? `<span class="req-author-badge">著：${esc(r.author)}</span>` : ""}
       </div>
-      <div class="req-card-header">
-        <div class="req-card-left">
-          <span class="req-book-title">${esc(r.title)}</span>
-          ${r.author ? `<span class="req-author-badge">著：${esc(r.author)}</span>` : ""}
-        </div>
-        <span class="req-status-badge" style="color:${stColor[r.status]||"#888"}">${stLabel[r.status]||""}</span>
-      </div>
-      ${r.reason ? `<div class="req-reason">"${esc(r.reason)}"</div>` : ""}
-      ${r.reply ? `<div class="req-reply">📣 図書館より：${esc(r.reply)}</div>` : ""}
-      <div class="req-card-footer">
-        <div class="req-meta">🕐 ${(r.created_at||"").slice(0,10)}</div>
-        ${voteBtn}
-      </div>
-    </div>`;
-  }).join("");
+      <span class="req-status-badge" style="color:${stColor[r.status]||"#888"}">${stLabel[r.status]||""}</span>
+    </div>
+    ${r.reason ? `<div class="req-reason">"${esc(r.reason)}"</div>` : ""}
+    ${r.reply ? `<div class="req-reply">📣 図書館より：${esc(r.reply)}</div>` : ""}
+    <div class="req-card-footer">
+      <div class="req-meta">🕐 ${(r.created_at||"").slice(0,10)}</div>
+      ${voteBtn}
+    </div>
+  </div>`;
+}
 
-  el.querySelectorAll(".req-vote-btn:not([disabled]):not(.req-vote-done)").forEach(btn => {
+function bindVoteEvents(container) {
+  container.querySelectorAll(".req-vote-btn:not([disabled]):not(.req-vote-done)").forEach(btn => {
     btn.addEventListener("click", async () => {
       const id = parseInt(btn.dataset.id);
       btn.disabled = true;
@@ -1817,8 +1799,50 @@ async function loadReqList() {
       } else { btn.disabled = false; }
     });
   });
+}
+
+async function loadReqList() {
+  const elBooks = document.getElementById("reqListBooks");
+  const elFb = document.getElementById("reqListFeedback");
+  if (!elBooks) return;
+  elBooks.innerHTML = '<div class="loading">読み込み中…</div>';
+  if (elFb) elFb.innerHTML = '<div class="loading">読み込み中…</div>';
+  try {
+    const res = await fetch("/api/requests");
+    const items = await res.json();
+    const votedIds = getVotedIds();
+    const order = {pending:0, approved:1, rejected:2, done:3,
+      fb_received:0, fb_checking:1, fb_pending:1, fb_done:2, fb_noted:2, fb_rejected:3, fb_none:3};
+    const sorted = [...items].sort((a,b) => (order[a.status]??0) - (order[b.status]??0) || (b.votes||0) - (a.votes||0));
+
+    const books = sorted.filter(r => r.type !== "feedback");
+    const fbs = sorted.filter(r => r.type === "feedback");
+
+    elBooks.innerHTML = books.length ? books.map(r => reqResidentCardHtml(r, votedIds)).join("") : '<div class="loading">まだ本のリクエストはありません</div>';
+    if (elFb) elFb.innerHTML = fbs.length ? fbs.map(r => reqResidentCardHtml(r, votedIds)).join("") : '<div class="loading">まだご要望・ご意見はありません</div>';
+
+    bindVoteEvents(elBooks);
+    if (elFb) bindVoteEvents(elFb);
+
+    // サブタブ切り替え
+    document.querySelectorAll(".res-subtab-btn").forEach(btn => {
+      btn.onclick = () => {
+        const isBooks = btn.dataset.subtab === "books";
+        document.querySelectorAll(".res-subtab-btn").forEach(b => {
+          const bIsBooks = b.dataset.subtab === "books";
+          const active = b === btn;
+          if (active && bIsBooks) Object.assign(b.style, {background:"#3d6b4f", color:"#fff", borderColor:"#3d6b4f"});
+          else if (active) Object.assign(b.style, {background:"#5b8dd9", color:"#fff", borderColor:"#5b8dd9"});
+          else if (bIsBooks) Object.assign(b.style, {background:"#f2f8f4", color:"#8aaa94", borderColor:"#c0d9c8"});
+          else Object.assign(b.style, {background:"#f5f8ff", color:"#8aabcc", borderColor:"#c0cfe8"});
+          b.classList.toggle("active", active);
+        });
+        elBooks.style.display = isBooks ? "" : "none";
+        if (elFb) elFb.style.display = isBooks ? "none" : "";
+      };
+    });
   } catch(e) {
-    el.innerHTML = `<div class="loading">読み込みに失敗しました：${e.message}</div>`;
+    elBooks.innerHTML = `<div class="loading">読み込みに失敗しました：${e.message}</div>`;
   }
 }
 
