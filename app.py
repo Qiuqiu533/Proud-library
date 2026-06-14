@@ -1307,6 +1307,19 @@ def api_post_announcement():
     return jsonify({"ok": True})
 
 
+@app.route("/api/announcements/<int:ann_id>", methods=["PATCH"])
+def api_update_announcement(ann_id):
+    body = request.get_json()
+    if body.get("password") != get_admin_password():
+        return jsonify({"error": "unauthorized"}), 401
+    con = get_con()
+    execute(con, "UPDATE announcements SET title=?, body=?, category=?, image_url=? WHERE id=?",
+        (body.get("title","").strip(), body.get("body","").strip(),
+         body.get("category","お知らせ"), body.get("image_url","").strip(), ann_id))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+
 @app.route("/api/announcements/<int:ann_id>", methods=["DELETE"])
 def api_delete_announcement(ann_id):
     body = request.get_json()
