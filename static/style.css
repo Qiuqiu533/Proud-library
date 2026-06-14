@@ -553,3 +553,12 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
 
 /* 新着タブ 入荷日バッジ */
 .arrived-badge { position: absolute; bottom: 4px; left: 0; right: 0; text-align: center; background: rgba(61,107,79,0.88); color: #fff; font-size: 0.66rem; padding: 2px 0; border-radius: 0 0 6px 6px; font-weight: 700; pointer-events: none; }
+
+/* リクエスト投票 */
+.req-card-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; gap: 8px; }
+.req-vote-btn { display: flex; align-items: center; gap: 4px; padding: 6px 14px; background: #f0faf4; border: 1.5px solid #3d6b4f; color: #2a4a37; border-radius: 20px; font-size: 0.82rem; font-weight: 700; cursor: pointer; transition: background 0.15s, transform 0.1s; white-space: nowrap; }
+.req-vote-btn:hover:not([disabled]):not(.req-vote-done) { background: #d0f0dc; transform: scale(1.05); }
+.req-vote-btn.req-vote-done { background: #3d6b4f; color: #fff; border-color: #3d6b4f; cursor: default; }
+.req-vote-btn[disabled]:not(.req-vote-done) { opacity: 0.4; cursor: default; }
+.req-vote-count { font-size: 1rem; font-weight: 900; }
+.req-vote-admin { font-size: 0.78rem; color: #3d6b4f; font-weight: 700; margin-left: 6px; }

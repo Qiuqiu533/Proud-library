@@ -432,7 +432,27 @@ def _ensure_db():
     threading.Thread(target=_migrate_add_card_columns, daemon=True).start()
     threading.Thread(target=_migrate_genre_map_to_db, daemon=True).start()
     threading.Thread(target=_migrate_ndc_genres, daemon=True).start()
+    threading.Thread(target=_migrate_add_votes_column, daemon=True).start()
 
+
+def _migrate_add_votes_column():
+    try:
+        con = get_con()
+        if IS_POSTGRES:
+            try:
+                con.cursor().execute("ALTER TABLE book_requests ADD COLUMN votes INTEGER DEFAULT 0")
+                con.commit()
+            except Exception:
+                con.rollback()
+        else:
+            try:
+                con.execute("ALTER TABLE book_requests ADD COLUMN votes INTEGER DEFAULT 0")
+                con.commit()
+            except Exception:
+                pass
+        con.close()
+    except Exception as e:
+        print(f"migrate votes error: {e}")
 
 def _migrate_genre_map_to_db():
     """genre_map.json が存在し DB が空なら一度だけ移行する"""
@@ -1178,7 +1198,7 @@ def api_delete_announcement(ann_id):
 @app.route("/api/requests")
 def api_requests():
     con = get_con()
-    rows = fetchall(con, "SELECT id,title,author,reason,room,status,note,created_at FROM book_requests ORDER BY id DESC")
+    rows = fetchall(con, "SELECT id,title,author,reason,room,status,note,votes,created_at FROM book_requests ORDER BY votes DESC, id DESC")
     con.close()
     return jsonify([{**r, "created_at": str(r["created_at"])[:10]} for r in rows])
 
@@ -1197,6 +1217,15 @@ def api_post_request():
     con.commit(); con.close()
     return jsonify({"ok": True})
 
+
+@app.route("/api/requests/<int:req_id>/vote", methods=["POST"])
+def api_vote_request(req_id):
+    con = get_con()
+    execute(con, "UPDATE book_requests SET votes = COALESCE(votes,0) + 1 WHERE id=?", (req_id,))
+    con.commit()
+    row = fetchone(con, "SELECT votes FROM book_requests WHERE id=?", (req_id,))
+    con.close()
+    return jsonify({"ok": True, "votes": row["votes"] if row else 0})
 
 @app.route("/api/requests/<int:req_id>", methods=["PATCH"])
 def api_update_request(req_id):
