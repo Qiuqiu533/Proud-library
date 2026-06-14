@@ -1772,17 +1772,24 @@ async function loadReqList() {
     const isFeedback = r.type === "feedback";
     const voted = votedIds.includes(r.id);
     const votes = r.votes || 0;
-    const borderColor = isFeedback ? "#5b8dd9" : "#3d6b4f";
-    const icon = isFeedback ? "💬" : "📖";
-    const voteBtn = isFeedback ? "" : `
+    const isFb = isFeedback;
+    const borderColor = isFb ? "#5b8dd9" : "#3d6b4f";
+    const bgColor = isFb ? "#f0f5ff" : "#f2f8f4";
+    const labelColor = isFb ? "#5b8dd9" : "#3d6b4f";
+    const labelBg = isFb ? "#dceaff" : "#d4ead9";
+    const label = isFb ? "💬 ご要望・ご意見" : "📖 本のリクエスト";
+    const voteBtn = isFb ? "" : `
         <button class="req-vote-btn${voted?" req-vote-done":""}" data-id="${r.id}" ${(r.status==="done"||r.status==="rejected")?"disabled":""}>
           👍 <span class="req-vote-count">${votes}</span>${voted?" 済":" 読みたい"}
         </button>`;
     return `
-    <div class="req-card" data-id="${r.id}" style="border-left:4px solid ${borderColor}">
+    <div class="req-card" data-id="${r.id}" style="border-left:5px solid ${borderColor};background:${bgColor}">
+      <div style="margin-bottom:8px">
+        <span style="font-size:0.72rem;font-weight:700;color:${labelColor};background:${labelBg};padding:2px 8px;border-radius:10px">${label}</span>
+      </div>
       <div class="req-card-header">
         <div class="req-card-left">
-          <span class="req-book-title">${icon} ${esc(r.title)}</span>
+          <span class="req-book-title">${esc(r.title)}</span>
           ${r.author ? `<span class="req-author-badge">著：${esc(r.author)}</span>` : ""}
         </div>
         <span class="req-status-badge" style="color:${stColor[r.status]||"#888"}">${stLabel[r.status]||""}</span>
