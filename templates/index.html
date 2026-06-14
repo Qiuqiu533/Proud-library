@@ -1068,6 +1068,26 @@
               </ol>
               <p style="margin-top:6px;font-size:0.82rem;color:#666">※変更後はデータベースに保存されるため、次回起動後も有効です。</p>
             </div>
+            <div class="guide-step-box" style="margin-top:12px">
+              <strong>🔑 パスワードを忘れた・リセットしたい場合（アプリ管理者向け）：</strong>
+              <p style="margin:6px 0 8px;font-size:0.85rem;color:#555">コードの修正・デプロイはパスワードとは無関係のため、担当者がパスワードを変更してもアプリ管理者（秋山）は引き続きコードを修正できます。</p>
+              <strong style="font-size:0.88rem">方法A：Render環境変数から確認・上書き（簡単）</strong>
+              <ol class="guide-ol">
+                <li><a href="https://dashboard.render.com" target="_blank">dashboard.render.com</a> にログイン</li>
+                <li>proud-library → Environment を開く</li>
+                <li><code>ADMIN_PASSWORD</code> / <code>BOARD_PASSWORD</code> / <code>RESIDENT_PASSWORD</code> を確認または書き換えて保存</li>
+                <li>自動再デプロイ後に新しい値が有効になる</li>
+              </ol>
+              <strong style="font-size:0.88rem;display:block;margin-top:10px">方法B：DBを直接リセット（完全初期化）</strong>
+              <ol class="guide-ol">
+                <li><a href="https://neon.tech" target="_blank">neon.tech</a> にログインしてSQL Editorを開く</li>
+                <li>以下のSQLを実行してパスワード設定を削除する</li>
+              </ol>
+              <div style="background:#f4f4f4;border-radius:6px;padding:8px 12px;font-family:monospace;font-size:0.82rem;margin-top:6px">
+                DELETE FROM settings WHERE key IN ('admin_password', 'board_password', 'resident_password');
+              </div>
+              <p style="margin-top:6px;font-size:0.82rem;color:#666">※削除後はRender環境変数の値（初期値）が有効になります。</p>
+            </div>
           </div>
 
           <!-- 4. お知らせ -->
