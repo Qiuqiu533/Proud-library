@@ -914,7 +914,10 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
     if (btn.dataset.tab === "new") loadNew();
     if (btn.dataset.tab === "fav") loadFavorites();
     if (btn.dataset.tab === "log") loadLog("all");
-    if (btn.dataset.tab === "request") loadReqList();
+    if (btn.dataset.tab === "request") {
+      loadReqList();
+      document.getElementById("reqMsg").textContent = "";
+    }
     if (btn.dataset.tab === "news") loadNews();
     if (btn.dataset.tab === "info") loadInfo();
     if (btn.dataset.tab === "card") loadCard();
