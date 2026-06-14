@@ -1377,11 +1377,12 @@ def api_post_request():
     body = request.get_json()
     title = body.get("title", "").strip()
     req_type = body.get("type", "request")
+    default_status = "fb_received" if req_type == "feedback" else "pending"
     if not title:
         return jsonify({"error": "title required"}), 400
     con = get_con()
-    execute(con, "INSERT INTO book_requests (title,author,reason,room,type) VALUES (?,?,?,?,?)",
-        (title, body.get("author","").strip(), body.get("reason","").strip(), body.get("room","").strip(), req_type))
+    execute(con, "INSERT INTO book_requests (title,author,reason,room,type,status) VALUES (?,?,?,?,?,?)",
+        (title, body.get("author","").strip(), body.get("reason","").strip(), body.get("room","").strip(), req_type, default_status))
     con.commit(); con.close()
     return jsonify({"ok": True})
 
@@ -1398,7 +1399,8 @@ def api_vote_request(req_id):
 @app.route("/api/requests/<int:req_id>", methods=["PATCH"])
 def api_update_request(req_id):
     body = request.get_json()
-    if body.get("password") != get_admin_password():
+    pw = body.get("password")
+    if pw != get_admin_password() and pw != get_board_password():
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     if "status" in body:
@@ -1414,7 +1416,8 @@ def api_update_request(req_id):
 @app.route("/api/requests/<int:req_id>", methods=["DELETE"])
 def api_delete_request(req_id):
     body = request.get_json()
-    if body.get("password") != get_admin_password():
+    pw = body.get("password")
+    if pw != get_admin_password() and pw != get_board_password():
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     execute(con, "DELETE FROM book_requests WHERE id=?", (req_id,))
