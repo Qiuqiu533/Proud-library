@@ -1690,7 +1690,9 @@ function saveVotedIds(ids) { localStorage.setItem("voted_requests", JSON.stringi
 
 async function loadReqList() {
   const el = document.getElementById("reqList");
+  if (!el) return;
   el.innerHTML = '<div class="loading">読み込み中…</div>';
+  try {
   const res = await fetch("/api/requests");
   const items = await res.json();
   if (!items.length) { el.innerHTML = '<div class="loading">まだリクエストはありません</div>'; return; }
@@ -1713,7 +1715,7 @@ async function loadReqList() {
       ${r.reason ? `<div class="req-reason">"${esc(r.reason)}"</div>` : ""}
       ${r.note ? `<div class="req-note">📝 ${esc(r.note)}</div>` : ""}
       <div class="req-card-footer">
-        <div class="req-meta">${r.room ? `🏠 ${esc(r.room)}　` : ""}🕐 ${r.created_at.slice(0,10)}</div>
+        <div class="req-meta">${r.room ? `🏠 ${esc(r.room)}　` : ""}🕐 ${(r.created_at||"").slice(0,10)}</div>
         <button class="req-vote-btn${voted?" req-vote-done":""}" data-id="${r.id}" ${r.status==="done"?"disabled":""}>
           👍 <span class="req-vote-count">${votes}</span>${voted?" 済":" 読みたい"}
         </button>
@@ -1735,6 +1737,9 @@ async function loadReqList() {
       } else { btn.disabled = false; }
     });
   });
+  } catch(e) {
+    el.innerHTML = '<div class="loading">読み込みに失敗しました。再度お試しください。</div>';
+  }
 }
 
 async function loadReqManage() {
