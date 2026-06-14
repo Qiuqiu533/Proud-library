@@ -1758,10 +1758,15 @@ async function loadReqList() {
   const res = await fetch("/api/requests");
   const items = await res.json();
   if (!items.length) { el.innerHTML = '<div class="loading">まだリクエストはありません</div>'; return; }
-  const stLabel = {pending:"⏳ 検討中", approved:"✅ 購入決定", rejected:"❌ 見送り", done:"📦 入荷済"};
-  const stColor = {pending:"#888", approved:"#3d8a4f", rejected:"#c00", done:"#555"};
+  const stLabel = {pending:"⏳ 検討中", approved:"✅ 購入決定", rejected:"❌ 見送り", done:"📦 入荷済",
+    fb_received:"📬 受付中", fb_checking:"🔍 確認中", fb_done:"✅ 対応済", fb_rejected:"❌ 見送り",
+    fb_pending:"⏳ 検討中", fb_noted:"📝 参考意見として受理", fb_none:"➖ 対応なし"};
+  const stColor = {pending:"#888", approved:"#3d8a4f", rejected:"#c00", done:"#555",
+    fb_received:"#888", fb_checking:"#5b8dd9", fb_done:"#3d8a4f", fb_rejected:"#c00",
+    fb_pending:"#888", fb_noted:"#7a5c9a", fb_none:"#aaa"};
   const votedIds = getVotedIds();
-  const order = {pending:0, approved:1, rejected:2, done:3};
+  const order = {pending:0, approved:1, rejected:2, done:3,
+    fb_received:0, fb_checking:1, fb_pending:1, fb_done:2, fb_noted:2, fb_rejected:3, fb_none:3};
   const sorted = [...items].sort((a,b) => (order[a.status]??0) - (order[b.status]??0) || (b.votes||0) - (a.votes||0));
   el.innerHTML = sorted.map(r => {
     const isFeedback = r.type === "feedback";
@@ -1818,12 +1823,20 @@ async function loadReqManage() {
 
   // Summary
   const cnt = {pending:0, approved:0, rejected:0, done:0};
-  items.forEach(r => { if (cnt[r.status]!==undefined) cnt[r.status]++; });
+  let fbTotal = 0, fbDone = 0;
+  items.forEach(r => {
+    if (r.type === "feedback") { fbTotal++; if (r.status==="fb_done") fbDone++; }
+    else { if (cnt[r.status]!==undefined) cnt[r.status]++; else cnt.pending++; }
+  });
   document.getElementById("reqSummary").innerHTML = `
+    <div style="font-size:0.75rem;color:#666;font-weight:600;width:100%;margin-bottom:4px">📖 本のリクエスト</div>
     <div class="req-sum-box"><div class="req-sum-num" style="color:#888">${cnt.pending}</div><div class="req-sum-lbl">⏳ 検討中</div></div>
     <div class="req-sum-box"><div class="req-sum-num" style="color:#3d8a4f">${cnt.approved}</div><div class="req-sum-lbl">✅ 購入決定</div></div>
     <div class="req-sum-box"><div class="req-sum-num" style="color:#c00">${cnt.rejected}</div><div class="req-sum-lbl">❌ 見送り</div></div>
-    <div class="req-sum-box"><div class="req-sum-num" style="color:#555">${cnt.done}</div><div class="req-sum-lbl">📦 入荷済</div></div>`;
+    <div class="req-sum-box"><div class="req-sum-num" style="color:#555">${cnt.done}</div><div class="req-sum-lbl">📦 入荷済</div></div>
+    <div style="font-size:0.75rem;color:#666;font-weight:600;width:100%;margin:8px 0 4px">💬 ご要望・ご意見</div>
+    <div class="req-sum-box"><div class="req-sum-num" style="color:#5b8dd9">${fbTotal}</div><div class="req-sum-lbl">📬 合計</div></div>
+    <div class="req-sum-box"><div class="req-sum-num" style="color:#3d8a4f">${fbDone}</div><div class="req-sum-lbl">✅ 対応済</div></div>`;
 
   if (!items.length) { el.innerHTML = '<div class="loading">リクエストはまだありません</div>'; return; }
   el.innerHTML = items.map(r => `
@@ -1840,10 +1853,20 @@ async function loadReqManage() {
       <div class="req-meta">${r.room ? `🏠 ${esc(r.room)}　` : ""}🕐 ${(r.created_at||"").slice(0,10)}</div>
       <div class="req-admin-controls">
         <select class="req-status-sel" data-id="${r.id}">
-          <option value="pending"  ${r.status==="pending"  ?"selected":""}>⏳ 検討中</option>
+          ${r.type==="feedback" ? `
+          <option value="fb_received" ${r.status==="fb_received"||!r.status?"selected":""}>📬 受付中</option>
+          <option value="fb_checking" ${r.status==="fb_checking"?"selected":""}>🔍 確認中</option>
+          <option value="fb_done"     ${r.status==="fb_done"    ?"selected":""}>✅ 対応済</option>
+          <option value="fb_rejected" ${r.status==="fb_rejected"?"selected":""}>❌ 見送り</option>
+          <option value="fb_pending"  ${r.status==="fb_pending" ?"selected":""}>⏳ 検討中</option>
+          <option value="fb_noted"    ${r.status==="fb_noted"   ?"selected":""}>📝 参考意見として受理</option>
+          <option value="fb_none"     ${r.status==="fb_none"    ?"selected":""}>➖ 対応なし</option>
+          ` : `
+          <option value="pending"  ${r.status==="pending" ||!r.status?"selected":""}>⏳ 検討中</option>
           <option value="approved" ${r.status==="approved"?"selected":""}>✅ 購入決定</option>
           <option value="rejected" ${r.status==="rejected"?"selected":""}>❌ 見送り</option>
           <option value="done"     ${r.status==="done"    ?"selected":""}>📦 入荷済</option>
+          `}
         </select>
         <input class="req-note-input" type="text" placeholder="管理者メモ（非公開）"
           value="${esc(r.note||"")}" data-id="${r.id}" />
