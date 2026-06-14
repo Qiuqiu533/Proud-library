@@ -1205,7 +1205,7 @@ def api_today_book():
     recent = get_recent_isbns()
     if recent:
         rng.shuffle(recent)
-        books = recent[:4]
+        books = recent[:8]
         return jsonify(books)
     total_pages = 109
     page = rng.randint(1, total_pages)
