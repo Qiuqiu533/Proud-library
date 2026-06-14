@@ -1826,7 +1826,7 @@ function reqAdminCardHtml(r) {
   const isFb = r.type === "feedback";
   const borderColor = isFb ? "#5b8dd9" : "#3d6b4f";
   const statusOpts = isFb ? `
-    <option value="fb_received" ${r.status==="fb_received"||!r.status?"selected":""}>📬 受付中</option>
+    <option value="fb_received" ${r.status==="fb_received"||!r.status||r.status==="pending"?"selected":""}>📬 受付中</option>
     <option value="fb_checking" ${r.status==="fb_checking"?"selected":""}>🔍 確認中</option>
     <option value="fb_done"     ${r.status==="fb_done"    ?"selected":""}>✅ 対応済</option>
     <option value="fb_rejected" ${r.status==="fb_rejected"?"selected":""}>❌ 見送り</option>
