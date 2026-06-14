@@ -82,8 +82,8 @@
         <div id="recentBooksRow" class="recent-row"></div>
       </div>
 
-      <!-- ジャンルフィルター -->
-      <div class="genre-filter-row">
+      <!-- ジャンルフィルター（表紙ずれ解消まで非表示） -->
+      <div class="genre-filter-row" style="display:none">
         <span class="genre-filter-label">ジャンル：</span>
         <button class="genre-btn active" data-genre="" data-mode="search">すべて</button>
         <button class="genre-btn" data-genre="文芸小説" data-mode="genre">📚 文芸小説</button>
@@ -100,7 +100,7 @@
       <div class="controls-row">
         <span id="totalCount" class="total-count"></span>
         <div class="filter-bar">
-          <select id="genreSelect" class="genre-select">
+          <select id="genreSelect" class="genre-select" style="display:none">
             <option value="|search">すべて</option>
             <option value="文芸小説|genre">📚 文芸小説</option>
             <option value="ミステリ・推理|genre">🔍 ミステリ</option>
