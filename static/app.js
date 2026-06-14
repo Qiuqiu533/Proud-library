@@ -926,8 +926,8 @@ document.getElementById("submitRate").addEventListener("click", async () => {
   }, 800);
 });
 
-// 画像をCanvas経由でリサイズしてbase64に変換（最大幅1000px、JPEG品質0.82）
-function resizeImageFile(file, maxWidth = 1000) {
+// 画像をCanvas経由でリサイズしてbase64に変換（最大幅800px、JPEG品質0.72）
+function resizeImageFile(file, maxWidth = 800) {
   return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -938,7 +938,7 @@ function resizeImageFile(file, maxWidth = 1000) {
         canvas.width = Math.round(img.width * scale);
         canvas.height = Math.round(img.height * scale);
         canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/jpeg", 0.82));
+        resolve(canvas.toDataURL("image/jpeg", 0.72));
       };
       img.src = e.target.result;
     };
