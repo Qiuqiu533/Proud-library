@@ -2469,7 +2469,7 @@ function initStaffChat() {
 
   loadChatMessages(true);
   if (chatPollTimer) clearInterval(chatPollTimer);
-  chatPollTimer = setInterval(() => loadChatMessages(), 30000);
+  chatPollTimer = setInterval(() => loadChatMessages(), 5000);
 
   const input = document.getElementById("chatInput");
   const sendBtn = document.getElementById("chatSendBtn");
