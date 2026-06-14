@@ -1810,12 +1810,13 @@ async function loadReqManage() {
   const items = await res.json();
 
   // Summary
-  const cnt = {pending:0, doing:0, done:0};
+  const cnt = {pending:0, approved:0, rejected:0, done:0};
   items.forEach(r => { if (cnt[r.status]!==undefined) cnt[r.status]++; });
   document.getElementById("reqSummary").innerHTML = `
-    <div class="req-sum-box"><div class="req-sum-num" style="color:#888">${cnt.pending}</div><div class="req-sum-lbl">⏳ 未対応</div></div>
-    <div class="req-sum-box"><div class="req-sum-num" style="color:#c07010">${cnt.doing}</div><div class="req-sum-lbl">🔄 検討中</div></div>
-    <div class="req-sum-box"><div class="req-sum-num" style="color:#3d8a4f">${cnt.done}</div><div class="req-sum-lbl">✅ 完了</div></div>`;
+    <div class="req-sum-box"><div class="req-sum-num" style="color:#888">${cnt.pending}</div><div class="req-sum-lbl">⏳ 検討中</div></div>
+    <div class="req-sum-box"><div class="req-sum-num" style="color:#3d8a4f">${cnt.approved}</div><div class="req-sum-lbl">✅ 購入決定</div></div>
+    <div class="req-sum-box"><div class="req-sum-num" style="color:#c00">${cnt.rejected}</div><div class="req-sum-lbl">❌ 見送り</div></div>
+    <div class="req-sum-box"><div class="req-sum-num" style="color:#555">${cnt.done}</div><div class="req-sum-lbl">📦 入荷済</div></div>`;
 
   if (!items.length) { el.innerHTML = '<div class="loading">リクエストはまだありません</div>'; return; }
   el.innerHTML = items.map(r => `
