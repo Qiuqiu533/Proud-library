@@ -1355,9 +1355,9 @@ document.getElementById("submitCal").addEventListener("click", async () => {
 // Initial load
 checkAuth();
 loadBooks();
-loadTodayBook();
+// loadTodayBook(); // 表紙ずれ解消まで非表示
 renderRecentBooks();
-loadGenreCounts();
+// loadGenreCounts(); // ジャンルフィルター非表示中
 
 // #44 スリープ対策: 4分ごとにpingしてサービスを起こしておく
 setInterval(() => fetch("/ping").catch(() => {}), 4 * 60 * 1000);
