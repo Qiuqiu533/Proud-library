@@ -1053,12 +1053,16 @@ document.getElementById("postNews")?.addEventListener("click", async () => {
 let boardPassword = "";
 let issueFilter = "all";
 
+let boardSenderName = sessionStorage.getItem("board_name") || "";
+
 document.getElementById("boardMenuBtn").addEventListener("click", () => {
   if (sessionStorage.getItem("board_auth") === "1") {
     openBoardPanel();
   } else {
     document.getElementById("boardLoginModal").style.display = "flex";
-    document.getElementById("boardPass").focus();
+    const nameEl = document.getElementById("boardName");
+    if (nameEl) { nameEl.value = boardSenderName; nameEl.focus(); }
+    else document.getElementById("boardPass").focus();
   }
 });
 
@@ -1067,8 +1071,11 @@ document.getElementById("boardLoginClose").addEventListener("click", () => {
 });
 
 document.getElementById("boardLoginBtn").addEventListener("click", async () => {
+  const nameEl = document.getElementById("boardName");
+  const name = nameEl ? nameEl.value.trim() : "";
   const pass = document.getElementById("boardPass").value;
   const err = document.getElementById("boardLoginError");
+  if (!name) { err.textContent = "お名前を入力してください"; nameEl && nameEl.focus(); return; }
   if (!pass) { err.textContent = "パスワードを入力してください"; return; }
   const res = await fetch("/api/board/auth", {
     method: "POST", headers: {"Content-Type":"application/json"},
@@ -1076,8 +1083,10 @@ document.getElementById("boardLoginBtn").addEventListener("click", async () => {
   });
   if (res.ok) {
     boardPassword = pass;
+    boardSenderName = name;
     sessionStorage.setItem("board_auth", "1");
     sessionStorage.setItem("board_pass", pass);
+    sessionStorage.setItem("board_name", name);
     document.getElementById("boardLoginModal").style.display = "none";
     document.getElementById("boardPass").value = "";
     openBoardPanel();
@@ -1089,6 +1098,9 @@ document.getElementById("boardLoginBtn").addEventListener("click", async () => {
 document.getElementById("boardPass").addEventListener("keydown", e => {
   if (e.key === "Enter") document.getElementById("boardLoginBtn").click();
 });
+document.getElementById("boardName") && document.getElementById("boardName").addEventListener("keydown", e => {
+  if (e.key === "Enter") document.getElementById("boardPass").focus();
+});
 
 document.getElementById("boardClose").addEventListener("click", () => {
   document.getElementById("boardPanel").style.display = "none";
@@ -1096,7 +1108,10 @@ document.getElementById("boardClose").addEventListener("click", () => {
 
 function openBoardPanel() {
   boardPassword = sessionStorage.getItem("board_pass") || "";
-  reqAdminPass = boardPassword;  // board password also works for request admin
+  boardSenderName = sessionStorage.getItem("board_name") || "";
+  reqAdminPass = boardPassword;
+  const lbl = document.getElementById("chatSenderLabel");
+  if (lbl) lbl.textContent = boardSenderName ? `👤 ${boardSenderName}` : "";
   document.getElementById("boardPanel").style.display = "flex";
   loadAdminNews();
 }
@@ -1115,6 +1130,7 @@ document.querySelectorAll(".board-tab").forEach(btn => {
     if (btn.dataset.btab === "issues") loadIssues();
     if (btn.dataset.btab === "brequest") loadReqManage();
     if (btn.dataset.btab === "loaned") loadLoanedBooks();
+    if (btn.dataset.btab === "staffchat") initStaffChat();
   });
 });
 
@@ -2356,4 +2372,89 @@ document.getElementById("cardResetBtn")?.addEventListener("click", () => {
   localStorage.removeItem("libraryCardUrl");
   localStorage.removeItem("libraryCardImage");
   loadCard();
+});
+
+// ===== Staff Chat =====
+let chatPollTimer = null;
+
+function chatMsgHtml(m) {
+  const isMe = m.sender === boardSenderName;
+  const time = (m.created_at || "").slice(0, 16).replace("T", " ");
+  return `
+  <div style="display:flex;flex-direction:column;align-items:${isMe?"flex-end":"flex-start"};gap:2px">
+    <div style="font-size:0.72rem;color:#aaa;padding:0 6px">${isMe?"":esc(m.sender)+"　"}${time}</div>
+    <div style="display:flex;align-items:flex-end;gap:6px;flex-direction:${isMe?"row-reverse":"row"}">
+      ${isMe?"":`<div style="width:32px;height:32px;border-radius:50%;background:#3d6b4f;color:#fff;display:flex;align-items:center;justify-content:center;font-size:0.8rem;font-weight:700;flex-shrink:0">${esc(m.sender.slice(0,1))}</div>`}
+      <div style="max-width:70%;background:${isMe?"#3d6b4f":"#fff"};color:${isMe?"#fff":"#333"};padding:9px 13px;border-radius:${isMe?"14px 14px 4px 14px":"14px 14px 14px 4px"};font-size:0.88rem;line-height:1.5;box-shadow:0 1px 4px rgba(0,0,0,0.08);word-break:break-word">
+        ${esc(m.message)}
+      </div>
+      <button class="chat-del-btn" data-id="${m.id}" title="削除" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:0.8rem;padding:2px;opacity:0;transition:opacity 0.2s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0">🗑</button>
+    </div>
+  </div>`;
+}
+
+async function loadChatMessages(scrollToBottom = false) {
+  const box = document.getElementById("chatMessages");
+  if (!box) return;
+  const res = await fetch(`/api/staff_chat?password=${encodeURIComponent(boardPassword)}`);
+  if (!res.ok) return;
+  const msgs = await res.json();
+  msgs.reverse();
+  if (!msgs.length) {
+    box.innerHTML = '<div style="text-align:center;color:#bbb;padding:40px 0;font-size:0.9rem">まだメッセージはありません<br>最初のメッセージを送ってみましょう！</div>';
+    return;
+  }
+  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+  box.innerHTML = msgs.map(chatMsgHtml).join("");
+  box.querySelectorAll(".chat-del-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("このメッセージを削除しますか？")) return;
+      await fetch(`/api/staff_chat/${btn.dataset.id}`, {
+        method: "DELETE", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({password: boardPassword})
+      });
+      loadChatMessages();
+    });
+  });
+  if (scrollToBottom || atBottom) box.scrollTop = box.scrollHeight;
+}
+
+function initStaffChat() {
+  const lbl = document.getElementById("chatSenderLabel");
+  if (lbl) lbl.textContent = boardSenderName ? `👤 ${boardSenderName}` : "";
+
+  loadChatMessages(true);
+  if (chatPollTimer) clearInterval(chatPollTimer);
+  chatPollTimer = setInterval(() => loadChatMessages(), 30000);
+
+  const input = document.getElementById("chatInput");
+  const sendBtn = document.getElementById("chatSendBtn");
+  if (!input || !sendBtn) return;
+
+  const send = async () => {
+    const msg = input.value.trim();
+    if (!msg || !boardSenderName) return;
+    input.value = "";
+    sendBtn.disabled = true;
+    await fetch("/api/staff_chat", {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({password: boardPassword, sender: boardSenderName, message: msg})
+    });
+    sendBtn.disabled = false;
+    loadChatMessages(true);
+    input.focus();
+  };
+
+  sendBtn.onclick = send;
+  input.onkeydown = e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } };
+}
+
+// チャットタブを離れたらポーリング停止
+document.querySelectorAll(".board-tab").forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (btn.dataset.btab !== "staffchat" && chatPollTimer) {
+      clearInterval(chatPollTimer);
+      chatPollTimer = null;
+    }
+  });
 });

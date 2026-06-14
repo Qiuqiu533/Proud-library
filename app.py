@@ -224,6 +224,14 @@ def init_db():
                 updated_at TIMESTAMP DEFAULT NOW()
             )
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS staff_chat (
+                id SERIAL PRIMARY KEY,
+                sender TEXT NOT NULL,
+                message TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
         con.commit()
     else:
         con.execute("""
@@ -333,6 +341,14 @@ def init_db():
                 title TEXT DEFAULT '',
                 author TEXT DEFAULT '',
                 updated_at TEXT DEFAULT (datetime('now','localtime'))
+            )
+        """)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS staff_chat (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                sender TEXT NOT NULL,
+                message TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now','localtime'))
             )
         """)
         con.commit()
@@ -530,6 +546,34 @@ def _ensure_db():
     threading.Thread(target=_migrate_ndc_genres, daemon=True).start()
     threading.Thread(target=_migrate_add_votes_column, daemon=True).start()
     threading.Thread(target=_migrate_add_type_reply_columns, daemon=True).start()
+    threading.Thread(target=_migrate_add_staff_chat, daemon=True).start()
+
+
+def _migrate_add_staff_chat():
+    try:
+        con = get_con()
+        if USE_PG:
+            con.cursor().execute("""
+                CREATE TABLE IF NOT EXISTS staff_chat (
+                    id SERIAL PRIMARY KEY,
+                    sender TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+        else:
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS staff_chat (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    sender TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    created_at TEXT DEFAULT (datetime('now','localtime'))
+                )
+            """)
+        con.commit()
+        con.close()
+    except Exception as e:
+        print(f"migrate staff_chat error: {e}")
 
 
 def _migrate_add_votes_column():
@@ -1421,6 +1465,42 @@ def api_delete_request(req_id):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     execute(con, "DELETE FROM book_requests WHERE id=?", (req_id,))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+
+# --- Staff Chat ---
+@app.route("/api/staff_chat", methods=["GET"])
+def api_staff_chat_get():
+    pw = request.args.get("password", "")
+    if pw != get_board_password():
+        return jsonify({"error": "unauthorized"}), 401
+    con = get_con()
+    rows = fetchall(con, "SELECT id, sender, message, created_at FROM staff_chat ORDER BY created_at DESC LIMIT 100")
+    con.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/staff_chat", methods=["POST"])
+def api_staff_chat_post():
+    body = request.get_json()
+    if body.get("password") != get_board_password():
+        return jsonify({"error": "unauthorized"}), 401
+    sender = (body.get("sender") or "").strip()
+    message = (body.get("message") or "").strip()
+    if not sender or not message:
+        return jsonify({"error": "sender and message required"}), 400
+    con = get_con()
+    execute(con, "INSERT INTO staff_chat (sender, message) VALUES (?, ?)", (sender, message))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+@app.route("/api/staff_chat/<int:msg_id>", methods=["DELETE"])
+def api_staff_chat_delete(msg_id):
+    body = request.get_json()
+    if body.get("password") != get_board_password():
+        return jsonify({"error": "unauthorized"}), 401
+    con = get_con()
+    execute(con, "DELETE FROM staff_chat WHERE id=?", (msg_id,))
     con.commit(); con.close()
     return jsonify({"ok": True})
 
