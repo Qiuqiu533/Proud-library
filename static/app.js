@@ -1775,7 +1775,7 @@ async function loadReqList() {
       ${r.reason ? `<div class="req-reason">"${esc(r.reason)}"</div>` : ""}
       ${r.note ? `<div class="req-note">📝 ${esc(r.note)}</div>` : ""}
       <div class="req-card-footer">
-        <div class="req-meta">${r.room ? `🏠 ${esc(r.room)}　` : ""}🕐 ${(r.created_at||"").slice(0,10)}</div>
+        <div class="req-meta">🕐 ${(r.created_at||"").slice(0,10)}</div>
         <button class="req-vote-btn${voted?" req-vote-done":""}" data-id="${r.id}" ${r.status==="done"?"disabled":""}>
           👍 <span class="req-vote-count">${votes}</span>${voted?" 済":" 読みたい"}
         </button>
