@@ -384,6 +384,16 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
 .today-book-author { font-size: 0.7rem; color: #556b5a; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .today-book-meta { font-size: 0.68rem; color: #889e90; }
 
+/* ===== 最近見た本 ===== */
+.recent-section { margin-bottom: 12px; }
+.recent-label { font-size: 0.72rem; color: #999; font-weight: 600; margin-bottom: 6px; letter-spacing: 0.03em; }
+.recent-row { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+.recent-row::-webkit-scrollbar { display: none; }
+.recent-thumb { flex-shrink: 0; width: 38px; height: 54px; border-radius: 4px; overflow: hidden; cursor: pointer; box-shadow: 0 1px 5px rgba(0,0,0,0.18); transition: transform .15s, box-shadow .15s; background: #d0e8d8; }
+.recent-thumb:hover { transform: scale(1.1); box-shadow: 0 3px 10px rgba(0,0,0,0.22); }
+.recent-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.recent-thumb-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
+
 /* ===== ジャンルフィルター ===== */
 .genre-select { display: none; padding: 7px 10px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; font-size: 0.85rem; outline: none; background: white; cursor: pointer; }
 .genre-filter-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 14px; padding: 0 2px; }
