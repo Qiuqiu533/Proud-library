@@ -498,7 +498,16 @@ function newsItemHtml(item, showDelete) {
         </select>
         <input type="text" class="news-edit-title" data-id="${item.id}" value="${item.title.replace(/"/g,'&quot;')}" placeholder="タイトル" style="width:100%;margin-bottom:8px;padding:8px;border-radius:6px;border:1px solid #ccc;box-sizing:border-box">
         <textarea class="news-edit-body" data-id="${item.id}" rows="4" style="width:100%;margin-bottom:8px;padding:8px;border-radius:6px;border:1px solid #ccc;box-sizing:border-box">${item.body}</textarea>
-        <input type="text" class="news-edit-img" data-id="${item.id}" value="${(item.image_url||"").replace(/"/g,'&quot;')}" placeholder="画像URL（任意）" style="width:100%;margin-bottom:8px;padding:8px;border-radius:6px;border:1px solid #ccc;box-sizing:border-box">
+        <div style="margin-bottom:8px">
+          <label style="font-size:0.85rem;color:#666;display:block;margin-bottom:4px">画像（ファイルを選択またはURLを入力）</label>
+          ${item.image_url ? `<img class="news-edit-img-preview" src="${item.image_url}" style="max-width:200px;max-height:120px;display:block;margin-bottom:6px;border-radius:6px" onerror="this.style.display='none'">` : ""}
+          <label style="display:inline-block;padding:6px 12px;background:#f0f0f0;border-radius:6px;cursor:pointer;font-size:0.85rem;margin-bottom:6px">
+            📷 画像を選択
+            <input type="file" class="news-edit-file" data-id="${item.id}" accept="image/*" style="display:none">
+          </label>
+          <span class="news-edit-filename" data-id="${item.id}" style="font-size:0.8rem;color:#888;margin-left:6px">未選択</span>
+          <input type="text" class="news-edit-img" data-id="${item.id}" value="${(item.image_url||"").replace(/"/g,'&quot;')}" placeholder="または画像URLを入力" style="width:100%;margin-top:6px;padding:8px;border-radius:6px;border:1px solid #ccc;box-sizing:border-box">
+        </div>
         <div style="display:flex;gap:8px">
           <button class="news-edit-save btn-primary" data-id="${item.id}" style="flex:1">💾 保存</button>
           <button class="news-edit-cancel" data-id="${item.id}" style="flex:1;padding:8px;border-radius:6px;border:1px solid #ccc;cursor:pointer;background:#fff">キャンセル</button>
@@ -549,10 +558,31 @@ async function loadAdminNews() {
       if (form) form.style.display = "none";
     });
   });
+  // 画像ファイル選択
+  list.querySelectorAll(".news-edit-file").forEach(input => {
+    input.addEventListener("change", async (e) => {
+      const id = input.dataset.id;
+      const file = e.target.files?.[0];
+      if (!file) return;
+      list.querySelector(`.news-edit-filename[data-id="${id}"]`).textContent = file.name;
+      const base64 = await resizeImageFile(file);
+      const imgUrl = list.querySelector(`.news-edit-img[data-id="${id}"]`);
+      imgUrl.value = base64;
+      let preview = list.querySelector(`.news-edit-img-preview[data-id="${id}"]`);
+      if (!preview) {
+        preview = document.createElement("img");
+        preview.className = "news-edit-img-preview";
+        preview.dataset.id = id;
+        preview.style.cssText = "max-width:200px;max-height:120px;display:block;margin-bottom:6px;border-radius:6px";
+        input.closest("div").prepend(preview);
+      }
+      preview.src = base64;
+    });
+  });
   list.querySelectorAll(".news-edit-save").forEach(btn => {
     btn.addEventListener("click", async () => {
       const id = btn.dataset.id;
-      const pass = adminPassword || prompt("管理者パスワードを入力してください");
+      const pass = boardPassword || prompt("管理者パスワードを入力してください");
       if (!pass) return;
       const title = list.querySelector(`.news-edit-title[data-id="${id}"]`).value.trim();
       const body = list.querySelector(`.news-edit-body[data-id="${id}"]`).value.trim();
@@ -560,12 +590,12 @@ async function loadAdminNews() {
       const image_url = list.querySelector(`.news-edit-img[data-id="${id}"]`).value.trim();
       const msg = list.querySelector(`.news-edit-msg[data-id="${id}"]`);
       if (!title || !body) { msg.textContent = "⚠️ タイトルと本文は必須です"; msg.style.color = "#e05"; return; }
-      btn.disabled = true;
+      btn.disabled = true; btn.textContent = "保存中…";
       const r = await fetch(`/api/announcements/${id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: pass, title, body, category, image_url })
       });
-      btn.disabled = false;
+      btn.disabled = false; btn.textContent = "💾 保存";
       if (r.ok) {
         msg.textContent = "✅ 更新しました";
         msg.style.color = "#3d6b4f";
