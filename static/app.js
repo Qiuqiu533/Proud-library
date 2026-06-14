@@ -111,9 +111,9 @@ function renderCard(book, opts = {}) {
   const rating = book.rating || getRating(book.isbn);
   const fav = isFav(book.isbn);
   const readStatus = getReadStatus(book.isbn);
-  const openBDFallback = `https://cover.openbd.jp/${book.isbn}.jpg`;
+  const ndlFallback = `https://ndlsearch.ndl.go.jp/thumbnail/${book.isbn}.jpg`;
   const img = book.cover
-    ? `<img class="book-cover" src="${book.cover}" alt="${book.title}" loading="lazy" onerror="if(this.src!=='${openBDFallback}'){this.src='${openBDFallback}';}else{this.replaceWith(Object.assign(document.createElement('div'),{className:'book-cover-placeholder',textContent:'📖'}));}">`
+    ? `<img class="book-cover" src="${book.cover}" alt="${book.title}" loading="lazy" onerror="if(this.src!=='${ndlFallback}'){this.src='${ndlFallback}';}else{this.replaceWith(Object.assign(document.createElement('div'),{className:'book-cover-placeholder',textContent:'📖'}));}">`
     : `<div class="book-cover-placeholder">📖</div>`;
 
   div.innerHTML = `
@@ -1763,8 +1763,15 @@ document.getElementById("pwChangeBtn").addEventListener("click", async () => {
 
 // ===== 貸出中一覧（入居者タブ） =====
 function isbn13ToCoverUrl(isbn13) {
-  if (isbn13) return `https://ndlsearch.ndl.go.jp/thumbnail/${isbn13}.jpg`;
-  return "";
+  if (isbn13 && isbn13.startsWith("978") && isbn13.length === 13) {
+    const digits = isbn13.slice(3, 12);
+    let total = 0;
+    for (let i = 0; i < digits.length; i++) total += (10 - i) * parseInt(digits[i]);
+    const check = (11 - (total % 11)) % 11;
+    const isbn10 = digits + (check === 10 ? "X" : String(check));
+    return `https://images-na.ssl-images-amazon.com/images/P/${isbn10}.09.LZZZZZZZ.jpg`;
+  }
+  return `https://ndlsearch.ndl.go.jp/thumbnail/${isbn13}.jpg`;
 }
 
 async function loadLoanedResident() {

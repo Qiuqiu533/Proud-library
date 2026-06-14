@@ -591,10 +591,9 @@ def _insert_genre_books(con, genre_map):
 
 # ── 蔵書スクレイピング ────────────────────────────────────────────────────
 def get_cover_url(isbn13, isbn10=""):
-    # NDL（国立国会図書館）サムネイル: 蔵書カバー率が高く1対1対応
-    if isbn13:
-        return f"https://ndlsearch.ndl.go.jp/thumbnail/{isbn13}.jpg"
-    return ""
+    if isbn10:
+        return f"https://images-na.ssl-images-amazon.com/images/P/{isbn10}.09.LZZZZZZZ.jpg"
+    return NDL_THUMB.format(isbn=isbn13)
 
 
 def isbn13_to_isbn10(isbn13):
@@ -1211,7 +1210,8 @@ def api_today_book():
         for b in books:
             isbn = b.get("isbn", "")
             if isbn:
-                b["cover"] = f"https://ndlsearch.ndl.go.jp/thumbnail/{isbn}.jpg"
+                isbn10 = isbn13_to_isbn10(isbn)
+                b["cover"] = get_cover_url(isbn, isbn10)
         return jsonify(books)
     total_pages = 109
     page = rng.randint(1, total_pages)
