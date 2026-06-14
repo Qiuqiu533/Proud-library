@@ -63,6 +63,7 @@
     <button class="tab-btn" data-tab="news">📢 お知らせ</button>
     <button class="tab-btn" data-tab="info">🏛️ 開館情報</button>
     <button class="tab-btn" data-tab="request">📬 リクエスト</button>
+    <button class="tab-btn" data-tab="reqlist">📋 一覧・投票</button>
   </nav>
 
   <main class="main-content">
@@ -259,13 +260,18 @@
           <p id="fbMsg" class="rate-msg" style="margin-top:10px"></p>
         </div>
 
-        <div class="req-form-card" style="margin-top:20px">
+        <p class="req-footer-note">※ リクエスト・ご意見は入荷・対応を保証するものではありません。ご了承のうえご利用ください。</p>
+      </div>
+    </div>
+
+    <div id="tab-reqlist" class="tab-panel">
+      <div class="req-page">
+        <div class="req-form-card">
           <h3>📋 みんなのリクエスト一覧</h3>
-          <p class="req-form-desc">他の方のリクエストに👍で共感を伝えられます。</p>
+          <p class="req-form-desc">他の方のリクエストに👍で共感を伝えられます。入荷してほしい本はリクエストタブから送れます。</p>
           <div id="reqList"><div class="loading">読み込み中…</div></div>
         </div>
-
-        <p class="req-footer-note">※ リクエスト・ご意見は入荷・対応を保証するものではありません。ご了承のうえご利用ください。</p>
+        <p class="req-footer-note">※ リクエストは入荷・対応を保証するものではありません。ご了承のうえご利用ください。</p>
       </div>
     </div>
   </main>
