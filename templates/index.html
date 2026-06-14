@@ -64,6 +64,7 @@
     <button class="tab-btn" data-tab="info">🏛️ 開館情報</button>
     <button class="tab-btn" data-tab="request">📬 リクエスト</button>
     <button class="tab-btn" data-tab="reqlist">📋 みんなのリクエスト一覧・投票</button>
+    <button class="tab-btn" data-tab="howto">❓ 使い方</button>
   </nav>
 
   <main class="main-content">
@@ -288,6 +289,89 @@
         <p class="req-footer-note">※ リクエストは入荷・対応を保証するものではありません。ご了承のうえご利用ください。</p>
       </div>
     </div>
+
+    <!-- 使い方タブ -->
+    <div id="tab-howto" class="tab-panel">
+      <div style="max-width:680px;margin:0 auto;padding:16px">
+        <h2 style="font-size:1.2rem;margin-bottom:4px">❓ 使い方ガイド</h2>
+        <p style="font-size:0.85rem;color:#888;margin-bottom:24px">プラウド船橋コミュニティ図書館アプリの使い方をご説明します。</p>
+
+        <div class="howto-section">
+          <div class="howto-icon">📖</div>
+          <div>
+            <div class="howto-title">本を探す（蔵書タブ）</div>
+            <div class="howto-body">タイトル・著者名・ジャンルで蔵書を検索できます。本をタップすると詳細・あらすじ・貸出状況が確認できます。<br>❤️ をタップするとお気に入りに追加できます。</div>
+          </div>
+        </div>
+
+        <div class="howto-section">
+          <div class="howto-icon">🆕</div>
+          <div>
+            <div class="howto-title">新着本を確認する（新着タブ）</div>
+            <div class="howto-body">最近入荷した本が一覧で表示されます。定期的にチェックして新しい本を見つけましょう。</div>
+          </div>
+        </div>
+
+        <div class="howto-section">
+          <div class="howto-icon">❤️</div>
+          <div>
+            <div class="howto-title">お気に入り・読書記録（お気に入り・読書記録タブ）</div>
+            <div class="howto-body">気になる本をお気に入り登録。読んだ本には感想や評価を記録できます。データはこのブラウザに保存されます。</div>
+          </div>
+        </div>
+
+        <div class="howto-section">
+          <div class="howto-icon">☁️</div>
+          <div>
+            <div class="howto-title">別の端末でも使う（クラウド同期）</div>
+            <div class="howto-body">お気に入りや読書記録を別のスマホ・タブレットでも共有できます。<br>設定 → クラウド同期 から部屋番号とPINコード（4桁）を設定してください。同じ部屋番号とPINを別の端末で入力すれば同期されます。</div>
+          </div>
+        </div>
+
+        <div class="howto-section">
+          <div class="howto-icon">📬</div>
+          <div>
+            <div class="howto-title">本をリクエストする（リクエストタブ）</div>
+            <div class="howto-body">読みたい本・入荷してほしい本をリクエストできます。タイトル・著者・理由を入力して送信してください。図書館委員会で検討します。<br>「みんなのリクエスト一覧・投票」タブでは他の方のリクエストに👍で共感を伝えられます。</div>
+          </div>
+        </div>
+
+        <div class="howto-section">
+          <div class="howto-icon">💬</div>
+          <div>
+            <div class="howto-title">ご要望・ご意見を伝える（リクエストタブ）</div>
+            <div class="howto-body">図書館の運営に関するご要望やご意見をお送りいただけます。管理者から返答が届く場合は「みんなのリクエスト一覧・投票」タブの「ご要望・ご意見」に表示されます。</div>
+          </div>
+        </div>
+
+        <div class="howto-section">
+          <div class="howto-icon">📢</div>
+          <div>
+            <div class="howto-title">お知らせを見る（お知らせタブ）</div>
+            <div class="howto-body">図書館からのイベント情報・企画・重要なお知らせを確認できます。</div>
+          </div>
+        </div>
+
+        <div class="howto-section">
+          <div class="howto-icon">🏛️</div>
+          <div>
+            <div class="howto-title">開館情報を確認する（開館情報タブ）</div>
+            <div class="howto-body">今日・今週の開館状況をカレンダーで確認できます。定休日（水曜・日曜）や祝日は自動的に表示されます。</div>
+          </div>
+        </div>
+
+        <div style="margin-top:28px;padding:16px;background:#f2f8f4;border-radius:12px;border-left:4px solid #3d6b4f">
+          <div style="font-weight:700;color:#3d6b4f;margin-bottom:6px">💡 お困りの際は</div>
+          <div style="font-size:0.85rem;color:#555;line-height:1.7">図書館受付または図書館委員会までお声がけください。<br>このガイドはいつでも「❓ 使い方」タブで確認できます。</div>
+        </div>
+
+        <div style="text-align:center;margin-top:20px">
+          <button onclick="showWelcome()" style="padding:10px 24px;background:#3d6b4f;color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:0.9rem">
+            🎬 はじめての方へ（スライドで見る）
+          </button>
+        </div>
+      </div>
+    </div>
   </main>
 
   <!-- Book detail modal -->
@@ -362,6 +446,70 @@
   </div>
 
   <!-- Board login modal -->
+  <!-- Welcome Modal -->
+  <div id="welcomeModal" class="modal-overlay" style="display:none;align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:20px;width:min(92vw,480px);padding:32px 28px 24px;position:relative;box-shadow:0 8px 40px rgba(0,0,0,0.18)">
+      <button onclick="closeWelcome()" style="position:absolute;top:14px;right:16px;background:none;border:none;font-size:1.4rem;cursor:pointer;color:#bbb">✕</button>
+
+      <!-- slides -->
+      <div id="welcomeSlides">
+
+        <div class="w-slide" data-slide="0">
+          <div style="text-align:center;margin-bottom:20px">
+            <div style="font-size:3rem;margin-bottom:10px">📚</div>
+            <div style="font-size:1.2rem;font-weight:800;color:#3d6b4f;margin-bottom:8px">プラウド船橋<br>コミュニティ図書館へようこそ</div>
+            <div style="font-size:0.88rem;color:#666;line-height:1.7">このアプリで蔵書の検索・お気に入り管理・リクエスト送信などができます。<br>4枚のスライドで使い方をご紹介します。</div>
+          </div>
+        </div>
+
+        <div class="w-slide" data-slide="1" style="display:none">
+          <div style="text-align:center;margin-bottom:12px;font-size:2.4rem">🔍</div>
+          <div style="font-weight:800;color:#3d6b4f;font-size:1.05rem;margin-bottom:14px;text-align:center">本を探す</div>
+          <div class="w-step"><span class="w-num">1</span>上の「📖 蔵書」タブを開く</div>
+          <div class="w-step"><span class="w-num">2</span>キーワード・著者名・ジャンルで検索</div>
+          <div class="w-step"><span class="w-num">3</span>本をタップして詳細・貸出状況を確認</div>
+          <div class="w-step"><span class="w-num">4</span>❤️ボタンでお気に入りに追加</div>
+        </div>
+
+        <div class="w-slide" data-slide="2" style="display:none">
+          <div style="text-align:center;margin-bottom:12px;font-size:2.4rem">☁️</div>
+          <div style="font-weight:800;color:#3d6b4f;font-size:1.05rem;margin-bottom:14px;text-align:center">お気に入り・読書記録を保存する</div>
+          <div class="w-step"><span class="w-num">1</span>「❤️ お気に入り」「📝 読書記録」タブで確認</div>
+          <div class="w-step"><span class="w-num">2</span>別のスマホでも使いたい場合はクラウド同期が便利</div>
+          <div class="w-step"><span class="w-num">3</span>「⚙️ 設定」→「クラウド同期」から部屋番号とPINを設定</div>
+          <div class="w-step"><span class="w-num">4</span>同じPINを別の端末で入力すれば同期完了</div>
+        </div>
+
+        <div class="w-slide" data-slide="3" style="display:none">
+          <div style="text-align:center;margin-bottom:12px;font-size:2.4rem">📬</div>
+          <div style="font-weight:800;color:#3d6b4f;font-size:1.05rem;margin-bottom:14px;text-align:center">リクエスト・ご要望を伝える</div>
+          <div class="w-step"><span class="w-num">1</span>「📬 リクエスト」タブを開く</div>
+          <div class="w-step"><span class="w-num">2</span>読みたい本のタイトル・著者を入力して送信</div>
+          <div class="w-step"><span class="w-num">3</span>図書館へのご要望・ご意見も同じタブから送れます</div>
+          <div class="w-step"><span class="w-num">4</span>「❓ 使い方」タブでいつでも確認できます</div>
+        </div>
+
+      </div>
+
+      <!-- dots -->
+      <div style="display:flex;justify-content:center;gap:8px;margin:20px 0 18px">
+        <span class="w-dot active" data-dot="0"></span>
+        <span class="w-dot" data-dot="1"></span>
+        <span class="w-dot" data-dot="2"></span>
+        <span class="w-dot" data-dot="3"></span>
+      </div>
+
+      <!-- buttons -->
+      <div style="display:flex;gap:10px">
+        <button id="wPrev" onclick="welcomeNav(-1)" style="flex:1;padding:11px;border:1.5px solid #ddd;border-radius:10px;background:#fff;cursor:pointer;font-size:0.9rem;color:#888;display:none">← 戻る</button>
+        <button id="wNext" onclick="welcomeNav(1)" style="flex:1;padding:11px;border:none;border-radius:10px;background:#3d6b4f;color:#fff;cursor:pointer;font-size:0.9rem;font-weight:700">次へ →</button>
+      </div>
+      <div style="text-align:center;margin-top:12px">
+        <button onclick="closeWelcome()" style="background:none;border:none;cursor:pointer;font-size:0.82rem;color:#bbb;text-decoration:underline">スキップ</button>
+      </div>
+    </div>
+  </div>
+
   <div id="boardLoginModal" class="modal-overlay" style="display:none">
     <div class="modal-box modal-small">
       <button class="modal-close" id="boardLoginClose">✕</button>
