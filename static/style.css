@@ -604,6 +604,12 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
 .lib-cal-day.today { outline: 2px solid #3d6b4f; outline-offset: -1px; border-radius: 6px; font-weight: 700; }
 .lib-cal-legend { margin-top: 10px; font-size: 0.72rem; color: #888; display: flex; align-items: center; gap: 6px; }
 .lib-cal-closed-dot { display: inline-block; width: 12px; height: 12px; background: #fde8e8; border-radius: 3px; border: 1px solid #e0a0a0; flex-shrink: 0; }
+.lib-cal-event-dot { color: #e07800; font-size: 0.85rem; }
+.lib-cal-day.has-event { background: #fff8ec; color: #b85c00; font-weight: 700; }
+.cal-event-mark { font-size: 0.6rem; color: #e07800; vertical-align: super; margin-right: 1px; }
+.cal-type-badge { font-size: 0.72rem; padding: 2px 7px; border-radius: 10px; font-weight: 600; white-space: nowrap; }
+.cal-type-badge.event { background: #e8f4ea; color: #3d6b4f; }
+.cal-type-badge.closed { background: #fde8e8; color: #c0392b; }
 
 /* ===== 使い方タブ ===== */
 .howto-section { display:flex; gap:14px; align-items:flex-start; padding:16px; background:#fff; border-radius:12px; margin-bottom:10px; box-shadow:0 1px 6px rgba(0,0,0,0.06); }
