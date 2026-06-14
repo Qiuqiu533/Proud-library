@@ -449,12 +449,7 @@ async function loadNew() {
   const res = await fetch(`/api/books/new`);
   const data = await res.json();
   const label = document.getElementById("newSourceLabel");
-  if (label) {
-    label.textContent = data.source === "registered"
-      ? "📥 図書館スタッフが登録した入荷日順です"
-      : "📅 OpenBD出版日順（入荷日未登録）";
-    label.style.color = data.source === "registered" ? "#3d6b4f" : "#999";
-  }
+  if (label) label.style.display = "none";
   renderGrid("newGrid", data.books, { showArrived: data.source === "registered" });
   applyAvailCache(data.books.map(b => b.isbn).filter(Boolean));
 }
