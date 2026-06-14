@@ -539,3 +539,17 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
 .card-iframe-error { font-size: 0.82rem; color: #c0392b; margin-top: 8px; }
 .card-open-link { color: #2a4a37; font-weight: 700; text-decoration: underline; }
 .card-screenshot { max-width: 100%; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.12); display: block; margin: 0 auto; }
+
+/* 新着登録管理パネル */
+.arrival-item { display: flex; align-items: center; gap: 10px; padding: 10px; border-bottom: 1px solid #e0e8e4; }
+.arrival-item:last-child { border-bottom: none; }
+.arrival-cover { width: 44px; height: 62px; object-fit: cover; border-radius: 4px; flex-shrink: 0; background: #f0f0f0; }
+.arrival-info { flex: 1; min-width: 0; }
+.arrival-title { font-size: 0.88rem; font-weight: 700; color: #2a4a37; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.arrival-author { font-size: 0.78rem; color: #666; }
+.arrival-date { font-size: 0.75rem; color: #3d6b4f; margin-top: 2px; }
+.btn-danger-sm { padding: 4px 10px; background: #e05; color: #fff; border: none; border-radius: 6px; font-size: 0.78rem; cursor: pointer; flex-shrink: 0; }
+.btn-danger-sm:hover { background: #c00; }
+
+/* 新着タブ 入荷日バッジ */
+.arrived-badge { position: absolute; bottom: 4px; left: 0; right: 0; text-align: center; background: rgba(61,107,79,0.88); color: #fff; font-size: 0.66rem; padding: 2px 0; border-radius: 0 0 6px 6px; font-weight: 700; pointer-events: none; }
