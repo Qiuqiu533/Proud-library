@@ -368,7 +368,8 @@
       <div style="text-align:center;padding:10px 0">
         <div style="font-size:2rem;margin-bottom:8px">🏛️</div>
         <h3 style="margin-bottom:8px">管理者メニュー</h3>
-        <p style="font-size:0.85rem;color:#888;margin-bottom:20px">専用パスワードを入力してください</p>
+        <p style="font-size:0.85rem;color:#888;margin-bottom:16px">専用パスワードを入力してください</p>
+        <input type="text" id="boardName" class="login-input" placeholder="お名前（チャット表示用）" style="margin-bottom:10px">
         <input type="password" id="boardPass" class="login-input" placeholder="パスワード" style="margin-bottom:10px">
         <button id="boardLoginBtn" class="btn-primary" style="width:100%">ログイン</button>
         <p id="boardLoginError" class="login-error"></p>
@@ -394,6 +395,7 @@
       <button class="board-tab" data-btab="calendar">📅 活動カレンダー</button>
       <button class="board-tab" data-btab="analysis">📈 集計・分析</button>
       <button class="board-tab" data-btab="swot">💡 強み・弱み</button>
+      <button class="board-tab" data-btab="staffchat">💬 チャット</button>
       <button class="board-tab" data-btab="settings">⚙️ 設定</button>
       <button class="board-tab" data-btab="guide">📖 操作ガイド</button>
     </div>
@@ -741,6 +743,27 @@
           <div class="swot-item">
             <div class="swot-item-title">⑤ 住民への周知強化（優先度：中）</div>
             <div class="swot-item-body">ウェブアプリ（proud-library.onrender.com）をまだ知らない住民が多い可能性がある。マンションのお知らせ掲示板やエントランスのデジタルサイネージ、管理組合の広報誌でQRコード付き案内を掲示することで利用者を増やせる。「今日の1冊」や「お気に入り機能」などの便利な機能を具体的にアピールすると効果的。</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Staff Chat -->
+      <div id="btab-staffchat" class="board-tab-panel">
+        <div style="display:flex;flex-direction:column;height:calc(100vh - 220px);min-height:400px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <h3 style="margin:0">💬 係員チャット</h3>
+            <span id="chatSenderLabel" style="font-size:0.85rem;color:#666;background:#f0f0f0;padding:4px 12px;border-radius:20px"></span>
+          </div>
+          <div id="chatMessages" style="flex:1;overflow-y:auto;background:#f5f7fa;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
+            <div class="loading">読み込み中…</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <input id="chatInput" type="text" placeholder="メッセージを入力…"
+              style="flex:1;padding:10px 14px;border:1.5px solid #ddd;border-radius:10px;font-size:0.9rem;font-family:inherit;outline:none">
+            <button id="chatSendBtn"
+              style="padding:10px 20px;background:#3d6b4f;color:#fff;border:none;border-radius:10px;font-size:0.9rem;font-weight:600;cursor:pointer;white-space:nowrap">
+              送信
+            </button>
           </div>
         </div>
       </div>
