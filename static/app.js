@@ -1535,6 +1535,7 @@ document.getElementById("submitCal").addEventListener("click", async () => {
 checkAuth();
 loadBooks();
 loadTopNew();
+loadReqList();
 // loadTodayBook(); // 表紙ずれ解消まで非表示
 renderRecentBooks();
 // loadGenreCounts(); // ジャンルフィルター非表示中
