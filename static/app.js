@@ -272,7 +272,7 @@ async function loadTodayBook() {
       const img = b.cover
         ? `<img class="today-book-cover" src="${b.cover}" alt="${b.title}" onerror="this.style.display='none'">`
         : `<div class="today-book-cover-placeholder">📖</div>`;
-      return `<div class="today-book-inner" data-isbn="${b.isbn}">${img}<div class="today-book-info"><div class="today-book-title">${b.title}</div><div class="today-book-author">${b.author || ""}</div></div></div>`;
+      return `<div class="today-book-inner" data-isbn="${b.isbn}">${img}<div class="today-book-title">${b.title}</div><div class="today-book-author">${b.author || ""}</div></div>`;
     }).join("");
     card.querySelectorAll(".today-book-inner").forEach(el => {
       el.addEventListener("click", () => openModal(el.dataset.isbn));
