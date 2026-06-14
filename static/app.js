@@ -466,9 +466,8 @@ async function loadFavorites() {
   const isbns = getFavIsbns();
   if (!isbns.length) { grid.innerHTML = '<div class="loading">お気に入りはまだありません。<br>本のカードの ♥ をタップして追加しましょう！</div>'; return; }
   grid.innerHTML = '<div class="loading">読み込み中…</div>';
-  const books = await Promise.all(isbns.map(isbn =>
-    fetch(`/api/book/${isbn}`).then(r => r.json()).catch(() => null)
-  ));
+  const res = await fetch(`/api/books/batch?isbns=${isbns.join(",")}`);
+  const books = await res.json();
   renderGrid("favGrid", books.filter(Boolean));
 }
 
@@ -481,9 +480,9 @@ async function loadLog(filter = "all") {
   if (filter !== "all") entries = entries.filter(e => e.status === filter);
   if (!entries.length) { grid.innerHTML = '<div class="loading">記録がありません。<br>本の詳細画面からステータスを設定できます。</div>'; return; }
   grid.innerHTML = '<div class="loading">読み込み中…</div>';
-  const books = await Promise.all(entries.map(e =>
-    fetch(`/api/book/${e.isbn}`).then(r => r.json()).then(b => ({ ...b, _status: e.status })).catch(() => null)
-  ));
+  const statusMap = Object.fromEntries(entries.map(e => [e.isbn, e.status]));
+  const res = await fetch(`/api/books/batch?isbns=${entries.map(e => e.isbn).join(",")}`);
+  const books = (await res.json()).map(b => ({ ...b, _status: statusMap[b.isbn] }));
   renderGrid("logGrid", books.filter(Boolean));
 }
 
