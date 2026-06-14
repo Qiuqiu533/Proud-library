@@ -242,6 +242,7 @@
           <div class="req-field">
             <label>お名前・部屋番号（任意・街区番号を入力するとハイフンが自動で入ります）</label>
             <input type="text" id="reqRoom" placeholder="例：5-533（5街区533室）またはお名前" maxlength="30" />
+            <p style="font-size:0.75rem;color:#aaa;margin:4px 0 0">※ 入力いただいた情報はリクエスト対応のみに使用し、第三者への提供は行いません。</p>
           </div>
           <button class="btn-primary req-submit-btn" id="reqSubmitBtn">📨 リクエストを送る</button>
           <p id="reqMsg" class="rate-msg" style="margin-top:10px"></p>
@@ -258,6 +259,7 @@
           <div class="req-field">
             <label>お名前・部屋番号（任意）</label>
             <input type="text" id="fbRoom" placeholder="例：5-533またはお名前" maxlength="30" />
+            <p style="font-size:0.75rem;color:#aaa;margin:4px 0 0">※ 入力いただいた情報はご要望対応のみに使用し、第三者への提供は行いません。</p>
           </div>
           <div class="req-field">
             <label>内容 <span class="req-required">*</span></label>
@@ -993,7 +995,8 @@
             <a class="guide-toc-item" href="#guide-calendar">8. 活動カレンダーを使う</a>
             <a class="guide-toc-item" href="#guide-render">9. Render.com（サーバー）の管理</a>
             <a class="guide-toc-item" href="#guide-trouble">10. よくある質問・トラブル対処</a>
-            <a class="guide-toc-item" href="#guide-contacts">11. 引き継ぎ情報</a>
+            <a class="guide-toc-item" href="#guide-privacy">11. 個人情報の取り扱いについて</a>
+            <a class="guide-toc-item" href="#guide-contacts">12. 引き継ぎ情報</a>
           </div>
 
           <!-- 1. 全体像 -->
@@ -1236,9 +1239,40 @@
             </div>
           </div>
 
-          <!-- 11. 引き継ぎ -->
+          <!-- 11. 個人情報 -->
+          <div class="guide-section" id="guide-privacy">
+            <h4 class="guide-section-title">11. 個人情報の取り扱いについて</h4>
+            <p class="guide-text">このアプリはプラウド船橋のライブラリーグループが運営する非営利・住民自治活動のためのツールです。個人情報保護法上の「個人情報取扱事業者」には該当しませんが、住民の信頼を守るため以下の方針で運用してください。</p>
+
+            <div class="guide-info-box">
+              <strong>📋 取り扱う情報と目的</strong><br><br>
+              <table class="guide-table" style="margin-top:0">
+                <tr><th>情報</th><th>入力</th><th>用途</th></tr>
+                <tr><td>お名前・部屋番号</td><td>任意</td><td>リクエスト・ご要望への返答のみ</td></tr>
+                <tr><td>クラウド同期用部屋番号・PIN</td><td>任意</td><td>お気に入り・読書記録の端末間同期のみ</td></tr>
+                <tr><td>チャットの発言者名</td><td>任意</td><td>ライブラリーグループ内の連絡のみ</td></tr>
+              </table>
+            </div>
+
+            <div class="guide-step-box" style="margin-top:12px">
+              <strong>運用上のルール：</strong>
+              <ul class="guide-ul">
+                <li>収集した情報はアプリ上の対応目的以外に使用しない</li>
+                <li>第三者（管理会社・他の住民など）への提供は行わない</li>
+                <li>管理者メモ（非公開欄）に不必要な個人情報を記録しない</li>
+                <li>担当者が交代する際はパスワードを変更する</li>
+              </ul>
+            </div>
+
+            <div class="guide-info-box" style="margin-top:12px">
+              <strong>💡 法律上の整理</strong><br>
+              本活動は営利目的ではなく住民コミュニティ形成のための自治活動であるため、個人情報保護法の適用対象外です。ただし管理組合への活動報告の際に、このアプリの運用概要と情報取り扱い方針を説明しておくと、住民からの問い合わせへの対応がスムーズになります。
+            </div>
+          </div>
+
+          <!-- 12. 引き継ぎ -->
           <div class="guide-section" id="guide-contacts">
-            <h4 class="guide-section-title">11. 引き継ぎ情報</h4>
+            <h4 class="guide-section-title">12. 引き継ぎ情報</h4>
             <table class="guide-table">
               <tr><th>サービス</th><th>アカウント・URL</th><th>備考</th></tr>
               <tr><td>Render.com</td><td>GitHubアカウントでログイン</td><td>サーバー管理</td></tr>
