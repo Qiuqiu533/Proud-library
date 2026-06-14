@@ -679,13 +679,13 @@ function _buildEventsMap(items) {
 }
 
 async function loadInfo() {
-  const [infoRes, calRes] = await Promise.all([
+  const [infoRes, schRes] = await Promise.all([
     fetch("/api/library-info"),
-    fetch("/api/calendar")
+    fetch("/api/lib-schedule")
   ]);
   const info = await infoRes.json();
-  const calItems = await calRes.json();
-  _calEventsMap = _buildEventsMap(calItems);
+  const schItems = await schRes.json();
+  _calEventsMap = _buildEventsMap(schItems);
   const hoursHtml = info.hours.map(h =>
     `<div class="avail-row"><span>${h.day}</span><span><strong>${h.time}</strong></span></div>`
   ).join("");
@@ -1156,6 +1156,7 @@ document.querySelectorAll(".board-tab").forEach(btn => {
     if (btn.dataset.btab === "newarrival") loadNewArrivalAdmin();
     if (btn.dataset.btab === "stats") loadStats();
     if (btn.dataset.btab === "calendar") loadCalendar();
+    if (btn.dataset.btab === "libschedule") loadLibSchedule();
     if (btn.dataset.btab === "issues") loadIssues();
     if (btn.dataset.btab === "brequest") loadReqManage();
     if (btn.dataset.btab === "loaned") loadLoanedBooks();
@@ -1556,19 +1557,14 @@ function renderCalendar() {
   const list = document.getElementById("calList");
   const items = allCalItems;
   if (!items.length) { list.innerHTML = '<div class="loading">活動記録はまだありません</div>'; return; }
-  list.innerHTML = items.map((item, idx) => {
-    const typeBadge = item.type === "closed"
-      ? `<span class="cal-type-badge closed">🚫 臨時休館</span>`
-      : `<span class="cal-type-badge event">📅 イベント</span>`;
-    return `
+  list.innerHTML = items.map((item, idx) => `
     <div class="cal-card">
       <div class="cal-header">
         <div class="move-btns">
           <button class="btn-move cal-up" data-id="${item.id}" ${idx===0?"disabled":""} title="上へ">▲</button>
           <button class="btn-move cal-down" data-id="${item.id}" ${idx===items.length-1?"disabled":""} title="下へ">▼</button>
         </div>
-        ${typeBadge}
-        <span class="cal-date cal-view-date" data-id="${item.id}">${item.event_date}</span>
+        <span class="cal-date cal-view-date" data-id="${item.id}">📅 ${item.event_date}</span>
         <span class="cal-title-text cal-view-title" data-id="${item.id}">${item.title}</span>
         <button class="btn-edit cal-edit-btn" data-id="${item.id}" title="編集">✏️</button>
         <button class="news-del cal-del" data-id="${item.id}" title="削除">🗑</button>
@@ -1576,11 +1572,7 @@ function renderCalendar() {
       ${item.body ? `<div class="cal-body cal-view-body" data-id="${item.id}">${item.body.replace(/\n/g,"<br>")}</div>` : `<div class="cal-view-body" data-id="${item.id}" style="display:none"></div>`}
       ${item.minutes ? `<details class="cal-minutes cal-view-mins" data-id="${item.id}"><summary>📝 議事録を見る</summary><div class="cal-minutes-body">${item.minutes.replace(/\n/g,"<br>")}</div></details>` : `<div class="cal-view-mins" data-id="${item.id}" style="display:none"></div>`}
       <div class="cal-edit-form" id="cedit-${item.id}" style="display:none">
-        <select class="ce-type" style="margin-bottom:6px;padding:8px;border-radius:8px;border:1.5px solid #cde;font-size:0.9rem;width:100%">
-          <option value="event" ${item.type!=="closed"?"selected":""}>📅 イベント</option>
-          <option value="closed" ${item.type==="closed"?"selected":""}>🚫 臨時休館</option>
-        </select>
-        <input class="ce-title" value="${item.title.replace(/"/g,'&quot;')}" placeholder="イベント名 / 臨時休館の理由" style="margin-bottom:6px" />
+        <input class="ce-title" value="${item.title.replace(/"/g,'&quot;')}" placeholder="イベント名" style="margin-bottom:6px" />
         <input type="date" class="ce-date" value="${item.event_date}" style="margin-bottom:6px" />
         <textarea class="ce-body" rows="2" placeholder="内容・メモ" style="margin-bottom:6px">${item.body||""}</textarea>
         <textarea class="ce-minutes" rows="4" placeholder="議事録（任意）">${item.minutes||""}</textarea>
@@ -1589,8 +1581,7 @@ function renderCalendar() {
           <button class="ce-cancel btn-secondary" data-id="${item.id}" style="font-size:0.83rem;padding:6px 14px">キャンセル</button>
         </div>
       </div>
-    </div>`;
-  }).join("");
+    </div>`).join("");
 
   list.querySelectorAll(".cal-up").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -1649,17 +1640,16 @@ function renderCalendar() {
       const event_date = form.querySelector(".ce-date").value;
       const body = form.querySelector(".ce-body").value.trim();
       const minutes = form.querySelector(".ce-minutes").value.trim();
-      const type = form.querySelector(".ce-type").value;
       if (!title) { alert("タイトルを入力してください"); return; }
       btn.textContent = "保存中…"; btn.disabled = true;
       try {
         const res = await fetch(`/api/calendar/${id}`, {
           method: "PATCH", headers: {"Content-Type":"application/json"},
-          body: JSON.stringify({password: boardPassword, title, event_date, body, minutes, type})
+          body: JSON.stringify({password: boardPassword, title, event_date, body, minutes})
         });
         if (!res.ok) { alert("保存に失敗しました（認証エラー）"); btn.textContent = "保存"; btn.disabled = false; return; }
         const item = allCalItems.find(i => String(i.id) === String(id));
-        if (item) { item.title = title; item.event_date = event_date; item.body = body; item.minutes = minutes; item.type = type; }
+        if (item) { item.title = title; item.event_date = event_date; item.body = body; item.minutes = minutes; }
         renderCalendar();
       } catch(e) {
         alert("通信エラーが発生しました");
@@ -1679,16 +1669,121 @@ function renderCalendar() {
   });
 }
 
+// ===== Lib Schedule =====
+let allLsItems = [];
+
+document.getElementById("lsFormToggle").addEventListener("click", () => {
+  const f = document.getElementById("lsForm");
+  f.style.display = f.style.display === "none" ? "block" : "none";
+});
+
+async function loadLibSchedule() {
+  const list = document.getElementById("lsList");
+  list.innerHTML = '<div class="loading">読み込み中…</div>';
+  const res = await fetch("/api/lib-schedule");
+  allLsItems = await res.json();
+  renderLibSchedule();
+}
+
+function renderLibSchedule() {
+  const list = document.getElementById("lsList");
+  if (!allLsItems.length) { list.innerHTML = '<div class="loading">登録された予定はありません</div>'; return; }
+  list.innerHTML = allLsItems.map(item => {
+    const badge = item.type === "closed"
+      ? `<span class="cal-type-badge closed">🚫 臨時休館</span>`
+      : `<span class="cal-type-badge event">📅 イベント</span>`;
+    return `
+    <div class="cal-card" id="ls-card-${item.id}">
+      <div class="cal-header">
+        ${badge}
+        <span class="ls-view-date">${item.event_date}</span>
+        <span class="cal-title-text ls-view-title">${item.title}</span>
+        <button class="btn-edit ls-edit-btn" data-id="${item.id}" title="編集">✏️</button>
+        <button class="news-del ls-del" data-id="${item.id}" title="削除">🗑</button>
+      </div>
+      <div class="ls-edit-form" id="lsedit-${item.id}" style="display:none">
+        <select class="lse-type" style="margin-bottom:6px;padding:8px;border-radius:8px;border:1.5px solid #cde;font-size:0.9rem;width:100%">
+          <option value="event" ${item.type!=="closed"?"selected":""}>📅 イベント</option>
+          <option value="closed" ${item.type==="closed"?"selected":""}>🚫 臨時休館</option>
+        </select>
+        <input class="lse-title" value="${item.title.replace(/"/g,'&quot;')}" placeholder="タイトル" style="margin-bottom:6px" />
+        <input type="date" class="lse-date" value="${item.event_date}" style="margin-bottom:6px" />
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <button class="btn-primary lse-save" data-id="${item.id}" style="font-size:0.83rem;padding:6px 14px">保存</button>
+          <button class="lse-cancel btn-secondary" data-id="${item.id}" style="font-size:0.83rem;padding:6px 14px">キャンセル</button>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+
+  list.querySelectorAll(".ls-edit-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.getElementById(`lsedit-${btn.dataset.id}`).style.display = "block";
+    });
+  });
+  list.querySelectorAll(".lse-cancel").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.getElementById(`lsedit-${btn.dataset.id}`).style.display = "none";
+    });
+  });
+  list.querySelectorAll(".lse-save").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.id;
+      const form = document.getElementById(`lsedit-${id}`);
+      const title = form.querySelector(".lse-title").value.trim();
+      const event_date = form.querySelector(".lse-date").value;
+      const type = form.querySelector(".lse-type").value;
+      if (!title || !event_date) { alert("タイトルと日付を入力してください"); return; }
+      btn.textContent = "保存中…"; btn.disabled = true;
+      const res = await fetch(`/api/lib-schedule/${id}`, {
+        method: "PATCH", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({password: boardPassword, title, event_date, type})
+      });
+      if (!res.ok) { alert("保存に失敗しました"); btn.textContent = "保存"; btn.disabled = false; return; }
+      const item = allLsItems.find(i => String(i.id) === String(id));
+      if (item) { item.title = title; item.event_date = event_date; item.type = type; }
+      renderLibSchedule();
+    });
+  });
+  list.querySelectorAll(".ls-del").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("この予定を削除しますか？")) return;
+      await fetch(`/api/lib-schedule/${btn.dataset.id}`, {
+        method: "DELETE", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({password: boardPassword})
+      });
+      loadLibSchedule();
+    });
+  });
+}
+
+document.getElementById("submitLs").addEventListener("click", async () => {
+  const title = document.getElementById("lsTitle").value.trim();
+  const event_date = document.getElementById("lsDate").value;
+  const type = document.getElementById("lsType").value;
+  if (!title || !event_date) { document.getElementById("lsMsg").textContent = "タイトルと日付を入力してください"; return; }
+  const res = await fetch("/api/lib-schedule", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({password: boardPassword, title, event_date, type})
+  });
+  if (res.ok) {
+    document.getElementById("lsMsg").textContent = "✅ 登録しました";
+    document.getElementById("lsTitle").value = "";
+    document.getElementById("lsDate").value = "";
+    document.getElementById("lsType").value = "event";
+    loadLibSchedule();
+  }
+});
+
 document.getElementById("submitCal").addEventListener("click", async () => {
   const title = document.getElementById("calTitle").value.trim();
   const event_date = document.getElementById("calDate").value;
   const body = document.getElementById("calBody").value.trim();
   const minutes = document.getElementById("calMinutes").value.trim();
-  const type = document.getElementById("calType").value;
   if (!title || !event_date) { document.getElementById("calMsg").textContent = "タイトルと日付を入力してください"; return; }
   const res = await fetch("/api/calendar", {
     method: "POST", headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({password: boardPassword, title, event_date, body, minutes, type})
+    body: JSON.stringify({password: boardPassword, title, event_date, body, minutes})
   });
   if (res.ok) {
     document.getElementById("calMsg").textContent = "✅ 登録しました";

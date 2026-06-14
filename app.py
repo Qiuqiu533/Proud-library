@@ -547,7 +547,7 @@ def _ensure_db():
     threading.Thread(target=_migrate_add_votes_column, daemon=True).start()
     threading.Thread(target=_migrate_add_type_reply_columns, daemon=True).start()
     threading.Thread(target=_migrate_add_staff_chat, daemon=True).start()
-    threading.Thread(target=_migrate_calendar_type, daemon=True).start()
+    threading.Thread(target=_migrate_lib_schedule, daemon=True).start()
 
 
 def _migrate_add_staff_chat():
@@ -625,20 +625,33 @@ def _migrate_add_type_reply_columns():
     except Exception as e:
         print(f"migrate type/reply error: {e}")
 
-def _migrate_calendar_type():
+def _migrate_lib_schedule():
     try:
         con = get_con()
-        try:
-            if USE_PG:
-                con.cursor().execute("ALTER TABLE calendar_events ADD COLUMN type TEXT DEFAULT 'event'")
-            else:
-                con.execute("ALTER TABLE calendar_events ADD COLUMN type TEXT DEFAULT 'event'")
-            con.commit()
-        except Exception:
-            if USE_PG: con.rollback()
+        if USE_PG:
+            con.cursor().execute("""
+                CREATE TABLE IF NOT EXISTS lib_schedule (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    event_date TEXT NOT NULL,
+                    type TEXT NOT NULL DEFAULT 'event',
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+        else:
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS lib_schedule (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    event_date TEXT NOT NULL,
+                    type TEXT NOT NULL DEFAULT 'event',
+                    created_at TEXT DEFAULT (datetime('now','localtime'))
+                )
+            """)
+        con.commit()
         con.close()
     except Exception as e:
-        print(f"migrate calendar type error: {e}")
+        print(f"migrate lib_schedule error: {e}")
 
 def _migrate_genre_map_to_db():
     """genre_map.json が存在し DB が空なら一度だけ移行する"""
@@ -925,9 +938,9 @@ def api_delete_issue(issue_id):
 @app.route("/api/calendar")
 def api_calendar():
     con = get_con()
-    rows = fetchall(con, "SELECT id,title,event_date,body,minutes,sort_order,created_at,type FROM calendar_events ORDER BY sort_order ASC, event_date DESC")
+    rows = fetchall(con, "SELECT id,title,event_date,body,minutes,sort_order,created_at FROM calendar_events ORDER BY sort_order ASC, event_date DESC")
     con.close()
-    return jsonify([{**r, "created_at": str(r["created_at"])[:10], "type": r.get("type") or "event"} for r in rows])
+    return jsonify([{**r, "created_at": str(r["created_at"])[:10]} for r in rows])
 
 
 @app.route("/api/calendar", methods=["POST"])
@@ -938,10 +951,9 @@ def api_post_calendar():
     con = get_con()
     row = fetchone(con, "SELECT MIN(sort_order) as m FROM calendar_events")
     new_order = ((row["m"] or 0) - 1) if row else -1
-    execute(con, "INSERT INTO calendar_events (title,event_date,body,minutes,sort_order,type) VALUES (?,?,?,?,?,?)",
+    execute(con, "INSERT INTO calendar_events (title,event_date,body,minutes,sort_order) VALUES (?,?,?,?,?)",
         (body.get("title","").strip(), body.get("event_date",""),
-         body.get("body","").strip(), body.get("minutes","").strip(), new_order,
-         body.get("type","event")))
+         body.get("body","").strip(), body.get("minutes","").strip(), new_order))
     con.commit(); con.close()
     return jsonify({"ok": True})
 
@@ -964,10 +976,53 @@ def api_update_calendar(ev_id):
     if body.get("password") != get_board_password():
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
-    execute(con, "UPDATE calendar_events SET title=?,event_date=?,body=?,minutes=?,type=? WHERE id=?",
+    execute(con, "UPDATE calendar_events SET title=?,event_date=?,body=?,minutes=? WHERE id=?",
         (body.get("title","").strip(), body.get("event_date",""),
-         body.get("body","").strip(), body.get("minutes","").strip(),
-         body.get("type","event"), ev_id))
+         body.get("body","").strip(), body.get("minutes","").strip(), ev_id))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+
+# --- Lib Schedule ---
+@app.route("/api/lib-schedule")
+def api_lib_schedule():
+    con = get_con()
+    rows = fetchall(con, "SELECT id,title,event_date,type,created_at FROM lib_schedule ORDER BY event_date ASC")
+    con.close()
+    return jsonify([{**r, "created_at": str(r["created_at"])[:10]} for r in rows])
+
+
+@app.route("/api/lib-schedule", methods=["POST"])
+def api_post_lib_schedule():
+    body = request.get_json()
+    if body.get("password") != get_board_password():
+        return jsonify({"error": "unauthorized"}), 401
+    con = get_con()
+    execute(con, "INSERT INTO lib_schedule (title,event_date,type) VALUES (?,?,?)",
+        (body.get("title","").strip(), body.get("event_date",""), body.get("type","event")))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/lib-schedule/<int:sch_id>", methods=["PATCH"])
+def api_update_lib_schedule(sch_id):
+    body = request.get_json()
+    if body.get("password") != get_board_password():
+        return jsonify({"error": "unauthorized"}), 401
+    con = get_con()
+    execute(con, "UPDATE lib_schedule SET title=?,event_date=?,type=? WHERE id=?",
+        (body.get("title","").strip(), body.get("event_date",""), body.get("type","event"), sch_id))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/lib-schedule/<int:sch_id>", methods=["DELETE"])
+def api_delete_lib_schedule(sch_id):
+    body = request.get_json()
+    if body.get("password") != get_board_password():
+        return jsonify({"error": "unauthorized"}), 401
+    con = get_con()
+    execute(con, "DELETE FROM lib_schedule WHERE id=?", (sch_id,))
     con.commit(); con.close()
     return jsonify({"ok": True})
 
