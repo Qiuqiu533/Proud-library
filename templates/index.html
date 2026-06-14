@@ -991,10 +991,9 @@
             <a class="guide-toc-item" href="#guide-chat">6. ライブラリーグループチャット</a>
             <a class="guide-toc-item" href="#guide-issues">7. 課題管理を使う</a>
             <a class="guide-toc-item" href="#guide-calendar">8. 活動カレンダーを使う</a>
-            <a class="guide-toc-item" href="#guide-genre">9. ジャンルデータについて</a>
-            <a class="guide-toc-item" href="#guide-render">10. Render.com（サーバー）の管理</a>
-            <a class="guide-toc-item" href="#guide-trouble">11. よくある質問・トラブル対処</a>
-            <a class="guide-toc-item" href="#guide-contacts">12. 引き継ぎ情報</a>
+            <a class="guide-toc-item" href="#guide-render">9. Render.com（サーバー）の管理</a>
+            <a class="guide-toc-item" href="#guide-trouble">10. よくある質問・トラブル対処</a>
+            <a class="guide-toc-item" href="#guide-contacts">11. 引き継ぎ情報</a>
           </div>
 
           <!-- 1. 全体像 -->
@@ -1045,7 +1044,7 @@
             <div class="guide-warning-box">⚠️ このページは管理者メニュー内にのみ表示されますが、パスワードは別途安全な場所に保管してください。</div>
             <table class="guide-table">
               <tr><th>種類</th><th>初期値</th><th>用途</th></tr>
-              <tr><td>🏠 住民パスワード</td><td>proud2525</td><td>住民がサイトにログインする際のパスワード</td></tr>
+              <tr><td>🏠 住民パスワード</td><td>pfl2525</td><td>住民がサイトにログインする際のパスワード</td></tr>
               <tr><td>🏛️ 管理者パスワード</td><td>kanri5533</td><td>管理者メニューへのログイン・各種操作に使用</td></tr>
             </table>
             <div class="guide-step-box">
@@ -1178,22 +1177,9 @@
             <p class="guide-text" style="margin-top:8px">編集・並び替え・削除の操作は課題管理と同じです。</p>
           </div>
 
-          <!-- 9. ジャンルデータ -->
-          <div class="guide-section" id="guide-genre">
-            <h4 class="guide-section-title">9. ジャンルデータについて</h4>
-            <p class="guide-text">蔵書のジャンルフィルター機能は、データベースに保存されたジャンル情報を使っています。</p>
-            <div class="guide-info-box">
-              <strong>🔄 自動更新の仕組み</strong><br>
-              アプリが起動するたびにバックグラウンドで新しい本を検出し、OpenBD API（国内書誌サービス）から書誌情報を取得して自動的にジャンルを分類します。<strong>担当者は何もしなくてOKです。</strong>
-            </div>
-            <div class="guide-warning-box">
-              ⚠️ 自動分類はNDCコードとキーワードによる判定のため、一部の本は正確でない場合があります。主要ジャンルは概ね正確です。
-            </div>
-          </div>
-
-          <!-- 10. Render管理 -->
+          <!-- 9. Render管理 -->
           <div class="guide-section" id="guide-render">
-            <h4 class="guide-section-title">10. Render.com（サーバー）の管理</h4>
+            <h4 class="guide-section-title">9. Render.com（サーバー）の管理</h4>
             <p class="guide-text">サーバーの管理は <a href="https://dashboard.render.com" target="_blank">dashboard.render.com</a> から行います。</p>
             <div class="guide-step-box">
               <strong>サイトが正常に動いているか確認する：</strong>
@@ -1217,9 +1203,9 @@
             </div>
           </div>
 
-          <!-- 11. トラブル対処 -->
+          <!-- 10. トラブル対処 -->
           <div class="guide-section" id="guide-trouble">
-            <h4 class="guide-section-title">11. よくある質問・トラブル対処</h4>
+            <h4 class="guide-section-title">10. よくある質問・トラブル対処</h4>
             <div class="guide-faq-item">
               <div class="guide-faq-q">Q. サイトを開いたら黒い画面（Renderのローディング）が出た</div>
               <div class="guide-faq-a">無料プランのスリープ状態からの起動画面です。最大1〜2分待つと起動します。誰かがアプリを開き続けていればスリープしません。完全に防ぐにはUptimeRobot（無料）などの外部監視サービスを利用する方法があります。</div>
@@ -1250,9 +1236,9 @@
             </div>
           </div>
 
-          <!-- 12. 引き継ぎ -->
+          <!-- 11. 引き継ぎ -->
           <div class="guide-section" id="guide-contacts">
-            <h4 class="guide-section-title">12. 引き継ぎ情報</h4>
+            <h4 class="guide-section-title">11. 引き継ぎ情報</h4>
             <table class="guide-table">
               <tr><th>サービス</th><th>アカウント・URL</th><th>備考</th></tr>
               <tr><td>Render.com</td><td>GitHubアカウントでログイン</td><td>サーバー管理</td></tr>
