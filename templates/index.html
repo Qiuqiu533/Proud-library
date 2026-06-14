@@ -998,11 +998,13 @@
             <a class="guide-toc-item" href="#guide-login">2. 管理者メニューへのログイン</a>
             <a class="guide-toc-item" href="#guide-passwords">3. パスワード一覧</a>
             <a class="guide-toc-item" href="#guide-news">4. お知らせを投稿・編集する</a>
+            <a class="guide-toc-item" href="#guide-newarrival">4b. 新着本を登録する</a>
             <a class="guide-toc-item" href="#guide-requests">5. リクエスト・ご要望を管理する</a>
             <a class="guide-toc-item" href="#guide-chat">6. ライブラリーグループチャット</a>
             <a class="guide-toc-item" href="#guide-issues">7. 課題管理を使う</a>
             <a class="guide-toc-item" href="#guide-calendar">8. 活動カレンダーを使う</a>
             <a class="guide-toc-item" href="#guide-render">9. Render.com（サーバー）の管理</a>
+            <a class="guide-toc-item" href="#guide-dbcheck">9b. DB使用量の定期確認</a>
             <a class="guide-toc-item" href="#guide-trouble">10. よくある質問・トラブル対処</a>
             <a class="guide-toc-item" href="#guide-privacy">11. 個人情報の取り扱いについて</a>
             <a class="guide-toc-item" href="#guide-contacts">12. 引き継ぎ情報</a>
@@ -1114,6 +1116,24 @@
             </div>
           </div>
 
+          <!-- 4b. 新着登録 -->
+          <div class="guide-section" id="guide-newarrival">
+            <h4 class="guide-section-title">4b. 新着本を登録する</h4>
+            <p class="guide-text">librarylife.netに新しい本を追加した後、このアプリの「新着」タブに表示させるにはISBNの登録が必要です。</p>
+            <div class="guide-step-box">
+              <strong>登録手順：</strong>
+              <ol class="guide-ol">
+                <li>管理者メニュー →「📦 新着登録」タブ</li>
+                <li>本のISBNコード（13桁）を入力して「検索」</li>
+                <li>書誌情報（タイトル・著者・表紙）が表示されたら「登録する」をクリック</li>
+                <li>住民の「🆕 新着」タブに反映される</li>
+              </ol>
+            </div>
+            <div class="guide-info-box">
+              💡 ISBNは本の裏表紙のバーコード下に記載されている13桁の数字です。ハイフンなしで入力してください。
+            </div>
+          </div>
+
           <!-- 5. リクエスト管理 -->
           <div class="guide-section" id="guide-requests">
             <h4 class="guide-section-title">5. リクエスト・ご要望を管理する</h4>
@@ -1148,6 +1168,17 @@
                 <li>「管理者メモ」欄に内部メモを記入（住民には非公開）</li>
                 <li>「居住者への返答」欄に記入して「返答を保存」→ 住民の一覧に「📣 図書館より：」として表示される</li>
               </ol>
+            </div>
+            <div class="guide-warning-box" style="margin-top:12px">
+              <strong>⚠️ 不適切な投稿があった場合の対応</strong><br><br>
+              住民からのリクエスト・ご要望は匿名での投稿が可能なため、不適切な内容が送られる場合があります。<br><br>
+              <strong>対応手順：</strong>
+              <ol class="guide-ol" style="margin-top:6px">
+                <li>管理者メニュー → 該当のカードを確認</li>
+                <li>内容が不適切と判断した場合は🗑ボタンで削除（管理者パスワード必要）</li>
+                <li>必要に応じて管理者メモに記録を残しておく（削除前にメモしておくと経緯が追える）</li>
+              </ol>
+              <p style="margin-top:8px;font-size:0.85rem">※ 投稿者のIPアドレスは記録していないため、匿名投稿の場合は発信者を特定できません。悪質な場合はお知らせ欄で全住民向けに注意喚起する方法が有効です。</p>
             </div>
           </div>
 
@@ -1232,6 +1263,25 @@
             <div class="guide-info-box">
               ✅ <strong>データベースはNeon（無料・無期限）を使用</strong><br>
               このサイトでは<a href="https://neon.tech" target="_blank">Neon</a>の無料PostgreSQLを使用しています。期限なく無料で使えるため、データベースの移行作業は不要です。
+            </div>
+          </div>
+
+          <!-- 9b. DB使用量の定期確認 -->
+          <div class="guide-section" id="guide-dbcheck">
+            <h4 class="guide-section-title">9b. DB使用量の定期確認</h4>
+            <p class="guide-text">データベース（Neon）の無料枠は <strong>512MB</strong> です。通常の利用では数年間は問題ありませんが、定期的に残量を確認することを推奨します。</p>
+            <div class="guide-step-box">
+              <strong>確認手順：</strong>
+              <ol class="guide-ol">
+                <li>管理者メニューにログイン →「⚙️ 設定」タブ</li>
+                <li>「🗄️ DB使用量」欄の「📊 使用量を確認する」をクリック</li>
+                <li>使用率・テーブル別内訳・残り容量が表示される</li>
+              </ol>
+            </div>
+            <div class="guide-info-box">
+              🔄 <strong>自動削除機能あり</strong><br>
+              使用率が <strong>95%</strong> を超えると、次回のアクセス時に古い画像データが自動的に削除されます（チャット画像：古い順50件、お知らせ画像：古い順10件）。テキストデータは削除されません。<br><br>
+              📅 <strong>推奨確認頻度：月1回程度</strong>（80%を超えたら早めの対応を）
             </div>
           </div>
 
