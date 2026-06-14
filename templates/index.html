@@ -272,8 +272,18 @@
       <div class="req-page">
         <div class="req-form-card">
           <h3>📋 みんなのリクエスト一覧</h3>
-          <p class="req-form-desc">他の方のリクエストに👍で共感を伝えられます。入荷してほしい本はリクエストタブから送れます。</p>
-          <div id="reqList"><div class="loading">読み込み中…</div></div>
+          <div style="display:flex;gap:10px;margin:12px 0 16px">
+            <button class="res-subtab-btn active" data-subtab="books"
+              style="flex:1;padding:11px 16px;border:2px solid #3d6b4f;border-radius:10px;background:#3d6b4f;color:#fff;cursor:pointer;font-size:0.88rem;font-weight:700;text-align:center;transition:all 0.2s">
+              📖 本のリクエスト
+            </button>
+            <button class="res-subtab-btn" data-subtab="feedback"
+              style="flex:1;padding:11px 16px;border:2px solid #c0cfe8;border-radius:10px;background:#f5f8ff;color:#8aabcc;cursor:pointer;font-size:0.88rem;font-weight:700;text-align:center;transition:all 0.2s">
+              💬 ご要望・ご意見
+            </button>
+          </div>
+          <div id="reqListBooks"><div class="loading">読み込み中…</div></div>
+          <div id="reqListFeedback" style="display:none"><div class="loading">読み込み中…</div></div>
         </div>
         <p class="req-footer-note">※ リクエストは入荷・対応を保証するものではありません。ご了承のうえご利用ください。</p>
       </div>
