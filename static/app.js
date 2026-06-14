@@ -52,17 +52,15 @@ let logFilter = "all";
 
 // ===== localStorage helpers =====
 function getRating(isbn) {
-  try { return JSON.parse(localStorage.getItem("rating_" + isbn)) || { score: 0, votes: 0, reviews: [] }; }
-  catch { return { score: 0, votes: 0, reviews: [] }; }
+  return { score: 0, votes: 0, reviews: [] };
 }
-function saveRating(isbn, score, review) {
-  const r = getRating(isbn);
-  const newVotes = r.votes + 1;
-  const newScore = Math.round(((r.score * r.votes + score) / newVotes) * 10) / 10;
-  const reviews = review ? [...r.reviews, review] : r.reviews;
-  const updated = { score: newScore, votes: newVotes, reviews };
-  localStorage.setItem("rating_" + isbn, JSON.stringify(updated));
-  return updated;
+async function saveRating(isbn, score, review) {
+  const res = await fetch("/api/rate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ isbn, score, review })
+  });
+  return await res.json();
 }
 
 function isFav(isbn) { return localStorage.getItem("fav_" + isbn) === "1"; }
@@ -680,7 +678,7 @@ function _renderModalContent(isbn, book, rating) {
     </div>
 
     <div class="modal-section">
-      <h3>⭐ みんなの評価（あなたのデバイス）</h3>
+      <h3>⭐ みんなの評価</h3>
       <div class="big-stars">${rating.score ? "★".repeat(Math.round(rating.score)) + "☆".repeat(5 - Math.round(rating.score)) : "☆☆☆☆☆"}</div>
       <div class="rating-info">${rating.score ? `${rating.score.toFixed(1)} / 5.0（${rating.votes}件）` : "まだ評価がありません"}</div>
       <button class="btn-rate" data-isbn="${isbn}">この本を評価する</button>
@@ -732,12 +730,11 @@ async function openModal(isbn, preloadedBook) {
   modal.style.display = "flex";
 
   if (preloadedBook) {
-    // 即時表示：カードデータで先にレンダリング
-    const rating = getRating(isbn);
-    document.getElementById("modalContent").innerHTML = _renderModalContent(isbn, preloadedBook, rating);
+    // 即時表示：カードデータで先にレンダリング（評価は空で初期表示）
+    document.getElementById("modalContent").innerHTML = _renderModalContent(isbn, preloadedBook, { score: 0, votes: 0, reviews: [] });
     _bindModalEvents(isbn);
 
-    // 貸出状況・詳細情報を非同期で取得して更新
+    // 貸出状況・評価・詳細情報を非同期で取得して更新
     try {
       const res = await fetch(`/api/book/${isbn}`);
       const book = await res.json();
@@ -758,6 +755,12 @@ async function openModal(isbn, preloadedBook) {
         ].filter(Boolean).join("");
         if (newTags) tagsEl.innerHTML = newTags;
       }
+      // 評価をサーバーデータで更新
+      const rating = book.rating || { score: 0, votes: 0, reviews: [] };
+      const starsEl = document.querySelector(".big-stars");
+      const ratingInfoEl = document.querySelector(".rating-info");
+      if (starsEl) starsEl.textContent = rating.score ? "★".repeat(Math.round(rating.score)) + "☆".repeat(5 - Math.round(rating.score)) : "☆☆☆☆☆";
+      if (ratingInfoEl) ratingInfoEl.textContent = rating.score ? `${rating.score.toFixed(1)} / 5.0（${rating.votes}件）` : "まだ評価がありません";
       // 内容紹介を追加
       const descPlaceholder = document.getElementById("modal-desc-placeholder");
       if (descPlaceholder && book.description) {
@@ -768,11 +771,11 @@ async function openModal(isbn, preloadedBook) {
       if (availEl) availEl.innerHTML = `<div class="avail-row"><span>取得できませんでした</span></div>`;
     }
   } else {
-    // preloadedBookなし（評価後の再表示など）：従来通り全データ取得してから表示
+    // preloadedBookなし（評価後の再表示など）：全データ取得してから表示
     document.getElementById("modalContent").innerHTML = '<div class="loading">読み込み中…</div>';
     const res = await fetch(`/api/book/${isbn}`);
     const book = await res.json();
-    const rating = getRating(isbn);
+    const rating = book.rating || { score: 0, votes: 0, reviews: [] };
     const availHtml = book.availability && book.availability.length
       ? book.availability.map(a => `<div class="avail-row"><span>${a.library}</span>${statusBadge(a.status)}</div>`).join("")
       : `<div class="avail-row"><span>情報なし</span></div>`;
@@ -839,10 +842,11 @@ document.querySelectorAll(".star-opt").forEach(el => {
   el.addEventListener("mouseleave", () => updateStarUI(ratingScore));
 });
 
-document.getElementById("submitRate").addEventListener("click", () => {
+document.getElementById("submitRate").addEventListener("click", async () => {
   if (!ratingScore) { document.getElementById("rateMsg").textContent = "星を選んでください"; return; }
   const review = document.getElementById("reviewText").value.trim();
-  saveRating(ratingTarget, ratingScore, review);
+  document.getElementById("rateMsg").textContent = "送信中…";
+  await saveRating(ratingTarget, ratingScore, review);
   document.getElementById("rateMsg").textContent = "✅ 投稿しました！";
   setTimeout(() => {
     document.getElementById("rateModal").style.display = "none";
