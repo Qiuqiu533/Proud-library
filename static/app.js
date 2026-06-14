@@ -260,6 +260,38 @@ async function loadBooks(keyword = "", page = 1) {
   applyAvailCache(data.books.map(b => b.isbn).filter(Boolean));
 }
 
+// ===== ジャンル件数バッジ =====
+async function loadGenreCounts() {
+  try {
+    const res = await fetch("/api/genres");
+    const data = await res.json();
+    const countMap = {};
+    data.forEach(r => { if (r.genre) countMap[r.genre] = r.count; });
+    // デスクトップ: ボタンにバッジ追加
+    document.querySelectorAll(".genre-btn[data-genre]").forEach(btn => {
+      const genre = btn.dataset.genre;
+      if (!genre) return;
+      const cnt = countMap[genre];
+      if (!cnt) return;
+      const existing = btn.querySelector(".genre-count");
+      if (existing) existing.remove();
+      const badge = document.createElement("span");
+      badge.className = "genre-count";
+      badge.textContent = cnt;
+      btn.appendChild(badge);
+    });
+    // モバイル: selectオプションに件数追加
+    document.querySelectorAll("#genreSelect option").forEach(opt => {
+      const genre = (opt.value || "").split("|")[0];
+      if (!genre) return;
+      const cnt = countMap[genre];
+      if (!cnt) return;
+      if (!opt.dataset.baseText) opt.dataset.baseText = opt.textContent;
+      opt.textContent = `${opt.dataset.baseText} (${cnt})`;
+    });
+  } catch (e) {}
+}
+
 // ===== 今日の1冊 =====
 async function loadTodayBook() {
   try {
@@ -1325,6 +1357,7 @@ checkAuth();
 loadBooks();
 loadTodayBook();
 renderRecentBooks();
+loadGenreCounts();
 
 // #44 スリープ対策: 4分ごとにpingしてサービスを起こしておく
 setInterval(() => fetch("/ping").catch(() => {}), 4 * 60 * 1000);
