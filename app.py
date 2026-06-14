@@ -1017,8 +1017,41 @@ FULL_STATS = {
     ],
 }
 
+def auto_cleanup_images():
+    """DB使用量が95%超の場合、古い画像データを自動削除する"""
+    if not USE_PG:
+        return
+    try:
+        con = get_con()
+        size_row = fetchone(con, "SELECT pg_database_size(current_database()) AS bytes")
+        total_bytes = size_row["bytes"]
+        limit_bytes = 512 * 1024 * 1024
+        percent = total_bytes / limit_bytes * 100
+        if percent >= 95:
+            # チャット画像：古い順に最大50件の画像データを削除
+            execute(con, """
+                UPDATE staff_chat SET image_data = ''
+                WHERE image_data != '' AND id IN (
+                    SELECT id FROM staff_chat WHERE image_data != ''
+                    ORDER BY created_at ASC LIMIT 50
+                )
+            """)
+            # お知らせ画像：base64保存されている古い順に最大10件を削除
+            execute(con, """
+                UPDATE announcements SET image_url = ''
+                WHERE image_url LIKE 'data:%' AND id IN (
+                    SELECT id FROM announcements WHERE image_url LIKE 'data:%'
+                    ORDER BY id ASC LIMIT 10
+                )
+            """)
+            con.commit()
+        con.close()
+    except Exception as e:
+        print(f"auto_cleanup_images error: {e}")
+
 @app.route("/ping")
 def ping():
+    auto_cleanup_images()
     return "ok", 200
 
 
