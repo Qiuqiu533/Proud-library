@@ -158,7 +158,7 @@ function renderCard(book, opts = {}) {
 
   div.addEventListener("click", () => {
     saveRecentBook(book.isbn, book.title, book.cover || "");
-    openModal(book.isbn);
+    openModal(book.isbn, book);
   });
   availObserver.observe(div);
   return div;
@@ -424,8 +424,9 @@ async function loadTopNew() {
         <div class="top-new-author">${esc(b.author || "")}</div>
       </div>`;
     }).join("");
+    const bookMap = Object.fromEntries(books.map(b => [b.isbn, b]));
     row.querySelectorAll(".top-new-item").forEach(el => {
-      el.addEventListener("click", () => openModal(el.dataset.isbn));
+      el.addEventListener("click", () => openModal(el.dataset.isbn, bookMap[el.dataset.isbn]));
     });
     section.style.display = "block";
   } catch(e) {}
@@ -637,13 +638,7 @@ function bindCalNav() {
 }
 
 // ===== Modal =====
-async function openModal(isbn) {
-  const modal = document.getElementById("modal");
-  document.getElementById("modalContent").innerHTML = '<div class="loading">読み込み中…</div>';
-  modal.style.display = "flex";
-  const res = await fetch(`/api/book/${isbn}`);
-  const book = await res.json();
-  const rating = getRating(isbn);
+function _renderModalContent(isbn, book, rating) {
   const fav = isFav(isbn);
   const readStatus = getReadStatus(isbn);
   const isbn13 = book.isbn13 || isbn;
@@ -655,16 +650,13 @@ async function openModal(isbn) {
     book.pubdate ? `<span class="tag tag-year">${book.pubdate.slice(0,4)}年</span>` : "",
     book.pages && book.pages !== "0" ? `<span class="tag tag-pages">${book.pages}P</span>` : "",
   ].filter(Boolean).join("");
-  const availHtml = book.availability && book.availability.length
-    ? book.availability.map(a => `<div class="avail-row"><span>${a.library}</span>${statusBadge(a.status)}</div>`).join("")
-    : `<div class="avail-row"><span>情報なし</span></div>`;
   const reviewsHtml = rating.reviews && rating.reviews.length
     ? rating.reviews.map(r => `<div class="review-item">💬 ${r}</div>`).join("")
     : `<div class="no-content">まだコメントはありません</div>`;
   const descHtml = book.description
     ? `<div class="modal-section"><h3>📄 内容紹介</h3><p class="book-desc">${book.description}</p></div>` : "";
 
-  document.getElementById("modalContent").innerHTML = `
+  return `
     <div class="modal-top">
       <div class="modal-cover">${book.cover ? `<img src="${book.cover}" alt="${book.title}" onerror="this.parentElement.innerHTML='<div class=\\'modal-cover-placeholder\\'>📖</div>'">` : '<div class="modal-cover-placeholder">📖</div>'}</div>
       <div class="modal-header">
@@ -694,12 +686,12 @@ async function openModal(isbn) {
       <button class="btn-rate" data-isbn="${isbn}">この本を評価する</button>
     </div>
 
-    <div class="modal-section">
+    <div class="modal-section" id="modal-avail-section">
       <h3>🏛️ 貸出状況</h3>
-      ${availHtml}
+      <div id="modal-avail-body"><div class="loading" style="font-size:0.85rem;padding:8px 0">取得中…</div></div>
     </div>
 
-    ${descHtml}
+    ${descHtml}<div id="modal-desc-placeholder"></div>
 
     <div class="modal-section">
       <h3>💬 コメント</h3>
@@ -714,7 +706,9 @@ async function openModal(isbn) {
         <a class="ext-link ext-link-lib" href="${libUrl}" target="_blank">図書館生活</a>
       </div>
     </div>`;
+}
 
+function _bindModalEvents(isbn) {
   document.querySelector(".fav-btn-large").addEventListener("click", e => {
     toggleFav(isbn);
     const active = isFav(isbn);
@@ -731,6 +725,62 @@ async function openModal(isbn) {
     ratingTarget = isbn;
     openRateModal();
   });
+}
+
+async function openModal(isbn, preloadedBook) {
+  const modal = document.getElementById("modal");
+  modal.style.display = "flex";
+
+  if (preloadedBook) {
+    // 即時表示：カードデータで先にレンダリング
+    const rating = getRating(isbn);
+    document.getElementById("modalContent").innerHTML = _renderModalContent(isbn, preloadedBook, rating);
+    _bindModalEvents(isbn);
+
+    // 貸出状況・詳細情報を非同期で取得して更新
+    try {
+      const res = await fetch(`/api/book/${isbn}`);
+      const book = await res.json();
+      const availEl = document.getElementById("modal-avail-body");
+      if (availEl) {
+        const availHtml = book.availability && book.availability.length
+          ? book.availability.map(a => `<div class="avail-row"><span>${a.library}</span>${statusBadge(a.status)}</div>`).join("")
+          : `<div class="avail-row"><span>情報なし</span></div>`;
+        availEl.innerHTML = availHtml;
+      }
+      // 出版年・ページ数タグを更新
+      const tagsEl = document.querySelector(".modal-tags");
+      if (tagsEl) {
+        const newTags = [
+          book.publisher ? `<span class="tag tag-publisher">${book.publisher}</span>` : "",
+          book.pubdate ? `<span class="tag tag-year">${book.pubdate.slice(0,4)}年</span>` : "",
+          book.pages && book.pages !== "0" ? `<span class="tag tag-pages">${book.pages}P</span>` : "",
+        ].filter(Boolean).join("");
+        if (newTags) tagsEl.innerHTML = newTags;
+      }
+      // 内容紹介を追加
+      const descPlaceholder = document.getElementById("modal-desc-placeholder");
+      if (descPlaceholder && book.description) {
+        descPlaceholder.outerHTML = `<div class="modal-section"><h3>📄 内容紹介</h3><p class="book-desc">${book.description}</p></div>`;
+      }
+    } catch(e) {
+      const availEl = document.getElementById("modal-avail-body");
+      if (availEl) availEl.innerHTML = `<div class="avail-row"><span>取得できませんでした</span></div>`;
+    }
+  } else {
+    // preloadedBookなし（評価後の再表示など）：従来通り全データ取得してから表示
+    document.getElementById("modalContent").innerHTML = '<div class="loading">読み込み中…</div>';
+    const res = await fetch(`/api/book/${isbn}`);
+    const book = await res.json();
+    const rating = getRating(isbn);
+    const availHtml = book.availability && book.availability.length
+      ? book.availability.map(a => `<div class="avail-row"><span>${a.library}</span>${statusBadge(a.status)}</div>`).join("")
+      : `<div class="avail-row"><span>情報なし</span></div>`;
+    const html = _renderModalContent(isbn, book, rating);
+    document.getElementById("modalContent").innerHTML = html;
+    document.getElementById("modal-avail-body").innerHTML = availHtml;
+    _bindModalEvents(isbn);
+  }
 }
 
 function closeModal() {
