@@ -2507,7 +2507,7 @@ function initStaffChat() {
   };
 
   sendBtn.onclick = send;
-  input.onkeydown = e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } };
+  input.onkeydown = null;
 }
 
 // チャットタブを離れたらポーリング停止
