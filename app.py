@@ -1426,9 +1426,19 @@ def api_delete_announcement(ann_id):
 @app.route("/api/requests")
 def api_requests():
     con = get_con()
-    rows = fetchall(con, "SELECT id,title,author,reason,room,status,note,votes,created_at,type,reply FROM book_requests ORDER BY votes DESC, id DESC")
+    rows = fetchall(con, "SELECT id,title,author,reason,room,status,votes,created_at,type,reply FROM book_requests ORDER BY votes DESC, id DESC")
     con.close()
     return jsonify([{**r, "created_at": str(r["created_at"])[:10], "type": r.get("type") or "request", "reply": r.get("reply") or ""} for r in rows])
+
+@app.route("/api/requests/admin")
+def api_requests_admin():
+    pw = request.args.get("password", "")
+    if pw != get_admin_password() and pw != get_board_password():
+        return jsonify({"error": "unauthorized"}), 401
+    con = get_con()
+    rows = fetchall(con, "SELECT id,title,author,reason,room,status,note,votes,created_at,type,reply FROM book_requests ORDER BY votes DESC, id DESC")
+    con.close()
+    return jsonify([{**r, "created_at": str(r["created_at"])[:10], "type": r.get("type") or "request", "reply": r.get("reply") or "", "note": r.get("note") or ""} for r in rows])
 
 
 @app.route("/api/requests", methods=["POST"])

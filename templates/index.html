@@ -978,21 +978,23 @@
         <div class="guide-container">
 
           <h3 class="guide-main-title">📖 サイト操作ガイド</h3>
-          <p class="guide-subtitle">プラウド船橋コミュニティ図書館 ライブラリー担当者向け</p>
+          <p class="guide-subtitle">プラウド船橋コミュニティ図書館 ライブラリーグループ担当者向け</p>
 
           <!-- 目次 -->
           <div class="guide-toc">
             <div class="guide-toc-title">📋 目次</div>
             <a class="guide-toc-item" href="#guide-overview">1. このサイトの全体像</a>
-            <a class="guide-toc-item" href="#guide-passwords">2. パスワード一覧</a>
-            <a class="guide-toc-item" href="#guide-news">3. お知らせを投稿する</a>
-            <a class="guide-toc-item" href="#guide-issues">4. 課題管理を使う</a>
-            <a class="guide-toc-item" href="#guide-calendar">5. 活動カレンダーを使う</a>
-            <a class="guide-toc-item" href="#guide-requests">6. 本のリクエストを管理する</a>
-            <a class="guide-toc-item" href="#guide-genre">7. ジャンルデータについて</a>
-            <a class="guide-toc-item" href="#guide-render">8. Render.com（サーバー）の管理</a>
-            <a class="guide-toc-item" href="#guide-trouble">9. よくある質問・トラブル対処</a>
-            <a class="guide-toc-item" href="#guide-contacts">10. 引き継ぎ情報</a>
+            <a class="guide-toc-item" href="#guide-login">2. 管理者メニューへのログイン</a>
+            <a class="guide-toc-item" href="#guide-passwords">3. パスワード一覧</a>
+            <a class="guide-toc-item" href="#guide-news">4. お知らせを投稿・編集する</a>
+            <a class="guide-toc-item" href="#guide-requests">5. リクエスト・ご要望を管理する</a>
+            <a class="guide-toc-item" href="#guide-chat">6. ライブラリーグループチャット</a>
+            <a class="guide-toc-item" href="#guide-issues">7. 課題管理を使う</a>
+            <a class="guide-toc-item" href="#guide-calendar">8. 活動カレンダーを使う</a>
+            <a class="guide-toc-item" href="#guide-genre">9. ジャンルデータについて</a>
+            <a class="guide-toc-item" href="#guide-render">10. Render.com（サーバー）の管理</a>
+            <a class="guide-toc-item" href="#guide-trouble">11. よくある質問・トラブル対処</a>
+            <a class="guide-toc-item" href="#guide-contacts">12. 引き継ぎ情報</a>
           </div>
 
           <!-- 1. 全体像 -->
@@ -1007,8 +1009,8 @@
               <div class="guide-diagram-box guide-box-purple">PostgreSQL<br><small>データベース（永続）</small></div>
             </div>
             <div class="guide-info-box">
-              <strong>📌 重要：無料プランの制限</strong><br>
-              Renderの無料プランは、15分間アクセスがないと自動的にスリープします。次にアクセスすると起動に最大50秒かかることがあります。これは正常な動作です。（対策として4分ごとの自動pingを実装済み）
+              <strong>📌 重要：無料プランのスリープについて</strong><br>
+              Renderの無料プランは、誰もアプリを開いていない状態が約15分続くとサーバーが自動でスリープします。次にアクセスすると起動に最大50秒かかることがあります。対策として4分ごとの自動pingを実装済みです。誰かがアプリを開いている間はスリープしません。
             </div>
             <table class="guide-table">
               <tr><th>項目</th><th>内容</th></tr>
@@ -1019,54 +1021,128 @@
             </table>
           </div>
 
-          <!-- 2. パスワード -->
+          <!-- 2. ログイン -->
+          <div class="guide-section" id="guide-login">
+            <h4 class="guide-section-title">2. 管理者メニューへのログイン</h4>
+            <p class="guide-text">画面右上の「🏛️ 管理者メニュー」ボタンをクリックするとログイン画面が表示されます。</p>
+            <div class="guide-step-box">
+              <strong>ログイン手順：</strong>
+              <ol class="guide-ol">
+                <li>「お名前」欄に自分の名前を入力（例：田中、委員長など）</li>
+                <li>「パスワード」欄に管理者パスワードを入力</li>
+                <li>「ログイン」をクリック</li>
+              </ol>
+            </div>
+            <div class="guide-info-box">
+              💡 <strong>お名前について</strong><br>
+              入力した名前はチャット（💬 チャットタブ）での発言者名として使用されます。ブラウザを閉じるまで保持されますが、次回ログイン時にまた入力が必要です。
+            </div>
+          </div>
+
+          <!-- 3. パスワード -->
           <div class="guide-section" id="guide-passwords">
-            <h4 class="guide-section-title">2. パスワード一覧</h4>
+            <h4 class="guide-section-title">3. パスワード一覧</h4>
             <div class="guide-warning-box">⚠️ このページは管理者メニュー内にのみ表示されますが、パスワードは別途安全な場所に保管してください。</div>
             <table class="guide-table">
               <tr><th>種類</th><th>初期値</th><th>用途</th></tr>
               <tr><td>🏠 住民パスワード</td><td>proud2525</td><td>住民がサイトにログインする際のパスワード</td></tr>
-              <tr><td>🏛️ 管理者パスワード</td><td>kanri5533</td><td>お知らせ投稿・削除、この管理者メニューへのログインに使用</td></tr>
+              <tr><td>🏛️ 管理者パスワード</td><td>kanri5533</td><td>管理者メニューへのログイン・各種操作に使用</td></tr>
             </table>
             <div class="guide-step-box">
               <strong>パスワードを変更する手順：</strong>
               <ol class="guide-ol">
                 <li>管理者メニュー →「⚙️ 設定」タブを開く</li>
-                <li>「現在のパスワード（管理者）」を入力</li>
                 <li>変更したいパスワードの種類を選択</li>
-                <li>新しいパスワードを入力して「🔐 変更する」をクリック</li>
+                <li>現在のパスワードと新しいパスワードを入力して「🔐 変更する」をクリック</li>
               </ol>
               <p style="margin-top:6px;font-size:0.82rem;color:#666">※変更後はデータベースに保存されるため、次回起動後も有効です。</p>
             </div>
           </div>
 
-          <!-- 3. お知らせ -->
+          <!-- 4. お知らせ -->
           <div class="guide-section" id="guide-news">
-            <h4 class="guide-section-title">3. お知らせを投稿する</h4>
-            <p class="guide-text">お知らせは住民が最初に目にするタブです。休館日・イベント・新着情報などを投稿できます。</p>
+            <h4 class="guide-section-title">4. お知らせを投稿・編集する</h4>
+            <p class="guide-text">住民向けのイベント情報・企画・重要連絡などを投稿できます。画像を複数枚添付することも可能です。</p>
             <div class="guide-step-box">
-              <strong>投稿手順：</strong>
+              <strong>新規投稿手順：</strong>
               <ol class="guide-ol">
-                <li>メインメニューの「📢 お知らせ」タブをクリック</li>
-                <li>右上の「管理者」ボタンをクリック（管理者パネルが開く）</li>
-                <li>カテゴリを選択（お知らせ・イベント・休館・新着）</li>
-                <li>タイトルと内容を入力</li>
-                <li>管理者パスワード（kanri5533）を入力</li>
+                <li>管理者メニュー →「📢 お知らせ」タブ</li>
+                <li>カテゴリを選択（お知らせ・イベント・休館・新着本）</li>
+                <li>タイトルと本文を入力</li>
+                <li>必要であれば「＋ 画像を追加」で画像を添付（複数可・自動圧縮）</li>
                 <li>「投稿する」をクリック</li>
               </ol>
             </div>
             <div class="guide-step-box" style="margin-top:10px">
-              <strong>削除手順：</strong>
+              <strong>編集・削除手順：</strong>
+              <ul class="guide-ul">
+                <li>✏️ ボタン → 編集フォームが開く。タイトル・本文・画像を変更して「💾 保存」</li>
+                <li>🗑 ボタン → 削除（確認ダイアログあり）</li>
+                <li>編集時に画像の「削除」ボタンで個別に画像を外すことも可能</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- 5. リクエスト管理 -->
+          <div class="guide-section" id="guide-requests">
+            <h4 class="guide-section-title">5. リクエスト・ご要望を管理する</h4>
+            <p class="guide-text">管理者メニューの「📬 リクエスト」タブでは、住民からの投稿を2つのタブに分けて管理できます。</p>
+            <div class="guide-step-box">
+              <strong>📖 本のリクエスト タブ</strong>
+              <table class="guide-table" style="margin-top:8px">
+                <tr><th>ステータス</th><th>意味</th></tr>
+                <tr><td>⏳ 検討中</td><td>まだ検討していない（初期状態）</td></tr>
+                <tr><td>✅ 購入決定</td><td>購入が決まった</td></tr>
+                <tr><td>❌ 見送り</td><td>今回は購入しない</td></tr>
+                <tr><td>📦 入荷済</td><td>入荷・配架完了</td></tr>
+              </table>
+            </div>
+            <div class="guide-step-box" style="margin-top:10px">
+              <strong>💬 ご要望・ご意見 タブ</strong>
+              <table class="guide-table" style="margin-top:8px">
+                <tr><th>ステータス</th><th>意味</th></tr>
+                <tr><td>📬 受付中</td><td>届いた・まだ未対応（初期状態）</td></tr>
+                <tr><td>🔍 確認中</td><td>内容を調査・関係者に共有中</td></tr>
+                <tr><td>✅ 対応済</td><td>何らかのアクション完了</td></tr>
+                <tr><td>❌ 見送り</td><td>対応しない</td></tr>
+                <tr><td>⏳ 検討中</td><td>対応を検討中</td></tr>
+                <tr><td>📝 参考意見として受理</td><td>アクション不要だが記録する</td></tr>
+                <tr><td>➖ 対応なし</td><td>対応の予定なし</td></tr>
+              </table>
+            </div>
+            <div class="guide-step-box" style="margin-top:10px">
+              <strong>対応手順：</strong>
               <ol class="guide-ol">
-                <li>お知らせ一覧の右上にある🗑アイコンをクリック</li>
-                <li>管理者パスワードを入力して削除</li>
+                <li>ステータスのセレクトボックスを変更 → 自動保存</li>
+                <li>「管理者メモ」欄に内部メモを記入（住民には非公開）</li>
+                <li>「居住者への返答」欄に記入して「返答を保存」→ 住民の一覧に「📣 図書館より：」として表示される</li>
               </ol>
             </div>
           </div>
 
-          <!-- 4. 課題管理 -->
+          <!-- 6. チャット -->
+          <div class="guide-section" id="guide-chat">
+            <h4 class="guide-section-title">6. ライブラリーグループチャット空間</h4>
+            <p class="guide-text">管理者メニューの「💬 チャット」タブで、ライブラリーグループメンバー間でメッセージのやり取りができます。</p>
+            <div class="guide-step-box">
+              <strong>使い方：</strong>
+              <ol class="guide-ol">
+                <li>管理者メニューにログイン時に入力した名前が発言者名になります</li>
+                <li>メッセージを入力して「送信」ボタンをクリック（Enterキーは改行専用）</li>
+                <li>🖼️ ボタンで画像を添付可能（自動圧縮）。送信前にプレビューで確認できます</li>
+                <li>画像はタップ/クリックで拡大表示できます</li>
+                <li>🗑 ボタンで自分のメッセージを削除できます</li>
+              </ol>
+            </div>
+            <div class="guide-info-box">
+              💡 <strong>メッセージの更新について</strong><br>
+              チャットは5秒ごとに自動更新されます。他のメンバーの発言はほぼリアルタイムで表示されます。2年以上前のメッセージは自動的に削除されます。
+            </div>
+          </div>
+
+          <!-- 7. 課題管理 -->
           <div class="guide-section" id="guide-issues">
-            <h4 class="guide-section-title">4. 課題管理を使う</h4>
+            <h4 class="guide-section-title">7. 課題管理を使う</h4>
             <p class="guide-text">ライブラリーグループで取り組む課題を登録・管理できます。優先度・対応状況を設定できます。</p>
             <div class="guide-step-box">
               <strong>課題の登録：</strong>
@@ -1087,9 +1163,9 @@
             </div>
           </div>
 
-          <!-- 5. カレンダー -->
+          <!-- 8. カレンダー -->
           <div class="guide-section" id="guide-calendar">
-            <h4 class="guide-section-title">5. 活動カレンダーを使う</h4>
+            <h4 class="guide-section-title">8. 活動カレンダーを使う</h4>
             <p class="guide-text">ライブラリーグループの活動記録・会議議事録を管理できます。</p>
             <div class="guide-step-box">
               <strong>記録の追加：</strong>
@@ -1102,44 +1178,22 @@
             <p class="guide-text" style="margin-top:8px">編集・並び替え・削除の操作は課題管理と同じです。</p>
           </div>
 
-          <!-- 6. リクエスト管理 -->
-          <div class="guide-section" id="guide-requests">
-            <h4 class="guide-section-title">6. 本のリクエストを管理する</h4>
-            <p class="guide-text">住民から入荷リクエストが届くと、管理者メニューの「📬 リクエスト」タブに表示されます。</p>
-            <table class="guide-table">
-              <tr><th>ステータス</th><th>意味</th></tr>
-              <tr><td>⏳ 未対応</td><td>まだ検討していない</td></tr>
-              <tr><td>🔄 検討中</td><td>購入を検討中・手配中</td></tr>
-              <tr><td>✅ 完了</td><td>入荷済み・対応済み</td></tr>
-            </table>
-            <div class="guide-step-box" style="margin-top:10px">
-              <strong>対応手順：</strong>
-              <ol class="guide-ol">
-                <li>管理者メニュー →「📬 リクエスト」タブ</li>
-                <li>リクエストカードのセレクトボックスでステータスを変更</li>
-                <li>メモ欄に「〇月入荷予定」などを記入</li>
-                <li>Enter または フォーカスを外すと自動保存</li>
-              </ol>
-            </div>
-          </div>
-
-          <!-- 7. ジャンルデータ -->
+          <!-- 9. ジャンルデータ -->
           <div class="guide-section" id="guide-genre">
-            <h4 class="guide-section-title">7. ジャンルデータについて</h4>
+            <h4 class="guide-section-title">9. ジャンルデータについて</h4>
             <p class="guide-text">蔵書のジャンルフィルター機能は、データベースに保存されたジャンル情報を使っています。</p>
             <div class="guide-info-box">
               <strong>🔄 自動更新の仕組み</strong><br>
-              アプリが起動するたびにバックグラウンドで新しい本を検出し、OpenBD API（国内書誌サービス）から書誌情報を取得して自動的にジャンルを分類します。週1回実行されます。<br><br>
-              <strong>担当者は何もしなくてOKです。</strong>
+              アプリが起動するたびにバックグラウンドで新しい本を検出し、OpenBD API（国内書誌サービス）から書誌情報を取得して自動的にジャンルを分類します。<strong>担当者は何もしなくてOKです。</strong>
             </div>
             <div class="guide-warning-box">
               ⚠️ 自動分類はNDCコードとキーワードによる判定のため、一部の本は正確でない場合があります。主要ジャンルは概ね正確です。
             </div>
           </div>
 
-          <!-- 8. Render管理 -->
+          <!-- 10. Render管理 -->
           <div class="guide-section" id="guide-render">
-            <h4 class="guide-section-title">8. Render.com（サーバー）の管理</h4>
+            <h4 class="guide-section-title">10. Render.com（サーバー）の管理</h4>
             <p class="guide-text">サーバーの管理は <a href="https://dashboard.render.com" target="_blank">dashboard.render.com</a> から行います。</p>
             <div class="guide-step-box">
               <strong>サイトが正常に動いているか確認する：</strong>
@@ -1159,58 +1213,56 @@
             </div>
             <div class="guide-info-box">
               ✅ <strong>データベースはNeon（無料・無期限）を使用</strong><br>
-              Renderの無料PostgreSQLは90日で削除されますが、このサイトでは<a href="https://neon.tech" target="_blank">Neon</a>の無料PostgreSQLに移行済みです。Neonは期限なく無料で使えるため、データベースの移行作業は不要です。
-            </div>
-            <div class="guide-step-box" style="margin-top:10px">
-              <strong>もし将来Neonのデータベースを作り直す必要が生じた場合：</strong>
-              <ol class="guide-ol">
-                <li><a href="https://neon.tech" target="_blank">neon.tech</a> にGitHubアカウントでログイン</li>
-                <li>「Create a project」→ Region: Asia Pacific (Singapore) で作成</li>
-                <li>表示された「Connection string」をコピー</li>
-                <li>Render → proud-library → Environment → <code>DATABASE_URL</code> の値を貼り替えて保存</li>
-                <li>自動再デプロイ後、ジャンルデータが自動的に復元されます</li>
-              </ol>
+              このサイトでは<a href="https://neon.tech" target="_blank">Neon</a>の無料PostgreSQLを使用しています。期限なく無料で使えるため、データベースの移行作業は不要です。
             </div>
           </div>
 
-          <!-- 9. トラブル対処 -->
+          <!-- 11. トラブル対処 -->
           <div class="guide-section" id="guide-trouble">
-            <h4 class="guide-section-title">9. よくある質問・トラブル対処</h4>
-
+            <h4 class="guide-section-title">11. よくある質問・トラブル対処</h4>
             <div class="guide-faq-item">
-              <div class="guide-faq-q">Q. サイトを開いたら「読み込み中」のまま止まる</div>
-              <div class="guide-faq-a">無料プランのスリープ状態です。最大50秒待つと起動します。スマートフォンではページを閉じずにそのまま待ってください。</div>
+              <div class="guide-faq-q">Q. サイトを開いたら黒い画面（Renderのローディング）が出た</div>
+              <div class="guide-faq-a">無料プランのスリープ状態からの起動画面です。最大1〜2分待つと起動します。誰かがアプリを開き続けていればスリープしません。完全に防ぐにはUptimeRobot（無料）などの外部監視サービスを利用する方法があります。</div>
             </div>
             <div class="guide-faq-item">
-              <div class="guide-faq-q">Q. 登録したお知らせや課題が消えた</div>
-              <div class="guide-faq-a">PostgreSQL（Neon・無期限）に移行済みのため、通常は消えません。消えた場合はRenderのLogsでエラーを確認してください。</div>
+              <div class="guide-faq-q">Q. お知らせの保存・編集ボタンを押しても反応しない</div>
+              <div class="guide-faq-a">管理者パスワードが正しく入力されているか確認してください。ログイン状態でも、ブラウザをリロードするとセッションが切れることがあります。その場合は再ログインしてください。</div>
+            </div>
+            <div class="guide-faq-item">
+              <div class="guide-faq-q">Q. リクエストのステータスを変えても入居者の画面に反映されない</div>
+              <div class="guide-faq-a">入居者が「みんなのリクエスト一覧・投票」タブを一度閉じて再度開くと最新情報が取得されます。ブラウザのリロードも有効です。</div>
+            </div>
+            <div class="guide-faq-item">
+              <div class="guide-faq-q">Q. チャットにメッセージが届かない</div>
+              <div class="guide-faq-a">チャットは5秒ごとに自動更新されます。最大5秒の遅延があります。チャットタブを開いたままにしてください。</div>
             </div>
             <div class="guide-faq-item">
               <div class="guide-faq-q">Q. パスワードを忘れた</div>
-              <div class="guide-faq-a">GitHubのコードを参照するか、Renderの環境変数（Environment）でデフォルト値を確認できます。初期値はこのガイドの「2. パスワード一覧」を参照。</div>
+              <div class="guide-faq-a">Renderの管理画面（dashboard.render.com）→ proud-library → Environment で環境変数を確認できます。初期値はこのガイドの「3. パスワード一覧」を参照。</div>
             </div>
             <div class="guide-faq-item">
               <div class="guide-faq-q">Q. 機能を追加・変更したい</div>
-              <div class="guide-faq-a">Claude（claude.ai）にこのサイトのURLとGitHubのURLを伝えた上で、「〇〇機能を追加してほしい」と依頼することで対応できます。コードの知識は不要です。</div>
+              <div class="guide-faq-a">Claude（claude.ai）に「プラウド船橋図書館アプリの〇〇を変更したい」と依頼することで対応できます。コードの知識は不要です。GitHubのURL（https://github.com/Qiuqiu533/Proud-library）を伝えると作業がスムーズです。</div>
             </div>
             <div class="guide-faq-item">
-              <div class="guide-faq-q">Q. 蔵書の本棚サイトのデータが古い</div>
+              <div class="guide-faq-q">Q. 蔵書データが更新されない</div>
               <div class="guide-faq-a">蔵書データはlibrarylife.net（図書館管理システム）からリアルタイムで取得しています。本の追加・削除はlibrarylife.net側で行ってください。このサイトへの作業は不要です。</div>
             </div>
           </div>
 
-          <!-- 10. 引き継ぎ -->
+          <!-- 12. 引き継ぎ -->
           <div class="guide-section" id="guide-contacts">
-            <h4 class="guide-section-title">10. 引き継ぎ情報</h4>
+            <h4 class="guide-section-title">12. 引き継ぎ情報</h4>
             <table class="guide-table">
-              <tr><th>サービス</th><th>アカウント</th><th>備考</th></tr>
-              <tr><td>Render.com</td><td>GitHubアカウントでログイン</td><td>サーバー・DB管理</td></tr>
+              <tr><th>サービス</th><th>アカウント・URL</th><th>備考</th></tr>
+              <tr><td>Render.com</td><td>GitHubアカウントでログイン</td><td>サーバー管理</td></tr>
               <tr><td>GitHub</td><td>Qiuqiu533/Proud-library</td><td>コード管理</td></tr>
+              <tr><td>Neon</td><td>neon.tech（GitHubアカウント）</td><td>データベース管理</td></tr>
               <tr><td>librarylife.net</td><td>図書館管理システム</td><td>蔵書登録はこちら</td></tr>
             </table>
             <div class="guide-info-box" style="margin-top:14px">
               <strong>💡 新任担当者へ</strong><br>
-              日常業務（お知らせ投稿・課題管理・リクエスト対応）はすべてこの管理者メニューから行えます。コードやサーバーの知識がなくても運用できます。<br><br>
+              日常業務（お知らせ投稿・リクエスト対応・チャット・課題管理）はすべてこの管理者メニューから行えます。コードやサーバーの知識がなくても運用できます。<br><br>
               機能の追加・変更が必要な場合は <strong>Claude（claude.ai）</strong> に相談してください。「プラウド船橋図書館サイト（<a href="https://proud-library.onrender.com" target="_blank" style="color:#3d6b4f">https://proud-library.onrender.com</a>）の機能を変更したい」と伝えれば対応できます。
             </div>
           </div>
