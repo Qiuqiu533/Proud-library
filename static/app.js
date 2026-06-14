@@ -582,8 +582,8 @@ async function loadAdminNews() {
   list.querySelectorAll(".news-edit-save").forEach(btn => {
     btn.addEventListener("click", async () => {
       const id = btn.dataset.id;
-      const pass = boardPassword || prompt("管理者パスワードを入力してください");
-      if (!pass) return;
+      const pass = boardPassword;
+      if (!pass) { alert("管理者としてログインしてください"); return; }
       const title = list.querySelector(`.news-edit-title[data-id="${id}"]`).value.trim();
       const body = list.querySelector(`.news-edit-body[data-id="${id}"]`).value.trim();
       const category = list.querySelector(`.news-edit-cat[data-id="${id}"]`).value;
