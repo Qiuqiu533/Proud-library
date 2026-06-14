@@ -69,6 +69,7 @@ function isFav(isbn) { return localStorage.getItem("fav_" + isbn) === "1"; }
 function toggleFav(isbn) {
   if (isFav(isbn)) localStorage.removeItem("fav_" + isbn);
   else localStorage.setItem("fav_" + isbn, "1");
+  setTimeout(cloudSync, 500);
 }
 function getFavIsbns() {
   return Object.keys(localStorage).filter(k => k.startsWith("fav_") && localStorage[k] === "1").map(k => k.slice(4));
@@ -78,6 +79,7 @@ function getReadStatus(isbn) { return localStorage.getItem("read_" + isbn) || ""
 function setReadStatus(isbn, status) {
   if (status) localStorage.setItem("read_" + isbn, status);
   else localStorage.removeItem("read_" + isbn);
+  setTimeout(cloudSync, 500);
 }
 function getLogEntries() {
   return Object.keys(localStorage).filter(k => k.startsWith("read_")).map(k => ({
@@ -1748,17 +1750,7 @@ async function cloudSync() {
   } catch {}
 }
 
-// お気に入り・読書ステータス変更時に自動同期
-const _origToggleFav = toggleFav;
-function toggleFav(isbn) {
-  _origToggleFav(isbn);
-  setTimeout(cloudSync, 500);
-}
-const _origSetReadStatus = setReadStatus;
-function setReadStatus(isbn, status) {
-  _origSetReadStatus(isbn, status);
-  setTimeout(cloudSync, 500);
-}
+
 
 document.getElementById("syncMenuBtn").addEventListener("click", () => {
   const u = getCloudUser();
