@@ -337,6 +337,69 @@ def _migrate_add_card_columns():
     except Exception as e:
         print(f"card column migration error: {e}")
 
+NDC_TO_GENRE = {
+    "913": "文芸小説", "914": "エッセイ・評論", "916": "エッセイ・評論",
+    "936": "ミステリ・推理", "933": "翻訳小説", "930": "翻訳小説",
+    "950": "翻訳小説", "940": "翻訳小説", "920": "翻訳小説",
+    "979": "翻訳小説", "970": "翻訳小説", "960": "翻訳小説",
+    "726": "絵本・児童書", "Y8": "絵本・児童書", "Y9": "児童文学",
+}
+
+def _ndc_to_genre(ndc):
+    if not ndc:
+        return ""
+    for prefix, genre in NDC_TO_GENRE.items():
+        if ndc.startswith(prefix):
+            return genre
+    return ""
+
+def _migrate_ndc_genres():
+    """OpenBD NDCコードでジャンル未分類の本を自動分類"""
+    import datetime
+    try:
+        con = get_con()
+        # 既にNDC分類済みかチェック（settingsに記録）
+        done = fetchone(con, "SELECT value FROM settings WHERE key='ndc_classify_done'")
+        if done:
+            con.close()
+            return
+        rows = fetchall(con, "SELECT isbn FROM genre_books WHERE genre='' OR genre IS NULL")
+        con.close()
+        if not rows:
+            return
+        isbns = [r["isbn"] for r in rows if r["isbn"]]
+        if not isbns:
+            return
+        updated = 0
+        for i in range(0, len(isbns), 1000):
+            batch = isbns[i:i+1000]
+            resp = requests.get(OPENBD_API, params={"isbn": ",".join(batch)}, timeout=20)
+            con2 = get_con()
+            for item in resp.json():
+                if not item:
+                    continue
+                try:
+                    isbn = item["summary"].get("isbn", "")
+                    subjects = item.get("onix", {}).get("DescriptiveDetail", {}).get("Subject", [])
+                    ndc = next((s["SubjectCode"] for s in subjects if s.get("SubjectSchemeIdentifier") == "78"), "")
+                    genre = _ndc_to_genre(ndc)
+                    if genre and isbn:
+                        execute(con2, "UPDATE genre_books SET genre=? WHERE isbn=? AND (genre='' OR genre IS NULL)", (genre, isbn))
+                        updated += 1
+                except Exception:
+                    pass
+            con2.commit(); con2.close()
+        # 完了フラグ
+        con3 = get_con()
+        if USE_PG:
+            execute(con3, "INSERT INTO settings(key,value) VALUES('ndc_classify_done',?) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value", (str(datetime.date.today()),))
+        else:
+            execute(con3, "INSERT OR REPLACE INTO settings(key,value) VALUES('ndc_classify_done',?)", (str(datetime.date.today()),))
+        con3.commit(); con3.close()
+        print(f"NDC genre classification: {updated} books updated")
+    except Exception as e:
+        print(f"NDC classify error: {e}")
+
 def _ensure_db():
     try:
         init_db()
@@ -344,6 +407,7 @@ def _ensure_db():
         print(f"DB init error: {e}")
     threading.Thread(target=_migrate_add_card_columns, daemon=True).start()
     threading.Thread(target=_migrate_genre_map_to_db, daemon=True).start()
+    threading.Thread(target=_migrate_ndc_genres, daemon=True).start()
 
 
 def _migrate_genre_map_to_db():
@@ -829,12 +893,16 @@ def api_books_new():
 
 _recent_isbns_cache = {"isbns": [], "date": None}
 
-def get_recent_isbns():
+def _upsert_setting(con, key, value):
+    if USE_PG:
+        execute(con, "INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value", (key, value))
+    else:
+        execute(con, "INSERT OR REPLACE INTO settings (key,value) VALUES (?,?)", (key, value))
+
+def _build_recent_isbns():
+    """OpenBDを叩いて直近5年の本リストを構築しDBにキャッシュ"""
     import datetime
     today = datetime.date.today()
-    cache = _recent_isbns_cache
-    if cache["date"] == today and cache["isbns"]:
-        return cache["isbns"]
     try:
         con = get_con()
         rows = fetchall(con, "SELECT isbn, title, author, publisher FROM genre_books")
@@ -845,10 +913,9 @@ def get_recent_isbns():
         info_map = {r["isbn"]: r for r in rows}
         cutoff_year = str(today.year - 5)
         recent = []
-        batch_size = 1000
-        for i in range(0, len(isbns), batch_size):
-            batch = isbns[i:i+batch_size]
-            resp = requests.get(OPENBD_API, params={"isbn": ",".join(batch)}, timeout=15)
+        for i in range(0, len(isbns), 1000):
+            batch = isbns[i:i+1000]
+            resp = requests.get(OPENBD_API, params={"isbn": ",".join(batch)}, timeout=20)
             for item in resp.json():
                 if not item:
                     continue
@@ -862,11 +929,43 @@ def get_recent_isbns():
                         recent.append(rec)
                 except Exception:
                     pass
-        cache["isbns"] = recent
-        cache["date"] = today
+        # DBに保存
+        con2 = get_con()
+        _upsert_setting(con2, "recent_books_cache", json.dumps(recent, ensure_ascii=False))
+        _upsert_setting(con2, "recent_books_cache_date", str(today))
+        con2.commit(); con2.close()
+        _recent_isbns_cache["isbns"] = recent
+        _recent_isbns_cache["date"] = today
         return recent
-    except Exception:
+    except Exception as e:
+        print(f"recent_isbns build error: {e}")
         return []
+
+def get_recent_isbns():
+    import datetime
+    today = datetime.date.today()
+    cache = _recent_isbns_cache
+    # メモリキャッシュがあれば即返す
+    if cache["date"] == today and cache["isbns"]:
+        return cache["isbns"]
+    # DBキャッシュを確認
+    try:
+        con = get_con()
+        date_row = fetchone(con, "SELECT value FROM settings WHERE key='recent_books_cache_date'")
+        if date_row and date_row["value"] == str(today):
+            data_row = fetchone(con, "SELECT value FROM settings WHERE key='recent_books_cache'")
+            con.close()
+            if data_row:
+                isbns = json.loads(data_row["value"])
+                cache["isbns"] = isbns
+                cache["date"] = today
+                return isbns
+        con.close()
+    except Exception:
+        pass
+    # キャッシュ無し→バックグラウンドで構築、今回は空リストを返す
+    threading.Thread(target=_build_recent_isbns, daemon=True).start()
+    return cache.get("isbns", [])
 
 @app.route("/api/today-book")
 def api_today_book():

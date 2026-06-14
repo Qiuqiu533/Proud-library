@@ -154,7 +154,10 @@ function renderCard(book, opts = {}) {
     });
   }
 
-  div.addEventListener("click", () => openModal(book.isbn));
+  div.addEventListener("click", () => {
+    saveRecentBook(book.isbn, book.title, book.cover || "");
+    openModal(book.isbn);
+  });
   availObserver.observe(div);
   return div;
 }
@@ -266,6 +269,35 @@ async function loadTodayBook() {
     });
     section.style.display = "block";
   } catch (e) {}
+}
+
+// ===== 最近見た本 =====
+function saveRecentBook(isbn, title, cover) {
+  if (!isbn) return;
+  let recent = [];
+  try { recent = JSON.parse(localStorage.getItem("recent_books") || "[]"); } catch {}
+  recent = recent.filter(b => b.isbn !== isbn);
+  recent.unshift({ isbn, title: title || "", cover: cover || "" });
+  localStorage.setItem("recent_books", JSON.stringify(recent.slice(0, 12)));
+  renderRecentBooks();
+}
+
+function renderRecentBooks() {
+  let recent = [];
+  try { recent = JSON.parse(localStorage.getItem("recent_books") || "[]"); } catch {}
+  const section = document.getElementById("recentBooksSection");
+  const row = document.getElementById("recentBooksRow");
+  if (!section || !row || !recent.length) { if (section) section.style.display = "none"; return; }
+  row.innerHTML = recent.map(b => {
+    const img = b.cover
+      ? `<img src="${b.cover}" alt="${b.title}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'recent-thumb-placeholder\\'>📖</div>'">`
+      : `<div class="recent-thumb-placeholder">📖</div>`;
+    return `<div class="recent-thumb" data-isbn="${b.isbn}" title="${b.title}">${img}</div>`;
+  }).join("");
+  row.querySelectorAll(".recent-thumb").forEach(el => {
+    el.addEventListener("click", () => openModal(el.dataset.isbn));
+  });
+  section.style.display = "";
 }
 
 function authorSortKey(author) {
@@ -1183,6 +1215,7 @@ document.getElementById("submitCal").addEventListener("click", async () => {
 checkAuth();
 loadBooks();
 loadTodayBook();
+renderRecentBooks();
 
 // #44 スリープ対策: 4分ごとにpingしてサービスを起こしておく
 setInterval(() => fetch("/ping").catch(() => {}), 4 * 60 * 1000);
