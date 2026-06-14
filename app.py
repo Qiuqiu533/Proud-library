@@ -1376,7 +1376,8 @@ def api_announcements():
 @app.route("/api/announcements", methods=["POST"])
 def api_post_announcement():
     body = request.get_json()
-    if body.get("password") != get_admin_password():
+    pw = body.get("password")
+    if pw != get_admin_password() and pw != get_board_password():
         return jsonify({"error": "unauthorized"}), 401
     title = body.get("title", "").strip()
     text = body.get("body", "").strip()
@@ -1395,7 +1396,8 @@ def api_post_announcement():
 @app.route("/api/announcements/<int:ann_id>", methods=["PATCH"])
 def api_update_announcement(ann_id):
     body = request.get_json()
-    if body.get("password") != get_admin_password():
+    pw = body.get("password")
+    if pw != get_admin_password() and pw != get_board_password():
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     images = body.get("images", [])
@@ -1411,7 +1413,8 @@ def api_update_announcement(ann_id):
 @app.route("/api/announcements/<int:ann_id>", methods=["DELETE"])
 def api_delete_announcement(ann_id):
     body = request.get_json()
-    if body.get("password") != get_admin_password():
+    pw = body.get("password")
+    if pw != get_admin_password() and pw != get_board_password():
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     execute(con, "DELETE FROM announcements WHERE id=?", (ann_id,))
