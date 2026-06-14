@@ -1911,9 +1911,11 @@ async function loadLoanedResident() {
   const res = await fetch("/api/availability/loaned");
   const items = await res.json();
   if (!items.length) {
-    grid.innerHTML = '<div class="loading">貸出中の記録がありません。<br>本の詳細を開くと在架状況が自動で記録されます。</div>';
+    grid.innerHTML = '<div class="loading">貸出中の記録がありません。</div>';
     return;
   }
+  const countEl = document.getElementById("loanedCount");
+  if (countEl) countEl.textContent = `全 ${items.length} 件`;
   // キャッシュデータのみで表示（外部API呼び出しなし）
   const books = items.map(r => ({
     isbn: r.isbn,

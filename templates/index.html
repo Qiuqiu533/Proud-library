@@ -187,8 +187,10 @@
 
     <!-- Loaned tab -->
     <div id="tab-loaned" class="tab-panel">
-      <h2 class="section-title">📤 貸出中書籍一覧</h2>
-      <p class="section-desc">確認済みの貸出中書籍です（過去48時間以内）。本の詳細を開くと自動で在架状況が記録されます。</p>
+      <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:6px">
+        <h2 class="section-title">📤 貸出中書籍一覧</h2>
+        <span id="loanedCount" class="total-count"></span>
+      </div>
       <div class="book-grid" id="loanedResGrid"><div class="loading">読み込み中…</div></div>
     </div>
 
