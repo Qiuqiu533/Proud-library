@@ -402,6 +402,46 @@ async function loadBooksByGenre(genre, page = 1) {
   applyAvailCache(data.books.map(b => b.isbn).filter(Boolean));
 }
 
+// ===== トップ新着（蔵書タブ最上部） =====
+async function loadTopNew() {
+  const section = document.getElementById("topNewSection");
+  const row = document.getElementById("topNewRow");
+  if (!section || !row) return;
+  try {
+    const res = await fetch("/api/books/new");
+    const data = await res.json();
+    const books = (data.books || data).slice(0, 10);
+    if (!books.length) return;
+    row.innerHTML = books.map(b => {
+      const cover = b.cover || get_cover_url_js(b.isbn);
+      const ndlFallback = `https://ndlsearch.ndl.go.jp/thumbnail/${b.isbn}.jpg`;
+      return `<div class="top-new-item" data-isbn="${b.isbn}">
+        <img class="top-new-cover" src="${cover}" alt="${esc(b.title)}" loading="lazy"
+          onerror="if(this.src!=='${ndlFallback}'){this.src='${ndlFallback}';}else{this.outerHTML='<div class=\\'top-new-placeholder\\'>📖</div>';}">
+        <div class="top-new-title">${esc(b.title)}</div>
+        <div class="top-new-author">${esc(b.author || "")}</div>
+      </div>`;
+    }).join("");
+    row.querySelectorAll(".top-new-item").forEach(el => {
+      el.addEventListener("click", () => openModal(el.dataset.isbn));
+    });
+    section.style.display = "block";
+  } catch(e) {}
+}
+
+function get_cover_url_js(isbn) {
+  if (!isbn) return "";
+  if (isbn.startsWith("978") && isbn.length === 13) {
+    const digits = isbn.slice(3, 12);
+    let total = 0;
+    for (let i = 0; i < digits.length; i++) total += (10 - i) * parseInt(digits[i]);
+    const check = (11 - (total % 11)) % 11;
+    const isbn10 = digits + (check === 10 ? "X" : String(check));
+    return `https://images-na.ssl-images-amazon.com/images/P/${isbn10}.09.LZZZZZZZ.jpg`;
+  }
+  return `https://ndlsearch.ndl.go.jp/thumbnail/${isbn}.jpg`;
+}
+
 // ===== New arrivals =====
 async function loadNew() {
   document.getElementById("newGrid").innerHTML = '<div class="loading">読み込み中…</div>';
@@ -1355,6 +1395,7 @@ document.getElementById("submitCal").addEventListener("click", async () => {
 // Initial load
 checkAuth();
 loadBooks();
+loadTopNew();
 // loadTodayBook(); // 表紙ずれ解消まで非表示
 renderRecentBooks();
 // loadGenreCounts(); // ジャンルフィルター非表示中
