@@ -292,26 +292,6 @@ async function loadGenreCounts() {
   } catch (e) {}
 }
 
-// ===== 今日の1冊 =====
-async function loadTodayBook() {
-  try {
-    const res = await fetch("/api/today-book");
-    const books = await res.json();
-    if (!books || !books.length) return;
-    const section = document.getElementById("todayBookSection");
-    const card = document.getElementById("todayBookCard");
-    card.innerHTML = books.map(b => {
-      const img = b.cover
-        ? `<img class="today-book-cover" src="${b.cover}" alt="${b.title}" onerror="this.outerHTML='<div class=\\'today-book-cover-placeholder\\'>📖</div>'">`
-        : `<div class="today-book-cover-placeholder">📖</div>`;
-      return `<div class="today-book-inner" data-isbn="${b.isbn}">${img}<div class="today-book-title">${b.title}</div><div class="today-book-author">${b.author || ""}</div></div>`;
-    }).join("");
-    card.querySelectorAll(".today-book-inner").forEach(el => {
-      el.addEventListener("click", () => openModal(el.dataset.isbn));
-    });
-    section.style.display = "block";
-  } catch (e) {}
-}
 
 // ===== 最近見た本 =====
 function saveRecentBook(isbn, title, cover) {
@@ -1055,6 +1035,34 @@ let issueFilter = "all";
 
 let boardSenderName = sessionStorage.getItem("board_name") || "";
 
+// タブ通知
+const PAGE_TITLE = document.title;
+let notifChatCount = 0;
+let notifReqCount = 0;
+let lastSeenChatId = null;
+let lastSeenReqPending = null;
+let reqPollTimer = null;
+
+function updatePageTitle() {
+  const total = notifChatCount + notifReqCount;
+  if (total > 0) {
+    const parts = [];
+    if (notifChatCount > 0) parts.push(`💬${notifChatCount}`);
+    if (notifReqCount > 0) parts.push(`📬${notifReqCount}`);
+    document.title = `(${parts.join(" ")}) ${PAGE_TITLE}`;
+  } else {
+    document.title = PAGE_TITLE;
+  }
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    notifChatCount = 0;
+    notifReqCount = 0;
+    updatePageTitle();
+  }
+});
+
 document.getElementById("boardMenuBtn").addEventListener("click", () => {
   if (sessionStorage.getItem("board_auth") === "1") {
     openBoardPanel();
@@ -1104,6 +1112,9 @@ document.getElementById("boardName") && document.getElementById("boardName").add
 
 document.getElementById("boardClose").addEventListener("click", () => {
   document.getElementById("boardPanel").style.display = "none";
+  if (reqPollTimer) { clearInterval(reqPollTimer); reqPollTimer = null; }
+  lastSeenReqPending = null;
+  lastSeenChatId = null;
 });
 
 function openBoardPanel() {
@@ -1664,7 +1675,6 @@ checkAuth();
 loadBooks();
 loadTopNew();
 loadReqList();
-// loadTodayBook(); // 表紙ずれ解消まで非表示
 renderRecentBooks();
 // loadGenreCounts(); // ジャンルフィルター非表示中
 
@@ -1954,7 +1964,7 @@ async function loadReqManage() {
   elBooks.innerHTML = '<div class="loading">読み込み中…</div>';
   elFb.innerHTML = '<div class="loading">読み込み中…</div>';
 
-  const res = await fetch("/api/requests");
+  const res = await fetch(`/api/requests/admin?password=${encodeURIComponent(reqAdminPass)}`);
   const items = await res.json();
 
   // Summary
@@ -2404,7 +2414,7 @@ function chatMsgHtml(m) {
   const avatar = `<div style="width:32px;height:32px;border-radius:50%;background:#3d6b4f;color:#fff;display:flex;align-items:center;justify-content:center;font-size:0.8rem;font-weight:700;flex-shrink:0">${esc((m.sender||"?").slice(0,1))}</div>`;
   const bubble = `
     <div style="max-width:72%;background:${isMe?"#3d6b4f":"#fff"};color:${isMe?"#fff":"#333"};padding:${m.image_data?"6px":"9px 13px"};border-radius:${isMe?"14px 14px 4px 14px":"14px 14px 14px 4px"};font-size:0.88rem;line-height:1.5;box-shadow:0 1px 4px rgba(0,0,0,0.08);word-break:break-word;overflow:hidden">
-      ${m.image_data ? `<img src="${m.image_data}" style="max-width:240px;max-height:240px;border-radius:8px;display:block;cursor:zoom-in" onclick="(()=>{const o=document.createElement('div');o.style='position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:9999;cursor:zoom-out';o.innerHTML='<img src=\\'${m.image_data}\\' style=\\'max-width:90vw;max-height:90vh;border-radius:8px\\'>';o.onclick=()=>o.remove();document.body.appendChild(o)})()">` : ""}
+      ${m.image_data ? `<img src="${m.image_data}" class="chat-img-thumb" style="max-width:240px;max-height:240px;border-radius:8px;display:block;cursor:zoom-in">` : ""}
       ${m.message ? `<div style="${m.image_data?"margin-top:6px;padding:0 6px 4px":""}">${esc(m.message)}</div>` : ""}
     </div>`;
   const delBtn = `<button class="chat-del-btn" data-id="${m.id}" title="削除" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:0.82rem;padding:4px 6px;flex-shrink:0;border-radius:6px;transition:background 0.15s" onmouseover="this.style.background='#f0e0e0';this.style.color='#c00'" onmouseout="this.style.background='';this.style.color='#ccc'">🗑</button>`;
@@ -2429,7 +2439,18 @@ async function loadChatMessages(scrollToBottom = false) {
     msgs.reverse();
     if (!msgs.length) {
       box.innerHTML = '<div style="text-align:center;color:#bbb;padding:40px 0;font-size:0.9rem">まだメッセージはありません<br>最初のメッセージを送ってみましょう！</div>';
+      lastSeenChatId = null;
       return;
+    }
+    const maxId = Math.max(...msgs.map(m => m.id));
+    if (lastSeenChatId === null) {
+      lastSeenChatId = maxId;
+    } else if (maxId > lastSeenChatId && document.hidden) {
+      notifChatCount += msgs.filter(m => m.id > lastSeenChatId).length;
+      lastSeenChatId = maxId;
+      updatePageTitle();
+    } else if (!document.hidden) {
+      lastSeenChatId = maxId;
     }
     const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
     box.innerHTML = msgs.map(chatMsgHtml).join("");
@@ -2441,6 +2462,18 @@ async function loadChatMessages(scrollToBottom = false) {
           body: JSON.stringify({password: boardPassword})
         });
         loadChatMessages();
+      });
+    });
+    box.querySelectorAll(".chat-img-thumb").forEach(img => {
+      img.addEventListener("click", () => {
+        const o = document.createElement("div");
+        o.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:9999;cursor:zoom-out";
+        const big = document.createElement("img");
+        big.src = img.src;
+        big.style.cssText = "max-width:90vw;max-height:90vh;border-radius:8px";
+        o.appendChild(big);
+        o.addEventListener("click", () => o.remove());
+        document.body.appendChild(o);
       });
     });
     if (scrollToBottom || atBottom) box.scrollTop = box.scrollHeight;
@@ -2470,6 +2503,28 @@ function initStaffChat() {
   loadChatMessages(true);
   if (chatPollTimer) clearInterval(chatPollTimer);
   chatPollTimer = setInterval(() => loadChatMessages(), 5000);
+
+  if (!reqPollTimer) {
+    reqPollTimer = setInterval(async () => {
+      try {
+        const res = await fetch("/api/requests");
+        if (!res.ok) return;
+        const items = await res.json();
+        const pendingCount = items.filter(r =>
+          r.type !== "feedback" ? r.status === "pending" : (r.status === "fb_received" || r.status === "pending")
+        ).length;
+        if (lastSeenReqPending === null) {
+          lastSeenReqPending = pendingCount;
+        } else if (pendingCount > lastSeenReqPending && document.hidden) {
+          notifReqCount += pendingCount - lastSeenReqPending;
+          lastSeenReqPending = pendingCount;
+          updatePageTitle();
+        } else if (!document.hidden) {
+          lastSeenReqPending = pendingCount;
+        }
+      } catch(e) {}
+    }, 60000);
+  }
 
   const input = document.getElementById("chatInput");
   const sendBtn = document.getElementById("chatSendBtn");
