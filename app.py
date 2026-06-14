@@ -1288,7 +1288,15 @@ def api_announcements():
     con = get_con()
     rows = fetchall(con, "SELECT id, title, body, category, image_url, created_at FROM announcements ORDER BY id DESC")
     con.close()
-    return jsonify([{**r, "image_url": r.get("image_url") or "", "created_at": str(r["created_at"])[:16]} for r in rows])
+    def parse_images(raw):
+        if not raw:
+            return []
+        try:
+            v = json.loads(raw)
+            return v if isinstance(v, list) else [v]
+        except Exception:
+            return [raw] if raw else []
+    return jsonify([{**r, "images": parse_images(r.get("image_url")), "created_at": str(r["created_at"])[:16]} for r in rows])
 
 
 @app.route("/api/announcements", methods=["POST"])
@@ -1301,8 +1309,11 @@ def api_post_announcement():
     if not title or not text:
         return jsonify({"error": "invalid"}), 400
     con = get_con()
+    images = body.get("images", [])
+    if not images and body.get("image_url","").strip():
+        images = [body.get("image_url","").strip()]
     execute(con, "INSERT INTO announcements (title, body, category, image_url) VALUES (?,?,?,?)",
-        (title, text, body.get("category","お知らせ"), body.get("image_url","").strip()))
+        (title, text, body.get("category","お知らせ"), json.dumps(images, ensure_ascii=False)))
     con.commit(); con.close()
     return jsonify({"ok": True})
 
@@ -1313,9 +1324,12 @@ def api_update_announcement(ann_id):
     if body.get("password") != get_admin_password():
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
+    images = body.get("images", [])
+    if not images and body.get("image_url","").strip():
+        images = [body.get("image_url","").strip()]
     execute(con, "UPDATE announcements SET title=?, body=?, category=?, image_url=? WHERE id=?",
         (body.get("title","").strip(), body.get("body","").strip(),
-         body.get("category","お知らせ"), body.get("image_url","").strip(), ann_id))
+         body.get("category","お知らせ"), json.dumps(images, ensure_ascii=False), ann_id))
     con.commit(); con.close()
     return jsonify({"ok": True})
 

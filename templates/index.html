@@ -393,18 +393,18 @@
           </select>
           <input type="text" id="newsTitle" placeholder="タイトル" />
           <textarea id="newsBody" placeholder="内容" rows="3"></textarea>
-          <div style="font-size:0.82rem;color:#666;margin:4px 0 2px">📷 画像（任意）</div>
-          <input type="url" id="newsImage" placeholder="画像URL（例: https://i.imgur.com/xxxxx.jpg）" />
-          <div style="text-align:center;color:#aaa;font-size:0.8rem;margin:4px 0">― または ―</div>
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.83rem;color:#444">
-            <input type="file" id="newsImageFile" accept="image/*" style="display:none" />
+          <div style="font-size:0.82rem;color:#666;margin:4px 0 2px">📷 画像（複数追加可）</div>
+          <div id="newsImageList"></div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.83rem;color:#444;margin-bottom:4px">
+            <input type="file" id="newsImageFile" accept="image/*" multiple style="display:none" />
             <span class="btn-secondary" style="font-size:0.8rem;padding:6px 14px" onclick="document.getElementById('newsImageFile').click()">📁 画像ファイルを選ぶ</span>
             <span id="newsImageFileName" style="color:#888">未選択</span>
           </label>
+          <input type="url" id="newsImage" placeholder="または画像URLを入力" />
           <div id="newsImagePreview" style="display:none;margin-top:8px;">
             <img id="newsPreviewImg" style="max-width:100%;max-height:200px;border-radius:8px;object-fit:contain;" alt="プレビュー">
-            <button type="button" id="newsClearImg" style="display:block;margin-top:4px;font-size:0.78rem;color:#888;background:none;border:none;cursor:pointer">✕ 画像を削除</button>
           </div>
+          <button type="button" id="newsClearImg" style="font-size:0.78rem;color:#888;background:none;border:none;cursor:pointer;margin-top:2px">✕ すべての画像をクリア</button>
           <button class="btn-primary" id="postNews">投稿する</button>
           <p id="newsMsg" class="rate-msg"></p>
         </div>
