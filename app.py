@@ -1330,8 +1330,6 @@ def api_requests():
 @app.route("/api/requests", methods=["POST"])
 def api_post_request():
     body = request.get_json()
-    if body.get("password") not in (get_resident_password(), get_admin_password(), get_board_password()):
-        return jsonify({"error": "unauthorized"}), 401
     title = body.get("title", "").strip()
     if not title:
         return jsonify({"error": "title required"}), 400

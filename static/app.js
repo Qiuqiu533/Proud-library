@@ -1585,10 +1585,9 @@ document.getElementById("reqSubmitBtn").addEventListener("click", async () => {
   if (!title) { msg.textContent = "⚠️ 書名を入力してください"; msg.style.color = "#e05"; return; }
   const btn = document.getElementById("reqSubmitBtn");
   btn.disabled = true; btn.textContent = "送信中…";
-  const pass = residentPassword || localStorage.getItem("req_pass") || "proud2525";
   const res = await fetch("/api/requests", {
     method: "POST", headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({password: pass, title, author, reason, room})
+    body: JSON.stringify({title, author, reason, room})
   });
   btn.disabled = false; btn.textContent = "📨 リクエストを送る";
   if (res.ok) {
