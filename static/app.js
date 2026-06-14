@@ -2404,7 +2404,7 @@ function chatMsgHtml(m) {
   const avatar = `<div style="width:32px;height:32px;border-radius:50%;background:#3d6b4f;color:#fff;display:flex;align-items:center;justify-content:center;font-size:0.8rem;font-weight:700;flex-shrink:0">${esc((m.sender||"?").slice(0,1))}</div>`;
   const bubble = `
     <div style="max-width:72%;background:${isMe?"#3d6b4f":"#fff"};color:${isMe?"#fff":"#333"};padding:${m.image_data?"6px":"9px 13px"};border-radius:${isMe?"14px 14px 4px 14px":"14px 14px 14px 4px"};font-size:0.88rem;line-height:1.5;box-shadow:0 1px 4px rgba(0,0,0,0.08);word-break:break-word;overflow:hidden">
-      ${m.image_data ? `<img src="${m.image_data}" style="max-width:240px;max-height:240px;border-radius:8px;display:block">` : ""}
+      ${m.image_data ? `<img src="${m.image_data}" style="max-width:240px;max-height:240px;border-radius:8px;display:block;cursor:zoom-in" onclick="(()=>{const o=document.createElement('div');o.style='position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:9999;cursor:zoom-out';o.innerHTML='<img src=\\'${m.image_data}\\' style=\\'max-width:90vw;max-height:90vh;border-radius:8px\\'>';o.onclick=()=>o.remove();document.body.appendChild(o)})()">` : ""}
       ${m.message ? `<div style="${m.image_data?"margin-top:6px;padding:0 6px 4px":""}">${esc(m.message)}</div>` : ""}
     </div>`;
   const delBtn = `<button class="chat-del-btn" data-id="${m.id}" title="削除" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:0.85rem;padding:2px;flex-shrink:0">🗑</button>`;
