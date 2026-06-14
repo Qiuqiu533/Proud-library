@@ -1206,6 +1206,11 @@ def api_today_book():
     if recent:
         rng.shuffle(recent)
         books = recent[:8]
+        # 表紙URLをISBNから直接生成（キャッシュの混在防止）
+        for b in books:
+            isbn = b.get("isbn", "")
+            if isbn:
+                b["cover"] = f"https://cover.openbd.jp/{isbn}.jpg"
         return jsonify(books)
     total_pages = 109
     page = rng.randint(1, total_pages)
