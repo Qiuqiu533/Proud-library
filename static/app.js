@@ -487,11 +487,24 @@ function newsItemHtml(item, showDelete) {
       <div class="news-meta">
         <span class="news-cat cat-${item.category}">${item.category}</span>
         <span class="news-date">${item.created_at.slice(0, 10)}</span>
-        ${showDelete ? `<button class="news-del" data-id="${item.id}" title="削除">🗑</button>` : ""}
+        ${showDelete ? `<button class="news-edit" data-id="${item.id}" title="編集">✏️</button><button class="news-del" data-id="${item.id}" title="削除">🗑</button>` : ""}
       </div>
       <div class="news-title">${item.title}</div>
       <div class="news-body">${item.body.replace(/\n/g, "<br>")}</div>
       ${item.image_url ? `<img class="news-img" src="${item.image_url}" alt="画像" onerror="this.style.display='none'">` : ""}
+      <div class="news-edit-form" id="news-edit-form-${item.id}" style="display:none;margin-top:12px;border-top:1px solid #eee;padding-top:12px">
+        <select class="news-edit-cat" data-id="${item.id}" style="margin-bottom:8px;padding:6px;border-radius:6px;border:1px solid #ccc;width:100%">
+          ${["お知らせ","イベント","図書委員会"].map(c => `<option value="${c}" ${item.category===c?"selected":""}>${c}</option>`).join("")}
+        </select>
+        <input type="text" class="news-edit-title" data-id="${item.id}" value="${item.title.replace(/"/g,'&quot;')}" placeholder="タイトル" style="width:100%;margin-bottom:8px;padding:8px;border-radius:6px;border:1px solid #ccc;box-sizing:border-box">
+        <textarea class="news-edit-body" data-id="${item.id}" rows="4" style="width:100%;margin-bottom:8px;padding:8px;border-radius:6px;border:1px solid #ccc;box-sizing:border-box">${item.body}</textarea>
+        <input type="text" class="news-edit-img" data-id="${item.id}" value="${(item.image_url||"").replace(/"/g,'&quot;')}" placeholder="画像URL（任意）" style="width:100%;margin-bottom:8px;padding:8px;border-radius:6px;border:1px solid #ccc;box-sizing:border-box">
+        <div style="display:flex;gap:8px">
+          <button class="news-edit-save btn-primary" data-id="${item.id}" style="flex:1">💾 保存</button>
+          <button class="news-edit-cancel" data-id="${item.id}" style="flex:1;padding:8px;border-radius:6px;border:1px solid #ccc;cursor:pointer;background:#fff">キャンセル</button>
+        </div>
+        <p class="news-edit-msg" data-id="${item.id}" style="margin-top:6px;font-size:0.85rem"></p>
+      </div>
     </div>`;
 }
 
@@ -522,6 +535,45 @@ async function loadAdminNews() {
         body: JSON.stringify({ password: pass })
       });
       if (r.ok) loadAdminNews(); else alert("パスワードが違います");
+    });
+  });
+  list.querySelectorAll(".news-edit").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const form = document.getElementById(`news-edit-form-${btn.dataset.id}`);
+      if (form) form.style.display = form.style.display === "none" ? "block" : "none";
+    });
+  });
+  list.querySelectorAll(".news-edit-cancel").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const form = document.getElementById(`news-edit-form-${btn.dataset.id}`);
+      if (form) form.style.display = "none";
+    });
+  });
+  list.querySelectorAll(".news-edit-save").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.id;
+      const pass = adminPassword || prompt("管理者パスワードを入力してください");
+      if (!pass) return;
+      const title = list.querySelector(`.news-edit-title[data-id="${id}"]`).value.trim();
+      const body = list.querySelector(`.news-edit-body[data-id="${id}"]`).value.trim();
+      const category = list.querySelector(`.news-edit-cat[data-id="${id}"]`).value;
+      const image_url = list.querySelector(`.news-edit-img[data-id="${id}"]`).value.trim();
+      const msg = list.querySelector(`.news-edit-msg[data-id="${id}"]`);
+      if (!title || !body) { msg.textContent = "⚠️ タイトルと本文は必須です"; msg.style.color = "#e05"; return; }
+      btn.disabled = true;
+      const r = await fetch(`/api/announcements/${id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: pass, title, body, category, image_url })
+      });
+      btn.disabled = false;
+      if (r.ok) {
+        msg.textContent = "✅ 更新しました";
+        msg.style.color = "#3d6b4f";
+        setTimeout(() => loadAdminNews(), 800);
+      } else {
+        msg.textContent = "❌ 失敗しました（パスワードを確認してください）";
+        msg.style.color = "#e05";
+      }
     });
   });
 }
