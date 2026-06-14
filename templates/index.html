@@ -694,7 +694,11 @@
           <button class="btn-board-add" id="calFormToggle">＋ 追加</button>
         </div>
         <div id="calForm" class="board-form" style="display:none">
-          <input type="text" id="calTitle" placeholder="イベント・会議名" />
+          <select id="calType" style="margin-bottom:6px;padding:8px;border-radius:8px;border:1.5px solid #cde;font-size:0.9rem;width:100%">
+            <option value="event">📅 イベント</option>
+            <option value="closed">🚫 臨時休館</option>
+          </select>
+          <input type="text" id="calTitle" placeholder="イベント・会議名 / 臨時休館の理由" />
           <input type="date" id="calDate" />
           <textarea id="calBody" placeholder="内容・メモ" rows="2"></textarea>
           <textarea id="calMinutes" placeholder="議事録（任意）" rows="4"></textarea>

@@ -614,11 +614,11 @@ function isClosedDay(y, m, d) {
   return false;
 }
 
-function buildCalendar(y, m) {
+function buildCalendar(y, m, eventsMap) {
+  eventsMap = eventsMap || {};
   const DAYS = ["月","火","水","木","金","土","日"];
   const first = new Date(y, m, 1);
   const lastDay = new Date(y, m + 1, 0).getDate();
-  // 月曜始まり: 0=月…6=日
   let startDow = (first.getDay() + 6) % 7;
   const today = new Date();
 
@@ -632,30 +632,60 @@ function buildCalendar(y, m) {
   DAYS.forEach(d => { html += `<div class="lib-cal-head ${d==="土"?"sat":d==="日"?"sun":""}">${d}</div>`; });
   for (let i = 0; i < startDow; i++) html += `<div class="lib-cal-empty"></div>`;
   for (let d = 1; d <= lastDay; d++) {
-    const dow = (new Date(y, m, d).getDay() + 6) % 7; // 0=月
+    const dow = (new Date(y, m, d).getDay() + 6) % 7;
     const closed = isClosedDay(y, m, d);
     const isToday = today.getFullYear()===y && today.getMonth()===m && today.getDate()===d;
+    const dateKey = `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    const evList = eventsMap[dateKey] || [];
+    const tempClosed = evList.find(e => e.type === "closed");
+    const eventItem = evList.find(e => e.type === "event");
     let cls = "lib-cal-day";
     if (dow === 5) cls += " sat";
     if (dow === 6) cls += " sun";
-    if (closed) cls += " closed";
+    if (closed || tempClosed) cls += " closed";
+    if (eventItem && !closed && !tempClosed) cls += " has-event";
     if (isToday) cls += " today";
-    const mark = closed ? "×" : d;
-    html += `<div class="${cls}" title="${closed==="nenmatsu"?"年末年始休館":closed==="teiky"?"定期休館（第2・第4水曜）":""}">${mark}</div>`;
+    let mark, title;
+    if (closed) {
+      mark = "×"; title = closed==="nenmatsu"?"年末年始休館":"定期休館（第2・第4水曜）";
+    } else if (tempClosed) {
+      mark = "×"; title = `臨時休館：${tempClosed.title}`;
+    } else if (eventItem) {
+      mark = `<span class="cal-event-mark">★</span>${d}`; title = evList.filter(e=>e.type==="event").map(e=>e.title).join("／");
+    } else {
+      mark = d; title = "";
+    }
+    html += `<div class="${cls}" title="${title}">${mark}</div>`;
   }
   html += `</div>
     <div class="lib-cal-legend">
-      <span class="lib-cal-closed-dot"></span>× 休館日（第2・第4水曜・年末年始）
+      <span class="lib-cal-closed-dot"></span>× 休館日（定期・臨時）&nbsp;&nbsp;
+      <span class="lib-cal-event-dot">★</span> イベント
     </div>
   </div>`;
   return html;
 }
 
-let _calYear, _calMonth;
+let _calYear, _calMonth, _calEventsMap = {};
+
+function _buildEventsMap(items) {
+  const map = {};
+  (items || []).forEach(item => {
+    if (!item.event_date) return;
+    if (!map[item.event_date]) map[item.event_date] = [];
+    map[item.event_date].push({title: item.title, type: item.type || "event"});
+  });
+  return map;
+}
 
 async function loadInfo() {
-  const res = await fetch("/api/library-info");
-  const info = await res.json();
+  const [infoRes, calRes] = await Promise.all([
+    fetch("/api/library-info"),
+    fetch("/api/calendar")
+  ]);
+  const info = await infoRes.json();
+  const calItems = await calRes.json();
+  _calEventsMap = _buildEventsMap(calItems);
   const hoursHtml = info.hours.map(h =>
     `<div class="avail-row"><span>${h.day}</span><span><strong>${h.time}</strong></span></div>`
   ).join("");
@@ -668,38 +698,26 @@ async function loadInfo() {
     <div class="info-row"><span class="info-label">所在地</span><span class="info-value">${info.location}</span></div>
     <div class="info-row"><span class="info-label">開館時間</span><span class="info-value">${hoursHtml}</span></div>
     <div class="info-row info-row-cal">
-      <span class="info-label">休館日</span>
+      <span class="info-label">休館日・イベント</span>
       <span class="info-value">
         <div class="info-closed-text">${info.closed}</div>
-        <div id="libCalWrap">${buildCalendar(_calYear, _calMonth)}</div>
+        <div id="libCalWrap">${buildCalendar(_calYear, _calMonth, _calEventsMap)}</div>
       </span>
     </div>
     <div class="info-source">📌 最新情報は <a href="https://www2.librarylife.net/booksearch?location=0011" target="_blank">図書館生活サイト</a> をご確認ください。</div>`;
 
-  document.getElementById("calPrev").addEventListener("click", () => {
-    _calMonth--;
-    if (_calMonth < 0) { _calMonth = 11; _calYear--; }
-    document.getElementById("libCalWrap").innerHTML = buildCalendar(_calYear, _calMonth);
-    document.getElementById("calPrev").addEventListener("click", arguments.callee);
-    bindCalNav();
-  });
-  document.getElementById("calNext").addEventListener("click", () => {
-    _calMonth++;
-    if (_calMonth > 11) { _calMonth = 0; _calYear++; }
-    document.getElementById("libCalWrap").innerHTML = buildCalendar(_calYear, _calMonth);
-    bindCalNav();
-  });
+  bindCalNav();
 }
 
 function bindCalNav() {
   document.getElementById("calPrev").onclick = () => {
     _calMonth--; if (_calMonth < 0) { _calMonth = 11; _calYear--; }
-    document.getElementById("libCalWrap").innerHTML = buildCalendar(_calYear, _calMonth);
+    document.getElementById("libCalWrap").innerHTML = buildCalendar(_calYear, _calMonth, _calEventsMap);
     bindCalNav();
   };
   document.getElementById("calNext").onclick = () => {
     _calMonth++; if (_calMonth > 11) { _calMonth = 0; _calYear++; }
-    document.getElementById("libCalWrap").innerHTML = buildCalendar(_calYear, _calMonth);
+    document.getElementById("libCalWrap").innerHTML = buildCalendar(_calYear, _calMonth, _calEventsMap);
     bindCalNav();
   };
 }
@@ -1538,14 +1556,19 @@ function renderCalendar() {
   const list = document.getElementById("calList");
   const items = allCalItems;
   if (!items.length) { list.innerHTML = '<div class="loading">活動記録はまだありません</div>'; return; }
-  list.innerHTML = items.map((item, idx) => `
+  list.innerHTML = items.map((item, idx) => {
+    const typeBadge = item.type === "closed"
+      ? `<span class="cal-type-badge closed">🚫 臨時休館</span>`
+      : `<span class="cal-type-badge event">📅 イベント</span>`;
+    return `
     <div class="cal-card">
       <div class="cal-header">
         <div class="move-btns">
           <button class="btn-move cal-up" data-id="${item.id}" ${idx===0?"disabled":""} title="上へ">▲</button>
           <button class="btn-move cal-down" data-id="${item.id}" ${idx===items.length-1?"disabled":""} title="下へ">▼</button>
         </div>
-        <span class="cal-date cal-view-date" data-id="${item.id}">📅 ${item.event_date}</span>
+        ${typeBadge}
+        <span class="cal-date cal-view-date" data-id="${item.id}">${item.event_date}</span>
         <span class="cal-title-text cal-view-title" data-id="${item.id}">${item.title}</span>
         <button class="btn-edit cal-edit-btn" data-id="${item.id}" title="編集">✏️</button>
         <button class="news-del cal-del" data-id="${item.id}" title="削除">🗑</button>
@@ -1553,7 +1576,11 @@ function renderCalendar() {
       ${item.body ? `<div class="cal-body cal-view-body" data-id="${item.id}">${item.body.replace(/\n/g,"<br>")}</div>` : `<div class="cal-view-body" data-id="${item.id}" style="display:none"></div>`}
       ${item.minutes ? `<details class="cal-minutes cal-view-mins" data-id="${item.id}"><summary>📝 議事録を見る</summary><div class="cal-minutes-body">${item.minutes.replace(/\n/g,"<br>")}</div></details>` : `<div class="cal-view-mins" data-id="${item.id}" style="display:none"></div>`}
       <div class="cal-edit-form" id="cedit-${item.id}" style="display:none">
-        <input class="ce-title" value="${item.title.replace(/"/g,'&quot;')}" placeholder="イベント名" style="margin-bottom:6px" />
+        <select class="ce-type" style="margin-bottom:6px;padding:8px;border-radius:8px;border:1.5px solid #cde;font-size:0.9rem;width:100%">
+          <option value="event" ${item.type!=="closed"?"selected":""}>📅 イベント</option>
+          <option value="closed" ${item.type==="closed"?"selected":""}>🚫 臨時休館</option>
+        </select>
+        <input class="ce-title" value="${item.title.replace(/"/g,'&quot;')}" placeholder="イベント名 / 臨時休館の理由" style="margin-bottom:6px" />
         <input type="date" class="ce-date" value="${item.event_date}" style="margin-bottom:6px" />
         <textarea class="ce-body" rows="2" placeholder="内容・メモ" style="margin-bottom:6px">${item.body||""}</textarea>
         <textarea class="ce-minutes" rows="4" placeholder="議事録（任意）">${item.minutes||""}</textarea>
@@ -1562,7 +1589,8 @@ function renderCalendar() {
           <button class="ce-cancel btn-secondary" data-id="${item.id}" style="font-size:0.83rem;padding:6px 14px">キャンセル</button>
         </div>
       </div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 
   list.querySelectorAll(".cal-up").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -1621,17 +1649,17 @@ function renderCalendar() {
       const event_date = form.querySelector(".ce-date").value;
       const body = form.querySelector(".ce-body").value.trim();
       const minutes = form.querySelector(".ce-minutes").value.trim();
+      const type = form.querySelector(".ce-type").value;
       if (!title) { alert("タイトルを入力してください"); return; }
       btn.textContent = "保存中…"; btn.disabled = true;
       try {
         const res = await fetch(`/api/calendar/${id}`, {
           method: "PATCH", headers: {"Content-Type":"application/json"},
-          body: JSON.stringify({password: boardPassword, title, event_date, body, minutes})
+          body: JSON.stringify({password: boardPassword, title, event_date, body, minutes, type})
         });
         if (!res.ok) { alert("保存に失敗しました（認証エラー）"); btn.textContent = "保存"; btn.disabled = false; return; }
-        // 楽観的にローカルデータを更新してすぐ再描画
         const item = allCalItems.find(i => String(i.id) === String(id));
-        if (item) { item.title = title; item.event_date = event_date; item.body = body; item.minutes = minutes; }
+        if (item) { item.title = title; item.event_date = event_date; item.body = body; item.minutes = minutes; item.type = type; }
         renderCalendar();
       } catch(e) {
         alert("通信エラーが発生しました");
@@ -1656,10 +1684,11 @@ document.getElementById("submitCal").addEventListener("click", async () => {
   const event_date = document.getElementById("calDate").value;
   const body = document.getElementById("calBody").value.trim();
   const minutes = document.getElementById("calMinutes").value.trim();
+  const type = document.getElementById("calType").value;
   if (!title || !event_date) { document.getElementById("calMsg").textContent = "タイトルと日付を入力してください"; return; }
   const res = await fetch("/api/calendar", {
     method: "POST", headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({password: boardPassword, title, event_date, body, minutes})
+    body: JSON.stringify({password: boardPassword, title, event_date, body, minutes, type})
   });
   if (res.ok) {
     document.getElementById("calMsg").textContent = "✅ 登録しました";
