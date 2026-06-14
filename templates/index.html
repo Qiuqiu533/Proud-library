@@ -127,6 +127,7 @@
 
     <!-- New arrivals tab -->
     <div id="tab-new" class="tab-panel">
+      <div id="newSourceLabel" style="font-size:0.8rem;margin-bottom:10px;padding:6px 10px;background:#f5f3ef;border-radius:8px;display:inline-block"></div>
       <h2 class="section-title">🆕 新着図書（100冊）</h2>
       <p class="section-desc">ISBN発行日（出版年月日）の順番で100冊を表示しています</p>
       <div class="book-grid" id="newGrid"><div class="loading">読み込み中…</div></div>
@@ -367,6 +368,7 @@
     </div>
     <div class="board-tabs">
       <button class="board-tab active" data-btab="adminnews">📢 お知らせ</button>
+      <button class="board-tab" data-btab="newarrival">📥 新着登録</button>
       <button class="board-tab" data-btab="issues">📋 課題管理</button>
       <button class="board-tab" data-btab="brequest">📬 リクエスト</button>
       <button class="board-tab" data-btab="stats">📊 蔵書統計</button>
@@ -409,6 +411,35 @@
         </div>
         <h3 style="margin:20px 0 10px">投稿済みお知らせ一覧</h3>
         <div id="adminNewsList" class="news-list"><div class="loading">読み込み中…</div></div>
+      </div>
+
+      <!-- 新着登録 -->
+      <div id="btab-newarrival" class="board-tab-panel">
+        <div class="board-section-header">
+          <h3>新着図書を登録</h3>
+        </div>
+        <div class="board-form">
+          <div style="font-size:0.82rem;color:#555;margin-bottom:4px">ISBNを入力すると本の情報を自動取得します</div>
+          <div style="display:flex;gap:8px">
+            <input type="text" id="arrivalIsbn" placeholder="ISBN（例：9784101092058）" style="flex:1;font-size:0.95rem" maxlength="13" />
+            <button class="btn-secondary" id="arrivalLookupBtn" style="white-space:nowrap;padding:8px 14px">🔍 検索</button>
+          </div>
+          <div id="arrivalPreview" style="display:none;background:#f8faf9;border:1.5px solid #b8ddc4;border-radius:10px;padding:12px;display:none;align-items:center;gap:12px">
+            <img id="arrivalPreviewCover" style="width:48px;height:66px;object-fit:cover;border-radius:4px;flex-shrink:0" alt="">
+            <div>
+              <div id="arrivalPreviewTitle" style="font-size:0.9rem;font-weight:700;color:#1a3a28"></div>
+              <div id="arrivalPreviewAuthor" style="font-size:0.8rem;color:#556b5a;margin-top:3px"></div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <label style="font-size:0.82rem;color:#555;flex-shrink:0">入荷日：</label>
+            <input type="date" id="arrivalDate" style="font-size:0.88rem;padding:7px 10px;border:1px solid #ddd;border-radius:8px" />
+          </div>
+          <button class="btn-primary" id="arrivalRegisterBtn">📥 新着として登録する</button>
+          <p id="arrivalMsg" style="font-size:0.83rem;min-height:1.2em;margin-top:4px"></p>
+        </div>
+        <h3 style="margin:20px 0 10px">登録済み新着一覧</h3>
+        <div id="arrivalList"><div class="loading">読み込み中…</div></div>
       </div>
 
       <!-- Issues -->

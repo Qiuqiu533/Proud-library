@@ -204,6 +204,18 @@ def init_db():
             )
         """)
         cur.execute("""
+            CREATE TABLE IF NOT EXISTS new_arrivals (
+                id SERIAL PRIMARY KEY,
+                isbn TEXT NOT NULL,
+                arrived_at DATE NOT NULL,
+                title TEXT DEFAULT '',
+                author TEXT DEFAULT '',
+                publisher TEXT DEFAULT '',
+                cover TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
+        cur.execute("""
             CREATE TABLE IF NOT EXISTS availability_cache (
                 isbn TEXT PRIMARY KEY,
                 status TEXT,
@@ -300,6 +312,18 @@ def init_db():
                 author TEXT DEFAULT '',
                 publisher TEXT DEFAULT '',
                 format TEXT DEFAULT ''
+            )
+        """)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS new_arrivals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                isbn TEXT NOT NULL,
+                arrived_at TEXT NOT NULL,
+                title TEXT DEFAULT '',
+                author TEXT DEFAULT '',
+                publisher TEXT DEFAULT '',
+                cover TEXT DEFAULT '',
+                created_at TEXT DEFAULT (datetime('now','localtime'))
             )
         """)
         con.execute("""
@@ -848,9 +872,98 @@ def api_stats():
     return jsonify(FULL_STATS)
 
 
+@app.route("/api/new-arrivals")
+def api_get_new_arrivals():
+    con = get_con()
+    rows = fetchall(con, "SELECT id,isbn,arrived_at,title,author,publisher,cover FROM new_arrivals ORDER BY arrived_at DESC, id DESC")
+    con.close()
+    return jsonify([{**r, "arrived_at": str(r["arrived_at"])[:10]} for r in rows])
+
+
+@app.route("/api/new-arrivals", methods=["POST"])
+def api_post_new_arrival():
+    body = request.get_json()
+    if body.get("password") != get_board_password():
+        return jsonify({"error": "unauthorized"}), 401
+    isbn = (body.get("isbn") or "").strip().replace("-", "")
+    arrived_at = (body.get("arrived_at") or "").strip()
+    if not isbn or not arrived_at:
+        return jsonify({"error": "ISBN と入荷日は必須です"}), 400
+    title = (body.get("title") or "").strip()
+    author = (body.get("author") or "").strip()
+    publisher = (body.get("publisher") or "").strip()
+    cover = (body.get("cover") or "").strip()
+    con = get_con()
+    if USE_PG:
+        execute(con, "INSERT INTO new_arrivals (isbn,arrived_at,title,author,publisher,cover) VALUES (?,?,?,?,?,?)",
+                (isbn, arrived_at, title, author, publisher, cover))
+    else:
+        execute(con, "INSERT INTO new_arrivals (isbn,arrived_at,title,author,publisher,cover) VALUES (?,?,?,?,?,?)",
+                (isbn, arrived_at, title, author, publisher, cover))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/new-arrivals/<int:arrival_id>", methods=["DELETE"])
+def api_delete_new_arrival(arrival_id):
+    body = request.get_json()
+    if body.get("password") != get_board_password():
+        return jsonify({"error": "unauthorized"}), 401
+    con = get_con()
+    execute(con, "DELETE FROM new_arrivals WHERE id=?", (arrival_id,))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/new-arrivals/lookup")
+def api_new_arrival_lookup():
+    isbn = request.args.get("isbn", "").strip().replace("-", "")
+    if not isbn:
+        return jsonify({"error": "ISBN required"}), 400
+    try:
+        resp = requests.get(OPENBD_API, params={"isbn": isbn}, timeout=8)
+        data = resp.json()
+        if data and data[0]:
+            s = data[0]["summary"]
+            isbn10 = isbn13_to_isbn10(isbn) if isbn.startswith("978") else ""
+            return jsonify({
+                "isbn": isbn,
+                "title": s.get("title", ""),
+                "author": s.get("author", ""),
+                "publisher": s.get("publisher", ""),
+                "cover": s.get("cover", "") or get_cover_url(isbn, isbn10)
+            })
+    except Exception:
+        pass
+    return jsonify({"isbn": isbn, "title": "", "author": "", "publisher": "", "cover": ""})
+
+
 @app.route("/api/books/new")
 def api_books_new():
-    """出版日順の新着100冊（OpenBD一括取得でソート）"""
+    """新着図書一覧：new_arrivalsテーブル優先、なければOpenBD出版日順"""
+    try:
+        con = get_con()
+        rows = fetchall(con, "SELECT isbn,arrived_at,title,author,publisher,cover FROM new_arrivals ORDER BY arrived_at DESC, id DESC LIMIT 100")
+        con.close()
+        if rows:
+            books = []
+            for r in rows:
+                isbn = r["isbn"]
+                isbn10 = isbn13_to_isbn10(isbn) if isbn.startswith("978") else ""
+                books.append({
+                    "isbn": isbn,
+                    "isbn10": isbn10,
+                    "title": r["title"] or isbn,
+                    "author": r["author"] or "",
+                    "publisher": r["publisher"] or "",
+                    "cover": r["cover"] or get_cover_url(isbn, isbn10),
+                    "arrived_at": str(r["arrived_at"])[:10],
+                    "format": ""
+                })
+            return jsonify({"books": books, "source": "registered"})
+    except Exception:
+        pass
+    # フォールバック：従来のOpenBD出版日順
     try:
         # librarylife から2ページ分取得
         import concurrent.futures

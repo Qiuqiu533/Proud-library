@@ -192,14 +192,24 @@ async function applyAvailCache(isbns) {
   } catch {}
 }
 
-function renderGrid(containerId, books) {
+function renderGrid(containerId, books, opts = {}) {
   const grid = document.getElementById(containerId);
   grid.innerHTML = "";
   if (!books || !books.length) {
     grid.innerHTML = '<div class="loading">本が見つかりませんでした。</div>';
     return;
   }
-  books.forEach(b => grid.appendChild(renderCard(b)));
+  books.forEach(b => {
+    const card = renderCard(b);
+    if (opts.showArrived && b.arrived_at) {
+      const badge = document.createElement("div");
+      badge.className = "arrived-badge";
+      const d = new Date(b.arrived_at);
+      badge.textContent = `${d.getMonth()+1}/${d.getDate()} 入荷`;
+      card.querySelector(".card-cover-wrap").appendChild(badge);
+    }
+    grid.appendChild(card);
+  });
 }
 
 // ===== Pagination =====
@@ -365,7 +375,14 @@ async function loadNew() {
   document.getElementById("newGrid").innerHTML = '<div class="loading">読み込み中…</div>';
   const res = await fetch(`/api/books/new`);
   const data = await res.json();
-  renderGrid("newGrid", data.books);
+  const label = document.getElementById("newSourceLabel");
+  if (label) {
+    label.textContent = data.source === "registered"
+      ? "📥 図書館スタッフが登録した入荷日順です"
+      : "📅 OpenBD出版日順（入荷日未登録）";
+    label.style.color = data.source === "registered" ? "#3d6b4f" : "#999";
+  }
+  renderGrid("newGrid", data.books, { showArrived: data.source === "registered" });
   applyAvailCache(data.books.map(b => b.isbn).filter(Boolean));
 }
 
@@ -769,6 +786,7 @@ document.querySelectorAll(".board-tab").forEach(btn => {
     btn.classList.add("active");
     document.getElementById("btab-" + btn.dataset.btab).classList.add("active");
     if (btn.dataset.btab === "adminnews") loadAdminNews();
+    if (btn.dataset.btab === "newarrival") loadNewArrivalAdmin();
     if (btn.dataset.btab === "stats") loadStats();
     if (btn.dataset.btab === "calendar") loadCalendar();
     if (btn.dataset.btab === "issues") loadIssues();
@@ -776,6 +794,97 @@ document.querySelectorAll(".board-tab").forEach(btn => {
     if (btn.dataset.btab === "loaned") loadLoanedBooks();
   });
 });
+
+// ===== 新着登録（管理者） =====
+(function() {
+  // 入荷日のデフォルトを今日に設定
+  const dateEl = document.getElementById("arrivalDate");
+  if (dateEl) dateEl.value = new Date().toISOString().slice(0, 10);
+
+  document.getElementById("arrivalLookupBtn")?.addEventListener("click", async () => {
+    const isbn = document.getElementById("arrivalIsbn").value.trim().replace(/-/g, "");
+    const msg = document.getElementById("arrivalMsg");
+    if (!isbn) { msg.textContent = "ISBNを入力してください"; msg.style.color = "#e05"; return; }
+    msg.textContent = "検索中…"; msg.style.color = "#888";
+    const res = await fetch(`/api/new-arrivals/lookup?isbn=${isbn}`);
+    const data = await res.json();
+    if (data.title) {
+      document.getElementById("arrivalPreviewTitle").textContent = data.title;
+      document.getElementById("arrivalPreviewAuthor").textContent = data.author || "";
+      const coverEl = document.getElementById("arrivalPreviewCover");
+      coverEl.src = data.cover || "";
+      coverEl.style.display = data.cover ? "" : "none";
+      document.getElementById("arrivalPreview").style.display = "flex";
+      msg.textContent = "✅ 本の情報を取得しました";
+      msg.style.color = "#3d6b4f";
+      document.getElementById("arrivalLookupBtn").dataset.title = data.title;
+      document.getElementById("arrivalLookupBtn").dataset.author = data.author || "";
+      document.getElementById("arrivalLookupBtn").dataset.publisher = data.publisher || "";
+      document.getElementById("arrivalLookupBtn").dataset.cover = data.cover || "";
+    } else {
+      document.getElementById("arrivalPreview").style.display = "none";
+      msg.textContent = "⚠️ OpenBDに情報がありません。ISBNを確認してください";
+      msg.style.color = "#e05";
+    }
+  });
+
+  document.getElementById("arrivalRegisterBtn")?.addEventListener("click", async () => {
+    const isbn = document.getElementById("arrivalIsbn").value.trim().replace(/-/g, "");
+    const arrived_at = document.getElementById("arrivalDate").value;
+    const msg = document.getElementById("arrivalMsg");
+    const btn = document.getElementById("arrivalLookupBtn");
+    if (!isbn) { msg.textContent = "ISBNを入力してください"; msg.style.color = "#e05"; return; }
+    if (!arrived_at) { msg.textContent = "入荷日を入力してください"; msg.style.color = "#e05"; return; }
+    const res = await fetch("/api/new-arrivals", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        password: boardPassword, isbn, arrived_at,
+        title: btn.dataset.title || "", author: btn.dataset.author || "",
+        publisher: btn.dataset.publisher || "", cover: btn.dataset.cover || ""
+      })
+    });
+    if (res.ok) {
+      msg.textContent = "✅ 登録しました";
+      msg.style.color = "#3d6b4f";
+      document.getElementById("arrivalIsbn").value = "";
+      document.getElementById("arrivalPreview").style.display = "none";
+      btn.dataset.title = btn.dataset.author = btn.dataset.publisher = btn.dataset.cover = "";
+      loadNewArrivalAdmin();
+    } else {
+      msg.textContent = "❌ 登録に失敗しました";
+      msg.style.color = "#e05";
+    }
+  });
+})();
+
+async function loadNewArrivalAdmin() {
+  const el = document.getElementById("arrivalList");
+  if (!el) return;
+  el.innerHTML = '<div class="loading">読み込み中…</div>';
+  const res = await fetch("/api/new-arrivals");
+  const items = await res.json();
+  if (!items.length) { el.innerHTML = '<div class="loading">登録された新着図書はありません</div>'; return; }
+  el.innerHTML = items.map(r => `
+    <div class="arrival-item">
+      <img class="arrival-cover" src="${r.cover || ""}" onerror="this.style.display='none'" alt="">
+      <div class="arrival-info">
+        <div class="arrival-title">${esc(r.title || r.isbn)}</div>
+        <div class="arrival-author">${esc(r.author || "")}</div>
+        <div class="arrival-date">📅 入荷日：${r.arrived_at}</div>
+      </div>
+      <button class="arrival-del btn-danger-sm" data-id="${r.id}">削除</button>
+    </div>`).join("");
+  el.querySelectorAll(".arrival-del").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("この新着登録を削除しますか？")) return;
+      await fetch(`/api/new-arrivals/${btn.dataset.id}`, {
+        method: "DELETE", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({password: boardPassword})
+      });
+      loadNewArrivalAdmin();
+    });
+  });
+}
 
 // ===== Issues =====
 document.getElementById("issueFormToggle").addEventListener("click", () => {
