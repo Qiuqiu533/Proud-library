@@ -532,18 +532,107 @@ async function loadAdminNews() {
 }
 
 // ===== Library info =====
+function isClosedDay(y, m, d) {
+  const date = new Date(y, m, d);
+  const dow = date.getDay(); // 0=日,3=水
+  // 年末年始: 12/28〜1/3
+  if ((m === 11 && d >= 28) || (m === 0 && d <= 3)) return "nenmatsu";
+  // 第2・第4水曜日
+  if (dow === 3) {
+    const weekNum = Math.ceil(d / 7);
+    if (weekNum === 2 || weekNum === 4) return "teiky";
+  }
+  return false;
+}
+
+function buildCalendar(y, m) {
+  const DAYS = ["月","火","水","木","金","土","日"];
+  const first = new Date(y, m, 1);
+  const lastDay = new Date(y, m + 1, 0).getDate();
+  // 月曜始まり: 0=月…6=日
+  let startDow = (first.getDay() + 6) % 7;
+  const today = new Date();
+
+  let html = `<div class="lib-cal">
+    <div class="lib-cal-nav">
+      <button class="lib-cal-btn" id="calPrev">&#8249;</button>
+      <span class="lib-cal-month">${y}年${m + 1}月</span>
+      <button class="lib-cal-btn" id="calNext">&#8250;</button>
+    </div>
+    <div class="lib-cal-grid">`;
+  DAYS.forEach(d => { html += `<div class="lib-cal-head ${d==="土"?"sat":d==="日"?"sun":""}">${d}</div>`; });
+  for (let i = 0; i < startDow; i++) html += `<div class="lib-cal-empty"></div>`;
+  for (let d = 1; d <= lastDay; d++) {
+    const dow = (new Date(y, m, d).getDay() + 6) % 7; // 0=月
+    const closed = isClosedDay(y, m, d);
+    const isToday = today.getFullYear()===y && today.getMonth()===m && today.getDate()===d;
+    let cls = "lib-cal-day";
+    if (dow === 5) cls += " sat";
+    if (dow === 6) cls += " sun";
+    if (closed) cls += " closed";
+    if (isToday) cls += " today";
+    const mark = closed ? "×" : d;
+    html += `<div class="${cls}" title="${closed==="nenmatsu"?"年末年始休館":closed==="teiky"?"定期休館（第2・第4水曜）":""}">${mark}</div>`;
+  }
+  html += `</div>
+    <div class="lib-cal-legend">
+      <span class="lib-cal-closed-dot"></span>× 休館日（第2・第4水曜・年末年始）
+    </div>
+  </div>`;
+  return html;
+}
+
+let _calYear, _calMonth;
+
 async function loadInfo() {
   const res = await fetch("/api/library-info");
   const info = await res.json();
   const hoursHtml = info.hours.map(h =>
     `<div class="avail-row"><span>${h.day}</span><span><strong>${h.time}</strong></span></div>`
   ).join("");
+  const now = new Date();
+  _calYear = now.getFullYear();
+  _calMonth = now.getMonth();
+
   document.getElementById("infoCard").innerHTML = `
     <h2>📍 ${info.name}</h2>
     <div class="info-row"><span class="info-label">所在地</span><span class="info-value">${info.location}</span></div>
     <div class="info-row"><span class="info-label">開館時間</span><span class="info-value">${hoursHtml}</span></div>
-    <div class="info-row"><span class="info-label">休館日</span><span class="info-value">${info.closed}</span></div>
+    <div class="info-row info-row-cal">
+      <span class="info-label">休館日</span>
+      <span class="info-value">
+        <div class="info-closed-text">${info.closed}</div>
+        <div id="libCalWrap">${buildCalendar(_calYear, _calMonth)}</div>
+      </span>
+    </div>
     <div class="info-source">📌 最新情報は <a href="https://www2.librarylife.net/booksearch?location=0011" target="_blank">図書館生活サイト</a> をご確認ください。</div>`;
+
+  document.getElementById("calPrev").addEventListener("click", () => {
+    _calMonth--;
+    if (_calMonth < 0) { _calMonth = 11; _calYear--; }
+    document.getElementById("libCalWrap").innerHTML = buildCalendar(_calYear, _calMonth);
+    document.getElementById("calPrev").addEventListener("click", arguments.callee);
+    bindCalNav();
+  });
+  document.getElementById("calNext").addEventListener("click", () => {
+    _calMonth++;
+    if (_calMonth > 11) { _calMonth = 0; _calYear++; }
+    document.getElementById("libCalWrap").innerHTML = buildCalendar(_calYear, _calMonth);
+    bindCalNav();
+  });
+}
+
+function bindCalNav() {
+  document.getElementById("calPrev").onclick = () => {
+    _calMonth--; if (_calMonth < 0) { _calMonth = 11; _calYear--; }
+    document.getElementById("libCalWrap").innerHTML = buildCalendar(_calYear, _calMonth);
+    bindCalNav();
+  };
+  document.getElementById("calNext").onclick = () => {
+    _calMonth++; if (_calMonth > 11) { _calMonth = 0; _calYear++; }
+    document.getElementById("libCalWrap").innerHTML = buildCalendar(_calYear, _calMonth);
+    bindCalNav();
+  };
 }
 
 // ===== Modal =====
