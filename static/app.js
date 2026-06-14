@@ -302,7 +302,7 @@ async function loadTodayBook() {
     const card = document.getElementById("todayBookCard");
     card.innerHTML = books.map(b => {
       const img = b.cover
-        ? `<img class="today-book-cover" src="${b.cover}" alt="${b.title}" onerror="this.style.display='none'">`
+        ? `<img class="today-book-cover" src="${b.cover}" alt="${b.title}" onerror="this.outerHTML='<div class=\\'today-book-cover-placeholder\\'>📖</div>'">`
         : `<div class="today-book-cover-placeholder">📖</div>`;
       return `<div class="today-book-inner" data-isbn="${b.isbn}">${img}<div class="today-book-title">${b.title}</div><div class="today-book-author">${b.author || ""}</div></div>`;
     }).join("");
