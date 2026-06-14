@@ -1942,15 +1942,26 @@ async function loadReqManage() {
   bindReqAdminEvents(elFb);
 
   // サブタブ切り替え
+  function applySubtabStyle(activeSubtab) {
+    document.querySelectorAll(".req-subtab-btn").forEach(b => {
+      const isActive = b.dataset.subtab === activeSubtab;
+      const isBooks = b.dataset.subtab === "books";
+      if (isActive && isBooks) {
+        Object.assign(b.style, {background:"#3d6b4f", color:"#fff", borderColor:"#3d6b4f"});
+      } else if (isActive && !isBooks) {
+        Object.assign(b.style, {background:"#5b8dd9", color:"#fff", borderColor:"#5b8dd9"});
+      } else if (!isActive && isBooks) {
+        Object.assign(b.style, {background:"#f2f8f4", color:"#8aaa94", borderColor:"#c0d9c8"});
+      } else {
+        Object.assign(b.style, {background:"#f5f8ff", color:"#8aabcc", borderColor:"#c0cfe8"});
+      }
+      b.classList.toggle("active", isActive);
+    });
+  }
   document.querySelectorAll(".req-subtab-btn").forEach(btn => {
     btn.onclick = () => {
       const isBooks = btn.dataset.subtab === "books";
-      document.querySelectorAll(".req-subtab-btn").forEach(b => {
-        const bIsBooks = b.dataset.subtab === "books";
-        b.style.color = b === btn ? (bIsBooks ? "#3d6b4f" : "#5b8dd9") : "#aaa";
-        b.style.borderBottomColor = b === btn ? (bIsBooks ? "#3d6b4f" : "#5b8dd9") : "transparent";
-        b.classList.toggle("active", b === btn);
-      });
+      applySubtabStyle(btn.dataset.subtab);
       elBooks.style.display = isBooks ? "" : "none";
       elFb.style.display = isBooks ? "none" : "";
     };
