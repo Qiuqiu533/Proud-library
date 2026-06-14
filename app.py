@@ -553,23 +553,35 @@ def _migrate_add_staff_chat():
     try:
         con = get_con()
         if USE_PG:
-            con.cursor().execute("""
+            cur = con.cursor()
+            cur.execute("""
                 CREATE TABLE IF NOT EXISTS staff_chat (
                     id SERIAL PRIMARY KEY,
                     sender TEXT NOT NULL,
-                    message TEXT NOT NULL,
+                    message TEXT NOT NULL DEFAULT '',
+                    image_data TEXT DEFAULT '',
                     created_at TIMESTAMP DEFAULT NOW()
                 )
             """)
+            # 既存テーブルにimage_dataカラムを追加
+            try:
+                cur.execute("ALTER TABLE staff_chat ADD COLUMN image_data TEXT DEFAULT ''")
+            except Exception:
+                con.rollback()
         else:
             con.execute("""
                 CREATE TABLE IF NOT EXISTS staff_chat (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     sender TEXT NOT NULL,
-                    message TEXT NOT NULL,
+                    message TEXT NOT NULL DEFAULT '',
+                    image_data TEXT DEFAULT '',
                     created_at TEXT DEFAULT (datetime('now','localtime'))
                 )
             """)
+            try:
+                con.execute("ALTER TABLE staff_chat ADD COLUMN image_data TEXT DEFAULT ''")
+            except Exception:
+                pass
         con.commit()
         con.close()
     except Exception as e:
@@ -1476,7 +1488,13 @@ def api_staff_chat_get():
     if pw != get_board_password():
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
-    rows = fetchall(con, "SELECT id, sender, message, created_at FROM staff_chat ORDER BY created_at DESC LIMIT 100")
+    # 2年以上前のメッセージを自動削除
+    if USE_PG:
+        execute(con, "DELETE FROM staff_chat WHERE created_at < NOW() - INTERVAL '2 years'")
+    else:
+        execute(con, "DELETE FROM staff_chat WHERE created_at < datetime('now','-2 years','localtime')")
+    con.commit()
+    rows = fetchall(con, "SELECT id, sender, message, image_data, created_at FROM staff_chat ORDER BY created_at DESC LIMIT 100")
     con.close()
     return jsonify([dict(r) for r in rows])
 
@@ -1485,12 +1503,13 @@ def api_staff_chat_post():
     body = request.get_json()
     if body.get("password") != get_board_password():
         return jsonify({"error": "unauthorized"}), 401
-    sender = (body.get("sender") or "").strip()
+    sender = (body.get("sender") or "匿名").strip()
     message = (body.get("message") or "").strip()
-    if not sender or not message:
-        return jsonify({"error": "sender and message required"}), 400
+    image_data = (body.get("image_data") or "").strip()
+    if not message and not image_data:
+        return jsonify({"error": "message or image required"}), 400
     con = get_con()
-    execute(con, "INSERT INTO staff_chat (sender, message) VALUES (?, ?)", (sender, message))
+    execute(con, "INSERT INTO staff_chat (sender, message, image_data) VALUES (?, ?, ?)", (sender, message, image_data))
     con.commit(); con.close()
     return jsonify({"ok": True})
 
