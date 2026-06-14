@@ -500,13 +500,16 @@ function newsItemHtml(item, showDelete) {
         <textarea class="news-edit-body" data-id="${item.id}" rows="4" style="width:100%;margin-bottom:8px;padding:8px;border-radius:6px;border:1px solid #ccc;box-sizing:border-box">${item.body}</textarea>
         <div style="margin-bottom:8px">
           <label style="font-size:0.85rem;color:#666;display:block;margin-bottom:4px">画像（ファイルを選択またはURLを入力）</label>
-          ${item.image_url ? `<img class="news-edit-img-preview" src="${item.image_url}" style="max-width:200px;max-height:120px;display:block;margin-bottom:6px;border-radius:6px" onerror="this.style.display='none'">` : ""}
-          <label style="display:inline-block;padding:6px 12px;background:#f0f0f0;border-radius:6px;cursor:pointer;font-size:0.85rem;margin-bottom:6px">
-            📷 画像を選択
-            <input type="file" class="news-edit-file" data-id="${item.id}" accept="image/*" style="display:none">
-          </label>
-          <span class="news-edit-filename" data-id="${item.id}" style="font-size:0.8rem;color:#888;margin-left:6px">未選択</span>
-          <input type="text" class="news-edit-img" data-id="${item.id}" value="${(item.image_url||"").replace(/"/g,'&quot;')}" placeholder="または画像URLを入力" style="width:100%;margin-top:6px;padding:8px;border-radius:6px;border:1px solid #ccc;box-sizing:border-box">
+          ${item.image_url ? `<img class="news-edit-img-preview" data-id="${item.id}" src="${item.image_url}" style="max-width:200px;max-height:120px;display:block;margin-bottom:6px;border-radius:6px" onerror="this.style.display='none'">` : ""}
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+            <label style="display:inline-block;padding:6px 12px;background:#f0f0f0;border-radius:6px;cursor:pointer;font-size:0.85rem">
+              📷 画像を選択
+              <input type="file" class="news-edit-file" data-id="${item.id}" accept="image/*" style="display:none">
+            </label>
+            <span class="news-edit-filename" data-id="${item.id}" style="font-size:0.8rem;color:#888">未選択</span>
+            <button class="news-edit-clear-img" data-id="${item.id}" style="padding:6px 12px;border-radius:6px;border:1px solid #e05;color:#e05;background:#fff;cursor:pointer;font-size:0.85rem${item.image_url?'':';display:none'}">🗑 画像を削除</button>
+          </div>
+          <input type="text" class="news-edit-img" data-id="${item.id}" value="${(item.image_url||"").replace(/"/g,'&quot;')}" placeholder="または画像URLを入力" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ccc;box-sizing:border-box">
         </div>
         <div style="display:flex;gap:8px">
           <button class="news-edit-save btn-primary" data-id="${item.id}" style="flex:1">💾 保存</button>
@@ -558,6 +561,17 @@ async function loadAdminNews() {
       if (form) form.style.display = "none";
     });
   });
+  // 画像削除
+  list.querySelectorAll(".news-edit-clear-img").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.id;
+      list.querySelector(`.news-edit-img[data-id="${id}"]`).value = "";
+      list.querySelector(`.news-edit-filename[data-id="${id}"]`).textContent = "未選択";
+      const preview = list.querySelector(`.news-edit-img-preview[data-id="${id}"]`);
+      if (preview) preview.style.display = "none";
+      btn.style.display = "none";
+    });
+  });
   // 画像ファイル選択
   list.querySelectorAll(".news-edit-file").forEach(input => {
     input.addEventListener("change", async (e) => {
@@ -568,6 +582,8 @@ async function loadAdminNews() {
       const base64 = await resizeImageFile(file);
       const imgUrl = list.querySelector(`.news-edit-img[data-id="${id}"]`);
       imgUrl.value = base64;
+      const clearBtn = list.querySelector(`.news-edit-clear-img[data-id="${id}"]`);
+      if (clearBtn) clearBtn.style.display = "";
       let preview = list.querySelector(`.news-edit-img-preview[data-id="${id}"]`);
       if (!preview) {
         preview = document.createElement("img");
