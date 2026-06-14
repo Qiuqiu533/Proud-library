@@ -2374,21 +2374,47 @@ document.getElementById("cardResetBtn")?.addEventListener("click", () => {
   loadCard();
 });
 
-// ===== Staff Chat =====
+// ===== ライブラリーグループチャット空間 =====
 let chatPollTimer = null;
+let chatPendingImage = "";  // base64 compressed image
+
+function compressImage(file, maxPx = 1200, quality = 0.72) {
+  return new Promise(resolve => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      if (w > maxPx || h > maxPx) {
+        if (w > h) { h = Math.round(h * maxPx / w); w = maxPx; }
+        else { w = Math.round(w * maxPx / h); h = maxPx; }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.src = url;
+  });
+}
 
 function chatMsgHtml(m) {
-  const isMe = m.sender === boardSenderName;
+  const isMe = m.sender === (boardSenderName || "");
   const time = (m.created_at || "").slice(0, 16).replace("T", " ");
+  const avatar = `<div style="width:32px;height:32px;border-radius:50%;background:#3d6b4f;color:#fff;display:flex;align-items:center;justify-content:center;font-size:0.8rem;font-weight:700;flex-shrink:0">${esc((m.sender||"?").slice(0,1))}</div>`;
+  const bubble = `
+    <div style="max-width:72%;background:${isMe?"#3d6b4f":"#fff"};color:${isMe?"#fff":"#333"};padding:${m.image_data?"6px":"9px 13px"};border-radius:${isMe?"14px 14px 4px 14px":"14px 14px 14px 4px"};font-size:0.88rem;line-height:1.5;box-shadow:0 1px 4px rgba(0,0,0,0.08);word-break:break-word;overflow:hidden">
+      ${m.image_data ? `<img src="${m.image_data}" style="max-width:240px;max-height:240px;border-radius:8px;display:block">` : ""}
+      ${m.message ? `<div style="${m.image_data?"margin-top:6px;padding:0 6px 4px":""}">${esc(m.message)}</div>` : ""}
+    </div>`;
+  const delBtn = `<button class="chat-del-btn" data-id="${m.id}" title="削除" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:0.85rem;padding:2px;flex-shrink:0">🗑</button>`;
   return `
   <div style="display:flex;flex-direction:column;align-items:${isMe?"flex-end":"flex-start"};gap:2px">
-    <div style="font-size:0.72rem;color:#aaa;padding:0 6px">${isMe?"":esc(m.sender)+"　"}${time}</div>
+    <div style="font-size:0.72rem;color:#aaa;padding:0 6px">${isMe?"":`<b>${esc(m.sender)}</b>　`}${time}</div>
     <div style="display:flex;align-items:flex-end;gap:6px;flex-direction:${isMe?"row-reverse":"row"}">
-      ${isMe?"":`<div style="width:32px;height:32px;border-radius:50%;background:#3d6b4f;color:#fff;display:flex;align-items:center;justify-content:center;font-size:0.8rem;font-weight:700;flex-shrink:0">${esc(m.sender.slice(0,1))}</div>`}
-      <div style="max-width:70%;background:${isMe?"#3d6b4f":"#fff"};color:${isMe?"#fff":"#333"};padding:9px 13px;border-radius:${isMe?"14px 14px 4px 14px":"14px 14px 14px 4px"};font-size:0.88rem;line-height:1.5;box-shadow:0 1px 4px rgba(0,0,0,0.08);word-break:break-word">
-        ${esc(m.message)}
-      </div>
-      <button class="chat-del-btn" data-id="${m.id}" title="削除" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:0.8rem;padding:2px;opacity:0;transition:opacity 0.2s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0">🗑</button>
+      ${isMe?"":avatar}
+      ${bubble}
+      ${delBtn}
     </div>
   </div>`;
 }
@@ -2396,32 +2422,50 @@ function chatMsgHtml(m) {
 async function loadChatMessages(scrollToBottom = false) {
   const box = document.getElementById("chatMessages");
   if (!box) return;
-  const res = await fetch(`/api/staff_chat?password=${encodeURIComponent(boardPassword)}`);
-  if (!res.ok) return;
-  const msgs = await res.json();
-  msgs.reverse();
-  if (!msgs.length) {
-    box.innerHTML = '<div style="text-align:center;color:#bbb;padding:40px 0;font-size:0.9rem">まだメッセージはありません<br>最初のメッセージを送ってみましょう！</div>';
-    return;
-  }
-  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
-  box.innerHTML = msgs.map(chatMsgHtml).join("");
-  box.querySelectorAll(".chat-del-btn").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      if (!confirm("このメッセージを削除しますか？")) return;
-      await fetch(`/api/staff_chat/${btn.dataset.id}`, {
-        method: "DELETE", headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({password: boardPassword})
+  try {
+    const res = await fetch(`/api/staff_chat?password=${encodeURIComponent(boardPassword)}`);
+    if (!res.ok) return;
+    const msgs = await res.json();
+    msgs.reverse();
+    if (!msgs.length) {
+      box.innerHTML = '<div style="text-align:center;color:#bbb;padding:40px 0;font-size:0.9rem">まだメッセージはありません<br>最初のメッセージを送ってみましょう！</div>';
+      return;
+    }
+    const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+    box.innerHTML = msgs.map(chatMsgHtml).join("");
+    box.querySelectorAll(".chat-del-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("このメッセージを削除しますか？")) return;
+        await fetch(`/api/staff_chat/${btn.dataset.id}`, {
+          method: "DELETE", headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({password: boardPassword})
+        });
+        loadChatMessages();
       });
-      loadChatMessages();
     });
-  });
-  if (scrollToBottom || atBottom) box.scrollTop = box.scrollHeight;
+    if (scrollToBottom || atBottom) box.scrollTop = box.scrollHeight;
+  } catch(e) { console.error("chat load error", e); }
+}
+
+function setChatImgPreview(dataUrl) {
+  chatPendingImage = dataUrl || "";
+  const preview = document.getElementById("chatImgPreview");
+  const thumb = document.getElementById("chatImgThumb");
+  if (!preview || !thumb) return;
+  if (dataUrl) {
+    thumb.src = dataUrl;
+    preview.style.display = "flex";
+  } else {
+    preview.style.display = "none";
+    thumb.src = "";
+  }
 }
 
 function initStaffChat() {
   const lbl = document.getElementById("chatSenderLabel");
-  if (lbl) lbl.textContent = boardSenderName ? `👤 ${boardSenderName}` : "";
+  const name = boardSenderName || sessionStorage.getItem("board_name") || "";
+  if (!boardSenderName && name) boardSenderName = name;
+  if (lbl) lbl.textContent = boardSenderName ? `👤 ${boardSenderName}` : "👤 名前未設定";
 
   loadChatMessages(true);
   if (chatPollTimer) clearInterval(chatPollTimer);
@@ -2429,16 +2473,33 @@ function initStaffChat() {
 
   const input = document.getElementById("chatInput");
   const sendBtn = document.getElementById("chatSendBtn");
+  const imgInput = document.getElementById("chatImgInput");
+  const imgClear = document.getElementById("chatImgClear");
   if (!input || !sendBtn) return;
+
+  // 画像選択
+  if (imgInput) {
+    imgInput.onchange = async () => {
+      const file = imgInput.files[0];
+      if (!file) return;
+      const dataUrl = await compressImage(file);
+      setChatImgPreview(dataUrl);
+      imgInput.value = "";
+    };
+  }
+  if (imgClear) imgClear.onclick = () => setChatImgPreview("");
 
   const send = async () => {
     const msg = input.value.trim();
-    if (!msg || !boardSenderName) return;
+    if (!msg && !chatPendingImage) return;
+    const sender = boardSenderName || "匿名";
     input.value = "";
     sendBtn.disabled = true;
+    const image_data = chatPendingImage;
+    setChatImgPreview("");
     await fetch("/api/staff_chat", {
       method: "POST", headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({password: boardPassword, sender: boardSenderName, message: msg})
+      body: JSON.stringify({password: boardPassword, sender, message: msg, image_data})
     });
     sendBtn.disabled = false;
     loadChatMessages(true);

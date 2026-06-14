@@ -751,19 +751,28 @@
       <div id="btab-staffchat" class="board-tab-panel">
         <div style="display:flex;flex-direction:column;height:calc(100vh - 220px);min-height:400px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-            <h3 style="margin:0">💬 係員チャット</h3>
+            <h3 style="margin:0;font-size:1rem">📚 ライブラリーグループチャット空間</h3>
             <span id="chatSenderLabel" style="font-size:0.85rem;color:#666;background:#f0f0f0;padding:4px 12px;border-radius:20px"></span>
           </div>
           <div id="chatMessages" style="flex:1;overflow-y:auto;background:#f5f7fa;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
             <div class="loading">読み込み中…</div>
           </div>
-          <div style="display:flex;gap:8px">
+          <div style="display:flex;gap:8px;align-items:center">
+            <label id="chatImgBtn" title="画像を送る"
+              style="padding:10px 12px;background:#f0f4f8;border:1.5px solid #ddd;border-radius:10px;cursor:pointer;font-size:1.1rem;flex-shrink:0">
+              🖼️
+              <input id="chatImgInput" type="file" accept="image/*" style="display:none">
+            </label>
             <input id="chatInput" type="text" placeholder="メッセージを入力…"
               style="flex:1;padding:10px 14px;border:1.5px solid #ddd;border-radius:10px;font-size:0.9rem;font-family:inherit;outline:none">
             <button id="chatSendBtn"
               style="padding:10px 20px;background:#3d6b4f;color:#fff;border:none;border-radius:10px;font-size:0.9rem;font-weight:600;cursor:pointer;white-space:nowrap">
               送信
             </button>
+          </div>
+          <div id="chatImgPreview" style="display:none;margin-top:8px;padding:8px;background:#fff;border-radius:8px;border:1px solid #ddd;display:flex;align-items:center;gap:8px">
+            <img id="chatImgThumb" style="height:60px;border-radius:6px;object-fit:cover">
+            <button id="chatImgClear" style="background:none;border:none;cursor:pointer;color:#999;font-size:1.1rem">✕</button>
           </div>
         </div>
       </div>
