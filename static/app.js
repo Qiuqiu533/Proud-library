@@ -1763,15 +1763,8 @@ document.getElementById("pwChangeBtn").addEventListener("click", async () => {
 
 // ===== 貸出中一覧（入居者タブ） =====
 function isbn13ToCoverUrl(isbn13) {
-  if (isbn13 && isbn13.startsWith("978") && isbn13.length === 13) {
-    const digits = isbn13.slice(3, 12);
-    let total = 0;
-    for (let i = 0; i < digits.length; i++) total += (10 - i) * parseInt(digits[i]);
-    const check = (11 - (total % 11)) % 11;
-    const isbn10 = digits + (check === 10 ? "X" : String(check));
-    return `https://images-na.ssl-images-amazon.com/images/P/${isbn10}.09.LZZZZZZZ.jpg`;
-  }
-  return `https://ndlsearch.ndl.go.jp/thumbnail/${isbn13}.jpg`;
+  if (isbn13) return `https://cover.openbd.jp/${isbn13}.jpg`;
+  return "";
 }
 
 async function loadLoanedResident() {
