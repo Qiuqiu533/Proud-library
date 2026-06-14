@@ -604,3 +604,15 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
 .lib-cal-day.today { outline: 2px solid #3d6b4f; outline-offset: -1px; border-radius: 6px; font-weight: 700; }
 .lib-cal-legend { margin-top: 10px; font-size: 0.72rem; color: #888; display: flex; align-items: center; gap: 6px; }
 .lib-cal-closed-dot { display: inline-block; width: 12px; height: 12px; background: #fde8e8; border-radius: 3px; border: 1px solid #e0a0a0; flex-shrink: 0; }
+
+/* ===== 使い方タブ ===== */
+.howto-section { display:flex; gap:14px; align-items:flex-start; padding:16px; background:#fff; border-radius:12px; margin-bottom:10px; box-shadow:0 1px 6px rgba(0,0,0,0.06); }
+.howto-icon { font-size:1.6rem; flex-shrink:0; width:40px; text-align:center; }
+.howto-title { font-weight:700; font-size:0.95rem; color:#2d4a38; margin-bottom:5px; }
+.howto-body { font-size:0.83rem; color:#555; line-height:1.7; }
+
+/* ===== ウェルカムモーダル ===== */
+.w-step { display:flex; align-items:flex-start; gap:10px; font-size:0.88rem; color:#444; margin-bottom:10px; line-height:1.6; }
+.w-num { background:#3d6b4f; color:#fff; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700; flex-shrink:0; margin-top:1px; }
+.w-dot { width:8px; height:8px; border-radius:50%; background:#ddd; cursor:pointer; transition:background 0.2s; }
+.w-dot.active { background:#3d6b4f; width:22px; border-radius:4px; }

@@ -2519,3 +2519,52 @@ document.querySelectorAll(".board-tab").forEach(btn => {
     }
   });
 });
+
+// ===== ウェルカムモーダル =====
+let welcomeSlide = 0;
+const WELCOME_TOTAL = 4;
+
+function showWelcome() {
+  welcomeSlide = 0;
+  updateWelcomeSlide();
+  document.getElementById("welcomeModal").style.display = "flex";
+}
+
+function closeWelcome() {
+  document.getElementById("welcomeModal").style.display = "none";
+  localStorage.setItem("welcomeSeen", "1");
+}
+
+function welcomeNav(dir) {
+  welcomeSlide = Math.max(0, Math.min(WELCOME_TOTAL - 1, welcomeSlide + dir));
+  updateWelcomeSlide();
+}
+
+function updateWelcomeSlide() {
+  document.querySelectorAll(".w-slide").forEach(el => {
+    el.style.display = parseInt(el.dataset.slide) === welcomeSlide ? "" : "none";
+  });
+  document.querySelectorAll(".w-dot").forEach(el => {
+    el.classList.toggle("active", parseInt(el.dataset.dot) === welcomeSlide);
+  });
+  const prev = document.getElementById("wPrev");
+  const next = document.getElementById("wNext");
+  if (prev) prev.style.display = welcomeSlide === 0 ? "none" : "";
+  if (next) {
+    next.textContent = welcomeSlide === WELCOME_TOTAL - 1 ? "✅ 使ってみる" : "次へ →";
+    next.onclick = welcomeSlide === WELCOME_TOTAL - 1 ? closeWelcome : () => welcomeNav(1);
+  }
+}
+
+// ドットクリック
+document.querySelectorAll(".w-dot").forEach(dot => {
+  dot.addEventListener("click", () => {
+    welcomeSlide = parseInt(dot.dataset.dot);
+    updateWelcomeSlide();
+  });
+});
+
+// 初回訪問時に表示
+if (!localStorage.getItem("welcomeSeen")) {
+  setTimeout(showWelcome, 800);
+}
