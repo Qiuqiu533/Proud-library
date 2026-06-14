@@ -1756,10 +1756,11 @@ async function loadReqList() {
   const res = await fetch("/api/requests");
   const items = await res.json();
   if (!items.length) { el.innerHTML = '<div class="loading">まだリクエストはありません</div>'; return; }
-  const stLabel = {pending:"⏳ 検討中", doing:"🔄 選定中", done:"✅ 入荷済"};
-  const stColor = {pending:"#888", doing:"#c07010", done:"#3d8a4f"};
+  const stLabel = {pending:"⏳ 検討中", approved:"✅ 購入決定", rejected:"❌ 見送り", done:"📦 入荷済"};
+  const stColor = {pending:"#888", approved:"#3d8a4f", rejected:"#c00", done:"#555"};
   const votedIds = getVotedIds();
-  const sorted = [...items.filter(r=>r.status!=="done"), ...items.filter(r=>r.status==="done")];
+  const order = {pending:0, approved:1, rejected:2, done:3};
+  const sorted = [...items].sort((a,b) => (order[a.status]??0) - (order[b.status]??0) || (b.votes||0) - (a.votes||0));
   el.innerHTML = sorted.map(r => {
     const voted = votedIds.includes(r.id);
     const votes = r.votes || 0;
@@ -1776,7 +1777,7 @@ async function loadReqList() {
       ${r.note ? `<div class="req-note">📝 ${esc(r.note)}</div>` : ""}
       <div class="req-card-footer">
         <div class="req-meta">🕐 ${(r.created_at||"").slice(0,10)}</div>
-        <button class="req-vote-btn${voted?" req-vote-done":""}" data-id="${r.id}" ${r.status==="done"?"disabled":""}>
+        <button class="req-vote-btn${voted?" req-vote-done":""}" data-id="${r.id}" ${(r.status==="done"||r.status==="rejected")?"disabled":""}>
           👍 <span class="req-vote-count">${votes}</span>${voted?" 済":" 読みたい"}
         </button>
       </div>
@@ -1830,9 +1831,10 @@ async function loadReqManage() {
       <div class="req-meta">${r.room ? `🏠 ${esc(r.room)}　` : ""}🕐 ${r.created_at.slice(0,10)}</div>
       <div class="req-admin-controls">
         <select class="req-status-sel" data-id="${r.id}">
-          <option value="pending" ${r.status==="pending"?"selected":""}>⏳ 未対応</option>
-          <option value="doing"   ${r.status==="doing"  ?"selected":""}>🔄 検討中</option>
-          <option value="done"    ${r.status==="done"   ?"selected":""}>✅ 完了</option>
+          <option value="pending"  ${r.status==="pending"  ?"selected":""}>⏳ 検討中</option>
+          <option value="approved" ${r.status==="approved"?"selected":""}>✅ 購入決定</option>
+          <option value="rejected" ${r.status==="rejected"?"selected":""}>❌ 見送り</option>
+          <option value="done"     ${r.status==="done"    ?"selected":""}>📦 入荷済</option>
         </select>
         <input class="req-note-input" type="text" placeholder="管理者メモ（任意）"
           value="${esc(r.note||"")}" data-id="${r.id}" />
