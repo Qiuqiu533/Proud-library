@@ -1815,9 +1815,98 @@ async function loadReqList() {
   }
 }
 
+function reqAdminCardHtml(r) {
+  const isFb = r.type === "feedback";
+  const borderColor = isFb ? "#5b8dd9" : "#3d6b4f";
+  const statusOpts = isFb ? `
+    <option value="fb_received" ${r.status==="fb_received"||!r.status?"selected":""}>📬 受付中</option>
+    <option value="fb_checking" ${r.status==="fb_checking"?"selected":""}>🔍 確認中</option>
+    <option value="fb_done"     ${r.status==="fb_done"    ?"selected":""}>✅ 対応済</option>
+    <option value="fb_rejected" ${r.status==="fb_rejected"?"selected":""}>❌ 見送り</option>
+    <option value="fb_pending"  ${r.status==="fb_pending" ?"selected":""}>⏳ 検討中</option>
+    <option value="fb_noted"    ${r.status==="fb_noted"   ?"selected":""}>📝 参考意見として受理</option>
+    <option value="fb_none"     ${r.status==="fb_none"    ?"selected":""}>➖ 対応なし</option>
+  ` : `
+    <option value="pending"  ${r.status==="pending" ||!r.status?"selected":""}>⏳ 検討中</option>
+    <option value="approved" ${r.status==="approved"?"selected":""}>✅ 購入決定</option>
+    <option value="rejected" ${r.status==="rejected"?"selected":""}>❌ 見送り</option>
+    <option value="done"     ${r.status==="done"    ?"selected":""}>📦 入荷済</option>
+  `;
+  return `
+    <div class="req-admin-card" style="border-left:4px solid ${borderColor}">
+      <div class="req-admin-card-header">
+        <div>
+          <div class="req-book-title">${esc(r.title)} ${!isFb?`<span class="req-vote-admin">👍 ${r.votes||0}</span>`:""}</div>
+          ${r.author ? `<span class="req-author-badge">著：${esc(r.author)}</span>` : ""}
+        </div>
+        <button class="news-del req-del" data-id="${r.id}" title="削除">🗑</button>
+      </div>
+      ${r.reason ? `<div class="req-reason">"${esc(r.reason)}"</div>` : ""}
+      <div class="req-meta">${r.room ? `🏠 ${esc(r.room)}　` : ""}🕐 ${(r.created_at||"").slice(0,10)}</div>
+      <div class="req-admin-controls">
+        <select class="req-status-sel" data-id="${r.id}">${statusOpts}</select>
+        <input class="req-note-input" type="text" placeholder="管理者メモ（非公開）"
+          value="${esc(r.note||"")}" data-id="${r.id}" />
+      </div>
+      <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+        <input class="req-reply-input" type="text" placeholder="📣 居住者への返答（一覧に表示されます）"
+          value="${esc(r.reply||"")}" data-id="${r.id}"
+          style="flex:1;padding:7px 10px;border-radius:6px;border:1px solid #5b8dd9;font-size:0.85rem">
+        <button class="req-reply-save" data-id="${r.id}" style="padding:7px 14px;border-radius:6px;background:#5b8dd9;color:#fff;border:none;cursor:pointer;font-size:0.85rem">返答を保存</button>
+      </div>
+    </div>`;
+}
+
+function bindReqAdminEvents(container) {
+  container.querySelectorAll(".req-status-sel").forEach(sel => {
+    sel.addEventListener("change", async () => {
+      await fetch(`/api/requests/${sel.dataset.id}`, {
+        method:"PATCH", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({password: reqAdminPass, status: sel.value})
+      });
+      loadReqManage();
+    });
+  });
+  container.querySelectorAll(".req-note-input").forEach(inp => {
+    const save = async () => {
+      await fetch(`/api/requests/${inp.dataset.id}`, {
+        method:"PATCH", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({password: reqAdminPass, note: inp.value})
+      });
+    };
+    inp.addEventListener("blur", save);
+    inp.addEventListener("keydown", e => { if (e.key==="Enter") { save(); inp.blur(); }});
+  });
+  container.querySelectorAll(".req-reply-save").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.id;
+      const reply = container.querySelector(`.req-reply-input[data-id="${id}"]`).value.trim();
+      btn.textContent = "保存中…"; btn.disabled = true;
+      await fetch(`/api/requests/${id}`, {
+        method:"PATCH", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({password: reqAdminPass, reply})
+      });
+      btn.textContent = "✅ 保存済"; setTimeout(() => { btn.textContent = "返答を保存"; btn.disabled = false; }, 1500);
+    });
+  });
+  container.querySelectorAll(".req-del").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("このリクエストを削除しますか？")) return;
+      await fetch(`/api/requests/${btn.dataset.id}`, {
+        method:"DELETE", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({password: reqAdminPass})
+      });
+      loadReqManage();
+    });
+  });
+}
+
 async function loadReqManage() {
-  const el = document.getElementById("reqAdminList");
-  el.innerHTML = '<div class="loading">読み込み中…</div>';
+  const elBooks = document.getElementById("reqAdminBooks");
+  const elFb = document.getElementById("reqAdminFeedback");
+  elBooks.innerHTML = '<div class="loading">読み込み中…</div>';
+  elFb.innerHTML = '<div class="loading">読み込み中…</div>';
+
   const res = await fetch("/api/requests");
   const items = await res.json();
 
@@ -1829,96 +1918,35 @@ async function loadReqManage() {
     else { if (cnt[r.status]!==undefined) cnt[r.status]++; else cnt.pending++; }
   });
   document.getElementById("reqSummary").innerHTML = `
-    <div style="font-size:0.75rem;color:#666;font-weight:600;width:100%;margin-bottom:4px">📖 本のリクエスト</div>
     <div class="req-sum-box"><div class="req-sum-num" style="color:#888">${cnt.pending}</div><div class="req-sum-lbl">⏳ 検討中</div></div>
     <div class="req-sum-box"><div class="req-sum-num" style="color:#3d8a4f">${cnt.approved}</div><div class="req-sum-lbl">✅ 購入決定</div></div>
     <div class="req-sum-box"><div class="req-sum-num" style="color:#c00">${cnt.rejected}</div><div class="req-sum-lbl">❌ 見送り</div></div>
     <div class="req-sum-box"><div class="req-sum-num" style="color:#555">${cnt.done}</div><div class="req-sum-lbl">📦 入荷済</div></div>
-    <div style="font-size:0.75rem;color:#666;font-weight:600;width:100%;margin:8px 0 4px">💬 ご要望・ご意見</div>
-    <div class="req-sum-box"><div class="req-sum-num" style="color:#5b8dd9">${fbTotal}</div><div class="req-sum-lbl">📬 合計</div></div>
+    <div class="req-sum-box" style="border-left:2px solid #e0e0e0;padding-left:12px;margin-left:4px"><div class="req-sum-num" style="color:#5b8dd9">${fbTotal}</div><div class="req-sum-lbl">💬 ご要望</div></div>
     <div class="req-sum-box"><div class="req-sum-num" style="color:#3d8a4f">${fbDone}</div><div class="req-sum-lbl">✅ 対応済</div></div>`;
 
-  if (!items.length) { el.innerHTML = '<div class="loading">リクエストはまだありません</div>'; return; }
-  el.innerHTML = items.map(r => `
-    <div class="req-admin-card" style="border-left:4px solid ${r.type==="feedback"?"#5b8dd9":"#3d6b4f"}">
-      <div class="req-admin-card-header">
-        <div>
-          <span style="font-size:0.75rem;color:${r.type==="feedback"?"#5b8dd9":"#3d6b4f"};font-weight:600">${r.type==="feedback"?"💬 ご要望・ご意見":"📖 本のリクエスト"}</span>
-          <div class="req-book-title">${esc(r.title)} ${r.type!=="feedback"?`<span class="req-vote-admin">👍 ${r.votes||0}</span>`:""}</div>
-          ${r.author ? `<span class="req-author-badge">著：${esc(r.author)}</span>` : ""}
-        </div>
-        <button class="news-del req-del" data-id="${r.id}" title="削除">🗑</button>
-      </div>
-      ${r.reason ? `<div class="req-reason">"${esc(r.reason)}"</div>` : ""}
-      <div class="req-meta">${r.room ? `🏠 ${esc(r.room)}　` : ""}🕐 ${(r.created_at||"").slice(0,10)}</div>
-      <div class="req-admin-controls">
-        <select class="req-status-sel" data-id="${r.id}">
-          ${r.type==="feedback" ? `
-          <option value="fb_received" ${r.status==="fb_received"||!r.status?"selected":""}>📬 受付中</option>
-          <option value="fb_checking" ${r.status==="fb_checking"?"selected":""}>🔍 確認中</option>
-          <option value="fb_done"     ${r.status==="fb_done"    ?"selected":""}>✅ 対応済</option>
-          <option value="fb_rejected" ${r.status==="fb_rejected"?"selected":""}>❌ 見送り</option>
-          <option value="fb_pending"  ${r.status==="fb_pending" ?"selected":""}>⏳ 検討中</option>
-          <option value="fb_noted"    ${r.status==="fb_noted"   ?"selected":""}>📝 参考意見として受理</option>
-          <option value="fb_none"     ${r.status==="fb_none"    ?"selected":""}>➖ 対応なし</option>
-          ` : `
-          <option value="pending"  ${r.status==="pending" ||!r.status?"selected":""}>⏳ 検討中</option>
-          <option value="approved" ${r.status==="approved"?"selected":""}>✅ 購入決定</option>
-          <option value="rejected" ${r.status==="rejected"?"selected":""}>❌ 見送り</option>
-          <option value="done"     ${r.status==="done"    ?"selected":""}>📦 入荷済</option>
-          `}
-        </select>
-        <input class="req-note-input" type="text" placeholder="管理者メモ（非公開）"
-          value="${esc(r.note||"")}" data-id="${r.id}" />
-      </div>
-      <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
-        <input class="req-reply-input" type="text" placeholder="📣 居住者への返答（一覧に表示されます）"
-          value="${esc(r.reply||"")}" data-id="${r.id}"
-          style="flex:1;padding:7px 10px;border-radius:6px;border:1px solid #5b8dd9;font-size:0.85rem">
-        <button class="req-reply-save" data-id="${r.id}" style="padding:7px 14px;border-radius:6px;background:#5b8dd9;color:#fff;border:none;cursor:pointer;font-size:0.85rem">返答を保存</button>
-      </div>
-    </div>`).join("");
+  const books = items.filter(r => r.type !== "feedback");
+  const fbs = items.filter(r => r.type === "feedback");
 
-  el.querySelectorAll(".req-status-sel").forEach(sel => {
-    sel.addEventListener("change", async () => {
-      await fetch(`/api/requests/${sel.dataset.id}`, {
-        method:"PATCH", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({password: reqAdminPass, status: sel.value})
+  elBooks.innerHTML = books.length ? books.map(reqAdminCardHtml).join("") : '<div class="loading">本のリクエストはまだありません</div>';
+  elFb.innerHTML = fbs.length ? fbs.map(reqAdminCardHtml).join("") : '<div class="loading">ご要望・ご意見はまだありません</div>';
+
+  bindReqAdminEvents(elBooks);
+  bindReqAdminEvents(elFb);
+
+  // サブタブ切り替え
+  document.querySelectorAll(".req-subtab-btn").forEach(btn => {
+    btn.onclick = () => {
+      const isBooks = btn.dataset.subtab === "books";
+      document.querySelectorAll(".req-subtab-btn").forEach(b => {
+        const bIsBooks = b.dataset.subtab === "books";
+        b.style.color = b === btn ? (bIsBooks ? "#3d6b4f" : "#5b8dd9") : "#aaa";
+        b.style.borderBottomColor = b === btn ? (bIsBooks ? "#3d6b4f" : "#5b8dd9") : "transparent";
+        b.classList.toggle("active", b === btn);
       });
-      loadReqManage();
-    });
-  });
-  el.querySelectorAll(".req-note-input").forEach(inp => {
-    const save = async () => {
-      await fetch(`/api/requests/${inp.dataset.id}`, {
-        method:"PATCH", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({password: reqAdminPass, note: inp.value})
-      });
+      elBooks.style.display = isBooks ? "" : "none";
+      elFb.style.display = isBooks ? "none" : "";
     };
-    inp.addEventListener("blur", save);
-    inp.addEventListener("keydown", e => { if (e.key==="Enter") { save(); inp.blur(); }});
-  });
-  el.querySelectorAll(".req-reply-save").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const id = btn.dataset.id;
-      const reply = el.querySelector(`.req-reply-input[data-id="${id}"]`).value.trim();
-      btn.textContent = "保存中…"; btn.disabled = true;
-      await fetch(`/api/requests/${id}`, {
-        method:"PATCH", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({password: reqAdminPass, reply})
-      });
-      btn.textContent = "✅ 保存済"; setTimeout(() => { btn.textContent = "返答を保存"; btn.disabled = false; }, 1500);
-    });
-  });
-  el.querySelectorAll(".req-del").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      if (!confirm("このリクエストを削除しますか？")) return;
-      await fetch(`/api/requests/${btn.dataset.id}`, {
-        method:"DELETE", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({password: reqAdminPass})
-      });
-      loadReqManage();
-    });
   });
 }
 

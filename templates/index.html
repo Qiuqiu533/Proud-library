@@ -487,7 +487,12 @@
       <!-- Book Requests (admin) -->
       <div id="btab-brequest" class="board-tab-panel">
         <div class="req-admin-summary" id="reqSummary"></div>
-        <div id="reqAdminList"><div class="loading">読み込み中…</div></div>
+        <div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:2px solid #e8e8e8;padding-bottom:0">
+          <button class="req-subtab-btn active" data-subtab="books" style="padding:8px 18px;border:none;background:none;cursor:pointer;font-size:0.9rem;font-weight:600;color:#3d6b4f;border-bottom:2px solid #3d6b4f;margin-bottom:-2px">📖 本のリクエスト</button>
+          <button class="req-subtab-btn" data-subtab="feedback" style="padding:8px 18px;border:none;background:none;cursor:pointer;font-size:0.9rem;font-weight:600;color:#aaa;border-bottom:2px solid transparent;margin-bottom:-2px">💬 ご要望・ご意見</button>
+        </div>
+        <div id="reqAdminBooks"><div class="loading">読み込み中…</div></div>
+        <div id="reqAdminFeedback" style="display:none"><div class="loading">読み込み中…</div></div>
       </div>
 
       <!-- Loaned books -->
