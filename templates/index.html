@@ -245,15 +245,19 @@
           <p id="reqMsg" class="rate-msg" style="margin-top:10px"></p>
         </div>
 
-        <div class="req-form-card" style="margin-top:20px">
+        <div class="req-form-card" style="margin-top:20px;border-left:4px solid #5b8dd9">
           <h3>💬 図書館へのご要望・ご意見</h3>
           <p class="req-form-desc">蔵書・運営に関するご要望や、図書館委員会へのご意見をお気軽にどうぞ。</p>
+          <div class="req-field">
+            <label>件名 <span class="req-required">*</span></label>
+            <input type="text" id="fbTitle" placeholder="例：返却方法について、〇〇コーナーの提案" maxlength="80" />
+          </div>
           <div class="req-field">
             <label>お名前・部屋番号（任意）</label>
             <input type="text" id="fbRoom" placeholder="例：5-533またはお名前" maxlength="30" />
           </div>
           <div class="req-field">
-            <label>ご要望・ご意見 <span class="req-required">*</span></label>
+            <label>内容 <span class="req-required">*</span></label>
             <textarea id="fbBody" placeholder="例：〇〇コーナーを作ってほしい、返却期限を延ばしてほしい、など" rows="4" maxlength="500"></textarea>
           </div>
           <button class="btn-primary req-submit-btn" id="fbSubmitBtn">📩 送信する</button>

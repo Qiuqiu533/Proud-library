@@ -1719,21 +1719,23 @@ document.getElementById("reqSubmitBtn").addEventListener("click", async () => {
 
 // ===== 図書館へのご要望フォーム =====
 document.getElementById("fbSubmitBtn").addEventListener("click", async () => {
+  const title = document.getElementById("fbTitle").value.trim();
   const body = document.getElementById("fbBody").value.trim();
   const room = document.getElementById("fbRoom").value.trim();
   const msg = document.getElementById("fbMsg");
-  if (!body) { msg.textContent = "⚠️ ご要望・ご意見を入力してください"; msg.style.color = "#e05"; return; }
+  if (!title) { msg.textContent = "⚠️ 件名を入力してください"; msg.style.color = "#e05"; return; }
+  if (!body) { msg.textContent = "⚠️ 内容を入力してください"; msg.style.color = "#e05"; return; }
   const btn = document.getElementById("fbSubmitBtn");
   btn.disabled = true; btn.textContent = "送信中…";
-  const pass = residentPassword || "proud2525";
   const res = await fetch("/api/requests", {
     method: "POST", headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({password: pass, title: "【ご要望・ご意見】" + body.slice(0, 40), author: "", reason: body, room})
+    body: JSON.stringify({title, author: "", reason: body, room, type: "feedback"})
   });
   btn.disabled = false; btn.textContent = "📩 送信する";
   if (res.ok) {
     msg.textContent = "✅ 送信しました！ありがとうございます。";
     msg.style.color = "#3d6b4f";
+    document.getElementById("fbTitle").value = "";
     document.getElementById("fbBody").value = "";
     document.getElementById("fbRoom").value = "";
     showReqToast("✅ ご要望を送信しました！");
@@ -1762,24 +1764,29 @@ async function loadReqList() {
   const order = {pending:0, approved:1, rejected:2, done:3};
   const sorted = [...items].sort((a,b) => (order[a.status]??0) - (order[b.status]??0) || (b.votes||0) - (a.votes||0));
   el.innerHTML = sorted.map(r => {
+    const isFeedback = r.type === "feedback";
     const voted = votedIds.includes(r.id);
     const votes = r.votes || 0;
+    const borderColor = isFeedback ? "#5b8dd9" : "#3d6b4f";
+    const icon = isFeedback ? "💬" : "📖";
+    const voteBtn = isFeedback ? "" : `
+        <button class="req-vote-btn${voted?" req-vote-done":""}" data-id="${r.id}" ${(r.status==="done"||r.status==="rejected")?"disabled":""}>
+          👍 <span class="req-vote-count">${votes}</span>${voted?" 済":" 読みたい"}
+        </button>`;
     return `
-    <div class="req-card" data-id="${r.id}">
+    <div class="req-card" data-id="${r.id}" style="border-left:4px solid ${borderColor}">
       <div class="req-card-header">
         <div class="req-card-left">
-          <span class="req-book-title">📖 ${esc(r.title)}</span>
+          <span class="req-book-title">${icon} ${esc(r.title)}</span>
           ${r.author ? `<span class="req-author-badge">著：${esc(r.author)}</span>` : ""}
         </div>
         <span class="req-status-badge" style="color:${stColor[r.status]||"#888"}">${stLabel[r.status]||""}</span>
       </div>
       ${r.reason ? `<div class="req-reason">"${esc(r.reason)}"</div>` : ""}
-      ${r.note ? `<div class="req-note">📝 ${esc(r.note)}</div>` : ""}
+      ${r.reply ? `<div class="req-reply">📣 図書館より：${esc(r.reply)}</div>` : ""}
       <div class="req-card-footer">
         <div class="req-meta">🕐 ${(r.created_at||"").slice(0,10)}</div>
-        <button class="req-vote-btn${voted?" req-vote-done":""}" data-id="${r.id}" ${(r.status==="done"||r.status==="rejected")?"disabled":""}>
-          👍 <span class="req-vote-count">${votes}</span>${voted?" 済":" 読みたい"}
-        </button>
+        ${voteBtn}
       </div>
     </div>`;
   }).join("");
@@ -1820,16 +1827,17 @@ async function loadReqManage() {
 
   if (!items.length) { el.innerHTML = '<div class="loading">リクエストはまだありません</div>'; return; }
   el.innerHTML = items.map(r => `
-    <div class="req-admin-card">
+    <div class="req-admin-card" style="border-left:4px solid ${r.type==="feedback"?"#5b8dd9":"#3d6b4f"}">
       <div class="req-admin-card-header">
         <div>
-          <div class="req-book-title">📖 ${esc(r.title)} <span class="req-vote-admin">👍 ${r.votes||0}</span></div>
+          <span style="font-size:0.75rem;color:${r.type==="feedback"?"#5b8dd9":"#3d6b4f"};font-weight:600">${r.type==="feedback"?"💬 ご要望・ご意見":"📖 本のリクエスト"}</span>
+          <div class="req-book-title">${esc(r.title)} ${r.type!=="feedback"?`<span class="req-vote-admin">👍 ${r.votes||0}</span>`:""}</div>
           ${r.author ? `<span class="req-author-badge">著：${esc(r.author)}</span>` : ""}
         </div>
         <button class="news-del req-del" data-id="${r.id}" title="削除">🗑</button>
       </div>
       ${r.reason ? `<div class="req-reason">"${esc(r.reason)}"</div>` : ""}
-      <div class="req-meta">${r.room ? `🏠 ${esc(r.room)}　` : ""}🕐 ${r.created_at.slice(0,10)}</div>
+      <div class="req-meta">${r.room ? `🏠 ${esc(r.room)}　` : ""}🕐 ${(r.created_at||"").slice(0,10)}</div>
       <div class="req-admin-controls">
         <select class="req-status-sel" data-id="${r.id}">
           <option value="pending"  ${r.status==="pending"  ?"selected":""}>⏳ 検討中</option>
@@ -1837,8 +1845,14 @@ async function loadReqManage() {
           <option value="rejected" ${r.status==="rejected"?"selected":""}>❌ 見送り</option>
           <option value="done"     ${r.status==="done"    ?"selected":""}>📦 入荷済</option>
         </select>
-        <input class="req-note-input" type="text" placeholder="管理者メモ（任意）"
+        <input class="req-note-input" type="text" placeholder="管理者メモ（非公開）"
           value="${esc(r.note||"")}" data-id="${r.id}" />
+      </div>
+      <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+        <input class="req-reply-input" type="text" placeholder="📣 居住者への返答（一覧に表示されます）"
+          value="${esc(r.reply||"")}" data-id="${r.id}"
+          style="flex:1;padding:7px 10px;border-radius:6px;border:1px solid #5b8dd9;font-size:0.85rem">
+        <button class="req-reply-save" data-id="${r.id}" style="padding:7px 14px;border-radius:6px;background:#5b8dd9;color:#fff;border:none;cursor:pointer;font-size:0.85rem">返答を保存</button>
       </div>
     </div>`).join("");
 
@@ -1860,6 +1874,18 @@ async function loadReqManage() {
     };
     inp.addEventListener("blur", save);
     inp.addEventListener("keydown", e => { if (e.key==="Enter") { save(); inp.blur(); }});
+  });
+  el.querySelectorAll(".req-reply-save").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.id;
+      const reply = el.querySelector(`.req-reply-input[data-id="${id}"]`).value.trim();
+      btn.textContent = "保存中…"; btn.disabled = true;
+      await fetch(`/api/requests/${id}`, {
+        method:"PATCH", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({password: reqAdminPass, reply})
+      });
+      btn.textContent = "✅ 保存済"; setTimeout(() => { btn.textContent = "返答を保存"; btn.disabled = false; }, 1500);
+    });
   });
   el.querySelectorAll(".req-del").forEach(btn => {
     btn.addEventListener("click", async () => {

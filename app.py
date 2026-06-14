@@ -529,6 +529,7 @@ def _ensure_db():
     threading.Thread(target=_migrate_genre_map_to_db, daemon=True).start()
     threading.Thread(target=_migrate_ndc_genres, daemon=True).start()
     threading.Thread(target=_migrate_add_votes_column, daemon=True).start()
+    threading.Thread(target=_migrate_add_type_reply_columns, daemon=True).start()
 
 
 def _migrate_add_votes_column():
@@ -549,6 +550,23 @@ def _migrate_add_votes_column():
         con.close()
     except Exception as e:
         print(f"migrate votes error: {e}")
+
+def _migrate_add_type_reply_columns():
+    try:
+        con = get_con()
+        for col, default in [("type", "'request'"), ("reply", "''")]:
+            try:
+                if USE_PG:
+                    con.cursor().execute(f"ALTER TABLE book_requests ADD COLUMN {col} TEXT DEFAULT {default}")
+                    con.commit()
+                else:
+                    con.execute(f"ALTER TABLE book_requests ADD COLUMN {col} TEXT DEFAULT {default}")
+                    con.commit()
+            except Exception:
+                if USE_PG: con.rollback()
+        con.close()
+    except Exception as e:
+        print(f"migrate type/reply error: {e}")
 
 def _migrate_genre_map_to_db():
     """genre_map.json が存在し DB が空なら一度だけ移行する"""
@@ -1349,20 +1367,21 @@ def api_delete_announcement(ann_id):
 @app.route("/api/requests")
 def api_requests():
     con = get_con()
-    rows = fetchall(con, "SELECT id,title,author,reason,room,status,note,votes,created_at FROM book_requests ORDER BY votes DESC, id DESC")
+    rows = fetchall(con, "SELECT id,title,author,reason,room,status,note,votes,created_at,type,reply FROM book_requests ORDER BY votes DESC, id DESC")
     con.close()
-    return jsonify([{**r, "created_at": str(r["created_at"])[:10]} for r in rows])
+    return jsonify([{**r, "created_at": str(r["created_at"])[:10], "type": r.get("type") or "request", "reply": r.get("reply") or ""} for r in rows])
 
 
 @app.route("/api/requests", methods=["POST"])
 def api_post_request():
     body = request.get_json()
     title = body.get("title", "").strip()
+    req_type = body.get("type", "request")
     if not title:
         return jsonify({"error": "title required"}), 400
     con = get_con()
-    execute(con, "INSERT INTO book_requests (title,author,reason,room) VALUES (?,?,?,?)",
-        (title, body.get("author","").strip(), body.get("reason","").strip(), body.get("room","").strip()))
+    execute(con, "INSERT INTO book_requests (title,author,reason,room,type) VALUES (?,?,?,?,?)",
+        (title, body.get("author","").strip(), body.get("reason","").strip(), body.get("room","").strip(), req_type))
     con.commit(); con.close()
     return jsonify({"ok": True})
 
@@ -1386,6 +1405,8 @@ def api_update_request(req_id):
         execute(con, "UPDATE book_requests SET status=? WHERE id=?", (body["status"], req_id))
     if "note" in body:
         execute(con, "UPDATE book_requests SET note=? WHERE id=?", (body["note"], req_id))
+    if "reply" in body:
+        execute(con, "UPDATE book_requests SET reply=? WHERE id=?", (body["reply"], req_id))
     con.commit(); con.close()
     return jsonify({"ok": True})
 
