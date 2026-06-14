@@ -1795,7 +1795,7 @@ async function loadReqList() {
     });
   });
   } catch(e) {
-    el.innerHTML = '<div class="loading">読み込みに失敗しました。再度お試しください。</div>';
+    el.innerHTML = `<div class="loading">読み込みに失敗しました：${e.message}</div>`;
   }
 }
 
