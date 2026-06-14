@@ -482,6 +482,15 @@ async function loadLog(filter = "all") {
 
 // ===== Announcements =====
 function newsItemHtml(item, showDelete) {
+  const images = item.images || (item.image_url ? [item.image_url] : []);
+  const imagesHtml = images.length
+    ? `<div class="news-imgs">${images.map(src => `<img class="news-img" src="${src}" alt="画像" onerror="this.style.display='none'">`).join("")}</div>`
+    : "";
+  const editImagesHtml = images.map((src, i) => `
+    <div class="news-edit-img-row" data-index="${i}" style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <img src="${src}" style="width:80px;height:60px;object-fit:cover;border-radius:6px" onerror="this.style.display='none'">
+      <button class="news-edit-remove-img" data-id="${item.id}" data-index="${i}" style="padding:4px 10px;border-radius:6px;border:1px solid #e05;color:#e05;background:#fff;cursor:pointer;font-size:0.8rem">🗑 削除</button>
+    </div>`).join("");
   return `
     <div class="news-card" data-id="${item.id}">
       <div class="news-meta">
@@ -491,7 +500,7 @@ function newsItemHtml(item, showDelete) {
       </div>
       <div class="news-title">${item.title}</div>
       <div class="news-body">${item.body.replace(/\n/g, "<br>")}</div>
-      ${item.image_url ? `<img class="news-img" src="${item.image_url}" alt="画像" onerror="this.style.display='none'">` : ""}
+      ${imagesHtml}
       <div class="news-edit-form" id="news-edit-form-${item.id}" style="display:none;margin-top:12px;border-top:1px solid #eee;padding-top:12px">
         <select class="news-edit-cat" data-id="${item.id}" style="margin-bottom:8px;padding:6px;border-radius:6px;border:1px solid #ccc;width:100%">
           ${["お知らせ","イベント","図書委員会"].map(c => `<option value="${c}" ${item.category===c?"selected":""}>${c}</option>`).join("")}
@@ -499,17 +508,12 @@ function newsItemHtml(item, showDelete) {
         <input type="text" class="news-edit-title" data-id="${item.id}" value="${item.title.replace(/"/g,'&quot;')}" placeholder="タイトル" style="width:100%;margin-bottom:8px;padding:8px;border-radius:6px;border:1px solid #ccc;box-sizing:border-box">
         <textarea class="news-edit-body" data-id="${item.id}" rows="4" style="width:100%;margin-bottom:8px;padding:8px;border-radius:6px;border:1px solid #ccc;box-sizing:border-box">${item.body}</textarea>
         <div style="margin-bottom:8px">
-          <label style="font-size:0.85rem;color:#666;display:block;margin-bottom:4px">画像（ファイルを選択またはURLを入力）</label>
-          ${item.image_url ? `<img class="news-edit-img-preview" data-id="${item.id}" src="${item.image_url}" style="max-width:200px;max-height:120px;display:block;margin-bottom:6px;border-radius:6px" onerror="this.style.display='none'">` : ""}
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
-            <label style="display:inline-block;padding:6px 12px;background:#f0f0f0;border-radius:6px;cursor:pointer;font-size:0.85rem">
-              📷 画像を選択
-              <input type="file" class="news-edit-file" data-id="${item.id}" accept="image/*" style="display:none">
-            </label>
-            <span class="news-edit-filename" data-id="${item.id}" style="font-size:0.8rem;color:#888">未選択</span>
-            <button class="news-edit-clear-img" data-id="${item.id}" style="padding:6px 12px;border-radius:6px;border:1px solid #e05;color:#e05;background:#fff;cursor:pointer;font-size:0.85rem${item.image_url?'':';display:none'}">🗑 画像を削除</button>
-          </div>
-          <input type="text" class="news-edit-img" data-id="${item.id}" value="${(item.image_url||"").replace(/"/g,'&quot;')}" placeholder="または画像URLを入力" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ccc;box-sizing:border-box">
+          <label style="font-size:0.85rem;color:#666;display:block;margin-bottom:6px">📷 画像（複数追加可）</label>
+          <div class="news-edit-img-list" data-id="${item.id}">${editImagesHtml}</div>
+          <label style="display:inline-block;padding:6px 12px;background:#f0f0f0;border-radius:6px;cursor:pointer;font-size:0.85rem;margin-top:4px">
+            ＋ 画像を追加
+            <input type="file" class="news-edit-file" data-id="${item.id}" accept="image/*" multiple style="display:none">
+          </label>
         </div>
         <div style="display:flex;gap:8px">
           <button class="news-edit-save btn-primary" data-id="${item.id}" style="flex:1">💾 保存</button>
@@ -561,38 +565,28 @@ async function loadAdminNews() {
       if (form) form.style.display = "none";
     });
   });
-  // 画像削除
-  list.querySelectorAll(".news-edit-clear-img").forEach(btn => {
+  // 既存画像の個別削除
+  list.querySelectorAll(".news-edit-remove-img").forEach(btn => {
     btn.addEventListener("click", () => {
-      const id = btn.dataset.id;
-      list.querySelector(`.news-edit-img[data-id="${id}"]`).value = "";
-      list.querySelector(`.news-edit-filename[data-id="${id}"]`).textContent = "未選択";
-      const preview = list.querySelector(`.news-edit-img-preview[data-id="${id}"]`);
-      if (preview) preview.style.display = "none";
-      btn.style.display = "none";
+      btn.closest(".news-edit-img-row").remove();
     });
   });
-  // 画像ファイル選択
+  // 画像ファイル追加（複数対応）
   list.querySelectorAll(".news-edit-file").forEach(input => {
     input.addEventListener("change", async (e) => {
       const id = input.dataset.id;
-      const file = e.target.files?.[0];
-      if (!file) return;
-      list.querySelector(`.news-edit-filename[data-id="${id}"]`).textContent = file.name;
-      const base64 = await resizeImageFile(file);
-      const imgUrl = list.querySelector(`.news-edit-img[data-id="${id}"]`);
-      imgUrl.value = base64;
-      const clearBtn = list.querySelector(`.news-edit-clear-img[data-id="${id}"]`);
-      if (clearBtn) clearBtn.style.display = "";
-      let preview = list.querySelector(`.news-edit-img-preview[data-id="${id}"]`);
-      if (!preview) {
-        preview = document.createElement("img");
-        preview.className = "news-edit-img-preview";
-        preview.dataset.id = id;
-        preview.style.cssText = "max-width:200px;max-height:120px;display:block;margin-bottom:6px;border-radius:6px";
-        input.closest("div").prepend(preview);
+      const imgList = list.querySelector(`.news-edit-img-list[data-id="${id}"]`);
+      for (const file of Array.from(e.target.files || [])) {
+        const base64 = await resizeImageFile(file);
+        const row = document.createElement("div");
+        row.className = "news-edit-img-row";
+        row.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:6px";
+        row.innerHTML = `<img src="${base64}" style="width:80px;height:60px;object-fit:cover;border-radius:6px">
+          <button class="news-edit-remove-img-dynamic" style="padding:4px 10px;border-radius:6px;border:1px solid #e05;color:#e05;background:#fff;cursor:pointer;font-size:0.8rem">🗑 削除</button>`;
+        row.querySelector(".news-edit-remove-img-dynamic").addEventListener("click", () => row.remove());
+        imgList.appendChild(row);
       }
-      preview.src = base64;
+      input.value = "";
     });
   });
   list.querySelectorAll(".news-edit-save").forEach(btn => {
@@ -603,13 +597,15 @@ async function loadAdminNews() {
       const title = list.querySelector(`.news-edit-title[data-id="${id}"]`).value.trim();
       const body = list.querySelector(`.news-edit-body[data-id="${id}"]`).value.trim();
       const category = list.querySelector(`.news-edit-cat[data-id="${id}"]`).value;
-      const image_url = list.querySelector(`.news-edit-img[data-id="${id}"]`).value.trim();
+      // 残っている画像行からsrcを収集
+      const imgList = list.querySelector(`.news-edit-img-list[data-id="${id}"]`);
+      const images = Array.from(imgList.querySelectorAll("img")).map(img => img.src).filter(Boolean);
       const msg = list.querySelector(`.news-edit-msg[data-id="${id}"]`);
       if (!title || !body) { msg.textContent = "⚠️ タイトルと本文は必須です"; msg.style.color = "#e05"; return; }
       btn.disabled = true; btn.textContent = "保存中…";
       const r = await fetch(`/api/announcements/${id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: pass, title, body, category, image_url })
+        body: JSON.stringify({ password: pass, title, body, category, images })
       });
       btn.disabled = false; btn.textContent = "💾 保存";
       if (r.ok) {
@@ -967,47 +963,61 @@ function resizeImageFile(file, maxWidth = 1000) {
   });
 }
 
-let newsImageData = ""; // URL or base64
+let newsImages = []; // 投稿フォームの画像リスト（base64 or URL）
+
+function renderNewsImageList() {
+  const container = document.getElementById("newsImageList");
+  if (!container) return;
+  container.innerHTML = newsImages.map((src, i) => `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <img src="${src}" style="width:80px;height:60px;object-fit:cover;border-radius:6px" onerror="this.style.display='none'">
+      <button type="button" class="news-img-remove" data-index="${i}" style="padding:4px 10px;border-radius:6px;border:1px solid #e05;color:#e05;background:#fff;cursor:pointer;font-size:0.8rem">🗑 削除</button>
+    </div>`).join("");
+  container.querySelectorAll(".news-img-remove").forEach(btn => {
+    btn.addEventListener("click", () => {
+      newsImages.splice(parseInt(btn.dataset.index), 1);
+      renderNewsImageList();
+    });
+  });
+}
 
 function clearNewsImage() {
-  newsImageData = "";
+  newsImages = [];
   document.getElementById("newsImage").value = "";
   document.getElementById("newsImageFile").value = "";
   document.getElementById("newsImageFileName").textContent = "未選択";
   document.getElementById("newsImagePreview").style.display = "none";
   document.getElementById("newsPreviewImg").src = "";
-}
-
-function showNewsPreview(src) {
-  const preview = document.getElementById("newsImagePreview");
-  const img = document.getElementById("newsPreviewImg");
-  img.src = src;
-  img.onload = () => { preview.style.display = "block"; };
-  img.onerror = () => { preview.style.display = "none"; };
+  renderNewsImageList();
 }
 
 // URL入力でプレビュー
 document.getElementById("newsImage").addEventListener("input", e => {
   const url = e.target.value.trim();
+  const preview = document.getElementById("newsImagePreview");
+  const img = document.getElementById("newsPreviewImg");
   if (url) {
-    newsImageData = url;
-    newsImageFile.value = "";
-    document.getElementById("newsImageFileName").textContent = "未選択";
-    showNewsPreview(url);
+    img.src = url;
+    img.onload = () => { preview.style.display = "block"; };
+    img.onerror = () => { preview.style.display = "none"; };
   } else {
-    newsImageData = "";
-    document.getElementById("newsImagePreview").style.display = "none";
+    preview.style.display = "none";
   }
 });
 
-// ファイル選択でプレビュー
+// ファイル選択（複数）でプレビュー
 document.getElementById("newsImageFile").addEventListener("change", async (e) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
-  document.getElementById("newsImageFileName").textContent = file.name;
+  const files = Array.from(e.target.files || []);
+  if (!files.length) return;
+  document.getElementById("newsImageFileName").textContent = files.map(f => f.name).join(", ");
   document.getElementById("newsImage").value = "";
-  newsImageData = await resizeImageFile(file);
-  showNewsPreview(newsImageData);
+  document.getElementById("newsImagePreview").style.display = "none";
+  for (const file of files) {
+    const base64 = await resizeImageFile(file);
+    newsImages.push(base64);
+  }
+  renderNewsImageList();
+  e.target.value = "";
 });
 
 document.getElementById("newsClearImg")?.addEventListener("click", clearNewsImage);
@@ -1017,11 +1027,12 @@ document.getElementById("postNews")?.addEventListener("click", async () => {
   const body = document.getElementById("newsBody").value.trim();
   const pass = boardPassword;
   const cat = document.getElementById("newsCat").value;
-  const image_url = newsImageData || document.getElementById("newsImage").value.trim();
+  const urlInput = document.getElementById("newsImage").value.trim();
+  const images = [...newsImages, ...(urlInput ? [urlInput] : [])];
   if (!title || !body) { document.getElementById("newsMsg").textContent = "タイトルと内容を入力してください"; return; }
   const res = await fetch("/api/announcements", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, body, category: cat, image_url, password: pass })
+    body: JSON.stringify({ title, body, category: cat, images, password: pass })
   });
   if (res.ok) {
     document.getElementById("newsMsg").textContent = "✅ 投稿しました！";
