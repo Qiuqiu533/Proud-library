@@ -591,8 +591,9 @@ def _insert_genre_books(con, genre_map):
 
 # ── 蔵書スクレイピング ────────────────────────────────────────────────────
 def get_cover_url(isbn13, isbn10=""):
-    if isbn10:
-        return f"https://images-na.ssl-images-amazon.com/images/P/{isbn10}.09.LZZZZZZZ.jpg"
+    # OpenBDのカバー画像CDN（ISBN-13直引き・1対1対応で確実）
+    if isbn13:
+        return f"https://cover.openbd.jp/{isbn13}.jpg"
     return NDL_THUMB.format(isbn=isbn13)
 
 
