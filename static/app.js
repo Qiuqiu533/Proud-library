@@ -2407,7 +2407,7 @@ function chatMsgHtml(m) {
       ${m.image_data ? `<img src="${m.image_data}" style="max-width:240px;max-height:240px;border-radius:8px;display:block;cursor:zoom-in" onclick="(()=>{const o=document.createElement('div');o.style='position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:9999;cursor:zoom-out';o.innerHTML='<img src=\\'${m.image_data}\\' style=\\'max-width:90vw;max-height:90vh;border-radius:8px\\'>';o.onclick=()=>o.remove();document.body.appendChild(o)})()">` : ""}
       ${m.message ? `<div style="${m.image_data?"margin-top:6px;padding:0 6px 4px":""}">${esc(m.message)}</div>` : ""}
     </div>`;
-  const delBtn = `<button class="chat-del-btn" data-id="${m.id}" title="削除" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:0.85rem;padding:2px;flex-shrink:0">🗑</button>`;
+  const delBtn = `<button class="chat-del-btn" data-id="${m.id}" title="削除" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:0.82rem;padding:4px 6px;flex-shrink:0;border-radius:6px;transition:background 0.15s" onmouseover="this.style.background='#f0e0e0';this.style.color='#c00'" onmouseout="this.style.background='';this.style.color='#ccc'">🗑</button>`;
   return `
   <div style="display:flex;flex-direction:column;align-items:${isMe?"flex-end":"flex-start"};gap:2px">
     <div style="font-size:0.72rem;color:#aaa;padding:0 6px">${isMe?"":`<b>${esc(m.sender)}</b>　`}${time}</div>
