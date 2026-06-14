@@ -374,14 +374,14 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
 /* ===== 今日の1冊 ===== */
 .today-book-section { background: linear-gradient(135deg, #f0faf4 0%, #e8f5ec 100%); border: 2px solid #b8ddc4; border-radius: 12px; padding: 10px 12px; margin-bottom: 14px; }
 .today-book-label { font-size: 0.72rem; font-weight: 700; color: #3d6b4f; letter-spacing: 0.05em; margin-bottom: 8px; }
-#todayBookCard { display: flex; gap: 10px; overflow-x: auto; }
-.today-book-inner { display: flex; gap: 8px; cursor: pointer; flex-shrink: 0; max-width: 200px; }
-.today-book-inner:hover { opacity: 0.85; }
-.today-book-cover { width: 44px; height: 62px; object-fit: cover; border-radius: 4px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); flex-shrink: 0; }
-.today-book-cover-placeholder { width: 44px; height: 62px; background: #d0e8d8; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0; }
-.today-book-info { display: flex; flex-direction: column; justify-content: center; gap: 2px; overflow: hidden; }
-.today-book-title { font-size: 0.78rem; font-weight: 700; color: #1a3a28; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-.today-book-author { font-size: 0.7rem; color: #556b5a; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+#todayBookCard { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+#todayBookCard::-webkit-scrollbar { display: none; }
+.today-book-inner { display: flex; flex-direction: column; align-items: center; cursor: pointer; flex-shrink: 0; width: 72px; gap: 4px; }
+.today-book-inner:hover { opacity: 0.82; }
+.today-book-cover { width: 60px; height: 84px; object-fit: cover; border-radius: 5px; box-shadow: 0 2px 6px rgba(0,0,0,0.18); }
+.today-book-cover-placeholder { width: 60px; height: 84px; background: #d0e8d8; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; }
+.today-book-title { font-size: 0.68rem; font-weight: 700; color: #1a3a28; line-height: 1.3; text-align: center; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; width: 100%; }
+.today-book-author { font-size: 0.62rem; color: #556b5a; text-align: center; width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .today-book-meta { font-size: 0.68rem; color: #889e90; }
 
 /* ===== 最近見た本 ===== */
