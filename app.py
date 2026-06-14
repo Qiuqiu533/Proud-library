@@ -957,6 +957,28 @@ def api_genres():
     return jsonify([{"genre": r["genre"], "count": r["cnt"]} for r in rows])
 
 
+@app.route("/api/books/batch")
+def api_books_batch():
+    """ISBNリストをDBから一括取得（お気に入り・読書記録用）"""
+    isbns_param = request.args.get("isbns", "")
+    isbns = [i.strip() for i in isbns_param.split(",") if i.strip()][:50]
+    if not isbns:
+        return jsonify([])
+    con = get_con()
+    placeholders = ",".join(["?" for _ in isbns])
+    rows = fetchall(con, f"SELECT isbn,title,author,publisher,format FROM genre_books WHERE isbn IN ({placeholders})", tuple(isbns))
+    con.close()
+    row_map = {r["isbn"]: r for r in rows}
+    result = []
+    for isbn in isbns:
+        r = row_map.get(isbn)
+        if r:
+            isbn10 = isbn13_to_isbn10(isbn) if isbn.startswith("978") else ""
+            result.append({**r, "cover": get_cover_url(isbn, isbn10), "rating": {"score":0,"votes":0,"reviews":[]}})
+        else:
+            result.append({"isbn": isbn, "title": isbn, "author": "", "publisher": "", "cover": "", "rating": {"score":0,"votes":0,"reviews":[]}})
+    return jsonify(result)
+
 @app.route("/api/books/by-genre")
 def api_books_by_genre():
     """ジャンル別書籍一覧（DBから・ページネーション付き）"""
