@@ -534,7 +534,7 @@ def _ensure_db():
 def _migrate_add_votes_column():
     try:
         con = get_con()
-        if IS_POSTGRES:
+        if USE_PG:
             try:
                 con.cursor().execute("ALTER TABLE book_requests ADD COLUMN votes INTEGER DEFAULT 0")
                 con.commit()
