@@ -362,65 +362,161 @@ def _migrate_add_card_columns():
         print(f"card column migration error: {e}")
 
 NDC_TO_GENRE = {
-    "913": "文芸小説", "914": "エッセイ・評論", "916": "エッセイ・評論",
-    "936": "ミステリ・推理", "933": "翻訳小説", "930": "翻訳小説",
-    "950": "翻訳小説", "940": "翻訳小説", "920": "翻訳小説",
-    "979": "翻訳小説", "970": "翻訳小説", "960": "翻訳小説",
-    "726": "絵本・児童書", "Y8": "絵本・児童書", "Y9": "児童文学",
+    # 日本文学
+    "913": "文芸小説", "915": "文芸小説",
+    "914": "エッセイ・評論", "916": "エッセイ・評論", "917": "エッセイ・評論",
+    "911": "文芸小説",  # 詩
+    "912": "文芸小説",  # 戯曲
+    # 時代・歴史小説
+    "9131": "時代小説・歴史小説",  # 日本小説（江戸以前テーマ多い）
+    # ミステリ
+    "936": "ミステリ・推理",
+    # 翻訳小説（各国文学）
+    "920": "翻訳小説", "921": "翻訳小説", "922": "翻訳小説", "923": "翻訳小説",
+    "930": "翻訳小説", "931": "翻訳小説", "932": "翻訳小説", "933": "翻訳小説",
+    "934": "翻訳小説", "935": "翻訳小説", "937": "翻訳小説", "938": "翻訳小説",
+    "940": "翻訳小説", "941": "翻訳小説", "942": "翻訳小説", "943": "翻訳小説",
+    "950": "翻訳小説", "951": "翻訳小説", "953": "翻訳小説", "955": "翻訳小説",
+    "960": "翻訳小説", "961": "翻訳小説", "963": "翻訳小説",
+    "970": "翻訳小説", "971": "翻訳小説", "973": "翻訳小説",
+    "980": "翻訳小説", "981": "翻訳小説", "983": "翻訳小説",
+    "990": "翻訳小説", "993": "翻訳小説",
+    # ファンタジー・SF（NDCでは小説内サブジャンルなので書名で補完）
+    # 絵本・児童
+    "726": "絵本・児童書", "E": "絵本・児童書",
+    "Y8": "絵本・児童書", "Y81": "絵本・児童書", "Y82": "絵本・児童書",
+    "Y9": "児童文学", "Y91": "児童文学", "Y92": "児童文学",
+    # 自己啓発・ビジネス
+    "159": "実用・ハウツー",  # 人生訓
+    "336": "実用・ハウツー",  # 経営管理
+    "335": "実用・ハウツー",  # 企業・経営
+    "320": "実用・ハウツー",  # 法律
+    "330": "実用・ハウツー",  # 経済
+    "331": "実用・ハウツー",  # 経済学
+    "338": "実用・ハウツー",  # 金融
+    "141": "実用・ハウツー",  # 心理学
+    "143": "実用・ハウツー",  # 発達心理
+    "145": "実用・ハウツー",  # 異常心理
+    "146": "実用・ハウツー",  # 臨床心理
+    # 健康・医療
+    "490": "実用・ハウツー", "491": "実用・ハウツー", "492": "実用・ハウツー",
+    "493": "実用・ハウツー", "494": "実用・ハウツー", "495": "実用・ハウツー",
+    "496": "実用・ハウツー", "497": "実用・ハウツー", "498": "実用・ハウツー",
+    # 料理・生活
+    "596": "実用・ハウツー",  # 料理
+    "590": "実用・ハウツー",  # 家政
+    "591": "実用・ハウツー",  # 家庭管理
+    "593": "実用・ハウツー",  # 被服
+    "597": "実用・ハウツー",  # 住居
+    "598": "実用・ハウツー",  # 家庭衛生
+    "370": "実用・ハウツー",  # 教育
+    # 歴史・伝記
+    "210": "エッセイ・評論", "211": "エッセイ・評論", "212": "エッセイ・評論",
+    "213": "エッセイ・評論", "214": "エッセイ・評論", "215": "エッセイ・評論",
+    "216": "エッセイ・評論", "217": "エッセイ・評論", "218": "エッセイ・評論",
+    "219": "エッセイ・評論",
+    "280": "エッセイ・評論", "281": "エッセイ・評論", "289": "エッセイ・評論",
+    "230": "エッセイ・評論",  # 世界史
+    # 社会・ノンフィクション
+    "300": "エッセイ・評論", "304": "エッセイ・評論",
+    "360": "エッセイ・評論", "361": "エッセイ・評論",
+    "316": "エッセイ・評論",  # 民族問題
 }
+
+# タイトル・著者キーワードによる補完分類
+KEYWORD_GENRE = [
+    (["ミステリ","推理","刑事","探偵","殺人","犯罪","謎","サスペンス"], "ミステリ・推理"),
+    (["時代","武士","侍","江戸","幕末","忍者","剣客","藩","お城","将軍"], "時代小説・歴史小説"),
+    (["SF","宇宙","ロボット","人工知能","AI","未来","サイバー"], "ファンタジー・SF"),
+    (["ファンタジー","魔法","魔王","勇者","異世界","竜","ドラゴン","エルフ"], "ファンタジー・SF"),
+    (["絵本","えほん","ピクチャー"], "絵本・児童書"),
+    (["児童","こども","子ども","少年","少女"], "児童文学"),
+    (["料理","レシピ","クッキング","おかず","献立"], "実用・ハウツー"),
+    (["健康","ダイエット","医療","病気","症状","治療","養生"], "実用・ハウツー"),
+    (["ビジネス","仕事術","マネジメント","リーダー","起業","投資","株","マーケ"], "実用・ハウツー"),
+    (["自己啓発","習慣","成功","メンタル","マインド","思考法"], "実用・ハウツー"),
+]
 
 def _ndc_to_genre(ndc):
     if not ndc:
         return ""
-    for prefix, genre in NDC_TO_GENRE.items():
-        if ndc.startswith(prefix):
+    # 長いプレフィックスから順にマッチ（より具体的なものを優先）
+    for length in [4, 3, 2]:
+        prefix = ndc[:length]
+        if prefix in NDC_TO_GENRE:
+            return NDC_TO_GENRE[prefix]
+    return ""
+
+def _keyword_genre(title, author=""):
+    text = (title or "") + " " + (author or "")
+    for keywords, genre in KEYWORD_GENRE:
+        if any(kw in text for kw in keywords):
             return genre
     return ""
 
 def _migrate_ndc_genres():
-    """OpenBD NDCコードでジャンル未分類の本を自動分類"""
+    """OpenBD NDCコード＋キーワードでジャンル未分類の本を自動分類（改訂版で再実行）"""
     import datetime
+    CURRENT_VERSION = "v2"
     try:
         con = get_con()
-        # 既にNDC分類済みかチェック（settingsに記録）
         done = fetchone(con, "SELECT value FROM settings WHERE key='ndc_classify_done'")
-        if done:
+        if done and done["value"] == CURRENT_VERSION:
             con.close()
             return
-        rows = fetchall(con, "SELECT isbn FROM genre_books WHERE genre='' OR genre IS NULL")
+        # 全件対象（未分類 + 前バージョン分類済みも再分類）
+        rows = fetchall(con, "SELECT isbn, title, author FROM genre_books")
         con.close()
         if not rows:
             return
-        isbns = [r["isbn"] for r in rows if r["isbn"]]
-        if not isbns:
-            return
-        updated = 0
-        for i in range(0, len(isbns), 1000):
-            batch = isbns[i:i+1000]
-            resp = requests.get(OPENBD_API, params={"isbn": ",".join(batch)}, timeout=20)
-            con2 = get_con()
-            for item in resp.json():
-                if not item:
-                    continue
-                try:
-                    isbn = item["summary"].get("isbn", "")
-                    subjects = item.get("onix", {}).get("DescriptiveDetail", {}).get("Subject", [])
-                    ndc = next((s["SubjectCode"] for s in subjects if s.get("SubjectSchemeIdentifier") == "78"), "")
-                    genre = _ndc_to_genre(ndc)
-                    if genre and isbn:
-                        execute(con2, "UPDATE genre_books SET genre=? WHERE isbn=? AND (genre='' OR genre IS NULL)", (genre, isbn))
-                        updated += 1
-                except Exception:
-                    pass
-            con2.commit(); con2.close()
-        # 完了フラグ
-        con3 = get_con()
+        # キーワードで先に補完（OpenBD不要な分）
+        kw_updated = 0
+        con_kw = get_con()
+        for r in rows:
+            genre = _keyword_genre(r["title"] or "", r["author"] or "")
+            if genre:
+                execute(con_kw, "UPDATE genre_books SET genre=? WHERE isbn=? AND (genre='' OR genre IS NULL OR genre='その他')", (genre, r["isbn"]))
+                kw_updated += 1
+        con_kw.commit(); con_kw.close()
+
+        # OpenBD NDCコードで分類（未分類のみ）
+        con2 = get_con()
+        unclassified = fetchall(con2, "SELECT isbn FROM genre_books WHERE genre='' OR genre IS NULL OR genre='その他'")
+        con2.close()
+        isbns = [r["isbn"] for r in unclassified if r["isbn"]]
+        ndc_updated = 0
+        for i in range(0, len(isbns), 500):
+            batch = isbns[i:i+500]
+            try:
+                resp = requests.get(OPENBD_API, params={"isbn": ",".join(batch)}, timeout=30)
+                con3 = get_con()
+                for item in resp.json():
+                    if not item:
+                        continue
+                    try:
+                        isbn = item["summary"].get("isbn", "")
+                        title = item["summary"].get("title", "")
+                        author = item["summary"].get("author", "")
+                        subjects = item.get("onix", {}).get("DescriptiveDetail", {}).get("Subject", [])
+                        ndc = next((s["SubjectCode"] for s in subjects if s.get("SubjectSchemeIdentifier") == "78"), "")
+                        genre = _ndc_to_genre(ndc) or _keyword_genre(title, author)
+                        if genre and isbn:
+                            execute(con3, "UPDATE genre_books SET genre=? WHERE isbn=? AND (genre='' OR genre IS NULL OR genre='その他')", (genre, isbn))
+                            ndc_updated += 1
+                    except Exception:
+                        pass
+                con3.commit(); con3.close()
+            except Exception as e:
+                print(f"NDC batch error: {e}")
+
+        # 完了フラグ（バージョン付き）
+        con4 = get_con()
         if USE_PG:
-            execute(con3, "INSERT INTO settings(key,value) VALUES('ndc_classify_done',?) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value", (str(datetime.date.today()),))
+            execute(con4, "INSERT INTO settings(key,value) VALUES('ndc_classify_done',?) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value", (CURRENT_VERSION,))
         else:
-            execute(con3, "INSERT OR REPLACE INTO settings(key,value) VALUES('ndc_classify_done',?)", (str(datetime.date.today()),))
-        con3.commit(); con3.close()
-        print(f"NDC genre classification: {updated} books updated")
+            execute(con4, "INSERT OR REPLACE INTO settings(key,value) VALUES('ndc_classify_done',?)", (CURRENT_VERSION,))
+        con4.commit(); con4.close()
+        print(f"NDC genre classification v2: keyword={kw_updated}, ndc={ndc_updated} books updated")
     except Exception as e:
         print(f"NDC classify error: {e}")
 
