@@ -1103,6 +1103,10 @@ document.getElementById("postNews")?.addEventListener("click", async () => {
   const urlInput = document.getElementById("newsImage").value.trim();
   const images = [...newsImages, ...(urlInput ? [urlInput] : [])];
   if (!title || !body) { document.getElementById("newsMsg").textContent = "タイトルと内容を入力してください"; return; }
+  if (!pass) {
+    document.getElementById("newsMsg").textContent = "⚠️ セッションが切れています。一度ログアウトして再ログインしてください";
+    return;
+  }
   const res = await fetch("/api/announcements", {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ title, body, category: cat, images, event_date: document.getElementById("newsEventDate")?.value || "", password: pass })
