@@ -888,6 +888,7 @@ def index():
 
 
 @app.route("/api/auth", methods=["POST"])
+@rate_limit(limit=5, window=60)
 def api_auth():
     body = request.get_json()
     if body.get("password") == get_resident_password():
@@ -905,6 +906,7 @@ def api_login_qr_url():
 
 
 @app.route("/api/board/auth", methods=["POST"])
+@rate_limit(limit=5, window=60)
 def api_board_auth():
     body = request.get_json()
     if body.get("password") == get_board_password():
