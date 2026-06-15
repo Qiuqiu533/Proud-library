@@ -670,29 +670,28 @@ function buildCalendar(y, m, eventsMap) {
     const dateKey = `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
     const evList = eventsMap[dateKey] || [];
     const tempClosed = evList.find(e => e.type === "closed");
-    const eventItem = evList.find(e => e.type === "event");
+    const events = evList.filter(e => e.type === "event");
     let cls = "lib-cal-day";
     if (dow === 5) cls += " sat";
     if (dow === 6) cls += " sun";
     if (closed || tempClosed) cls += " closed";
-    if (eventItem && !closed && !tempClosed) cls += " has-event";
+    if (events.length && !closed && !tempClosed) cls += " has-event";
     if (isToday) cls += " today";
-    let mark, title;
+    let sub = "";
     if (closed) {
-      mark = "×"; title = closed==="nenmatsu"?"年末年始休館":"定期休館（第2・第4水曜）";
+      sub = `<span class="cal-sub cal-sub-closed">×休館</span>`;
     } else if (tempClosed) {
-      mark = "×"; title = `臨時休館：${tempClosed.title}`;
-    } else if (eventItem) {
-      mark = `<span class="cal-event-mark">★</span>${d}`; title = evList.filter(e=>e.type==="event").map(e=>e.title).join("／");
-    } else {
-      mark = d; title = "";
+      const label = tempClosed.title ? tempClosed.title : "臨時休館";
+      sub = `<span class="cal-sub cal-sub-closed" title="${esc(label)}">×${esc(label.length > 4 ? label.slice(0,4)+"…" : label)}</span>`;
+    } else if (events.length) {
+      sub = events.map(e => `<span class="cal-sub cal-sub-event" title="${esc(e.title)}">${esc(e.title.length > 4 ? e.title.slice(0,4)+"…" : e.title)}</span>`).join("");
     }
-    html += `<div class="${cls}" title="${title}">${mark}</div>`;
+    html += `<div class="${cls}"><span class="cal-day-num">${d}</span>${sub}</div>`;
   }
   html += `</div>
     <div class="lib-cal-legend">
-      <span class="lib-cal-closed-dot"></span>× 休館日（定期・臨時）&nbsp;&nbsp;
-      <span class="lib-cal-event-dot">★</span> イベント
+      <span class="lib-cal-closed-dot"></span><span>× 休館日</span>
+      <span class="lib-cal-event-dot">★</span><span>イベント</span>
     </div>
   </div>`;
   return html;
