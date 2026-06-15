@@ -40,44 +40,44 @@
   </div>
 
   <!-- Header -->
-  <header class="site-header">
+  <header class="site-header" role="banner">
     <div class="header-inner">
       <div class="logo">
-        <span class="logo-icon">📚</span>
+        <span class="logo-icon" aria-hidden="true">📚</span>
         <div class="logo-text">
           <h1>プラウド船橋図書館</h1>
           <span>コミュニティ図書館</span>
         </div>
       </div>
-      <div class="search-bar">
-        <input type="text" id="searchInput" placeholder="タイトル・著者で検索…" />
-        <button id="searchBtn">検索</button>
+      <div class="search-bar" role="search">
+        <input type="text" id="searchInput" placeholder="タイトル・著者で検索…" aria-label="蔵書を検索" />
+        <button id="searchBtn" aria-label="検索">検索</button>
       </div>
       <div class="header-btns">
-        <button id="syncMenuBtn" class="sync-menu-btn" title="クラウド同期">☁️</button>
-        <button id="logoutBtn" class="logout-btn" title="ログアウト">🔓<span class="logout-text"> ログアウト</span></button>
-        <button id="boardMenuBtn" class="board-menu-btn">🏛️<span class="board-menu-text"> 管理者メニュー</span></button>
+        <button id="syncMenuBtn" class="sync-menu-btn" title="クラウド同期" aria-label="クラウド同期">☁️</button>
+        <button id="logoutBtn" class="logout-btn" title="ログアウト" aria-label="ログアウト">🔓<span class="logout-text"> ログアウト</span></button>
+        <button id="boardMenuBtn" class="board-menu-btn" aria-label="管理者メニューを開く">🏛️<span class="board-menu-text"> 管理者メニュー</span></button>
       </div>
     </div>
   </header>
 
   <!-- Navigation tabs -->
-  <nav class="tab-nav">
-    <div class="tab-nav-inner">
-      <button class="tab-btn active" data-tab="books">📖 蔵書</button>
-      <button class="tab-btn" data-tab="new">🆕 新着</button>
-      <button class="tab-btn" data-tab="fav">❤️ お気に入り</button>
-      <button class="tab-btn" data-tab="log">📝 読書記録</button>
-      <button class="tab-btn" data-tab="card">🪪 会員証</button>
-      <button class="tab-btn" data-tab="news">📢 お知らせ</button>
-      <button class="tab-btn" data-tab="info">🏛️ 開館情報</button>
-      <button class="tab-btn" data-tab="request">📬 リクエスト</button>
-      <button class="tab-btn" data-tab="reqlist">📋 みんなのリクエスト一覧・投票</button>
-      <button class="tab-btn" data-tab="howto">❓ 使い方</button>
+  <nav class="tab-nav" aria-label="メインナビゲーション">
+    <div class="tab-nav-inner" role="tablist">
+      <button class="tab-btn active" data-tab="books" role="tab" aria-selected="true">📖 蔵書</button>
+      <button class="tab-btn" data-tab="new" role="tab" aria-selected="false">🆕 新着</button>
+      <button class="tab-btn" data-tab="fav" role="tab" aria-selected="false">❤️ お気に入り</button>
+      <button class="tab-btn" data-tab="log" role="tab" aria-selected="false">📝 読書記録</button>
+      <button class="tab-btn" data-tab="card" role="tab" aria-selected="false">🪪 会員証</button>
+      <button class="tab-btn" data-tab="news" role="tab" aria-selected="false">📢 お知らせ</button>
+      <button class="tab-btn" data-tab="info" role="tab" aria-selected="false">🏛️ 開館情報</button>
+      <button class="tab-btn" data-tab="request" role="tab" aria-selected="false">📬 リクエスト</button>
+      <button class="tab-btn" data-tab="reqlist" role="tab" aria-selected="false">📋 みんなのリクエスト一覧・投票</button>
+      <button class="tab-btn" data-tab="howto" role="tab" aria-selected="false">❓ 使い方</button>
     </div>
   </nav>
 
-  <main class="main-content">
+  <main class="main-content" role="main">
     <!-- Books tab -->
     <div id="tab-books" class="tab-panel active">
 

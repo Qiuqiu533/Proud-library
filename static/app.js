@@ -496,7 +496,7 @@ async function loadLog(filter = "all") {
 function newsItemHtml(item, showDelete) {
   const images = item.images || (item.image_url ? [item.image_url] : []);
   const imagesHtml = images.length
-    ? `<div class="news-imgs">${images.map(src => `<img class="news-img" src="${src}" alt="画像" onerror="this.style.display='none'">`).join("")}</div>`
+    ? `<div class="news-imgs">${images.map(src => `<img class="news-img" src="${src}" alt="お知らせ画像" loading="lazy" onerror="this.style.display='none'">`).join("")}</div>`
     : "";
   const editImagesHtml = images.map((src, i) => `
     <div class="news-edit-img-row" data-index="${i}" style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
@@ -938,9 +938,10 @@ document.getElementById("sortSelect").addEventListener("change", e => {
 
 document.querySelectorAll(".tab-btn").forEach(btn => {
   btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tab-btn").forEach(b => { b.classList.remove("active"); b.setAttribute("aria-selected", "false"); });
     document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
     btn.classList.add("active");
+    btn.setAttribute("aria-selected", "true");
     document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
     if (btn.dataset.tab === "new") loadNew();
     if (btn.dataset.tab === "fav") loadFavorites();
@@ -1269,7 +1270,7 @@ async function loadNewArrivalAdmin() {
   if (!items.length) { el.innerHTML = '<div class="loading">登録された新着図書はありません</div>'; return; }
   el.innerHTML = items.map(r => `
     <div class="arrival-item">
-      <img class="arrival-cover" src="${r.cover || ""}" onerror="this.style.display='none'" alt="">
+      <img class="arrival-cover" src="${r.cover || ""}" alt="${esc(r.title || '')}" loading="lazy" onerror="this.style.display='none'">
       <div class="arrival-info">
         <div class="arrival-title">${esc(r.title || r.isbn)}</div>
         <div class="arrival-author">${esc(r.author || "")}</div>
