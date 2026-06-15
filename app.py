@@ -895,6 +895,15 @@ def api_auth():
     return jsonify({"error": "unauthorized"}), 401
 
 
+@app.route("/api/login-qr-url")
+def api_login_qr_url():
+    base = request.host_url.rstrip("/")
+    pw = get_resident_password()
+    import urllib.parse
+    qr_url = f"{base}/?qr={urllib.parse.quote(pw)}"
+    return jsonify({"url": qr_url})
+
+
 @app.route("/api/board/auth", methods=["POST"])
 def api_board_auth():
     body = request.get_json()
