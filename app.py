@@ -287,6 +287,10 @@ def init_db():
             con.execute("ALTER TABLE announcements ADD COLUMN image_url TEXT DEFAULT ''")
         except Exception:
             pass
+        try:
+            con.execute("ALTER TABLE announcements ADD COLUMN event_date TEXT DEFAULT ''")
+        except Exception:
+            pass
         con.execute("""
             CREATE TABLE IF NOT EXISTS issues (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1509,7 +1513,7 @@ def api_library_info():
 @app.route("/api/announcements")
 def api_announcements():
     con = get_con()
-    rows = fetchall(con, "SELECT id, title, body, category, image_url, created_at FROM announcements ORDER BY id DESC")
+    rows = fetchall(con, "SELECT id, title, body, category, image_url, event_date, created_at FROM announcements ORDER BY id DESC")
     con.close()
     def parse_images(raw):
         if not raw:
@@ -1519,7 +1523,7 @@ def api_announcements():
             return v if isinstance(v, list) else [v]
         except Exception:
             return [raw] if raw else []
-    return jsonify([{**r, "images": parse_images(r.get("image_url")), "created_at": str(r["created_at"])[:16]} for r in rows])
+    return jsonify([{**r, "images": parse_images(r.get("image_url")), "event_date": r.get("event_date") or "", "created_at": str(r["created_at"])[:16]} for r in rows])
 
 
 @app.route("/api/announcements", methods=["POST"])
@@ -1536,8 +1540,9 @@ def api_post_announcement():
     images = body.get("images", [])
     if not images and body.get("image_url","").strip():
         images = [body.get("image_url","").strip()]
-    execute(con, "INSERT INTO announcements (title, body, category, image_url) VALUES (?,?,?,?)",
-        (title, text, body.get("category","お知らせ"), json.dumps(images, ensure_ascii=False)))
+    event_date = body.get("event_date", "").strip()
+    execute(con, "INSERT INTO announcements (title, body, category, image_url, event_date) VALUES (?,?,?,?,?)",
+        (title, text, body.get("category","お知らせ"), json.dumps(images, ensure_ascii=False), event_date))
     con.commit(); con.close()
     return jsonify({"ok": True})
 
@@ -1552,9 +1557,10 @@ def api_update_announcement(ann_id):
     images = body.get("images", [])
     if not images and body.get("image_url","").strip():
         images = [body.get("image_url","").strip()]
-    execute(con, "UPDATE announcements SET title=?, body=?, category=?, image_url=? WHERE id=?",
+    event_date = body.get("event_date", "").strip()
+    execute(con, "UPDATE announcements SET title=?, body=?, category=?, image_url=?, event_date=? WHERE id=?",
         (body.get("title","").strip(), body.get("body","").strip(),
-         body.get("category","お知らせ"), json.dumps(images, ensure_ascii=False), ann_id))
+         body.get("category","お知らせ"), json.dumps(images, ensure_ascii=False), event_date, ann_id))
     con.commit(); con.close()
     return jsonify({"ok": True})
 
