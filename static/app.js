@@ -791,6 +791,7 @@ function _renderModalContent(isbn, book, rating) {
     pubYear         ? ["出版年", pubYear]               : null,
     (book.pages && book.pages !== "0") ? ["ページ数", book.pages + "P"] : null,
     book.format     ? ["形式",   esc(book.format)]     : null,
+    (book.size && !book.size.startsWith("0mm")) ? ["サイズ", esc(book.size)] : null,
     isbn13          ? ["ISBN13", isbn13]               : null,
     (book.isbn10 || (isbn13.startsWith("978") ? "" : "")) ? ["ISBN10", esc(book.isbn10 || "")] : null,
   ].filter(r => r && r[1]);
@@ -908,6 +909,7 @@ async function openModal(isbn, preloadedBook) {
           py              ? ["出版年", py]                   : null,
           (book.pages && book.pages !== "0") ? ["ページ数", book.pages + "P"] : null,
           book.format     ? ["形式",   esc(book.format)]    : null,
+          (book.size && !book.size.startsWith("0mm")) ? ["サイズ", esc(book.size)] : null,
           i13             ? ["ISBN13", i13]                  : null,
           book.isbn10     ? ["ISBN10", esc(book.isbn10)]    : null,
         ].filter(r => r && r[1]);
