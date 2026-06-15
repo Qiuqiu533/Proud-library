@@ -814,6 +814,8 @@ function _renderModalContent(isbn, book, rating) {
       </div>
     </div>
 
+    ${descHtml}<div id="modal-desc-placeholder"></div>
+
     <div class="modal-section">
       <h3>📚 読書ステータス</h3>
       <div class="read-status-btns">
@@ -831,13 +833,6 @@ function _renderModalContent(isbn, book, rating) {
       <button class="btn-rate" data-isbn="${isbn}">この本を評価する</button>
     </div>
 
-    <div class="modal-section" id="modal-avail-section">
-      <h3>🏛️ 貸出状況</h3>
-      <div id="modal-avail-body"><div class="loading" style="font-size:0.85rem;padding:8px 0">取得中…</div></div>
-    </div>
-
-    ${descHtml}<div id="modal-desc-placeholder"></div>
-
     <div class="modal-section">
       <h3>💬 コメント</h3>
       ${reviewsHtml}
@@ -850,6 +845,11 @@ function _renderModalContent(isbn, book, rating) {
         <a class="ext-link ext-link-meter" href="${meterUrl}" target="_blank">読書メーター</a>
         <a class="ext-link ext-link-lib" href="${libUrl}" target="_blank">図書館生活</a>
       </div>
+    </div>
+
+    <div class="modal-section" id="modal-avail-section">
+      <h3>🏛️ 貸出状況</h3>
+      <div id="modal-avail-body"><div class="loading" style="font-size:0.85rem;padding:8px 0">取得中…</div></div>
     </div>`;
 }
 
