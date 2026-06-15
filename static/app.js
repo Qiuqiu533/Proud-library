@@ -800,7 +800,7 @@ function _renderModalContent(isbn, book, rating) {
     ? rating.reviews.map(r => `<div class="review-item">💬 ${esc(r)}</div>`).join("")
     : `<div class="no-content">まだコメントはありません</div>`;
   const descHtml = book.description
-    ? `<div class="modal-section"><h3>📄 内容紹介</h3><p class="book-desc">${esc(book.description)}</p></div>` : "";
+    ? `<div class="modal-section"><h3>📄 内容・収録作品</h3><p class="book-desc">${esc(book.description)}</p></div>` : "";
 
   return `
     <div class="modal-top">
@@ -924,7 +924,7 @@ async function openModal(isbn, preloadedBook) {
       // 内容紹介を追加
       const descPlaceholder = document.getElementById("modal-desc-placeholder");
       if (descPlaceholder && book.description) {
-        descPlaceholder.outerHTML = `<div class="modal-section"><h3>📄 内容紹介</h3><p class="book-desc">${book.description}</p></div>`;
+        descPlaceholder.outerHTML = `<div class="modal-section"><h3>📄 内容・収録作品</h3><p class="book-desc">${book.description}</p></div>`;
       }
     } catch(e) {
       const availEl = document.getElementById("modal-avail-body");
