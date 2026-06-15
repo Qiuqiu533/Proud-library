@@ -2075,11 +2075,11 @@ function reqAdminCardHtml(r) {
         <input class="req-note-input" type="text" placeholder="管理者メモ（非公開）"
           value="${esc(r.note||"")}" data-id="${r.id}" />
       </div>
-      <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
-        <input class="req-reply-input" type="text" placeholder="📣 居住者への返答（一覧に表示されます）"
-          value="${esc(r.reply||"")}" data-id="${r.id}"
-          style="flex:1;padding:7px 10px;border-radius:6px;border:1px solid #5b8dd9;font-size:0.85rem">
-        <button class="req-reply-save" data-id="${r.id}" style="padding:7px 14px;border-radius:6px;background:#5b8dd9;color:#fff;border:none;cursor:pointer;font-size:0.85rem">返答を保存</button>
+      <div style="margin-top:8px">
+        <textarea class="req-reply-input" placeholder="📣 居住者への返答（一覧に表示されます）"
+          data-id="${r.id}" rows="3"
+          style="width:100%;padding:8px 10px;border-radius:6px;border:1.5px solid #5b8dd9;font-size:0.88rem;font-family:inherit;resize:vertical;box-sizing:border-box;line-height:1.6">${esc(r.reply||"")}</textarea>
+        <button class="req-reply-save" data-id="${r.id}" style="margin-top:6px;width:100%;padding:9px 14px;border-radius:6px;background:#5b8dd9;color:#fff;border:none;cursor:pointer;font-size:0.88rem;font-weight:600">返答を保存</button>
       </div>
     </div>`;
 }
