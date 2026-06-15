@@ -784,11 +784,17 @@ function _renderModalContent(isbn, book, rating) {
   const ndlUrl = `https://ndlsearch.ndl.go.jp/search?q=${encodeURIComponent(book.title || "")}`;
   const meterUrl = `https://bookmeter.com/books/${isbn13}`;
   const libUrl = `https://www2.librarylife.net/booksearch/detail/${isbn}`;
-  const tags = [
-    book.publisher ? `<span class="tag tag-publisher">${book.publisher}</span>` : "",
-    (book.pubdate && parseInt(book.pubdate.slice(0,4)) >= 1900) ? `<span class="tag tag-year">${book.pubdate.slice(0,4)}年</span>` : "",
-    book.pages && book.pages !== "0" ? `<span class="tag tag-pages">${book.pages}P</span>` : "",
-  ].filter(Boolean).join("");
+  const pubYear = (book.pubdate && parseInt(book.pubdate.slice(0,4)) >= 1900) ? book.pubdate.slice(0,4) + "年" : "";
+  const infoRows = [
+    book.author     ? ["著者",   esc(book.author)]     : null,
+    book.publisher  ? ["出版社", esc(book.publisher)]  : null,
+    pubYear         ? ["出版年", pubYear]               : null,
+    (book.pages && book.pages !== "0") ? ["ページ数", book.pages + "P"] : null,
+    book.format     ? ["形式",   esc(book.format)]     : null,
+    isbn13          ? ["ISBN13", isbn13]               : null,
+    (book.isbn10 || (isbn13.startsWith("978") ? "" : "")) ? ["ISBN10", esc(book.isbn10 || "")] : null,
+  ].filter(r => r && r[1]);
+  const infoTable = infoRows.length ? `<dl class="book-info-dl">${infoRows.map(([k,v]) => `<div class="book-info-row"><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl>` : "";
   const reviewsHtml = rating.reviews && rating.reviews.length
     ? rating.reviews.map(r => `<div class="review-item">💬 ${esc(r)}</div>`).join("")
     : `<div class="no-content">まだコメントはありません</div>`;
@@ -800,8 +806,7 @@ function _renderModalContent(isbn, book, rating) {
       <div class="modal-cover">${book.cover ? `<img src="${book.cover}" alt="${esc(book.title)}" onerror="this.parentElement.innerHTML='<div class=\\'modal-cover-placeholder\\'>📖</div>'">` : '<div class="modal-cover-placeholder">📖</div>'}</div>
       <div class="modal-header">
         <h2>${esc(book.title) || "タイトル不明"}</h2>
-        <div class="modal-author">${esc(book.author) || "著者不明"}</div>
-        <div class="modal-tags">${tags}</div>
+        ${infoTable}
         <button class="fav-btn-large ${fav ? 'active' : ''}" data-isbn="${isbn}">
           ${fav ? '❤️ お気に入り済み' : '🤍 お気に入りに追加'}
         </button>

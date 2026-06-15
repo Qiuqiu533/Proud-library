@@ -165,6 +165,10 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .tag-publisher { background: #e8f0eb; color: #3d6b4f; }
 .tag-year { background: #fef3e0; color: #8a5f00; }
 .tag-pages { background: #fce4ec; color: #880e4f; }
+.book-info-dl { margin: 0 0 12px; padding: 0; }
+.book-info-row { display: flex; gap: 6px; align-items: baseline; font-size: 0.82rem; line-height: 1.7; }
+.book-info-row dt { color: #888; white-space: nowrap; min-width: 64px; flex-shrink: 0; }
+.book-info-row dd { margin: 0; color: #333; font-weight: 500; word-break: break-all; }
 .fav-btn-large { padding: 7px 14px; border: 1.5px solid #e05; border-radius: 20px; background: white; color: #e05; font-size: 0.82rem; cursor: pointer; font-family: inherit; transition: all .2s; }
 .fav-btn-large.active { background: #e05; color: white; }
 .modal-section h3 { font-size: 0.95rem; font-weight: 700; color: #3d6b4f; margin-bottom: 10px; }
