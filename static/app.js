@@ -155,9 +155,9 @@ function renderCard(book, opts = {}) {
       ${readStatus ? `<div class="read-badge">${readStatus}</div>` : ""}
     </div>
     <div class="book-info">
-      <div class="book-title">${book.title}</div>
-      <div class="book-author author-link" data-author="${(book.author||"").replace(/"/g,'&quot;')}">${book.author || "著者不明"}</div>
-      <div class="book-meta">${book.publisher || ""}</div>
+      <div class="book-title">${esc(book.title)}</div>
+      <div class="book-author author-link" data-author="${esc(book.author||"")}">${esc(book.author) || "著者不明"}</div>
+      <div class="book-meta">${esc(book.publisher || "")}</div>
       <div class="card-stars">${starsHtml(rating.score)}</div>
       <div class="avail-status" id="avail-${book.isbn}"></div>
     </div>`;
@@ -771,14 +771,14 @@ function _renderModalContent(isbn, book, rating) {
     ? rating.reviews.map(r => `<div class="review-item">💬 ${esc(r)}</div>`).join("")
     : `<div class="no-content">まだコメントはありません</div>`;
   const descHtml = book.description
-    ? `<div class="modal-section"><h3>📄 内容紹介</h3><p class="book-desc">${book.description}</p></div>` : "";
+    ? `<div class="modal-section"><h3>📄 内容紹介</h3><p class="book-desc">${esc(book.description)}</p></div>` : "";
 
   return `
     <div class="modal-top">
-      <div class="modal-cover">${book.cover ? `<img src="${book.cover}" alt="${book.title}" onerror="this.parentElement.innerHTML='<div class=\\'modal-cover-placeholder\\'>📖</div>'">` : '<div class="modal-cover-placeholder">📖</div>'}</div>
+      <div class="modal-cover">${book.cover ? `<img src="${book.cover}" alt="${esc(book.title)}" onerror="this.parentElement.innerHTML='<div class=\\'modal-cover-placeholder\\'>📖</div>'">` : '<div class="modal-cover-placeholder">📖</div>'}</div>
       <div class="modal-header">
-        <h2>${book.title || "タイトル不明"}</h2>
-        <div class="modal-author">${book.author || "著者不明"}</div>
+        <h2>${esc(book.title) || "タイトル不明"}</h2>
+        <div class="modal-author">${esc(book.author) || "著者不明"}</div>
         <div class="modal-tags">${tags}</div>
         <button class="fav-btn-large ${fav ? 'active' : ''}" data-isbn="${isbn}">
           ${fav ? '❤️ お気に入り済み' : '🤍 お気に入りに追加'}
@@ -1342,8 +1342,8 @@ function renderIssues() {
         <button class="btn-edit issue-edit-btn" data-id="${item.id}" title="編集">✏️</button>
         <button class="news-del issue-del" data-id="${item.id}" title="削除">🗑</button>
       </div>
-      <div class="issue-title issue-view-title" data-id="${item.id}">${item.title}</div>
-      <div class="issue-body issue-view-body" data-id="${item.id}">${item.body.replace(/\n/g,"<br>")}</div>
+      <div class="issue-title issue-view-title" data-id="${item.id}">${esc(item.title)}</div>
+      <div class="issue-body issue-view-body" data-id="${item.id}">${esc(item.body).replace(/\n/g,"<br>")}</div>
       <div class="issue-edit-form" id="iedit-${item.id}" style="display:none">
         <input class="ie-title" value="${item.title.replace(/"/g,'&quot;')}" placeholder="課題タイトル" />
         <textarea class="ie-body" rows="3">${item.body}</textarea>
@@ -1608,12 +1608,12 @@ function renderCalendar() {
           <button class="btn-move cal-down" data-id="${item.id}" ${idx===items.length-1?"disabled":""} title="下へ">▼</button>
         </div>
         <span class="cal-date cal-view-date" data-id="${item.id}">📅 ${item.event_date}</span>
-        <span class="cal-title-text cal-view-title" data-id="${item.id}">${item.title}</span>
+        <span class="cal-title-text cal-view-title" data-id="${item.id}">${esc(item.title)}</span>
         <button class="btn-edit cal-edit-btn" data-id="${item.id}" title="編集">✏️</button>
         <button class="news-del cal-del" data-id="${item.id}" title="削除">🗑</button>
       </div>
-      ${item.body ? `<div class="cal-body cal-view-body" data-id="${item.id}">${item.body.replace(/\n/g,"<br>")}</div>` : `<div class="cal-view-body" data-id="${item.id}" style="display:none"></div>`}
-      ${item.minutes ? `<details class="cal-minutes cal-view-mins" data-id="${item.id}"><summary>📝 議事録を見る</summary><div class="cal-minutes-body">${item.minutes.replace(/\n/g,"<br>")}</div></details>` : `<div class="cal-view-mins" data-id="${item.id}" style="display:none"></div>`}
+      ${item.body ? `<div class="cal-body cal-view-body" data-id="${item.id}">${esc(item.body).replace(/\n/g,"<br>")}</div>` : `<div class="cal-view-body" data-id="${item.id}" style="display:none"></div>`}
+      ${item.minutes ? `<details class="cal-minutes cal-view-mins" data-id="${item.id}"><summary>📝 議事録を見る</summary><div class="cal-minutes-body">${esc(item.minutes).replace(/\n/g,"<br>")}</div></details>` : `<div class="cal-view-mins" data-id="${item.id}" style="display:none"></div>`}
       <div class="cal-edit-form" id="cedit-${item.id}" style="display:none">
         <input class="ce-title" value="${item.title.replace(/"/g,'&quot;')}" placeholder="イベント名" style="margin-bottom:6px" />
         <input type="date" class="ce-date" value="${item.event_date}" style="margin-bottom:6px" />
@@ -1740,7 +1740,7 @@ function renderLibSchedule() {
       <div class="cal-header">
         ${badge}
         <span class="ls-view-date">${item.event_date}</span>
-        <span class="cal-title-text ls-view-title">${item.title}</span>
+        <span class="cal-title-text ls-view-title">${esc(item.title)}</span>
         <button class="btn-edit ls-edit-btn" data-id="${item.id}" title="編集">✏️</button>
         <button class="news-del ls-del" data-id="${item.id}" title="削除">🗑</button>
       </div>
