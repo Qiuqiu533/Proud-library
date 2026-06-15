@@ -844,9 +844,15 @@ function _bindModalEvents(isbn) {
   });
 }
 
+let _modalOpener = null;
 async function openModal(isbn, preloadedBook) {
   const modal = document.getElementById("modal");
+  _modalOpener = document.activeElement;
   modal.style.display = "flex";
+  setTimeout(() => {
+    const first = modal.querySelector("button, [tabindex]");
+    if (first) first.focus();
+  }, 50);
 
   if (preloadedBook) {
     // 即時表示：カードデータで先にレンダリング（評価は空で初期表示）
@@ -907,6 +913,7 @@ async function openModal(isbn, preloadedBook) {
 
 function closeModal() {
   document.getElementById("modal").style.display = "none";
+  if (_modalOpener) { _modalOpener.focus(); _modalOpener = null; }
   // モーダルで在架確認した結果をカードに反映
   const isbns = [...document.querySelectorAll(".avail-status[id^='avail-']")].map(el => el.id.replace("avail-",""));
   if (isbns.length) applyAvailCache(isbns);
@@ -928,6 +935,7 @@ document.getElementById("searchInput").addEventListener("keydown", e => { if (e.
 document.getElementById("modalClose").addEventListener("click", closeModal);
 document.getElementById("modalCloseBottom").addEventListener("click", closeModal);
 document.getElementById("modal").addEventListener("click", e => { if (e.target === document.getElementById("modal")) closeModal(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && document.getElementById("modal").style.display !== "none") closeModal(); });
 document.getElementById("rateClose").addEventListener("click", () => { document.getElementById("rateModal").style.display = "none"; });
 document.getElementById("rateModal").addEventListener("click", e => { if (e.target === document.getElementById("rateModal")) document.getElementById("rateModal").style.display = "none"; });
 

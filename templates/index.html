@@ -109,7 +109,7 @@
       </div>
 
       <div class="controls-row">
-        <span id="totalCount" class="total-count"></span>
+        <span id="totalCount" class="total-count" aria-live="polite" aria-atomic="true"></span>
         <div class="filter-bar">
           <select id="genreSelect" class="genre-select" style="display:none">
             <option value="|search">すべて</option>
@@ -238,19 +238,19 @@
           <p class="req-form-desc">読みたい本・入荷してほしい本をリクエストできます。<br>ご要望はライブラリーグループで検討し、できる限り対応します。</p>
           <p style="font-size:0.78rem;color:#999;margin-top:-8px;margin-bottom:8px">※ライブラリーグループは月1回の活動のため、ご返答までお時間をいただく場合がございます。ご了承のほどよろしくお願いいたします。</p>
           <div class="req-field">
-            <label>書名 <span class="req-required">*</span></label>
+            <label for="reqTitle">書名 <span class="req-required">*</span></label>
             <input type="text" id="reqTitle" placeholder="例：ハリー・ポッターと秘密の部屋" maxlength="100" />
           </div>
           <div class="req-field">
-            <label>著者名（任意）</label>
+            <label for="reqAuthor">著者名（任意）</label>
             <input type="text" id="reqAuthor" placeholder="例：J.K.ローリング" maxlength="60" />
           </div>
           <div class="req-field">
-            <label>リクエスト理由・一言（任意）</label>
+            <label for="reqReason">リクエスト理由・一言（任意）</label>
             <textarea id="reqReason" placeholder="例：子どもと一緒に読みたいです。シリーズ全巻揃えてほしいです。" rows="3" maxlength="200"></textarea>
           </div>
           <div class="req-field">
-            <label>お名前・部屋番号（任意・街区番号を入力するとハイフンが自動で入ります）</label>
+            <label for="reqRoom">お名前・部屋番号（任意・街区番号を入力するとハイフンが自動で入ります）</label>
             <input type="text" id="reqRoom" placeholder="例：5-533（5街区533室）またはお名前" maxlength="30" />
             <p style="font-size:0.75rem;color:#aaa;margin:4px 0 0">※ 入力いただいた情報はリクエスト対応のみに使用し、第三者への提供は行いません。</p>
           </div>
@@ -263,16 +263,16 @@
           <p class="req-form-desc">蔵書・運営に関するご要望や、ライブラリーグループへのご意見をお気軽にどうぞ。</p>
           <p style="font-size:0.78rem;color:#999;margin-top:-8px;margin-bottom:8px">※ライブラリーグループは月1回の活動のため、ご返答までお時間をいただく場合がございます。ご了承のほどよろしくお願いいたします。</p>
           <div class="req-field">
-            <label>件名 <span class="req-required">*</span></label>
+            <label for="fbTitle">件名 <span class="req-required">*</span></label>
             <input type="text" id="fbTitle" placeholder="例：返却方法について、〇〇コーナーの提案" maxlength="80" />
           </div>
           <div class="req-field">
-            <label>お名前・部屋番号（任意）</label>
+            <label for="fbRoom">お名前・部屋番号（任意）</label>
             <input type="text" id="fbRoom" placeholder="例：5-533またはお名前" maxlength="30" />
             <p style="font-size:0.75rem;color:#aaa;margin:4px 0 0">※ 入力いただいた情報はご要望対応のみに使用し、第三者への提供は行いません。</p>
           </div>
           <div class="req-field">
-            <label>内容 <span class="req-required">*</span></label>
+            <label for="fbBody">内容 <span class="req-required">*</span></label>
             <textarea id="fbBody" placeholder="例：〇〇コーナーを作ってほしい、返却期限を延ばしてほしい、など" rows="4" maxlength="500"></textarea>
           </div>
           <button class="btn-primary req-submit-btn" id="fbSubmitBtn">📩 送信する</button>
@@ -403,9 +403,9 @@
   </main>
 
   <!-- Book detail modal -->
-  <div id="modal" class="modal-overlay" style="display:none">
+  <div id="modal" class="modal-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal-box">
-      <button class="modal-close" id="modalClose">✕</button>
+      <button class="modal-close" id="modalClose" aria-label="閉じる">✕</button>
       <div id="modalContent" class="modal-content"><div class="loading">読み込み中…</div></div>
       <button class="modal-close-bottom" id="modalCloseBottom">✕ 閉じる</button>
     </div>
@@ -443,12 +443,12 @@
           </p>
         </div>
         <div class="pw-group">
-          <label>部屋番号（数字のみ・ハイフン不要）</label>
+          <label for="syncRoom">部屋番号（数字のみ・ハイフン不要）</label>
           <input type="text" id="syncRoom" placeholder="例：5533（5街区533室）、11203（1街区1203室）" maxlength="6" inputmode="numeric" />
           <div id="syncRoomPreview" style="font-size:0.8rem;color:#3d6b4f;margin-top:3px;min-height:1.1em"></div>
         </div>
         <div class="pw-group">
-          <label>PIN（6桁の数字）</label>
+          <label for="syncPin">PIN（6桁の数字）</label>
           <input type="password" id="syncPin" placeholder="例：123456" maxlength="6" inputmode="numeric" />
         </div>
         <button class="btn-primary" id="syncLoginBtn" style="width:100%;margin-top:4px">ログイン / 新規登録</button>
@@ -991,23 +991,23 @@
         <div class="pw-change-form">
           <p class="pw-change-note">変更するには現在の管理者パスワードが必要です。</p>
           <div class="pw-group">
-            <label>現在のパスワード（管理者）</label>
+            <label for="pwCurrent">現在のパスワード（管理者）</label>
             <input type="password" id="pwCurrent" placeholder="kanri5533など" />
           </div>
           <hr class="pw-divider">
           <div class="pw-group">
-            <label>変更対象</label>
+            <label for="pwTarget">変更対象</label>
             <select id="pwTarget">
               <option value="resident">🏠 住民パスワード（ログイン用）</option>
               <option value="board">🏛️ 管理者パスワード（お知らせ投稿・このメニュー共通）</option>
             </select>
           </div>
           <div class="pw-group">
-            <label>新しいパスワード（4文字以上）</label>
+            <label for="pwNew">新しいパスワード（4文字以上）</label>
             <input type="password" id="pwNew" placeholder="新しいパスワード" />
           </div>
           <div class="pw-group">
-            <label>確認（もう一度入力）</label>
+            <label for="pwConfirm">確認（もう一度入力）</label>
             <input type="password" id="pwConfirm" placeholder="確認入力" />
           </div>
           <button class="btn-primary" id="pwChangeBtn" style="margin-top:6px">🔐 パスワードを変更する</button>
