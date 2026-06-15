@@ -1,5 +1,8 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2c2c; min-height: 100vh; }
+body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2c2c; min-height: 100vh; overscroll-behavior-y: none; -webkit-tap-highlight-color: transparent; }
+/* iPhoneホームバー対応 */
+body { padding-bottom: env(safe-area-inset-bottom); }
+.site-header { padding-left: max(24px, env(safe-area-inset-left)); padding-right: max(24px, env(safe-area-inset-right)); }
 
 /* ===== Login screen ===== */
 .login-screen { position: fixed; inset: 0; background: linear-gradient(160deg, #2a4a37 0%, #3d6b4f 50%, #5a8a6a 100%); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
