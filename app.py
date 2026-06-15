@@ -178,6 +178,11 @@ def init_db():
             con.commit()
         except Exception:
             pass
+        try:
+            cur.execute("ALTER TABLE genre_books ADD COLUMN description TEXT DEFAULT ''")
+            con.commit()
+        except Exception:
+            pass
         cur.execute("""
             CREATE TABLE IF NOT EXISTS issues (
                 id SERIAL PRIMARY KEY,
@@ -294,6 +299,10 @@ def init_db():
             pass
         try:
             con.execute("ALTER TABLE announcements ADD COLUMN event_date TEXT DEFAULT ''")
+        except Exception:
+            pass
+        try:
+            con.execute("ALTER TABLE genre_books ADD COLUMN description TEXT DEFAULT ''")
         except Exception:
             pass
         con.execute("""
@@ -846,12 +855,22 @@ def fetch_book_detail(isbn):
                         break
         except Exception:
             pass
-    # Google Books APIで説明文を補完（登録不要・無料）
+    # DBキャッシュから説明文を確認
+    if not result.get("description"):
+        try:
+            dc = get_con()
+            cached = fetchone(dc, "SELECT description FROM genre_books WHERE isbn=?", (isbn,))
+            dc.close()
+            if cached and cached.get("description"):
+                result["description"] = cached["description"]
+        except Exception:
+            pass
+    # Google Books APIで説明文を補完（登録不要・無料）- キャッシュがない場合のみ
     if not result.get("description") and isbn13:
         try:
             gb = requests.get(
                 "https://www.googleapis.com/books/v1/volumes",
-                params={"q": f"isbn:{isbn13}", "langRestrict": "ja", "maxResults": 1},
+                params={"q": f"isbn:{isbn13}", "maxResults": 1},
                 timeout=5
             ).json()
             items = gb.get("items", [])
@@ -860,6 +879,15 @@ def fetch_book_detail(isbn):
                 desc = vi.get("description", "")
                 if desc:
                     result["description"] = desc[:400]
+                    # DBにキャッシュ保存（バックグラウンド）
+                    def _save_desc(isbn_, desc_):
+                        try:
+                            dc = get_con()
+                            execute(dc, "UPDATE genre_books SET description=? WHERE isbn=?", (desc_, isbn_))
+                            dc.commit(); dc.close()
+                        except Exception:
+                            pass
+                    threading.Thread(target=_save_desc, args=(isbn, desc[:400]), daemon=True).start()
                 if not result.get("publisher") and vi.get("publisher"):
                     result["publisher"] = vi["publisher"]
                 if not result.get("pubdate") and vi.get("publishedDate"):
