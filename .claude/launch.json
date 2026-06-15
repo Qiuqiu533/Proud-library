@@ -6,6 +6,13 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["app.py"],
       "port": 5050
+    },
+    {
+      "name": "proud-library-dev",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["/tmp/proud-library/app.py"],
+      "port": 5051,
+      "cwd": "/tmp/proud-library"
     }
   ]
 }

@@ -722,8 +722,7 @@ def _migrate_genre_map_to_db():
 
 
 def _insert_genre_books(con, genre_map):
-    """ジャンルマップをDBに一括挿入（既存データは全削除してから）"""
-    execute(con, "DELETE FROM genre_books")
+    """ジャンルマップをDBに一括挿入（descriptionを保持しつつ更新）"""
     for genre, books in genre_map.items():
         for b in books:
             isbn = b.get("isbn", "")
@@ -737,7 +736,9 @@ def _insert_genre_books(con, genre_map):
                     (isbn, genre, b.get("title",""), b.get("author",""), b.get("publisher",""), b.get("format","")))
             else:
                 execute(con,
-                    "INSERT OR REPLACE INTO genre_books (isbn,genre,title,author,publisher,format) VALUES (?,?,?,?,?,?)",
+                    "INSERT INTO genre_books (isbn,genre,title,author,publisher,format) VALUES (?,?,?,?,?,?)"
+                    " ON CONFLICT(isbn) DO UPDATE SET genre=excluded.genre,title=excluded.title,"
+                    "author=excluded.author,publisher=excluded.publisher,format=excluded.format",
                     (isbn, genre, b.get("title",""), b.get("author",""), b.get("publisher",""), b.get("format","")))
 
 
@@ -1546,6 +1547,23 @@ def api_book(isbn):
     detail = fetch_book_detail(isbn)
     detail["rating"] = get_rating(isbn)
     return jsonify(detail)
+
+
+@app.route("/api/book-description", methods=["POST"])
+def api_book_description():
+    body = request.get_json()
+    password = body.get("password", "")
+    if password != ADMIN_PASSWORD:
+        return jsonify({"error": "unauthorized"}), 401
+    isbn = body.get("isbn", "").strip()
+    description = body.get("description", "").strip()[:400]
+    if not isbn:
+        return jsonify({"error": "isbn required"}), 400
+    con = get_con()
+    execute(con, "UPDATE genre_books SET description=? WHERE isbn=?", (description, isbn))
+    con.commit()
+    con.close()
+    return jsonify({"ok": True})
 
 
 @app.route("/api/rate", methods=["POST"])

@@ -2907,3 +2907,56 @@ document.querySelectorAll(".w-dot").forEach(dot => {
 if (!localStorage.getItem("welcomeSeen")) {
   setTimeout(showWelcome, 800);
 }
+
+// ── 書評入力（管理者） ─────────────────────────────────────────────────────
+async function lookupBookForDesc() {
+  const isbn = document.getElementById("descIsbn").value.trim();
+  const info = document.getElementById("descBookInfo");
+  if (!isbn) return;
+  info.style.display = "none";
+  try {
+    const res = await fetch(`/api/book/${isbn}`);
+    const book = await res.json();
+    if (book.title) {
+      info.textContent = `📖 ${book.title}${book.author ? " / " + book.author : ""}`;
+      info.style.display = "block";
+      if (book.description) {
+        document.getElementById("descText").value = book.description;
+        document.getElementById("descCount").textContent = `（${book.description.length}/400文字）`;
+      }
+    } else {
+      info.textContent = "本が見つかりませんでした";
+      info.style.display = "block";
+    }
+  } catch(e) {
+    info.textContent = "取得エラー";
+    info.style.display = "block";
+  }
+}
+
+async function saveBookDesc() {
+  const isbn = document.getElementById("descIsbn").value.trim();
+  const description = document.getElementById("descText").value.trim();
+  const msg = document.getElementById("descMsg");
+  if (!isbn) { msg.textContent = "⚠️ ISBNを入力してください"; return; }
+  if (!description) { msg.textContent = "⚠️ 書評を入力してください"; return; }
+  const pass = sessionStorage.getItem("boardPassword");
+  if (!pass) { msg.textContent = "⚠️ 再ログインしてください"; return; }
+  msg.textContent = "保存中...";
+  try {
+    const res = await fetch("/api/book-description", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({password: pass, isbn, description})
+    });
+    if (res.ok) {
+      msg.textContent = "✅ 保存しました";
+      setTimeout(() => { msg.textContent = ""; }, 3000);
+    } else {
+      const err = await res.json().catch(() => ({}));
+      msg.textContent = "❌ 保存失敗: " + (err.error || res.status);
+    }
+  } catch(e) {
+    msg.textContent = "❌ 通信エラー";
+  }
+}
