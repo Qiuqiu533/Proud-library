@@ -2125,7 +2125,7 @@ async function loadReqManage() {
   elBooks.innerHTML = '<div class="loading">読み込み中…</div>';
   elFb.innerHTML = '<div class="loading">読み込み中…</div>';
 
-  const res = await fetch(`/api/requests/admin?password=${encodeURIComponent(reqAdminPass)}`);
+  const res = await fetch("/api/requests/admin", {headers: {"X-Password": reqAdminPass}});
   const items = await res.json();
 
   // Summary
