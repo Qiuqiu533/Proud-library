@@ -37,7 +37,8 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
 .search-bar button:hover { background: #d49000; }
 
 /* ===== Tabs ===== */
-.tab-nav { background: white; border-bottom: 2px solid #e0dbd0; display: flex; padding: 0 16px; overflow-x: auto; white-space: nowrap; position: sticky; top: 0; z-index: 90; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+.tab-nav { background: white; border-bottom: 2px solid #e0dbd0; position: sticky; top: 0; z-index: 90; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+.tab-nav-inner { display: flex; padding: 0 16px; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
 .tab-btn { padding: 11px 16px; border: none; background: none; font-family: inherit; font-size: 0.88rem; color: #666; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all .2s; font-weight: 500; white-space: nowrap; flex-shrink: 0; }
 .tab-btn.active { color: #3d6b4f; border-bottom-color: #3d6b4f; }
 .tab-btn:hover:not(.active) { color: #3d6b4f; background: #f5f5f0; }
@@ -468,7 +469,7 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
   .board-menu-btn { font-size: 0.7rem; padding: 5px 7px; }
   .board-menu-btn .board-menu-text { display: none; }
 
-  .tab-nav { overflow-x: auto; -webkit-overflow-scrolling: touch; gap: 2px; padding: 0 8px; }
+  .tab-nav-inner { gap: 2px; padding: 0 8px; }
   .tab-btn { font-size: 0.78rem; padding: 9px 10px; white-space: nowrap; flex-shrink: 0; }
 
   .book-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
