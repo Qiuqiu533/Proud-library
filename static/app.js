@@ -897,15 +897,21 @@ async function openModal(isbn, preloadedBook) {
           : `<div class="avail-row"><span>情報なし</span></div>`;
         availEl.innerHTML = availHtml;
       }
-      // 出版年・ページ数タグを更新
-      const tagsEl = document.querySelector(".modal-tags");
-      if (tagsEl) {
-        const newTags = [
-          book.publisher ? `<span class="tag tag-publisher">${book.publisher}</span>` : "",
-          (book.pubdate && parseInt(book.pubdate.slice(0,4)) >= 1900) ? `<span class="tag tag-year">${book.pubdate.slice(0,4)}年</span>` : "",
-          book.pages && book.pages !== "0" ? `<span class="tag tag-pages">${book.pages}P</span>` : "",
-        ].filter(Boolean).join("");
-        if (newTags) tagsEl.innerHTML = newTags;
+      // 書籍詳細情報（出版年・ISBN等）をフル取得データで更新
+      const infoEl = document.querySelector(".book-info-dl");
+      if (infoEl) {
+        const py = (book.pubdate && parseInt(book.pubdate.slice(0,4)) >= 1900) ? book.pubdate.slice(0,4) + "年" : "";
+        const i13 = book.isbn13 || isbn;
+        const rows = [
+          book.author     ? ["著者",   esc(book.author)]    : null,
+          book.publisher  ? ["出版社", esc(book.publisher)] : null,
+          py              ? ["出版年", py]                   : null,
+          (book.pages && book.pages !== "0") ? ["ページ数", book.pages + "P"] : null,
+          book.format     ? ["形式",   esc(book.format)]    : null,
+          i13             ? ["ISBN13", i13]                  : null,
+          book.isbn10     ? ["ISBN10", esc(book.isbn10)]    : null,
+        ].filter(r => r && r[1]);
+        infoEl.innerHTML = rows.map(([k,v]) => `<div class="book-info-row"><dt>${k}</dt><dd>${v}</dd></div>`).join("");
       }
       // 評価をサーバーデータで更新
       const rating = book.rating || { score: 0, votes: 0, reviews: [] };
