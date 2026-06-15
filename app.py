@@ -846,6 +846,28 @@ def fetch_book_detail(isbn):
                         break
         except Exception:
             pass
+    # Google Books APIで説明文を補完（登録不要・無料）
+    if not result.get("description") and isbn13:
+        try:
+            gb = requests.get(
+                "https://www.googleapis.com/books/v1/volumes",
+                params={"q": f"isbn:{isbn13}", "langRestrict": "ja", "maxResults": 1},
+                timeout=5
+            ).json()
+            items = gb.get("items", [])
+            if items:
+                vi = items[0].get("volumeInfo", {})
+                desc = vi.get("description", "")
+                if desc:
+                    result["description"] = desc[:300]
+                if not result.get("publisher") and vi.get("publisher"):
+                    result["publisher"] = vi["publisher"]
+                if not result.get("pubdate") and vi.get("publishedDate"):
+                    result["pubdate"] = vi["publishedDate"].replace("-", "")
+                if not result.get("pages") and vi.get("pageCount"):
+                    result["pages"] = str(vi["pageCount"])
+        except Exception:
+            pass
     return result
 
 
