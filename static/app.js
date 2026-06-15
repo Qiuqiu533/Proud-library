@@ -510,8 +510,8 @@ function newsItemHtml(item, showDelete) {
         <span class="news-date">${item.created_at.slice(0, 10)}</span>
         ${showDelete ? `<button class="news-edit" data-id="${item.id}" title="編集">✏️</button><button class="news-del" data-id="${item.id}" title="削除">🗑</button>` : ""}
       </div>
-      <div class="news-title">${item.title}</div>
-      <div class="news-body">${item.body.replace(/\n/g, "<br>")}</div>
+      <div class="news-title">${esc(item.title)}</div>
+      <div class="news-body">${esc(item.body).replace(/\n/g, "<br>")}</div>
       ${imagesHtml}
       <div class="news-edit-form" id="news-edit-form-${item.id}" style="display:none;margin-top:12px;border-top:1px solid #eee;padding-top:12px">
         <select class="news-edit-cat" data-id="${item.id}" style="margin-bottom:8px;padding:6px;border-radius:6px;border:1px solid #ccc;width:100%">
@@ -768,7 +768,7 @@ function _renderModalContent(isbn, book, rating) {
     book.pages && book.pages !== "0" ? `<span class="tag tag-pages">${book.pages}P</span>` : "",
   ].filter(Boolean).join("");
   const reviewsHtml = rating.reviews && rating.reviews.length
-    ? rating.reviews.map(r => `<div class="review-item">💬 ${r}</div>`).join("")
+    ? rating.reviews.map(r => `<div class="review-item">💬 ${esc(r)}</div>`).join("")
     : `<div class="no-content">まだコメントはありません</div>`;
   const descHtml = book.description
     ? `<div class="modal-section"><h3>📄 内容紹介</h3><p class="book-desc">${book.description}</p></div>` : "";
