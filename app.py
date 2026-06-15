@@ -173,6 +173,11 @@ def init_db():
                 created_at TIMESTAMP DEFAULT NOW()
             )
         """)
+        try:
+            cur.execute("ALTER TABLE announcements ADD COLUMN event_date TEXT DEFAULT ''")
+            con.commit()
+        except Exception:
+            pass
         cur.execute("""
             CREATE TABLE IF NOT EXISTS issues (
                 id SERIAL PRIMARY KEY,
