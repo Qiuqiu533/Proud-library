@@ -1116,8 +1116,11 @@ document.getElementById("postNews")?.addEventListener("click", async () => {
     clearNewsImage();
     loadAdminNews();
     loadNews();
-  } else {
+  } else if (res.status === 401) {
     document.getElementById("newsMsg").textContent = "❌ パスワードが違います";
+  } else {
+    const errJson = await res.json().catch(() => ({}));
+    document.getElementById("newsMsg").textContent = "❌ 投稿に失敗しました（" + (errJson.error || res.status) + "）";
   }
 });
 
