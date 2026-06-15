@@ -795,6 +795,7 @@ def fetch_book_detail(isbn):
             elif key == "ISBN13":  result["isbn13"] = val
             elif key == "ISBN10":  result["isbn10"] = val
             elif key == "ページ数": result["pages"] = val
+            elif key == "サイズ":  result["size"] = val
     availability = []
     for row in soup.select("table.table tbody tr"):
         tds = row.find_all("td")
