@@ -14,6 +14,13 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
 .login-btn:hover { opacity: 0.88; }
 .login-error { color: #e05; font-size: 0.85rem; min-height: 1.2em; margin-bottom: 8px; }
 .login-note { font-size: 0.75rem; color: #bbb; margin-top: 16px; }
+.login-qr-section { margin-top: 20px; }
+.login-qr-divider { display: flex; align-items: center; gap: 10px; color: #ccc; font-size: 0.8rem; margin-bottom: 16px; }
+.login-qr-divider::before, .login-qr-divider::after { content: ""; flex: 1; height: 1px; background: #eee; }
+.login-qr-label { font-size: 0.85rem; color: #666; margin-bottom: 12px; }
+.login-qr-wrap { display: flex; justify-content: center; margin-bottom: 10px; }
+.login-qr-wrap canvas, .login-qr-wrap img { border-radius: 8px; border: 1px solid #eee; }
+.login-qr-note { font-size: 0.72rem; color: #bbb; line-height: 1.6; }
 
 /* ===== Header ===== */
 .site-header { background: linear-gradient(135deg, #3d6b4f 0%, #2a4a37 100%); color: white; padding: 14px 24px; box-shadow: 0 2px 12px rgba(0,0,0,0.2); position: sticky; top: 0; z-index: 100; }
