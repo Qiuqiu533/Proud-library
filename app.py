@@ -859,7 +859,7 @@ def fetch_book_detail(isbn):
                 vi = items[0].get("volumeInfo", {})
                 desc = vi.get("description", "")
                 if desc:
-                    result["description"] = desc[:300]
+                    result["description"] = desc[:400]
                 if not result.get("publisher") and vi.get("publisher"):
                     result["publisher"] = vi["publisher"]
                 if not result.get("pubdate") and vi.get("publishedDate"):
