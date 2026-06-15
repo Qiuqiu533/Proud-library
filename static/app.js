@@ -688,9 +688,9 @@ function buildCalendar(y, m, eventsMap) {
       sub = `<span class="cal-sub cal-sub-closed">×休館</span>`;
     } else if (tempClosed) {
       const label = tempClosed.title ? tempClosed.title : "臨時休館";
-      sub = `<span class="cal-sub cal-sub-closed" title="${esc(label)}">×${esc(label.length > 8 ? label.slice(0,8)+"…" : label)}</span>`;
+      sub = `<span class="cal-sub cal-sub-closed" title="${esc(label)}">×${esc(label)}</span>`;
     } else if (events.length) {
-      sub = events.map(e => `<span class="cal-sub cal-sub-event" title="${esc(e.title)}">${esc(e.title.length > 8 ? e.title.slice(0,8)+"…" : e.title)}</span>`).join("");
+      sub = events.map(e => `<span class="cal-sub cal-sub-event" title="${esc(e.title)}">★${esc(e.title)}</span>`).join("");
     }
     html += `<div class="${cls}"><span class="cal-day-num">${d}</span>${sub}</div>`;
   }
