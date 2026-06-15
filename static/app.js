@@ -786,7 +786,7 @@ function _renderModalContent(isbn, book, rating) {
   const libUrl = `https://www2.librarylife.net/booksearch/detail/${isbn}`;
   const tags = [
     book.publisher ? `<span class="tag tag-publisher">${book.publisher}</span>` : "",
-    book.pubdate ? `<span class="tag tag-year">${book.pubdate.slice(0,4)}年</span>` : "",
+    (book.pubdate && parseInt(book.pubdate.slice(0,4)) >= 1900) ? `<span class="tag tag-year">${book.pubdate.slice(0,4)}年</span>` : "",
     book.pages && book.pages !== "0" ? `<span class="tag tag-pages">${book.pages}P</span>` : "",
   ].filter(Boolean).join("");
   const reviewsHtml = rating.reviews && rating.reviews.length
@@ -897,7 +897,7 @@ async function openModal(isbn, preloadedBook) {
       if (tagsEl) {
         const newTags = [
           book.publisher ? `<span class="tag tag-publisher">${book.publisher}</span>` : "",
-          book.pubdate ? `<span class="tag tag-year">${book.pubdate.slice(0,4)}年</span>` : "",
+          (book.pubdate && parseInt(book.pubdate.slice(0,4)) >= 1900) ? `<span class="tag tag-year">${book.pubdate.slice(0,4)}年</span>` : "",
           book.pages && book.pages !== "0" ? `<span class="tag tag-pages">${book.pages}P</span>` : "",
         ].filter(Boolean).join("");
         if (newTags) tagsEl.innerHTML = newTags;
