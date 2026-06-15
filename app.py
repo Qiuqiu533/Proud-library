@@ -4,6 +4,8 @@ from bs4 import BeautifulSoup
 import json
 import os
 import threading
+import time
+from collections import defaultdict
 
 # ── ジャンル別蔵書データ（Excelから事前生成）──────────────────────────────
 _GENRE_MAP_PATH = os.path.join(os.path.dirname(__file__), "static", "genre_map.json")
@@ -14,6 +16,35 @@ except Exception:
     GENRE_MAP = {}
 
 app = Flask(__name__)
+
+# ── レートリミット（住民向け公開エンドポイント保護）─────────────────────────
+_rate_store = defaultdict(list)
+_rate_lock = threading.Lock()
+
+def _check_rate_limit(key, limit=5, window=60):
+    """True=通過OK, False=制限超過。key単位でwindow秒間にlimit回まで許可。"""
+    now = time.time()
+    with _rate_lock:
+        timestamps = _rate_store[key]
+        timestamps[:] = [t for t in timestamps if now - t < window]
+        if len(timestamps) >= limit:
+            return False
+        timestamps.append(now)
+        return True
+
+def rate_limit(limit=5, window=60):
+    """デコレータ: IPアドレス＋エンドポイントでレートリミット"""
+    def decorator(f):
+        from functools import wraps
+        @wraps(f)
+        def wrapped(*args, **kwargs):
+            ip = request.headers.get("X-Forwarded-For", request.remote_addr or "unknown").split(",")[0].strip()
+            key = f"{ip}:{f.__name__}"
+            if not _check_rate_limit(key, limit, window):
+                return jsonify({"error": "しばらく時間をおいてから再試行してください"}), 429
+            return f(*args, **kwargs)
+        return wrapped
+    return decorator
 
 # ── DB設定 ──────────────────────────────────────────────────────────────
 # DATABASE_URL が設定されていればPostgreSQL、なければSQLite（ローカル開発用）
@@ -1447,6 +1478,7 @@ def api_book(isbn):
 
 
 @app.route("/api/rate", methods=["POST"])
+@rate_limit(limit=10, window=60)
 def api_rate():
     body = request.get_json()
     isbn = body.get("isbn", "")
@@ -1548,6 +1580,7 @@ def api_requests_admin():
 
 
 @app.route("/api/requests", methods=["POST"])
+@rate_limit(limit=5, window=60)
 def api_post_request():
     body = request.get_json()
     title = body.get("title", "").strip()
@@ -1563,6 +1596,7 @@ def api_post_request():
 
 
 @app.route("/api/requests/<int:req_id>/vote", methods=["POST"])
+@rate_limit(limit=10, window=60)
 def api_vote_request(req_id):
     con = get_con()
     execute(con, "UPDATE book_requests SET votes = COALESCE(votes,0) + 1 WHERE id=?", (req_id,))

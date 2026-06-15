@@ -894,6 +894,7 @@ function updateStarUI(n) {
 document.getElementById("searchBtn").addEventListener("click", () => loadBooks(document.getElementById("searchInput").value));
 document.getElementById("searchInput").addEventListener("keydown", e => { if (e.key === "Enter") loadBooks(document.getElementById("searchInput").value); });
 document.getElementById("modalClose").addEventListener("click", closeModal);
+document.getElementById("modalCloseBottom").addEventListener("click", closeModal);
 document.getElementById("modal").addEventListener("click", e => { if (e.target === document.getElementById("modal")) closeModal(); });
 document.getElementById("rateClose").addEventListener("click", () => { document.getElementById("rateModal").style.display = "none"; });
 document.getElementById("rateModal").addEventListener("click", e => { if (e.target === document.getElementById("rateModal")) document.getElementById("rateModal").style.display = "none"; });
@@ -1861,6 +1862,9 @@ document.getElementById("reqSubmitBtn").addEventListener("click", async () => {
     document.getElementById("reqReason").value = "";
     document.getElementById("reqRoom").value = "";
     showReqToast("✅ リクエストを送信しました！");
+  } else if (res.status === 429) {
+    msg.textContent = "⚠️ 送信が多すぎます。しばらく時間をおいてから再試行してください。";
+    msg.style.color = "#e07800";
   } else {
     msg.textContent = "❌ 送信できませんでした。もう一度お試しください。";
     msg.style.color = "#e05";

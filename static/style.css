@@ -140,6 +140,7 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
 .modal-small { max-width: 380px; }
 .modal-close { position: absolute; top: 14px; right: 14px; background: #f0ede8; border: none; border-radius: 50%; width: 34px; height: 34px; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .2s; }
 .modal-close:hover { background: #e0ddd8; }
+.modal-close-bottom { display: none; width: 100%; margin-top: 20px; padding: 12px; background: #f5f3f0; border: none; border-radius: 10px; font-size: 0.92rem; color: #555; cursor: pointer; font-family: inherit; justify-content: center; align-items: center; gap: 6px; }
 .modal-content { display: flex; flex-direction: column; gap: 18px; }
 .modal-top { display: flex; gap: 20px; align-items: flex-start; }
 .modal-cover { width: 120px; flex-shrink: 0; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); overflow: hidden; }
@@ -478,11 +479,31 @@ body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2
   .modal-box { margin: 12px; max-height: 90vh; overflow-y: auto; }
 
   .board-panel { padding: 0; }
-  .board-tabs { gap: 2px; padding: 8px 8px 0; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* ① 管理タブ: 折り返し2行表示 */
+  .board-tabs { flex-wrap: wrap; gap: 2px; padding: 8px 8px 0; overflow-x: unset; }
   .board-tab { font-size: 0.76rem; padding: 7px 10px; white-space: nowrap; flex-shrink: 0; }
   .board-body { padding: 12px; }
 
+  /* ② タップ領域を44px確保 */
+  .news-del, .btn-edit { min-width: 36px; min-height: 36px; display: inline-flex; align-items: center; justify-content: center; }
+  .btn-primary, .btn-secondary, .btn-board-add { min-height: 44px; }
+  .req-card-footer .btn-primary, .req-card-footer .btn-secondary { padding: 10px 14px; }
+
+  /* ③ iOS自動ズーム防止（font-size < 16pxでズームが発生する） */
+  input, textarea, select { font-size: 1rem !important; }
+
+  /* ④ カレンダーセルを広げる */
+  .lib-cal-day { padding: 7px 3px; }
+
+  /* ⑥ モーダル下部に閉じボタン表示 */
+  .modal-close-bottom { display: flex; }
+
   .controls-row { flex-wrap: wrap; gap: 6px; }
+}
+
+@media (max-width: 320px) {
+  /* ⑤ 極小端末では1列 */
+  .book-grid { grid-template-columns: 1fr; gap: 8px; }
 }
 
 @media (max-width: 400px) {
