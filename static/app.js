@@ -716,24 +716,30 @@ function _buildEventsMap(items) {
 }
 
 async function loadInfo() {
-  const [infoRes, schRes, annRes] = await Promise.all([
+  const [infoRes, schRes] = await Promise.all([
     fetch("/api/library-info"),
-    fetch("/api/lib-schedule"),
-    fetch("/api/announcements")
+    fetch("/api/lib-schedule")
   ]);
   const info = await infoRes.json();
   const schItems = await schRes.json();
-  const annItems = await annRes.json();
   _calEventsMap = _buildEventsMap(schItems);
-  // お知らせのevent_dateもカレンダーにマージ
-  (annItems || []).forEach(item => {
-    if (!item.event_date) return;
-    if (!_calEventsMap[item.event_date]) _calEventsMap[item.event_date] = [];
-    const type = item.category === "休館" ? "closed" : "event";
-    if (!_calEventsMap[item.event_date].find(e => e.title === item.title)) {
-      _calEventsMap[item.event_date].push({title: item.title, type});
+  // お知らせのevent_dateもカレンダーにマージ（失敗しても無視）
+  try {
+    const annRes = await fetch("/api/announcements");
+    if (annRes.ok) {
+      const annItems = await annRes.json();
+      if (Array.isArray(annItems)) {
+        annItems.forEach(item => {
+          if (!item.event_date) return;
+          if (!_calEventsMap[item.event_date]) _calEventsMap[item.event_date] = [];
+          const type = item.category === "休館" ? "closed" : "event";
+          if (!_calEventsMap[item.event_date].find(e => e.title === item.title)) {
+            _calEventsMap[item.event_date].push({title: item.title, type});
+          }
+        });
+      }
     }
-  });
+  } catch(e) { /* カレンダーへのお知らせマージに失敗しても続行 */ }
   const hoursHtml = info.hours.map(h =>
     `<div class="avail-row"><span>${h.day}</span><span><strong>${h.time}</strong></span></div>`
   ).join("");
