@@ -511,12 +511,17 @@ function newsItemHtml(item, showDelete) {
         ${showDelete ? `<button class="news-edit" data-id="${item.id}" title="編集">✏️</button><button class="news-del" data-id="${item.id}" title="削除">🗑</button>` : ""}
       </div>
       <div class="news-title">${esc(item.title)}</div>
+      ${item.event_date ? `<div class="news-event-date">📅 ${item.event_date}</div>` : ""}
       <div class="news-body">${esc(item.body).replace(/\n/g, "<br>")}</div>
       ${imagesHtml}
       <div class="news-edit-form" id="news-edit-form-${item.id}" style="display:none;margin-top:12px;border-top:1px solid #eee;padding-top:12px">
-        <select class="news-edit-cat" data-id="${item.id}" style="margin-bottom:8px;padding:6px;border-radius:6px;border:1px solid #ccc;width:100%">
-          ${["お知らせ","イベント","図書委員会"].map(c => `<option value="${c}" ${item.category===c?"selected":""}>${c}</option>`).join("")}
+        <select class="news-edit-cat" data-id="${item.id}" style="margin-bottom:8px;padding:6px;border-radius:6px;border:1px solid #ccc;width:100%" onchange="const w=this.closest('.news-edit-form').querySelector('.news-edit-date-wrap');if(w)w.style.display=(this.value==='イベント'||this.value==='休館')?'block':'none'">
+          ${["お知らせ","イベント","休館","新着","図書委員会"].map(c => `<option value="${c}" ${item.category===c?"selected":""}>${c}</option>`).join("")}
         </select>
+        <div class="news-edit-date-wrap" style="display:${(item.category==='イベント'||item.category==='休館')?'block':'none'};margin-bottom:8px">
+          <label style="font-size:0.82rem;color:#666;display:block;margin-bottom:4px">📅 カレンダーに表示する日付</label>
+          <input type="date" class="news-edit-event-date" data-id="${item.id}" value="${item.event_date||''}" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ccc;box-sizing:border-box" />
+        </div>
         <input type="text" class="news-edit-title" data-id="${item.id}" value="${item.title.replace(/"/g,'&quot;')}" placeholder="タイトル" style="width:100%;margin-bottom:8px;padding:8px;border-radius:6px;border:1px solid #ccc;box-sizing:border-box">
         <textarea class="news-edit-body" data-id="${item.id}" rows="4" style="width:100%;margin-bottom:8px;padding:8px;border-radius:6px;border:1px solid #ccc;box-sizing:border-box">${item.body}</textarea>
         <div style="margin-bottom:8px">
@@ -609,6 +614,7 @@ async function loadAdminNews() {
       const title = list.querySelector(`.news-edit-title[data-id="${id}"]`).value.trim();
       const body = list.querySelector(`.news-edit-body[data-id="${id}"]`).value.trim();
       const category = list.querySelector(`.news-edit-cat[data-id="${id}"]`).value;
+      const event_date = list.querySelector(`.news-edit-event-date[data-id="${id}"]`)?.value || "";
       // 残っている画像行からsrcを収集
       const imgList = list.querySelector(`.news-edit-img-list[data-id="${id}"]`);
       const images = Array.from(imgList.querySelectorAll("img")).map(img => img.src).filter(Boolean);
@@ -617,7 +623,7 @@ async function loadAdminNews() {
       btn.disabled = true; btn.textContent = "保存中…";
       const r = await fetch(`/api/announcements/${id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: pass, title, body, category, images })
+        body: JSON.stringify({ password: pass, title, body, category, images, event_date })
       });
       btn.disabled = false; btn.textContent = "💾 保存";
       if (r.ok) {
@@ -682,9 +688,9 @@ function buildCalendar(y, m, eventsMap) {
       sub = `<span class="cal-sub cal-sub-closed">×休館</span>`;
     } else if (tempClosed) {
       const label = tempClosed.title ? tempClosed.title : "臨時休館";
-      sub = `<span class="cal-sub cal-sub-closed" title="${esc(label)}">×${esc(label.length > 4 ? label.slice(0,4)+"…" : label)}</span>`;
+      sub = `<span class="cal-sub cal-sub-closed" title="${esc(label)}">×${esc(label.length > 6 ? label.slice(0,6)+"…" : label)}</span>`;
     } else if (events.length) {
-      sub = events.map(e => `<span class="cal-sub cal-sub-event" title="${esc(e.title)}">${esc(e.title.length > 4 ? e.title.slice(0,4)+"…" : e.title)}</span>`).join("");
+      sub = events.map(e => `<span class="cal-sub cal-sub-event" title="${esc(e.title)}">${esc(e.title.length > 6 ? e.title.slice(0,6)+"…" : e.title)}</span>`).join("");
     }
     html += `<div class="${cls}"><span class="cal-day-num">${d}</span>${sub}</div>`;
   }
@@ -710,13 +716,24 @@ function _buildEventsMap(items) {
 }
 
 async function loadInfo() {
-  const [infoRes, schRes] = await Promise.all([
+  const [infoRes, schRes, annRes] = await Promise.all([
     fetch("/api/library-info"),
-    fetch("/api/lib-schedule")
+    fetch("/api/lib-schedule"),
+    fetch("/api/announcements")
   ]);
   const info = await infoRes.json();
   const schItems = await schRes.json();
+  const annItems = await annRes.json();
   _calEventsMap = _buildEventsMap(schItems);
+  // お知らせのevent_dateもカレンダーにマージ
+  (annItems || []).forEach(item => {
+    if (!item.event_date) return;
+    if (!_calEventsMap[item.event_date]) _calEventsMap[item.event_date] = [];
+    const type = item.category === "休館" ? "closed" : "event";
+    if (!_calEventsMap[item.event_date].find(e => e.title === item.title)) {
+      _calEventsMap[item.event_date].push({title: item.title, type});
+    }
+  });
   const hoursHtml = info.hours.map(h =>
     `<div class="avail-row"><span>${h.day}</span><span><strong>${h.time}</strong></span></div>`
   ).join("");
@@ -1064,6 +1081,14 @@ document.getElementById("newsImageFile").addEventListener("change", async (e) =>
 
 document.getElementById("newsClearImg")?.addEventListener("click", clearNewsImage);
 
+function updateNewsDateWrap() {
+  const cat = document.getElementById("newsCat")?.value;
+  const wrap = document.getElementById("newsEventDateWrap");
+  if (wrap) wrap.style.display = (cat === "イベント" || cat === "休館") ? "block" : "none";
+}
+document.getElementById("newsCat")?.addEventListener("change", updateNewsDateWrap);
+updateNewsDateWrap();
+
 document.getElementById("postNews")?.addEventListener("click", async () => {
   const title = document.getElementById("newsTitle").value.trim();
   const body = document.getElementById("newsBody").value.trim();
@@ -1074,12 +1099,14 @@ document.getElementById("postNews")?.addEventListener("click", async () => {
   if (!title || !body) { document.getElementById("newsMsg").textContent = "タイトルと内容を入力してください"; return; }
   const res = await fetch("/api/announcements", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, body, category: cat, images, password: pass })
+    body: JSON.stringify({ title, body, category: cat, images, event_date: document.getElementById("newsEventDate")?.value || "", password: pass })
   });
   if (res.ok) {
     document.getElementById("newsMsg").textContent = "✅ 投稿しました！";
     document.getElementById("newsTitle").value = "";
     document.getElementById("newsBody").value = "";
+    const edWrap = document.getElementById("newsEventDateWrap");
+    if (edWrap) { edWrap.style.display = "none"; document.getElementById("newsEventDate").value = ""; }
     clearNewsImage();
     loadAdminNews();
     loadNews();
