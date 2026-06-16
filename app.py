@@ -856,15 +856,29 @@ def fetch_book_detail(isbn):
                         break
         except Exception:
             pass
-    # DBキャッシュから説明文を確認
+    # DBキャッシュから説明文を確認（タイトル整合性チェック付き）
     if not result.get("description"):
         try:
             dc = get_con()
             ph = "%s" if USE_PG else "?"
-            cached = fetchone(dc, f"SELECT description FROM genre_books WHERE isbn={ph}", (isbn,))
+            cached = fetchone(dc, f"SELECT title, author, description FROM genre_books WHERE isbn={ph}", (isbn,))
             dc.close()
             if cached and cached.get("description"):
-                result["description"] = cached["description"]
+                # LibraryLifeのタイトルとDBのタイトルが一致するか確認
+                def _title_matches(ll_title, db_title):
+                    if not ll_title or not db_title:
+                        return True  # どちらかが不明な場合はスキップ
+                    import re as _re
+                    def _norm(s):
+                        s = _re.sub(r'[\s　]', '', s)
+                        s = _re.sub(r'[〈〉（）()【】\[\]《》＜＞<>].*', '', s)
+                        return s.lower()
+                    n1, n2 = _norm(ll_title), _norm(db_title)
+                    return n1 in n2 or n2 in n1 or n1 == n2
+                ll_title = result.get("title", "")
+                db_title = cached.get("title", "")
+                if _title_matches(ll_title, db_title):
+                    result["description"] = cached["description"]
         except Exception:
             pass
     # Google Books APIで説明文を補完（登録不要・無料）- キャッシュがない場合のみ
