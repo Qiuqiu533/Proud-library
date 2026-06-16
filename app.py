@@ -860,7 +860,8 @@ def fetch_book_detail(isbn):
     if not result.get("description"):
         try:
             dc = get_con()
-            cached = fetchone(dc, "SELECT description FROM genre_books WHERE isbn=?", (isbn,))
+            ph = "%s" if USE_PG else "?"
+            cached = fetchone(dc, f"SELECT description FROM genre_books WHERE isbn={ph}", (isbn,))
             dc.close()
             if cached and cached.get("description"):
                 result["description"] = cached["description"]
@@ -881,14 +882,23 @@ def fetch_book_detail(isbn):
                 if desc:
                     result["description"] = desc[:400]
                     # DBにキャッシュ保存（バックグラウンド）
-                    def _save_desc(isbn_, desc_):
+                    def _save_desc(isbn_, desc_, title_, author_, publisher_):
                         try:
                             dc = get_con()
-                            execute(dc, "UPDATE genre_books SET description=? WHERE isbn=?", (desc_, isbn_))
+                            if USE_PG:
+                                execute(dc, """INSERT INTO genre_books (isbn, title, author, publisher, genre, format, description)
+                                    VALUES (%s,%s,%s,%s,'その他','その他',%s)
+                                    ON CONFLICT (isbn) DO UPDATE SET description=EXCLUDED.description""",
+                                    (isbn_, title_, author_, publisher_, desc_))
+                            else:
+                                execute(dc, "UPDATE genre_books SET description=? WHERE isbn=?", (desc_, isbn_))
                             dc.commit(); dc.close()
                         except Exception:
                             pass
-                    threading.Thread(target=_save_desc, args=(isbn, desc[:400]), daemon=True).start()
+                    threading.Thread(target=_save_desc, args=(
+                        isbn, desc[:400],
+                        result.get("title",""), result.get("author",""), result.get("publisher","")
+                    ), daemon=True).start()
                 if not result.get("publisher") and vi.get("publisher"):
                     result["publisher"] = vi["publisher"]
                 if not result.get("pubdate") and vi.get("publishedDate"):
