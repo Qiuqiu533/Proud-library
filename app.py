@@ -839,6 +839,16 @@ def fetch_book_detail(isbn):
     isbn10 = result.get("isbn10", "")
     isbn13 = result.get("isbn13", isbn)
     result["cover"] = get_cover_url(isbn13, isbn10)
+    # DBの書評を最優先で確認（管理者が登録した書評を常に優先する）
+    try:
+        dc = get_con()
+        ph = "%s" if USE_PG else "?"
+        cached = fetchone(dc, f"SELECT title, author, description FROM genre_books WHERE isbn={ph}", (isbn,))
+        dc.close()
+        if cached and cached.get("description"):
+            result["description"] = cached["description"]
+    except Exception:
+        pass
     if isbn13 and isbn13.startswith("978"):
         try:
             ob = requests.get(OPENBD_API, params={"isbn": isbn13}, timeout=5).json()
@@ -850,35 +860,12 @@ def fetch_book_detail(isbn):
                     result["publisher"] = summary["publisher"]
                 if summary.get("cover"):
                     result["cover"] = summary["cover"]
-                for t in ob[0].get("onix", {}).get("CollateralDetail", {}).get("TextContent", []):
-                    if t.get("TextType") in ("02", "03", "04"):
-                        result["description"] = t.get("Text", "")
-                        break
-        except Exception:
-            pass
-    # DBキャッシュから説明文を確認（タイトル整合性チェック付き）
-    if not result.get("description"):
-        try:
-            dc = get_con()
-            ph = "%s" if USE_PG else "?"
-            cached = fetchone(dc, f"SELECT title, author, description FROM genre_books WHERE isbn={ph}", (isbn,))
-            dc.close()
-            if cached and cached.get("description"):
-                # LibraryLifeのタイトルとDBのタイトルが一致するか確認
-                def _title_matches(ll_title, db_title):
-                    if not ll_title or not db_title:
-                        return True  # どちらかが不明な場合はスキップ
-                    import re as _re
-                    def _norm(s):
-                        s = _re.sub(r'[\s　]', '', s)
-                        s = _re.sub(r'[〈〉（）()【】\[\]《》＜＞<>].*', '', s)
-                        return s.lower()
-                    n1, n2 = _norm(ll_title), _norm(db_title)
-                    return n1 in n2 or n2 in n1 or n1 == n2
-                ll_title = result.get("title", "")
-                db_title = cached.get("title", "")
-                if _title_matches(ll_title, db_title):
-                    result["description"] = cached["description"]
+                # OpenBDの説明文はDBに書評がない場合のみ使用
+                if not result.get("description"):
+                    for t in ob[0].get("onix", {}).get("CollateralDetail", {}).get("TextContent", []):
+                        if t.get("TextType") in ("02", "03", "04"):
+                            result["description"] = t.get("Text", "")
+                            break
         except Exception:
             pass
     # Google Books APIで説明文を補完（登録不要・無料）- キャッシュがない場合のみ
@@ -899,6 +886,12 @@ def fetch_book_detail(isbn):
                     def _save_desc(isbn_, desc_, title_, author_, publisher_):
                         try:
                             dc = get_con()
+                            ph = "%s" if USE_PG else "?"
+                            # 既存の書評がある場合は上書きしない
+                            existing = fetchone(dc, f"SELECT description FROM genre_books WHERE isbn={ph}", (isbn_,))
+                            if existing and existing.get("description"):
+                                dc.close()
+                                return
                             if USE_PG:
                                 execute(dc, """INSERT INTO genre_books (isbn, title, author, publisher, genre, format, description)
                                     VALUES (%s,%s,%s,%s,'その他','その他',%s)
