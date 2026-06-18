@@ -881,7 +881,7 @@ def fetch_book_detail(isbn):
                 vi = items[0].get("volumeInfo", {})
                 desc = vi.get("description", "")
                 if desc:
-                    result["description"] = desc[:500]
+                    result["description"] = desc[:600]
                     # DBにキャッシュ保存（バックグラウンド）
                     def _save_desc(isbn_, desc_, title_, author_, publisher_):
                         try:
@@ -903,7 +903,7 @@ def fetch_book_detail(isbn):
                         except Exception:
                             pass
                     threading.Thread(target=_save_desc, args=(
-                        isbn, desc[:500],
+                        isbn, desc[:600],
                         result.get("title",""), result.get("author",""), result.get("publisher","")
                     ), daemon=True).start()
                 if not result.get("publisher") and vi.get("publisher"):
@@ -1573,7 +1573,7 @@ def api_book_description():
     if password != get_admin_password() and password != get_board_password():
         return jsonify({"error": "unauthorized"}), 401
     isbn = body.get("isbn", "").strip()
-    description = body.get("description", "").strip()[:500]
+    description = body.get("description", "").strip()[:600]
     if not isbn:
         return jsonify({"error": "isbn required"}), 400
     con = get_con()
