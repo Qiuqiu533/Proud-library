@@ -2940,7 +2940,7 @@ async function saveBookDesc() {
   const msg = document.getElementById("descMsg");
   if (!isbn) { msg.textContent = "⚠️ ISBNを入力してください"; return; }
   if (!description) { msg.textContent = "⚠️ 書評を入力してください"; return; }
-  const pass = sessionStorage.getItem("boardPassword");
+  const pass = sessionStorage.getItem("board_pass") || boardPassword;
   if (!pass) { msg.textContent = "⚠️ 再ログインしてください"; return; }
   msg.textContent = "保存中...";
   try {
