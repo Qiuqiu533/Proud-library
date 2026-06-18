@@ -2927,7 +2927,7 @@ async function lookupBookForDesc() {
     if (book.title) {
       info.textContent = `📖 ${book.title}${book.author ? " / " + book.author : ""}`;
       info.style.display = "block";
-      if (book.description) {
+      if (false) { // 既存書評は自動ロードしない（誤上書き防止）
         document.getElementById("descText").value = book.description;
         document.getElementById("descCount").textContent = `（${book.description.length}/500文字）`;
       }
