@@ -1259,7 +1259,7 @@ document.querySelectorAll(".board-tab").forEach(btn => {
     if (btn.dataset.btab === "bookdesc") {
       document.getElementById("descIsbn").value = "";
       document.getElementById("descText").value = "";
-      document.getElementById("descCount").textContent = "（0/500文字）";
+      document.getElementById("descCount").textContent = "（0/600文字）";
       document.getElementById("descBookInfo").style.display = "none";
       document.getElementById("descMsg").textContent = "";
     }
@@ -2929,7 +2929,7 @@ async function lookupBookForDesc() {
       info.style.display = "block";
       if (false) { // 既存書評は自動ロードしない（誤上書き防止）
         document.getElementById("descText").value = book.description;
-        document.getElementById("descCount").textContent = `（${book.description.length}/500文字）`;
+        document.getElementById("descCount").textContent = `（${book.description.length}/600文字）`;
       }
     } else {
       info.textContent = "本が見つかりませんでした";
@@ -2960,7 +2960,7 @@ async function saveBookDesc() {
       msg.textContent = "✅ 保存しました";
       document.getElementById("descIsbn").value = "";
       document.getElementById("descText").value = "";
-      document.getElementById("descCount").textContent = "（0/500文字）";
+      document.getElementById("descCount").textContent = "（0/600文字）";
       document.getElementById("descBookInfo").style.display = "none";
       setTimeout(() => { msg.textContent = ""; }, 3000);
     } else {

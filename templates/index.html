@@ -622,7 +622,7 @@
       <!-- 書評入力 -->
       <div id="btab-bookdesc" class="board-tab-panel">
         <h4 style="margin:0 0 12px">📝 書評・内容紹介の入力</h4>
-        <p style="font-size:0.85rem;color:#666;margin-bottom:12px">ISBNを入力して書評を登録します。既存の書評は上書きされます（最大500文字）。</p>
+        <p style="font-size:0.85rem;color:#666;margin-bottom:12px">ISBNを入力して書評を登録します。既存の書評は上書きされます（最大600文字）。</p>
         <div style="margin-bottom:10px">
           <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:4px">ISBN（13桁）</label>
           <div style="display:flex;gap:8px">
@@ -632,8 +632,8 @@
         </div>
         <div id="descBookInfo" style="font-size:0.85rem;color:#444;background:#f5f5f5;padding:8px;border-radius:6px;margin-bottom:10px;display:none"></div>
         <div style="margin-bottom:10px">
-          <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:4px">書評・内容紹介 <span id="descCount" style="font-weight:normal;color:#888">（0/500文字）</span></label>
-          <textarea id="descText" rows="6" style="width:100%;box-sizing:border-box;border:1px solid #ddd;border-radius:6px;padding:8px;font-size:0.85rem;resize:vertical" maxlength="500" placeholder="書評・内容紹介を500文字以内で入力してください" oninput="document.getElementById('descCount').textContent='（'+this.value.length+'/500文字）'"></textarea>
+          <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:4px">書評・内容紹介 <span id="descCount" style="font-weight:normal;color:#888">（0/600文字）</span></label>
+          <textarea id="descText" rows="6" style="width:100%;box-sizing:border-box;border:1px solid #ddd;border-radius:6px;padding:8px;font-size:0.85rem;resize:vertical" maxlength="600" placeholder="書評・内容紹介を600文字以内で入力してください" oninput="document.getElementById('descCount').textContent='（'+this.value.length+'/600文字）'"></textarea>
         </div>
         <button class="btn-primary" onclick="saveBookDesc()" style="width:100%">💾 保存する</button>
         <p id="descMsg" style="margin-top:8px;font-size:0.85rem;text-align:center"></p>
