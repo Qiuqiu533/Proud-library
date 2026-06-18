@@ -1256,6 +1256,13 @@ document.querySelectorAll(".board-tab").forEach(btn => {
     if (btn.dataset.btab === "loaned") loadLoanedBooks();
     if (btn.dataset.btab === "staffchat") initStaffChat();
     if (btn.dataset.btab === "settings") loadAdminQr();
+    if (btn.dataset.btab === "bookdesc") {
+      document.getElementById("descIsbn").value = "";
+      document.getElementById("descText").value = "";
+      document.getElementById("descCount").textContent = "（0/500文字）";
+      document.getElementById("descBookInfo").style.display = "none";
+      document.getElementById("descMsg").textContent = "";
+    }
   });
 });
 
@@ -2951,6 +2958,10 @@ async function saveBookDesc() {
     });
     if (res.ok) {
       msg.textContent = "✅ 保存しました";
+      document.getElementById("descIsbn").value = "";
+      document.getElementById("descText").value = "";
+      document.getElementById("descCount").textContent = "（0/500文字）";
+      document.getElementById("descBookInfo").style.display = "none";
       setTimeout(() => { msg.textContent = ""; }, 3000);
     } else {
       const err = await res.json().catch(() => ({}));
