@@ -2922,7 +2922,7 @@ async function lookupBookForDesc() {
       info.style.display = "block";
       if (book.description) {
         document.getElementById("descText").value = book.description;
-        document.getElementById("descCount").textContent = `（${book.description.length}/400文字）`;
+        document.getElementById("descCount").textContent = `（${book.description.length}/500文字）`;
       }
     } else {
       info.textContent = "本が見つかりませんでした";
