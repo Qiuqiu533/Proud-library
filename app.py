@@ -1577,7 +1577,7 @@ def api_book(isbn):
 def api_book_description():
     body = request.get_json()
     password = body.get("password", "")
-    if password != ADMIN_PASSWORD:
+    if password != get_admin_password() and password != get_board_password():
         return jsonify({"error": "unauthorized"}), 401
     isbn = body.get("isbn", "").strip()
     description = body.get("description", "").strip()[:500]
