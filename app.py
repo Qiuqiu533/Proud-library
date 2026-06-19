@@ -107,7 +107,9 @@ def fetchone(con, sql, params=()):
 
 # ── 定数 ────────────────────────────────────────────────────────────────
 LIBRARY_CODE = "0011"
-LIBRARYLIFE_BASE = "https://www2.librarylife.net"
+LIBRARYLIFE_BASE = "https://www.librarylife.net"
+_INERTIA_VERSION = "41d94b8935bef33f0a7fadd0e4bf2a77"
+_INERTIA_SESSION = requests.Session()
 OPENBD_API = "https://api.openbd.jp/v1/get"
 NDL_THUMB = "https://ndlsearch.ndl.go.jp/thumbnail/{isbn}.jpg"
 
@@ -758,64 +760,77 @@ def isbn13_to_isbn10(isbn13):
     return digits + ("X" if check == 10 else str(check))
 
 
+def _inertia_headers(partial_data=None, partial_component=None):
+    h = {
+        "Accept": "application/json",
+        "X-Inertia": "true",
+        "X-Inertia-Version": _INERTIA_VERSION,
+    }
+    if partial_data:
+        h["X-Inertia-Partial-Data"] = partial_data
+        h["X-Inertia-Partial-Component"] = partial_component or ""
+    return h
+
+
 def fetch_books(keyword="", page=1):
     url = f"{LIBRARYLIFE_BASE}/booksearch"
     params = {"location": LIBRARY_CODE, "keyword": keyword, "page": page}
-    resp = requests.get(url, params=params, timeout=10)
-    soup = BeautifulSoup(resp.text, "html.parser")
-    total = 0
-    page_data = soup.select_one(".page-data")
-    if page_data:
-        strong = page_data.find("strong")
-        if strong:
-            total = int(strong.text.replace(",", ""))
-    books = []
-    for row in soup.select("table.table tr")[1:]:
-        cols = row.find_all("td")
-        if len(cols) < 4:
-            continue
-        title_a = cols[0].find("a")
-        author_a = cols[1].find("a")
-        title = title_a.text.strip() if title_a else ""
-        href = title_a["href"] if title_a else ""
-        isbn = href.split("/")[-1] if href else ""
-        author = author_a.text.strip() if author_a else ""
-        isbn10 = isbn13_to_isbn10(isbn) if isbn.startswith("978") else ""
-        books.append({
-            "isbn": isbn, "isbn10": isbn10, "title": title, "author": author,
-            "publisher": cols[2].text.strip(), "format": cols[3].text.strip(),
-            "cover": get_cover_url(isbn, isbn10),
-        })
-    return {"books": books, "total": total, "page": page}
+    try:
+        resp = _INERTIA_SESSION.get(url, params=params, timeout=10,
+                                    headers=_inertia_headers("books", "book-search/index"))
+        data = resp.json()
+        books_data = data.get("props", {}).get("books", {})
+        raw = books_data.get("data", [])
+        total = books_data.get("total", len(raw))
+        books = []
+        for b in raw:
+            isbn = b.get("isbn13", "")
+            isbn10 = b.get("isbn10", "")
+            books.append({
+                "isbn": isbn, "isbn10": isbn10,
+                "title": b.get("title", ""),
+                "author": b.get("author_name", ""),
+                "publisher": b.get("publisher_name", ""),
+                "format": b.get("binding_kind", ""),
+                "cover": b.get("cover_image") or get_cover_url(isbn, isbn10),
+            })
+        return {"books": books, "total": total, "page": page}
+    except Exception as e:
+        app.logger.error(f"fetch_books error: {e}")
+        return {"books": [], "total": 0, "page": page}
 
 
 def fetch_book_detail(isbn):
     url = f"{LIBRARYLIFE_BASE}/booksearch/detail/{isbn}"
-    resp = requests.get(url, timeout=10)
-    soup = BeautifulSoup(resp.text, "html.parser")
     result = {"isbn": isbn}
-    result["title"] = soup.find("h1").text.strip() if soup.find("h1") else ""
-    for row in soup.select("#detail-area table.table tbody tr"):
-        for th, td in zip(row.find_all("th"), row.find_all("td")):
-            key, val = th.text.strip(), td.text.strip()
-            if key == "著者":      result["author"] = val
-            elif key == "出版社":  result["publisher"] = val
-            elif key == "形式":    result["format"] = val
-            elif key == "出版年月日": result["pubdate"] = val
-            elif key == "ISBN13":  result["isbn13"] = val
-            elif key == "ISBN10":  result["isbn10"] = val
-            elif key == "ページ数": result["pages"] = val
-            elif key == "サイズ":  result["size"] = val
-    availability = []
-    for row in soup.select("table.table tbody tr"):
-        tds = row.find_all("td")
-        if len(tds) >= 3 and tds[1].text.strip() and tds[2].text.strip():
-            availability.append({"library": tds[1].text.strip(), "status": tds[2].text.strip()})
-    result["availability"] = availability
+    try:
+        resp = _INERTIA_SESSION.get(url, timeout=10,
+                                    headers=_inertia_headers())
+        data = resp.json()
+        book = data.get("props", {}).get("book", {})
+        result["title"] = book.get("title", "")
+        result["author"] = book.get("author", "")
+        result["publisher"] = book.get("publisher", "")
+        result["format"] = book.get("binding", "")
+        result["pubdate"] = book.get("publication_date", "")
+        result["isbn13"] = book.get("isbn13", isbn)
+        result["isbn10"] = book.get("isbn10", "")
+        result["pages"] = str(book.get("pages", ""))
+        # 在庫情報をstocksから生成
+        availability = []
+        for s in book.get("stocks", []):
+            location = s.get("location", "")
+            state = s.get("state", "")
+            if location and state:
+                availability.append({"library": location, "status": state})
+        result["availability"] = availability
+    except Exception as e:
+        app.logger.error(f"fetch_book_detail error: {e}")
+        result["availability"] = []
     # キャッシュ保存（バックグラウンドで実行してレスポンスをブロックしない）
     if availability:
         statuses = [a["status"] for a in availability]
-        if any(s in ("利用可能", "在架") for s in statuses):
+        if any(s in ("利用可能", "在架", "開架") for s in statuses):
             avail_status = "available"
         elif any("貸出中" in s for s in statuses):
             avail_status = "loaned"
