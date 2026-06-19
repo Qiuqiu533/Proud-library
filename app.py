@@ -1592,7 +1592,7 @@ def api_book_description():
     if not isbn:
         return jsonify({"error": "isbn required"}), 400
     con = get_con()
-    execute(con, "UPDATE genre_books SET description=? WHERE isbn=?", (description, isbn))
+    execute(con, "UPDATE genre_books SET description=?, manual_review=TRUE WHERE isbn=?", (description, isbn))
     con.commit()
     con.close()
     return jsonify({"ok": True})
