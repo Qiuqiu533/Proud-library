@@ -319,17 +319,10 @@ async function loadBooks(keyword = "", page = 1) {
   const ppSel = document.getElementById("perPageSelect");
 
   let data;
-  if (!keyword) {
-    // キーワードなし→DB直接（件数変更・全件対応）
-    if (ppSel) { ppSel.disabled = false; ppSel.title = ""; }
-    const res = await fetch(`/api/books/by-genre?page=${page}&per=${currentPerPage}`);
-    data = await res.json();
-  } else {
-    // キーワードあり→librarylife.net（件数固定）
-    if (ppSel) { ppSel.disabled = true; ppSel.title = "キーワード検索中は変更できません"; }
-    const res = await fetch(`/api/books?keyword=${encodeURIComponent(keyword)}&page=${page}`);
-    data = await res.json();
-  }
+  // キーワードあり・なし共にDB直接（タイトル・著者両方検索対応）
+  if (ppSel) { ppSel.disabled = false; ppSel.title = ""; }
+  const res = await fetch(`/api/books/by-genre?keyword=${encodeURIComponent(keyword)}&page=${page}&per=${currentPerPage}`);
+  data = await res.json();
 
   currentTotal = data.total;
   let books = data.books.map(b => ({ ...b, rating: b.rating || getRating(b.isbn) }));
