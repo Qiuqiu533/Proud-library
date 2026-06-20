@@ -47,7 +47,7 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .tab-btn:hover:not(.active) { color: #3d6b4f; background: #f5f5f0; }
 
 /* ===== Main ===== */
-.main-content { max-width: 1600px; margin: 0 auto; padding: 20px 32px; }
+.main-content { max-width: 100%; margin: 0; padding: 20px 24px; }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 
