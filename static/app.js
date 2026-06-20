@@ -3954,15 +3954,18 @@ async function loadAdminCollections() {
       loadAdminCollections();
     });
   });
-  // フォームトグル
-  document.getElementById("collectionFormToggle")?.addEventListener("click", () => {
+  // フォームトグル（onclick = 重複登録防止）
+  const _toggleBtn = document.getElementById("collectionFormToggle");
+  if (_toggleBtn) _toggleBtn.onclick = () => {
     const f = document.getElementById("collectionForm");
     if (f) f.style.display = f.style.display === "none" ? "block" : "none";
-  });
-  document.getElementById("collectionFormCancel")?.addEventListener("click", () => {
+  };
+  const _cancelBtn = document.getElementById("collectionFormCancel");
+  if (_cancelBtn) _cancelBtn.onclick = () => {
     document.getElementById("collectionForm").style.display = "none";
-  });
-  document.getElementById("collectionSubmitBtn")?.addEventListener("click", async () => {
+  };
+  const _submitBtn = document.getElementById("collectionSubmitBtn");
+  if (_submitBtn) _submitBtn.onclick = async () => {
     const title = (document.getElementById("colTitle")?.value || "").trim();
     const desc = (document.getElementById("colDesc")?.value || "").trim();
     const emoji = (document.getElementById("colEmoji")?.value || "📚").trim();
