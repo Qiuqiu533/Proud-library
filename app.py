@@ -858,10 +858,15 @@ def fetch_book_detail(isbn):
     try:
         dc = get_con()
         ph = "%s" if USE_PG else "?"
-        cached = fetchone(dc, f"SELECT title, author, description FROM genre_books WHERE isbn={ph}", (isbn,))
+        cached = fetchone(dc, f"SELECT title, author, description, manual_review, manual_review_date FROM genre_books WHERE isbn={ph}", (isbn,))
         dc.close()
         if cached and cached.get("description"):
             result["description"] = cached["description"]
+        if cached and cached.get("manual_review"):
+            result["manual_review"] = True
+            d = cached.get("manual_review_date")
+            if d:
+                result["manual_review_date"] = str(d)
     except Exception:
         pass
     if isbn13 and isbn13.startswith("978"):
@@ -1592,7 +1597,7 @@ def api_book_description():
     if not isbn:
         return jsonify({"error": "isbn required"}), 400
     con = get_con()
-    execute(con, "UPDATE genre_books SET description=?, manual_review=TRUE WHERE isbn=?", (description, isbn))
+    execute(con, "UPDATE genre_books SET description=?, manual_review=TRUE, manual_review_date=CURRENT_DATE WHERE isbn=?", (description, isbn))
     con.commit()
     con.close()
     return jsonify({"ok": True})

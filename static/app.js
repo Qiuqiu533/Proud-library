@@ -799,8 +799,16 @@ function _renderModalContent(isbn, book, rating) {
   const reviewsHtml = rating.reviews && rating.reviews.length
     ? rating.reviews.map(r => `<div class="review-item">💬 ${esc(r)}</div>`).join("")
     : `<div class="no-content">まだコメントはありません</div>`;
-  const descHtml = book.description
-    ? `<div class="modal-section"><h3>📄 内容・収録作品</h3><p class="book-desc">${esc(book.description)}</p></div>` : "";
+  let descHtml = "";
+  if (book.description) {
+    let dateTag = "";
+    if (book.manual_review && book.manual_review_date) {
+      const d = new Date(book.manual_review_date);
+      const formatted = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+      dateTag = `<span class="manual-review-date">司書登録：${formatted}</span>`;
+    }
+    descHtml = `<div class="modal-section"><h3>📄 内容・収録作品</h3><p class="book-desc">${esc(book.description)}</p>${dateTag}</div>`;
+  }
 
   return `
     <div class="modal-top">
@@ -924,7 +932,13 @@ async function openModal(isbn, preloadedBook) {
       // 内容紹介を追加
       const descPlaceholder = document.getElementById("modal-desc-placeholder");
       if (descPlaceholder && book.description) {
-        descPlaceholder.outerHTML = `<div class="modal-section"><h3>📄 内容・収録作品</h3><p class="book-desc">${book.description}</p></div>`;
+        let dateTag2 = "";
+        if (book.manual_review && book.manual_review_date) {
+          const d2 = new Date(book.manual_review_date);
+          const fmt2 = `${d2.getFullYear()}年${d2.getMonth()+1}月${d2.getDate()}日`;
+          dateTag2 = `<span class="manual-review-date">司書登録：${fmt2}</span>`;
+        }
+        descPlaceholder.outerHTML = `<div class="modal-section"><h3>📄 内容・収録作品</h3><p class="book-desc">${book.description}</p>${dateTag2}</div>`;
       }
     } catch(e) {
       const availEl = document.getElementById("modal-avail-body");
