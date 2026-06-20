@@ -913,12 +913,12 @@ function _renderModalContent(isbn, book, rating) {
       </div>
     </div>
 
+    <div id="modal-related-placeholder"></div>
+
     <div class="modal-section" id="modal-avail-section">
       <h3>🏛️ 貸出状況</h3>
       <div id="modal-avail-body"><div class="loading" style="font-size:0.85rem;padding:8px 0">取得中…</div></div>
-    </div>
-
-    <div id="modal-related-placeholder"></div>`;
+    </div>`;
 }
 
 function _bindModalEvents(isbn) {
