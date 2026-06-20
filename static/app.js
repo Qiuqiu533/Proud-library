@@ -881,7 +881,7 @@ function _renderModalContent(isbn, book, rating) {
       </div>
     </div>
 
-    ${descHtml}<div id="modal-desc-placeholder"></div>
+    ${descHtml || '<div id="modal-desc-placeholder"></div>'}
 
     <div class="modal-section">
       <h3>📚 読書ステータス</h3>
