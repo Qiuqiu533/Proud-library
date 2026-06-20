@@ -894,7 +894,7 @@ def fetch_book_detail(isbn, hint_title=""):
             c1, c2 = _title_core(t1), _title_core(t2)
             return c1 == c2 or c1 in t2 or c2 in t1 or c1 in c2 or c2 in c1
 
-        cached = fetchone(dc, f"SELECT title, author, description, manual_review, manual_review_date FROM genre_books WHERE isbn={ph}", (isbn,))
+        cached = fetchone(dc, f"SELECT title, author, description, manual_review, manual_review_date, ai_review_date, ai_review_score, ai_model FROM genre_books WHERE isbn={ph}", (isbn,))
 
         # ISBNで見つかったがタイトルが一致しない場合 → タイトルで再検索
         if cached and cached.get("description") and lib_title:
@@ -905,14 +905,14 @@ def fetch_book_detail(isbn, hint_title=""):
         # ISBNで見つからない or タイトル不一致 → タイトルで再検索
         if (not cached or not cached.get("description")) and lib_title:
             cached = fetchone(dc,
-                f"SELECT title, author, description, manual_review, manual_review_date FROM genre_books WHERE title={ph}",
+                f"SELECT title, author, description, manual_review, manual_review_date, ai_review_date, ai_review_score, ai_model FROM genre_books WHERE title={ph}",
                 (lib_title,))
             # 完全一致しない場合は前方一致で再試行
             if not cached or not cached.get("description"):
                 title_prefix = _title_core(lib_title)
                 if len(title_prefix) >= 4:
                     cached = fetchone(dc,
-                        f"SELECT title, author, description, manual_review, manual_review_date FROM genre_books WHERE title LIKE {ph}",
+                        f"SELECT title, author, description, manual_review, manual_review_date, ai_review_date, ai_review_score, ai_model FROM genre_books WHERE title LIKE {ph}",
                         (title_prefix + "%",))
 
         dc.close()
@@ -923,6 +923,16 @@ def fetch_book_detail(isbn, hint_title=""):
             d = cached.get("manual_review_date")
             if d:
                 result["manual_review_date"] = str(d)
+        elif cached and not cached.get("manual_review") and result.get("description"):
+            ai_d = cached.get("ai_review_date")
+            ai_s = cached.get("ai_review_score")
+            ai_m = cached.get("ai_model")
+            if ai_d:
+                result["ai_review_date"] = str(ai_d)
+            if ai_s:
+                result["ai_review_score"] = int(ai_s)
+            if ai_m:
+                result["ai_model"] = ai_m
     except Exception:
         pass
     if isbn13 and isbn13.startswith("978"):

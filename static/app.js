@@ -830,6 +830,12 @@ function _renderModalContent(isbn, book, rating) {
       const formatted = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
       dateTag = `<span class="manual-review-date">司書登録：${formatted}</span>`;
     }
+    if (!book.manual_review && book.ai_review_date) {
+      const ad = new Date(book.ai_review_date);
+      const afmt = `${ad.getFullYear()}年${ad.getMonth()+1}月${ad.getDate()}日`;
+      const modelName = book.ai_model || "AI";
+      dateTag = `<span class="manual-review-date">AI登録：${afmt}（${modelName}）</span>`;
+    }
     const ratingTag = rating && rating.score
       ? `<span class="desc-rating">評価：${"★".repeat(Math.round(rating.score))}${"☆".repeat(5-Math.round(rating.score))} ${rating.score.toFixed(1)}（${rating.votes}件）</span>`
       : "";
@@ -964,6 +970,11 @@ async function openModal(isbn, preloadedBook) {
           const d2 = new Date(book.manual_review_date);
           const fmt2 = `${d2.getFullYear()}年${d2.getMonth()+1}月${d2.getDate()}日`;
           dateTag2 = `<span class="manual-review-date">司書登録：${fmt2}</span>`;
+        } else if (!book.manual_review && book.ai_review_date) {
+          const ad2 = new Date(book.ai_review_date);
+          const afmt2 = `${ad2.getFullYear()}年${ad2.getMonth()+1}月${ad2.getDate()}日`;
+          const modelName2 = book.ai_model || "AI";
+          dateTag2 = `<span class="manual-review-date">AI登録：${afmt2}（${modelName2}）</span>`;
         }
         const ratingTag2 = rating && rating.score
           ? `<span class="desc-rating">評価：${"★".repeat(Math.round(rating.score))}${"☆".repeat(5-Math.round(rating.score))} ${rating.score.toFixed(1)}（${rating.votes}件）</span>`
