@@ -375,7 +375,7 @@ function saveRecentBook(isbn, title, cover) {
   try { recent = JSON.parse(localStorage.getItem("recent_books") || "[]"); } catch {}
   recent = recent.filter(b => b.isbn !== isbn);
   recent.unshift({ isbn, title: title || "", cover: cover || "" });
-  localStorage.setItem("recent_books", JSON.stringify(recent.slice(0, 12)));
+  localStorage.setItem("recent_books", JSON.stringify(recent.slice(0, 20)));
   renderRecentBooks();
 }
 
