@@ -446,7 +446,25 @@ function renderRecentBooks() {
   row.querySelectorAll(".mini-card").forEach(el => {
     el.addEventListener("click", () => openModal(el.dataset.isbn));
   });
-  section.style.display = "";
+  section.style.display = topSectionsVisible() ? "" : "none";
+}
+
+function topSectionsVisible() {
+  return localStorage.getItem("topSectionsHidden") !== "1";
+}
+
+function toggleTopSections() {
+  const hidden = !topSectionsVisible();
+  localStorage.setItem("topSectionsHidden", hidden ? "1" : "0");
+  applyTopSectionsState();
+}
+
+function applyTopSectionsState() {
+  const visible = topSectionsVisible();
+  const wrapper = document.getElementById("topSectionsWrapper");
+  const btn = document.getElementById("toggleTopSections");
+  if (wrapper) wrapper.style.display = visible ? "" : "none";
+  if (btn) btn.textContent = visible ? "新着・最近見た本を隠す ▲" : "新着・最近見た本を表示 ▼";
 }
 
 function authorSortKey(author) {
@@ -1020,7 +1038,10 @@ async function openModal(isbn, preloadedBook) {
       const availEl = document.getElementById("modal-avail-body");
       if (availEl) {
         const availHtml = book.availability && book.availability.length
-          ? book.availability.map(a => `<div class="avail-row"><span>${a.library}</span>${statusBadge(a.status)}</div>`).join("")
+          ? book.availability.map(a => {
+              const isProud = a.library && a.library.includes("プラウド");
+              return `<div class="avail-row${isProud ? " avail-row--proud" : ""}"><span>${a.library}</span>${statusBadge(a.status)}</div>`;
+            }).join("")
           : `<div class="avail-row"><span>情報なし</span></div>`;
         availEl.innerHTML = availHtml;
       }
@@ -1062,7 +1083,10 @@ async function openModal(isbn, preloadedBook) {
     const book = await res.json();
     const rating = book.rating || { score: 0, votes: 0, reviews: [] };
     const availHtml = book.availability && book.availability.length
-      ? book.availability.map(a => `<div class="avail-row"><span>${a.library}</span>${statusBadge(a.status)}</div>`).join("")
+      ? book.availability.map(a => {
+          const isProud = a.library && a.library.includes("プラウド");
+          return `<div class="avail-row${isProud ? " avail-row--proud" : ""}"><span>${a.library}</span>${statusBadge(a.status)}</div>`;
+        }).join("")
       : `<div class="avail-row"><span>情報なし</span></div>`;
     const html = _renderModalContent(isbn, book, rating);
     document.getElementById("modalContent").innerHTML = html;
@@ -2093,6 +2117,7 @@ loadBooks();
 loadTopNew();
 loadReqList();
 renderRecentBooks();
+applyTopSectionsState();
 // loadGenreCounts(); // ジャンルフィルター非表示中
 
 // #44 スリープ対策: 4分ごとにpingしてサービスを起こしておく
