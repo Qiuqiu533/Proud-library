@@ -105,12 +105,14 @@ function awardStyleClass(awardName) {
 function renderAwardBadges(awards) {
   if (!awards || !awards.length) return "";
   return `<div class="award-badges">${awards.map(a => {
-    const cls = awardStyleClass(a.award);
+    const isRank1 = a.rank === 1;
+    const cls = isRank1 ? "rank1" : awardStyleClass(a.award);
     const year = a.year ? `'${String(a.year).slice(-2)}` : "";
-    const rank = a.rank && a.award === "本屋大賞" ? `${a.rank}位` : "";
+    const rank = a.rank ? `${a.rank}位` : "";
     const type = a.type === "nominee" ? "候補" : "受賞";
-    const label = `${a.award}${year}${rank ? " " + rank : ""}`;
-    return `<span class="award-badge award-badge--${cls}" title="${a.award} ${a.year || ""} ${type}">${label}</span>`;
+    const crown = isRank1 ? "👑 " : "";
+    const label = `${crown}${a.award}${year}${rank ? " " + rank : ""}`;
+    return `<span class="award-badge award-badge--${cls}" title="${a.award} ${a.year || ""} ${rank} ${type}">${label}</span>`;
   }).join("")}</div>`;
 }
 let ratingTarget = null;
