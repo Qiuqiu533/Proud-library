@@ -1391,8 +1391,14 @@ def api_books_by_genre():
         params_base.extend([like, like])
     if award:
         if USE_PG:
-            conditions.append(f"awards @> %s::jsonb")
-            params_base.append(json.dumps([{"award": award}]))
+            if award == "本屋大賞":
+                # 1位〜10位すべて（本屋大賞 + 本屋大賞ノミネート）を含める
+                conditions.append("(awards @> %s::jsonb OR awards @> %s::jsonb)")
+                params_base.append(json.dumps([{"award": "本屋大賞"}]))
+                params_base.append(json.dumps([{"award": "本屋大賞ノミネート"}]))
+            else:
+                conditions.append("awards @> %s::jsonb")
+                params_base.append(json.dumps([{"award": award}]))
         else:
             conditions.append(f"awards LIKE {ph}")
             params_base.append(f"%{award}%")
