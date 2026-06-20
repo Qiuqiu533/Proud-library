@@ -586,9 +586,9 @@
       <div style="text-align:center;padding:10px 0">
         <div style="font-size:2rem;margin-bottom:8px">🏛️</div>
         <h3 style="margin-bottom:8px">管理者メニュー</h3>
-        <p style="font-size:0.85rem;color:#888;margin-bottom:16px">専用パスワードを入力してください</p>
-        <input type="text" id="boardName" class="login-input" placeholder="お名前（チャット表示用）" style="margin-bottom:10px">
-        <input type="password" id="boardPass" class="login-input" placeholder="パスワード" style="margin-bottom:10px">
+        <p style="font-size:0.85rem;color:#888;margin-bottom:16px">管理者コードとパスワードを入力してください</p>
+        <input type="text" id="boardCode" class="login-input" placeholder="管理者コード（例: A000）" style="margin-bottom:10px" autocomplete="username">
+        <input type="password" id="boardPass" class="login-input" placeholder="パスワード" style="margin-bottom:10px" autocomplete="current-password">
         <button id="boardLoginBtn" class="btn-primary" style="width:100%">ログイン</button>
         <p id="boardLoginError" class="login-error"></p>
       </div>
@@ -601,8 +601,12 @@
       <div class="board-header-left">
         <span style="font-size:1.4rem">🏛️</span>
         <span class="board-title">管理者メニュー</span>
+        <span id="boardUserLabel" style="font-size:0.8rem;color:#888;margin-left:10px"></span>
       </div>
-      <button id="boardClose" class="board-close">✕ 閉じる</button>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button id="boardAdminLogout" class="board-close" style="background:#fff3f3;color:#c44;border:1px solid #fcc">🚪 ログアウト</button>
+        <button id="boardClose" class="board-close">✕ 閉じる</button>
+      </div>
     </div>
     <div class="board-tabs">
       <button class="board-tab active" data-btab="dashboard">🏠 ダッシュボード</button>
@@ -614,6 +618,7 @@
       <button class="board-tab" data-btab="libschedule">🗓️ 休館日・イベント</button>
       <button class="board-tab" data-btab="calendar">📅 活動カレンダー</button>
       <button class="board-tab" data-btab="staffchat">💬 チャット</button>
+      <button class="board-tab" data-btab="adminusers">👥 管理者設定</button>
       <button class="board-tab" data-btab="settings">⚙️ 設定</button>
       <button class="board-tab" data-btab="guide">📖 操作ガイド</button>
       <button class="board-tab" data-btab="analytics">📊 分析・レポート</button>
@@ -1069,6 +1074,11 @@
       </div>
 
       <!-- Settings -->
+      <div id="btab-adminusers" class="board-tab-panel">
+        <h3 style="margin-bottom:20px">👥 管理者アカウント設定</h3>
+        <div id="adminUsersContent"><div class="loading">読み込み中…</div></div>
+      </div>
+
       <div id="btab-settings" class="board-tab-panel">
         <h3 style="margin-bottom:20px">⚙️ 設定</h3>
 

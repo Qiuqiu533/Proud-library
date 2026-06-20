@@ -68,6 +68,9 @@ document.getElementById("logoutBtn").addEventListener("click", () => {
   sessionStorage.removeItem("resident_pass");
   sessionStorage.removeItem("board_auth");
   sessionStorage.removeItem("board_pass");
+  sessionStorage.removeItem("board_name");
+  sessionStorage.removeItem("admin_session");
+  adminSession = null;
   document.getElementById("loginScreen").style.display = "flex";
   document.getElementById("residentPass").value = "";
   document.getElementById("loginError").textContent = "";
@@ -204,6 +207,16 @@ function getLogEntries() {
   return Object.keys(localStorage).filter(k => k.startsWith("read_")).map(k => ({
     isbn: k.slice(5), status: localStorage[k]
   }));
+}
+function getReadMeta(isbn) {
+  try { return JSON.parse(localStorage.getItem("readmeta_" + isbn) || "{}"); } catch { return {}; }
+}
+function setReadMeta(isbn, date, memo) {
+  const obj = {};
+  if (date) obj.date = date;
+  if (memo) obj.memo = memo;
+  if (Object.keys(obj).length) localStorage.setItem("readmeta_" + isbn, JSON.stringify(obj));
+  else localStorage.removeItem("readmeta_" + isbn);
 }
 
 // ===== Utility =====
@@ -625,7 +638,25 @@ async function loadLog(filter = "all") {
   const statusMap = Object.fromEntries(entries.map(e => [e.isbn, e.status]));
   const res = await fetch(`/api/books/batch?isbns=${entries.map(e => e.isbn).join(",")}`);
   const books = (await res.json()).map(b => ({ ...b, _status: statusMap[b.isbn] }));
-  renderGrid("logGrid", books.filter(Boolean));
+  const validBooks = books.filter(Boolean);
+  renderGrid("logGrid", validBooks);
+  // 日付・感想をカード下に追記
+  validBooks.forEach(book => {
+    const meta = getReadMeta(book.isbn);
+    if (!meta.date && !meta.memo) return;
+    const cardEls = grid.querySelectorAll(".book-card");
+    cardEls.forEach(card => {
+      const btn = card.querySelector(`[data-isbn="${book.isbn}"]`);
+      if (!btn) return;
+      const existing = card.querySelector(".log-meta");
+      if (existing) return;
+      const metaDiv = document.createElement("div");
+      metaDiv.className = "log-meta";
+      if (meta.date) metaDiv.innerHTML += `<div class="log-meta-date">📅 ${meta.date}</div>`;
+      if (meta.memo) metaDiv.innerHTML += `<div class="log-meta-memo">${esc(meta.memo)}</div>`;
+      card.appendChild(metaDiv);
+    });
+  });
 }
 
 // ===== Announcements =====
@@ -986,6 +1017,20 @@ function _renderModalContent(isbn, book, rating) {
         `).join("")}
         ${readStatus ? `<button class="read-status-btn clear-btn" data-status="">✕ 解除</button>` : ""}
       </div>
+      ${readStatus ? (() => { const m = getReadMeta(isbn); return `
+      <div class="read-meta-form" id="readMetaForm">
+        <div class="read-meta-row">
+          <label class="read-meta-label">📅 読んだ日</label>
+          <input type="date" id="readMetaDate" class="read-meta-date" value="${m.date || ''}" max="${new Date().toISOString().slice(0,10)}">
+        </div>
+        <div class="read-meta-row">
+          <label class="read-meta-label">✏️ 読書感想</label>
+          <textarea id="readMetaMemo" class="read-meta-memo" rows="3" maxlength="300" placeholder="感想を入力（300文字まで）">${esc(m.memo || '')}</textarea>
+          <div class="read-meta-count" id="readMetaCount">${(m.memo || '').length}/300文字</div>
+        </div>
+        <button class="btn-primary read-meta-save" id="readMetaSave">💾 保存</button>
+        <span class="read-meta-saved" id="readMetaSaved" style="display:none;color:#2a7;font-size:0.85rem;margin-left:8px">保存しました</span>
+      </div>`; })() : ''}
     </div>
 
     <div class="modal-section">
@@ -1030,6 +1075,21 @@ function _bindModalEvents(isbn) {
       openModal(isbn);
     });
   });
+  const memoEl = document.getElementById("readMetaMemo");
+  const countEl = document.getElementById("readMetaCount");
+  const saveBtn = document.getElementById("readMetaSave");
+  if (memoEl && countEl) {
+    memoEl.addEventListener("input", () => { countEl.textContent = memoEl.value.length + "/300文字"; });
+  }
+  if (saveBtn) {
+    saveBtn.addEventListener("click", () => {
+      const date = (document.getElementById("readMetaDate") || {}).value || "";
+      const memo = memoEl ? memoEl.value : "";
+      setReadMeta(isbn, date, memo);
+      const saved = document.getElementById("readMetaSaved");
+      if (saved) { saved.style.display = "inline"; setTimeout(() => { saved.style.display = "none"; }, 2000); }
+    });
+  }
   document.querySelector(".btn-rate").addEventListener("click", () => {
     ratingTarget = isbn;
     openRateModal();
@@ -1374,7 +1434,11 @@ document.getElementById("postNews")?.addEventListener("click", async () => {
 let boardPassword = "";
 let issueFilter = "all";
 
-let boardSenderName = sessionStorage.getItem("board_name") || "";
+// 個人認証セッション
+let adminSession = JSON.parse(sessionStorage.getItem("admin_session") || "null");
+// adminSession = {code, name, role} or null
+
+let boardSenderName = (adminSession && adminSession.name) || sessionStorage.getItem("board_name") || "";
 
 // タブ通知
 const PAGE_TITLE = document.title;
@@ -1405,12 +1469,12 @@ document.addEventListener("visibilitychange", () => {
 });
 
 document.getElementById("boardMenuBtn").addEventListener("click", () => {
-  if (sessionStorage.getItem("board_auth") === "1") {
+  if (adminSession) {
     openBoardPanel();
   } else {
     document.getElementById("boardLoginModal").style.display = "flex";
-    const nameEl = document.getElementById("boardName");
-    if (nameEl) { nameEl.value = boardSenderName; nameEl.focus(); }
+    const codeEl = document.getElementById("boardCode");
+    if (codeEl) codeEl.focus();
     else document.getElementById("boardPass").focus();
   }
 });
@@ -1420,34 +1484,40 @@ document.getElementById("boardLoginClose").addEventListener("click", () => {
 });
 
 document.getElementById("boardLoginBtn").addEventListener("click", async () => {
-  const nameEl = document.getElementById("boardName");
-  const name = nameEl ? nameEl.value.trim() : "";
+  const codeEl = document.getElementById("boardCode");
+  const code = codeEl ? codeEl.value.trim() : "";
   const pass = document.getElementById("boardPass").value;
   const err = document.getElementById("boardLoginError");
-  if (!name) { err.textContent = "お名前を入力してください"; nameEl && nameEl.focus(); return; }
+  if (!code) { err.textContent = "管理者コードを入力してください"; codeEl && codeEl.focus(); return; }
   if (!pass) { err.textContent = "パスワードを入力してください"; return; }
-  const res = await fetch("/api/board/auth", {
+  err.textContent = "認証中…";
+  const res = await fetch("/api/admin/login", {
     method: "POST", headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({password: pass})
+    body: JSON.stringify({code, password: pass})
   });
-  if (res.ok) {
+  const data = await res.json();
+  if (res.ok && data.ok) {
+    adminSession = {code: data.code, name: data.name, role: data.role};
     boardPassword = pass;
-    boardSenderName = name;
+    boardSenderName = data.name;
+    sessionStorage.setItem("admin_session", JSON.stringify(adminSession));
     sessionStorage.setItem("board_auth", "1");
     sessionStorage.setItem("board_pass", pass);
-    sessionStorage.setItem("board_name", name);
+    sessionStorage.setItem("board_name", data.name);
     document.getElementById("boardLoginModal").style.display = "none";
     document.getElementById("boardPass").value = "";
+    if (codeEl) codeEl.value = "";
+    err.textContent = "";
     openBoardPanel();
   } else {
-    err.textContent = "❌ パスワードが違います";
+    err.textContent = "❌ " + (data.error || "認証に失敗しました");
     document.getElementById("boardPass").value = "";
   }
 });
 document.getElementById("boardPass").addEventListener("keydown", e => {
   if (e.key === "Enter") document.getElementById("boardLoginBtn").click();
 });
-document.getElementById("boardName") && document.getElementById("boardName").addEventListener("keydown", e => {
+document.getElementById("boardCode") && document.getElementById("boardCode").addEventListener("keydown", e => {
   if (e.key === "Enter") document.getElementById("boardPass").focus();
 });
 
@@ -1458,13 +1528,44 @@ document.getElementById("boardClose").addEventListener("click", () => {
   lastSeenChatId = null;
 });
 
+document.getElementById("boardAdminLogout")?.addEventListener("click", () => {
+  if (!confirm("管理者メニューからログアウトしますか？")) return;
+  adminSession = null;
+  boardPassword = "";
+  boardSenderName = "";
+  sessionStorage.removeItem("admin_session");
+  sessionStorage.removeItem("board_auth");
+  sessionStorage.removeItem("board_pass");
+  sessionStorage.removeItem("board_name");
+  document.getElementById("boardPanel").style.display = "none";
+  if (reqPollTimer) { clearInterval(reqPollTimer); reqPollTimer = null; }
+});
+
+const MASTER_ONLY_TABS = ["settings", "adminusers"];
+
+function applyRoleTabVisibility() {
+  const isMaster = adminSession && adminSession.role === "master";
+  MASTER_ONLY_TABS.forEach(key => {
+    const btn = document.querySelector(`.board-tab[data-btab="${key}"]`);
+    if (btn) btn.style.display = isMaster ? "" : "none";
+  });
+  // ヘッダーにログイン者名・ロール表示
+  const headerEl = document.getElementById("boardUserLabel");
+  if (headerEl && adminSession) {
+    const roleLabel = adminSession.role === "master" ? "マスター" : "管理者";
+    headerEl.textContent = `👤 ${adminSession.name}（${roleLabel}）`;
+  }
+}
+
 function openBoardPanel() {
+  adminSession = JSON.parse(sessionStorage.getItem("admin_session") || "null");
   boardPassword = sessionStorage.getItem("board_pass") || "";
   boardSenderName = sessionStorage.getItem("board_name") || "";
   reqAdminPass = boardPassword;
   const lbl = document.getElementById("chatSenderLabel");
   if (lbl) lbl.textContent = boardSenderName ? `👤 ${boardSenderName}` : "";
   document.getElementById("boardPanel").style.display = "flex";
+  applyRoleTabVisibility();
   // デフォルトタブを「ダッシュボード」に設定
   document.querySelectorAll(".board-tab").forEach(b => b.classList.remove("active"));
   document.querySelectorAll(".board-tab-panel").forEach(p => p.classList.remove("active"));
@@ -1493,6 +1594,7 @@ document.querySelectorAll(".board-tab").forEach(btn => {
     if (btn.dataset.btab === "loaned") loadLoanedBooks();
     if (btn.dataset.btab === "staffchat") initStaffChat();
     if (btn.dataset.btab === "settings") loadAdminQr();
+    if (btn.dataset.btab === "adminusers") loadAdminUsers();
     if (btn.dataset.btab === "bookdesc") {
       document.getElementById("descIsbn").value = "";
       document.getElementById("descText").value = "";
@@ -1986,6 +2088,7 @@ function switchBoardTab(tabKey) {
   if (tabKey === "brequest") loadReqManage();
   if (tabKey === "staffchat") initStaffChat();
   if (tabKey === "settings") loadAdminQr();
+  if (tabKey === "adminusers") loadAdminUsers();
   if (tabKey === "bookdesc") {
     document.getElementById("descIsbn").value = "";
     document.getElementById("descText").value = "";
@@ -2921,6 +3024,137 @@ async function loadDbSize() {
 document.getElementById("dbSizeBtn").addEventListener("click", loadDbSize);
 
 // ===== Admin QR =====
+// ===== 管理者アカウント管理 =====
+async function loadAdminUsers() {
+  const el = document.getElementById("adminUsersContent");
+  if (!el) return;
+  el.innerHTML = '<div class="loading">読み込み中…</div>';
+  const res = await fetch(`/api/admin/users?password=${encodeURIComponent(boardPassword)}`);
+  if (!res.ok) { el.innerHTML = '<div class="loading">読み込みに失敗しました</div>'; return; }
+  const users = await res.json();
+  const roleLabel = r => r === "master" ? '<span class="au-role au-master">マスター</span>' : '<span class="au-role au-admin">管理者</span>';
+  const myCode = adminSession ? adminSession.code : "";
+  el.innerHTML = `
+    <div class="au-list">
+      ${users.map(u => `
+        <div class="au-row" data-code="${esc(u.code)}">
+          <div class="au-info">
+            <span class="au-code">${esc(u.code)}</span>
+            <span class="au-name">${esc(u.name)}</span>
+            ${roleLabel(u.role)}
+            <span class="au-date">${u.created_at}</span>
+          </div>
+          <div class="au-actions">
+            <button class="au-pw-btn" data-code="${esc(u.code)}" data-name="${esc(u.name)}">🔑 PW変更</button>
+            ${u.code !== myCode ? `<button class="au-del-btn" data-code="${esc(u.code)}" data-name="${esc(u.name)}">🗑 削除</button>` : '<span class="au-self-label">（自分）</span>'}
+          </div>
+        </div>`).join("")}
+    </div>
+    <hr style="margin:20px 0;border:none;border-top:1px solid #eee">
+    <h4 style="margin:0 0 12px;font-size:0.95rem;color:#555">＋ 新しい管理者を追加</h4>
+    <div class="au-form">
+      <input type="text" id="auNewCode" placeholder="コード（例: A001）" class="au-input" maxlength="10">
+      <input type="text" id="auNewName" placeholder="氏名" class="au-input" maxlength="20">
+      <input type="password" id="auNewPass" placeholder="初期パスワード（6文字以上）" class="au-input">
+      <select id="auNewRole" class="au-input">
+        <option value="admin">管理者</option>
+        <option value="master">マスター</option>
+      </select>
+      <button id="auAddBtn" class="btn-primary">追加</button>
+      <p id="auMsg" style="margin-top:8px;font-size:0.85rem;color:#e05"></p>
+    </div>
+    <hr style="margin:20px 0;border:none;border-top:1px solid #eee">
+    <h4 style="margin:0 0 12px;font-size:0.95rem;color:#555">🔒 自分のパスワード変更</h4>
+    <div class="au-form">
+      <input type="password" id="auSelfCurPass" placeholder="現在のパスワード" class="au-input">
+      <input type="password" id="auSelfNewPass" placeholder="新しいパスワード（6文字以上）" class="au-input">
+      <button id="auSelfPwBtn" class="btn-primary">変更</button>
+      <p id="auSelfMsg" style="margin-top:8px;font-size:0.85rem"></p>
+    </div>`;
+
+  // 削除ボタン
+  el.querySelectorAll(".au-del-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const code = btn.dataset.code;
+      const name = btn.dataset.name;
+      if (!confirm(`${name}（${code}）を削除しますか？`)) return;
+      const curPass = prompt("マスターパスワードを入力してください：");
+      if (!curPass) return;
+      const r = await fetch(`/api/admin/users/${code}`, {
+        method: "DELETE", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({req_code: myCode, req_password: curPass})
+      });
+      const d = await r.json();
+      if (r.ok) loadAdminUsers();
+      else alert("❌ " + (d.error || "削除に失敗しました"));
+    });
+  });
+
+  // PW変更ボタン（マスターによる他者のリセット）
+  el.querySelectorAll(".au-pw-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const targetCode = btn.dataset.code;
+      const targetName = btn.dataset.name;
+      if (targetCode === myCode) {
+        document.getElementById("auSelfCurPass")?.focus();
+        return;
+      }
+      const newPw = prompt(`${targetName}（${targetCode}）の新しいパスワードを入力：`);
+      if (!newPw) return;
+      const curPass = prompt("マスターパスワードを入力してください：");
+      if (!curPass) return;
+      const r = await fetch(`/api/admin/users/${targetCode}/password`, {
+        method: "PATCH", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({req_code: myCode, req_password: curPass, new_password: newPw})
+      });
+      const d = await r.json();
+      alert(r.ok ? "✅ パスワードを変更しました" : "❌ " + (d.error || "失敗しました"));
+    });
+  });
+
+  // 新規追加
+  document.getElementById("auAddBtn")?.addEventListener("click", async () => {
+    const code = (document.getElementById("auNewCode").value || "").trim().toUpperCase();
+    const name = (document.getElementById("auNewName").value || "").trim();
+    const pass = document.getElementById("auNewPass").value;
+    const role = document.getElementById("auNewRole").value;
+    const msg = document.getElementById("auMsg");
+    msg.style.color = "#e05";
+    if (!code || !name || !pass) { msg.textContent = "コード・氏名・パスワードを入力してください"; return; }
+    const curPass = prompt("マスターパスワードを入力してください：");
+    if (!curPass) return;
+    const r = await fetch("/api/admin/users", {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({req_code: myCode, req_password: curPass, code, name, password: pass, role})
+    });
+    const d = await r.json();
+    if (r.ok) { msg.style.color = "#2a7"; msg.textContent = "✅ 追加しました"; loadAdminUsers(); }
+    else { msg.textContent = "❌ " + (d.error || "失敗しました"); }
+  });
+
+  // 自分のPW変更
+  document.getElementById("auSelfPwBtn")?.addEventListener("click", async () => {
+    const curPass = document.getElementById("auSelfCurPass").value;
+    const newPw = document.getElementById("auSelfNewPass").value;
+    const msg = document.getElementById("auSelfMsg");
+    if (!curPass || !newPw) { msg.style.color = "#e05"; msg.textContent = "現在・新しいパスワードを両方入力してください"; return; }
+    const r = await fetch(`/api/admin/users/${myCode}/password`, {
+      method: "PATCH", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({req_code: myCode, req_password: curPass, new_password: newPw})
+    });
+    const d = await r.json();
+    if (r.ok) {
+      msg.style.color = "#2a7"; msg.textContent = "✅ パスワードを変更しました";
+      boardPassword = newPw;
+      sessionStorage.setItem("board_pass", newPw);
+      document.getElementById("auSelfCurPass").value = "";
+      document.getElementById("auSelfNewPass").value = "";
+    } else {
+      msg.style.color = "#e05"; msg.textContent = "❌ " + (d.error || "失敗しました");
+    }
+  });
+}
+
 async function loadAdminQr() {
   const wrap = document.getElementById("adminQrCode");
   if (!wrap) return;

@@ -288,6 +288,17 @@ def init_db():
                 created_at TIMESTAMP DEFAULT NOW()
             )
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS admin_users (
+                id SERIAL PRIMARY KEY,
+                code TEXT UNIQUE NOT NULL,
+                name TEXT NOT NULL,
+                password_hash TEXT NOT NULL,
+                salt TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'admin',
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
         con.commit()
     else:
         con.execute("""
@@ -415,8 +426,82 @@ def init_db():
                 created_at TEXT DEFAULT (datetime('now','localtime'))
             )
         """)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS admin_users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                code TEXT UNIQUE NOT NULL,
+                name TEXT NOT NULL,
+                password_hash TEXT NOT NULL,
+                salt TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'admin',
+                created_at TEXT DEFAULT (datetime('now','localtime'))
+            )
+        """)
         con.commit()
     con.close()
+
+
+import hashlib
+import secrets as _secrets
+
+def _hash_password(password, salt=None):
+    if salt is None:
+        salt = _secrets.token_hex(16)
+    h = hashlib.sha256((salt + password).encode()).hexdigest()
+    return h, salt
+
+def _verify_password(password, password_hash, salt):
+    h, _ = _hash_password(password, salt)
+    return h == password_hash
+
+def _migrate_admin_users():
+    """admin_usersテーブルを追加し、マスターアカウントがなければ初期作成する"""
+    try:
+        con = get_con()
+        if USE_PG:
+            cur = con.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS admin_users (
+                    id SERIAL PRIMARY KEY,
+                    code TEXT UNIQUE NOT NULL,
+                    name TEXT NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    salt TEXT NOT NULL,
+                    role TEXT NOT NULL DEFAULT 'admin',
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            con.commit()
+            row = fetchone(con, "SELECT id FROM admin_users WHERE role='master' LIMIT 1")
+            if not row:
+                init_pw = get_board_password() or "kanri5533"
+                h, s = _hash_password(init_pw)
+                execute(con, "INSERT INTO admin_users (code, name, password_hash, salt, role) VALUES (?,?,?,?,?)",
+                        ("A000", "秋山", h, s, "master"))
+                con.commit()
+        else:
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS admin_users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    code TEXT UNIQUE NOT NULL,
+                    name TEXT NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    salt TEXT NOT NULL,
+                    role TEXT NOT NULL DEFAULT 'admin',
+                    created_at TEXT DEFAULT (datetime('now','localtime'))
+                )
+            """)
+            con.commit()
+            row = fetchone(con, "SELECT id FROM admin_users WHERE role='master' LIMIT 1")
+            if not row:
+                init_pw = get_board_password() or "kanri5533"
+                h, s = _hash_password(init_pw)
+                execute(con, "INSERT INTO admin_users (code, name, password_hash, salt, role) VALUES (?,?,?,?,?)",
+                        ("A000", "秋山", h, s, "master"))
+                con.commit()
+        con.close()
+    except Exception as e:
+        print(f"admin_users migration error: {e}")
 
 
 def _migrate_add_card_columns():
@@ -606,6 +691,7 @@ def _ensure_db():
     except Exception as e:
         print(f"DB init error: {e}")
     threading.Thread(target=_migrate_add_card_columns, daemon=True).start()
+    threading.Thread(target=_migrate_admin_users, daemon=True).start()
     threading.Thread(target=_migrate_genre_map_to_db, daemon=True).start()
     threading.Thread(target=_migrate_ndc_genres, daemon=True).start()
     threading.Thread(target=_migrate_add_votes_column, daemon=True).start()
@@ -1119,6 +1205,113 @@ def api_board_auth():
     if body.get("password") == get_board_password():
         return jsonify({"ok": True})
     return jsonify({"error": "unauthorized"}), 401
+
+
+# --- Admin Users (個人認証) ---
+@app.route("/api/admin/login", methods=["POST"])
+@rate_limit(limit=10, window=60)
+def api_admin_login():
+    body = request.get_json()
+    code = (body.get("code") or "").strip().upper()
+    password = body.get("password") or ""
+    if not code or not password:
+        return jsonify({"error": "コードとパスワードを入力してください"}), 400
+    con = get_con()
+    row = fetchone(con, "SELECT id,code,name,password_hash,salt,role FROM admin_users WHERE code=?", (code,))
+    con.close()
+    if not row or not _verify_password(password, row["password_hash"], row["salt"]):
+        return jsonify({"error": "コードまたはパスワードが正しくありません"}), 401
+    return jsonify({"ok": True, "code": row["code"], "name": row["name"], "role": row["role"]})
+
+
+@app.route("/api/admin/users", methods=["GET"])
+def api_admin_users_list():
+    pw = request.args.get("password", "")
+    if pw != get_board_password():
+        return jsonify({"error": "unauthorized"}), 401
+    con = get_con()
+    rows = fetchall(con, "SELECT id,code,name,role,created_at FROM admin_users ORDER BY id ASC")
+    con.close()
+    return jsonify([{**r, "created_at": str(r["created_at"])[:10]} for r in rows])
+
+
+@app.route("/api/admin/users", methods=["POST"])
+@rate_limit(limit=20, window=60)
+def api_admin_users_create():
+    body = request.get_json()
+    # マスター権限チェック（コード＋パスワード）
+    req_code = (body.get("req_code") or "").strip().upper()
+    req_pass = body.get("req_password") or ""
+    con = get_con()
+    req_row = fetchone(con, "SELECT role,password_hash,salt FROM admin_users WHERE code=?", (req_code,))
+    if not req_row or req_row["role"] != "master" or not _verify_password(req_pass, req_row["password_hash"], req_row["salt"]):
+        con.close()
+        return jsonify({"error": "マスター権限が必要です"}), 403
+    code = (body.get("code") or "").strip().upper()
+    name = (body.get("name") or "").strip()
+    password = body.get("password") or ""
+    role = body.get("role") or "admin"
+    if role not in ("master", "admin"):
+        role = "admin"
+    if not code or not name or not password:
+        con.close()
+        return jsonify({"error": "コード・氏名・パスワードは必須です"}), 400
+    if len(password) < 6:
+        con.close()
+        return jsonify({"error": "パスワードは6文字以上にしてください"}), 400
+    existing = fetchone(con, "SELECT id FROM admin_users WHERE code=?", (code,))
+    if existing:
+        con.close()
+        return jsonify({"error": "そのコードは既に使用されています"}), 409
+    h, s = _hash_password(password)
+    execute(con, "INSERT INTO admin_users (code,name,password_hash,salt,role) VALUES (?,?,?,?,?)",
+            (code, name, h, s, role))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/users/<string:target_code>", methods=["DELETE"])
+def api_admin_users_delete(target_code):
+    body = request.get_json()
+    req_code = (body.get("req_code") or "").strip().upper()
+    req_pass = body.get("req_password") or ""
+    con = get_con()
+    req_row = fetchone(con, "SELECT role,password_hash,salt FROM admin_users WHERE code=?", (req_code,))
+    if not req_row or req_row["role"] != "master" or not _verify_password(req_pass, req_row["password_hash"], req_row["salt"]):
+        con.close()
+        return jsonify({"error": "マスター権限が必要です"}), 403
+    if target_code.upper() == req_code:
+        con.close()
+        return jsonify({"error": "自分自身は削除できません"}), 400
+    execute(con, "DELETE FROM admin_users WHERE code=?", (target_code.upper(),))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/users/<string:target_code>/password", methods=["PATCH"])
+@rate_limit(limit=10, window=60)
+def api_admin_users_change_password(target_code):
+    body = request.get_json()
+    req_code = (body.get("req_code") or "").strip().upper()
+    req_pass = body.get("req_password") or ""
+    new_pw = body.get("new_password") or ""
+    if len(new_pw) < 6:
+        return jsonify({"error": "パスワードは6文字以上にしてください"}), 400
+    con = get_con()
+    req_row = fetchone(con, "SELECT role,password_hash,salt FROM admin_users WHERE code=?", (req_code,))
+    if not req_row or not _verify_password(req_pass, req_row["password_hash"], req_row["salt"]):
+        con.close()
+        return jsonify({"error": "現在のパスワードが正しくありません"}), 401
+    # 自分自身のPW変更 or マスターによる他者のリセット
+    is_self = req_code == target_code.upper()
+    is_master = req_row["role"] == "master"
+    if not is_self and not is_master:
+        con.close()
+        return jsonify({"error": "権限がありません"}), 403
+    h, s = _hash_password(new_pw)
+    execute(con, "UPDATE admin_users SET password_hash=?,salt=? WHERE code=?", (h, s, target_code.upper()))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
 
 
 # --- Issues ---
