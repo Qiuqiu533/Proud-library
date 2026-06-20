@@ -1695,6 +1695,33 @@ def api_book_description():
     return jsonify({"ok": True})
 
 
+@app.route("/api/books/related/<isbn>")
+def api_books_related(isbn):
+    """同じ著者・同じジャンルの本を返す（モーダル用）"""
+    con = get_con()
+    book = fetchone(con, "SELECT author, genre FROM genre_books WHERE isbn=?", (isbn,))
+    if not book:
+        con.close()
+        return jsonify({"same_author": [], "same_genre": []})
+    author = book["author"]
+    genre = book["genre"]
+    same_author = fetchall(con,
+        "SELECT isbn, title, author FROM genre_books WHERE author=? AND isbn!=? ORDER BY isbn DESC LIMIT 20",
+        (author, isbn))
+    same_genre = fetchall(con,
+        "SELECT isbn, title, author FROM genre_books WHERE genre=? AND isbn!=? AND (author!=? OR author IS NULL) ORDER BY isbn DESC LIMIT 20",
+        (genre, isbn, author))
+    con.close()
+    def enrich(rows):
+        result = []
+        for b in rows:
+            isbn13 = b["isbn"]
+            isbn10 = isbn13_to_isbn10(isbn13) if isbn13.startswith("978") else ""
+            result.append({"isbn": isbn13, "title": b["title"], "author": b["author"], "cover": get_cover_url(isbn13, isbn10)})
+        return result
+    return jsonify({"same_author": enrich(same_author), "same_genre": enrich(same_genre)})
+
+
 @app.route("/api/helpful", methods=["POST"])
 @rate_limit(limit=5, window=60)
 def api_helpful():
