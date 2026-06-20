@@ -992,10 +992,11 @@ async function openModal(isbn, preloadedBook) {
       if (ratingInfoEl) ratingInfoEl.textContent = rating.score ? `${rating.score.toFixed(1)} / 5.0（${rating.votes}件）` : "まだ評価がありません";
       // 内容紹介・AI登録情報・参考ボタンを描画
       _renderDescSection(isbn, book);
-      _loadRelatedBooks(isbn);
     } catch(e) {
       const availEl = document.getElementById("modal-avail-body");
       if (availEl) availEl.innerHTML = `<div class="avail-row"><span>取得できませんでした</span></div>`;
+    } finally {
+      _loadRelatedBooks(isbn);
     }
   } else {
     // preloadedBookなし（評価後の再表示など）：全データ取得してから表示
@@ -1032,7 +1033,7 @@ async function _loadRelatedBooks(isbn) {
         const ndlFallback = `https://ndlsearch.ndl.go.jp/thumbnail/${b.isbn}.jpg`;
         const imgOrPlaceholder = `<img src="${b.cover || ndlFallback}" alt="${esc(b.title)}" loading="lazy"
           onerror="if(this.src!=='${ndlFallback}'){this.src='${ndlFallback}';}else{this.replaceWith(Object.assign(document.createElement('div'),{className:'related-thumb-placeholder',textContent:'📖'}));}">`;
-        return `<div class="related-card" onclick="openModal('${b.isbn}')" role="button" tabindex="0">
+        return `<div class="related-card" onclick="openModal('${b.isbn}')" onkeydown="if(event.key==='Enter'||event.key===' ')openModal('${b.isbn}')" role="button" tabindex="0">
           <div class="related-thumb">${imgOrPlaceholder}</div>
           <div class="related-title">${esc(b.title)}</div>
           <div class="related-author">${esc(b.author || "")}</div>
