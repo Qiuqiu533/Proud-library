@@ -316,13 +316,23 @@ async function loadBooks(keyword = "", page = 1) {
   currentPage = page;
   document.getElementById("bookGrid").innerHTML = '<div class="loading">読み込み中…</div>';
   document.getElementById("totalCount").textContent = "";
-  // キーワード検索はlibraryllife.net固定のため件数変更不可
   const ppSel = document.getElementById("perPageSelect");
-  if (ppSel) { ppSel.disabled = !!keyword; ppSel.title = keyword ? "キーワード検索中は変更できません" : ""; }
-  const res = await fetch(`/api/books?keyword=${encodeURIComponent(keyword)}&page=${page}`);
-  const data = await res.json();
+
+  let data;
+  if (!keyword) {
+    // キーワードなし→DB直接（件数変更・全件対応）
+    if (ppSel) { ppSel.disabled = false; ppSel.title = ""; }
+    const res = await fetch(`/api/books/by-genre?page=${page}&per=${currentPerPage}`);
+    data = await res.json();
+  } else {
+    // キーワードあり→librarylife.net（件数固定）
+    if (ppSel) { ppSel.disabled = true; ppSel.title = "キーワード検索中は変更できません"; }
+    const res = await fetch(`/api/books?keyword=${encodeURIComponent(keyword)}&page=${page}`);
+    data = await res.json();
+  }
+
   currentTotal = data.total;
-  let books = data.books.map(b => ({ ...b, rating: getRating(b.isbn) }));
+  let books = data.books.map(b => ({ ...b, rating: b.rating || getRating(b.isbn) }));
   if (currentSort === "title") books.sort((a, b) => {
     const noA = !a.author || a.author === "著者不明";
     const noB = !b.author || b.author === "著者不明";

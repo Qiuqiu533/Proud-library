@@ -1371,16 +1371,35 @@ def api_books_batch():
 
 @app.route("/api/books/by-genre")
 def api_books_by_genre():
-    """ジャンル別書籍一覧（DBから・ページネーション付き）"""
-    genre = request.args.get("genre", "")
-    page  = int(request.args.get("page", 1))
-    per   = min(int(request.args.get("per", 50)), 200)
-    offset = (page - 1) * per
+    """ジャンル別・全件・キーワードDB検索（ページネーション付き）"""
+    genre   = request.args.get("genre", "")
+    keyword = request.args.get("keyword", "").strip()
+    page    = int(request.args.get("page", 1))
+    per     = min(int(request.args.get("per", 50)), 200)
+    offset  = (page - 1) * per
     con = get_con()
-    total_row = fetchone(con, "SELECT COUNT(*) as cnt FROM genre_books WHERE genre=?", (genre,))
+    ph = "%s" if USE_PG else "?"
+    if genre:
+        where = f"WHERE genre={ph}"
+        params_count = (genre,)
+        params_rows  = (genre, per, offset)
+        sql_count = f"SELECT COUNT(*) as cnt FROM genre_books {where}"
+        sql_rows  = f"SELECT isbn,genre,title,author,publisher,format FROM genre_books {where} ORDER BY isbn DESC LIMIT {ph} OFFSET {ph}"
+    elif keyword:
+        like = f"%{keyword}%"
+        where = f"WHERE title LIKE {ph} OR author LIKE {ph}"
+        params_count = (like, like)
+        params_rows  = (like, like, per, offset)
+        sql_count = f"SELECT COUNT(*) as cnt FROM genre_books {where}"
+        sql_rows  = f"SELECT isbn,genre,title,author,publisher,format FROM genre_books {where} ORDER BY isbn DESC LIMIT {ph} OFFSET {ph}"
+    else:
+        params_count = ()
+        params_rows  = (per, offset)
+        sql_count = "SELECT COUNT(*) as cnt FROM genre_books"
+        sql_rows  = f"SELECT isbn,genre,title,author,publisher,format FROM genre_books ORDER BY isbn DESC LIMIT {ph} OFFSET {ph}"
+    total_row = fetchone(con, sql_count, params_count)
     total = total_row["cnt"] if total_row else 0
-    rows = fetchall(con, "SELECT isbn,genre,title,author,publisher,format FROM genre_books WHERE genre=? LIMIT ? OFFSET ?",
-                    (genre, per, offset))
+    rows = fetchall(con, sql_rows, params_rows)
     con.close()
     isbns = [b["isbn"] for b in rows]
     ratings = get_ratings_bulk(isbns)
@@ -1390,7 +1409,7 @@ def api_books_by_genre():
         isbn10 = isbn13_to_isbn10(isbn13) if isbn13.startswith("978") else ""
         cover  = get_cover_url(isbn13, isbn10)
         result.append({**b, "isbn10": isbn10, "cover": cover, "rating": ratings.get(isbn13, {"score": 0, "votes": 0, "reviews": []})})
-    return jsonify({"books": result, "total": total, "page": page, "genre": genre})
+    return jsonify({"books": result, "total": total, "page": page, "genre": genre, "keyword": keyword})
 
 
 
