@@ -1374,7 +1374,7 @@ def api_books_by_genre():
     """ジャンル別書籍一覧（DBから・ページネーション付き）"""
     genre = request.args.get("genre", "")
     page  = int(request.args.get("page", 1))
-    per   = 50
+    per   = min(int(request.args.get("per", 50)), 200)
     offset = (page - 1) * per
     con = get_con()
     total_row = fetchone(con, "SELECT COUNT(*) as cnt FROM genre_books WHERE genre=?", (genre,))
