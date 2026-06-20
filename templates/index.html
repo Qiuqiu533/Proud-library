@@ -69,11 +69,11 @@
   <nav class="tab-nav" aria-label="メインナビゲーション">
     <div class="tab-nav-inner" role="tablist">
       <button class="tab-btn active" data-tab="books" role="tab" aria-selected="true">📖 蔵書</button>
-      <button class="tab-btn" data-tab="new" role="tab" aria-selected="false">🆕 新着</button>
+      <button class="tab-btn" data-tab="new" role="tab" aria-selected="false">🆕 新着<span id="newArrivalBadge" class="notif-badge" style="display:none"></span></button>
       <button class="tab-btn" data-tab="fav" role="tab" aria-selected="false">❤️ お気に入り</button>
       <button class="tab-btn" data-tab="log" role="tab" aria-selected="false">📝 読書記録</button>
       <button class="tab-btn" data-tab="card" role="tab" aria-selected="false">🪪 会員証</button>
-      <button class="tab-btn" data-tab="news" role="tab" aria-selected="false">📢 お知らせ</button>
+      <button class="tab-btn" data-tab="news" role="tab" aria-selected="false">📢 お知らせ<span id="newsUnreadBadge" class="notif-badge" style="display:none"></span></button>
       <button class="tab-btn" data-tab="info" role="tab" aria-selected="false">🏛️ 開館情報</button>
       <button class="tab-btn" data-tab="request" role="tab" aria-selected="false">📬 リクエスト</button>
       <button class="tab-btn" data-tab="reqlist" role="tab" aria-selected="false">📋 みんなのリクエスト一覧・投票</button>
@@ -85,6 +85,14 @@
   <main class="main-content" role="main">
     <!-- Books tab -->
     <div id="tab-books" class="tab-panel active">
+
+      <!-- 特集コーナー -->
+      <div id="collectionsSection" style="display:none;margin-bottom:14px">
+        <div class="section-label-row">
+          <span class="top-new-label">🎯 特集コーナー</span>
+        </div>
+        <div id="collectionsList" style="display:flex;flex-direction:column;gap:10px"></div>
+      </div>
 
       <!-- 新着図書（トップ表示） -->
       <div class="top-new-section" id="topNewSection" style="display:none">
@@ -256,6 +264,7 @@
     <div id="tab-log" class="tab-panel">
       <h2 class="section-title">📝 読書記録</h2>
       <p class="section-desc">本のステータスを記録できます（このデバイスに保存）</p>
+      <div id="logStats" class="log-stats-bar"></div>
       <div class="log-filters">
         <button class="log-filter-btn active" data-status="all">すべて</button>
         <button class="log-filter-btn" data-status="読んだ">✅ 読んだ</button>
@@ -627,6 +636,7 @@
       <button class="board-tab" data-btab="staffchat">💬 チャット</button>
       <button class="board-tab" data-btab="adminusers">👥 管理者設定</button>
       <button class="board-tab" data-btab="settings">⚙️ 設定</button>
+      <button class="board-tab" data-btab="collections">🎯 特集管理</button>
       <button class="board-tab" data-btab="guide">📖 操作ガイド</button>
       <button class="board-tab" data-btab="analytics">📊 分析・レポート</button>
     </div>
@@ -735,6 +745,18 @@
           <button class="btn-primary" id="arrivalRegisterBtn">📥 新着として登録する</button>
           <p id="arrivalMsg" style="font-size:0.83rem;min-height:1.2em;margin-top:4px"></p>
         </div>
+        <div style="margin-top:20px;padding:16px;background:#f5f7fa;border-radius:12px;border:1.5px solid #dde">
+          <h4 style="margin-bottom:10px;font-size:0.95rem">📋 ISBN一括インポート</h4>
+          <p style="font-size:0.82rem;color:#666;margin-bottom:10px">ISBNを1行1つで入力すると、まとめて新着登録できます（最大50冊）</p>
+          <textarea id="bulkIsbnInput" rows="6" placeholder="9784101092058&#10;9784167910303&#10;9784101005447&#10;..." style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #ccc;border-radius:8px;font-family:monospace;font-size:0.9rem;resize:vertical"></textarea>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap">
+            <label style="font-size:0.82rem;color:#555">入荷日：</label>
+            <input type="date" id="bulkArrivalDate" style="font-size:0.88rem;padding:7px 10px;border:1px solid #ddd;border-radius:8px">
+            <button class="btn-primary" id="bulkImportBtn" style="padding:9px 20px">📥 一括登録</button>
+          </div>
+          <div id="bulkImportProgress" style="margin-top:10px;font-size:0.85rem;color:#555"></div>
+        </div>
+
         <h3 style="margin:20px 0 10px">登録済み新着一覧</h3>
         <div id="arrivalList"><div class="loading">読み込み中…</div></div>
       </div>
@@ -1055,9 +1077,9 @@
         <div style="display:flex;flex-direction:column;height:calc(100vh - 220px);min-height:400px">
           <!-- ヘッダー行 -->
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-            <div style="display:flex;gap:6px;align-items:center">
-              <button id="chatModeGeneral" class="chat-mode-btn chat-mode-active" onclick="switchChatMode('general')">💬 一般</button>
-              <button id="chatModeThread" class="chat-mode-btn" onclick="switchChatMode('threads')">📂 スレッド</button>
+            <div style="display:flex;gap:0;align-items:center;background:#f0f0f0;border-radius:10px;padding:3px">
+              <button id="chatModeGeneral" class="chat-mode-btn chat-mode-active" onclick="switchChatMode('general')" style="border-radius:8px">💬 一般チャット</button>
+              <button id="chatModeThread" class="chat-mode-btn" onclick="switchChatMode('threads')" style="border-radius:8px">📂 スレッド</button>
             </div>
             <span id="chatSenderLabel" style="font-size:0.85rem;color:#666;background:#f0f0f0;padding:4px 12px;border-radius:20px"></span>
           </div>
@@ -1081,7 +1103,7 @@
               </button>
             </div>
             <div id="chatImgPreview" style="display:none;margin-top:8px;padding:8px;background:#fff;border-radius:8px;border:1px solid #ddd;align-items:center;gap:8px">
-              <img id="chatImgThumb" style="height:60px;border-radius:6px;object-fit:cover">
+              <img id="chatImgThumb" style="height:60px;border-radius:6px;object-fit:cover" alt="添付画像プレビュー">
               <button id="chatImgClear" style="background:none;border:none;cursor:pointer;color:#999;font-size:1.1rem">✕</button>
             </div>
           </div>
@@ -1089,8 +1111,10 @@
           <!-- スレッド一覧 -->
           <div id="chatViewThreadList" style="display:none;flex-direction:column;flex:1;overflow:hidden">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-              <span style="font-size:0.85rem;color:#666">スレッド一覧</span>
-              <button id="chatNewThreadBtn" class="btn-board-add" style="font-size:0.82rem;padding:6px 14px">＋ 新スレッド</button>
+              <span style="font-size:0.9rem;font-weight:600;color:#3d6b4f">📂 スレッド一覧</span>
+              <button id="chatNewThreadBtn" style="display:flex;align-items:center;gap:5px;padding:8px 16px;background:#3d6b4f;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:0.88rem;font-weight:600">
+                ✏️ 新スレッドを作成
+              </button>
             </div>
             <div id="chatThreadList" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px">
               <div class="loading">読み込み中…</div>
@@ -1154,6 +1178,17 @@
           </div>
         </div>
 
+        <div class="settings-section" style="margin-bottom:24px;padding:14px;background:#fff8e1;border-radius:10px;border:1px solid #ffe082">
+          <h4 style="margin-bottom:8px;color:#7a5700">🔑 パスワードを忘れた場合の復旧手順</h4>
+          <ol style="font-size:0.83rem;color:#555;margin:0;padding-left:20px;line-height:1.8">
+            <li>Renderダッシュボード → Environment Variables を開く</li>
+            <li><code>BOARD_PASSWORD</code> の値を新しいパスワードに変更</li>
+            <li>サービスを再起動（Manual Deploy → Deploy latest commit）</li>
+            <li>マスター管理者（A000）が管理画面にログインして各管理者のパスワードを再設定</li>
+          </ol>
+          <p style="font-size:0.78rem;color:#999;margin:8px 0 0">※ マスター管理者（A000/秋山）のパスワードは個人認証システムで管理されています</p>
+        </div>
+
         <h4 style="margin-bottom:16px">🔐 パスワード変更</h4>
         <div class="pw-change-form">
           <p class="pw-change-note">変更するには現在の管理者パスワードが必要です。</p>
@@ -1192,6 +1227,31 @@
       </div>
 
       <!-- 操作ガイド -->
+      <!-- 特集管理 -->
+      <div id="btab-collections" class="board-tab-panel">
+        <div class="board-section-header">
+          <h3>🎯 特集コーナー管理</h3>
+          <button class="btn-board-add" id="collectionFormToggle">＋ 新規特集</button>
+        </div>
+        <p style="font-size:0.82rem;color:#666;margin-bottom:12px">住民の蔵書画面トップに「特集コーナー」として表示されます。ISBNをカンマ区切りで入力してください。</p>
+        <div id="collectionForm" class="board-form" style="display:none">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+            <input id="colEmoji" type="text" maxlength="4" placeholder="📚" value="📚" style="width:56px;font-size:1.4rem;text-align:center;padding:6px;border:1px solid #ddd;border-radius:8px">
+            <input id="colTitle" type="text" placeholder="特集タイトル（例：夏の推薦図書）" style="flex:1;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:0.9rem">
+          </div>
+          <textarea id="colDesc" rows="2" placeholder="特集の説明（任意）" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:0.9rem;margin-bottom:8px;font-family:inherit;resize:vertical"></textarea>
+          <textarea id="colIsbns" rows="4" placeholder="ISBN（1行1冊 または カンマ区切り）&#10;9784101092058&#10;9784167910303" style="width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:0.85rem;font-family:monospace;margin-bottom:8px;resize:vertical"></textarea>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button id="collectionFormCancel" style="padding:8px 16px;border:1.5px solid #ddd;background:#fff;border-radius:8px;cursor:pointer">キャンセル</button>
+            <button id="collectionSubmitBtn" class="btn-primary" style="padding:8px 20px">作成</button>
+          </div>
+          <p id="collectionMsg" style="font-size:0.83rem;min-height:1em;margin-top:6px"></p>
+        </div>
+        <div id="adminCollectionList" style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
+          <div class="loading">読み込み中…</div>
+        </div>
+      </div>
+
       <div id="btab-guide" class="board-tab-panel">
         <div class="guide-container">
 
