@@ -104,15 +104,23 @@ function awardStyleClass(awardName) {
 
 function renderAwardBadges(awards) {
   if (!awards || !awards.length) return "";
-  return `<div class="award-badges">${awards.map(a => {
+  // 同じ賞・同じ年の重複を除去（本屋大賞1位とノミネートが混在しないよう）
+  const seen = new Set();
+  const unique = awards.filter(a => {
+    const key = `${a.award}|${a.year}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return `<div class="award-badges">${unique.map(a => {
     const isRank1 = a.rank === 1;
     const cls = isRank1 ? "rank1" : awardStyleClass(a.award);
     const year = a.year ? `'${String(a.year).slice(-2)}` : "";
-    const rank = a.rank ? `${a.rank}位` : "";
-    const type = a.type === "nominee" ? "候補" : "受賞";
+    const rankLabel = a.rank ? ` ${a.rank}位` : "";
     const crown = isRank1 ? "👑 " : "";
-    const label = `${crown}${a.award}${year}${rank ? " " + rank : ""}`;
-    return `<span class="award-badge award-badge--${cls}" title="${a.award} ${a.year || ""} ${rank} ${type}">${label}</span>`;
+    const label = `${crown}${a.award}${year}${rankLabel}`;
+    const tooltip = `${a.award} ${a.year || ""}${rankLabel}`;
+    return `<span class="award-badge award-badge--${cls}" title="${tooltip}">${label}</span>`;
   }).join("")}</div>`;
 }
 let ratingTarget = null;
