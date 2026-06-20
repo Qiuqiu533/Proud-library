@@ -95,6 +95,30 @@ async function saveRating(isbn, score, review) {
   return await res.json();
 }
 
+function _renderDescSection(isbn, book) {
+  if (!book.description) return;
+  const placeholder = document.getElementById("modal-desc-placeholder");
+  if (!placeholder) return;
+  let dateTag = "";
+  if (book.manual_review && book.manual_review_date) {
+    const d = new Date(book.manual_review_date);
+    dateTag = `<span class="manual-review-date">司書登録：${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日</span>`;
+  } else if (!book.manual_review && book.ai_review_date) {
+    const ad = new Date(book.ai_review_date);
+    const modelName = book.ai_model || "AI";
+    dateTag = `<span class="manual-review-date">AI登録：${ad.getFullYear()}年${ad.getMonth()+1}月${ad.getDate()}日（${modelName}）</span>`;
+  }
+  const aiScoreTag = book.ai_review_score
+    ? `<span class="desc-rating">書評品質スコア：${book.ai_review_score}点</span>` : "";
+  const helpfulCount = book.helpful_count || 0;
+  const helpfulVoted = (JSON.parse(localStorage.getItem("helpful_voted")||"[]")).includes(isbn);
+  const helpfulBtn = `<div class="helpful-row">
+    <button class="helpful-btn${helpfulVoted?' voted':''}" onclick="voteHelpful('${isbn}',this)" ${helpfulVoted?'disabled':''}>
+      👍 参考になった${helpfulCount > 0 ? `<span class="helpful-count">${helpfulCount}</span>` : ''}
+    </button></div>`;
+  placeholder.outerHTML = `<div class="modal-section"><h3>📄 内容・収録作品</h3><p class="book-desc">${esc(book.description)}</p>${dateTag}${aiScoreTag}${helpfulBtn}</div>`;
+}
+
 async function voteHelpful(isbn, btn) {
   try {
     const res = await fetch("/api/helpful", {
@@ -840,34 +864,7 @@ function _renderModalContent(isbn, book, rating) {
   const reviewsHtml = rating.reviews && rating.reviews.length
     ? rating.reviews.map(r => `<div class="review-item">💬 ${esc(r)}</div>`).join("")
     : `<div class="no-content">まだコメントはありません</div>`;
-  let descHtml = "";
-  if (book.description) {
-    let dateTag = "";
-    if (book.manual_review && book.manual_review_date) {
-      const d = new Date(book.manual_review_date);
-      const formatted = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
-      dateTag = `<span class="manual-review-date">司書登録：${formatted}</span>`;
-    }
-    if (!book.manual_review && book.ai_review_date) {
-      const ad = new Date(book.ai_review_date);
-      const afmt = `${ad.getFullYear()}年${ad.getMonth()+1}月${ad.getDate()}日`;
-      const modelName = book.ai_model || "AI";
-      dateTag = `<span class="manual-review-date">AI登録：${afmt}（${modelName}）</span>`;
-    }
-    const aiScoreTag = book.ai_review_score
-      ? `<span class="desc-rating">書評品質スコア：${book.ai_review_score}点</span>`
-      : "";
-    const helpfulCount = book.helpful_count || 0;
-    const helpfulVoted = (JSON.parse(localStorage.getItem("helpful_voted")||"[]")).includes(isbn);
-    const helpfulBtn = book.description
-      ? `<div class="helpful-row">
-           <button class="helpful-btn${helpfulVoted?' voted':''}" onclick="voteHelpful('${isbn}',this)" ${helpfulVoted?'disabled':''}>
-             👍 参考になった${helpfulCount > 0 ? `<span class="helpful-count">${helpfulCount}</span>` : ''}
-           </button>
-         </div>`
-      : "";
-    descHtml = `<div class="modal-section"><h3>📄 内容・収録作品</h3><p class="book-desc">${esc(book.description)}</p>${dateTag}${aiScoreTag}${helpfulBtn}</div>`;
-  }
+  // 書評・AI登録情報はAPIデータ取得後に確実に描画するため、常にプレースホルダーを使用
 
   return `
     <div class="modal-top">
@@ -881,7 +878,7 @@ function _renderModalContent(isbn, book, rating) {
       </div>
     </div>
 
-    ${descHtml || '<div id="modal-desc-placeholder"></div>'}
+    <div id="modal-desc-placeholder"></div>
 
     <div class="modal-section">
       <h3>📚 読書ステータス</h3>
@@ -989,34 +986,8 @@ async function openModal(isbn, preloadedBook) {
       const ratingInfoEl = document.querySelector(".rating-info");
       if (starsEl) starsEl.textContent = rating.score ? "★".repeat(Math.round(rating.score)) + "☆".repeat(5 - Math.round(rating.score)) : "☆☆☆☆☆";
       if (ratingInfoEl) ratingInfoEl.textContent = rating.score ? `${rating.score.toFixed(1)} / 5.0（${rating.votes}件）` : "まだ評価がありません";
-      // 内容紹介を追加
-      const descPlaceholder = document.getElementById("modal-desc-placeholder");
-      if (descPlaceholder && book.description) {
-        let dateTag2 = "";
-        if (book.manual_review && book.manual_review_date) {
-          const d2 = new Date(book.manual_review_date);
-          const fmt2 = `${d2.getFullYear()}年${d2.getMonth()+1}月${d2.getDate()}日`;
-          dateTag2 = `<span class="manual-review-date">司書登録：${fmt2}</span>`;
-        } else if (!book.manual_review && book.ai_review_date) {
-          const ad2 = new Date(book.ai_review_date);
-          const afmt2 = `${ad2.getFullYear()}年${ad2.getMonth()+1}月${ad2.getDate()}日`;
-          const modelName2 = book.ai_model || "AI";
-          dateTag2 = `<span class="manual-review-date">AI登録：${afmt2}（${modelName2}）</span>`;
-        }
-        const aiScoreTag2 = book.ai_review_score
-          ? `<span class="desc-rating">書評品質スコア：${book.ai_review_score}点</span>`
-          : "";
-        const helpfulCount2 = book.helpful_count || 0;
-        const helpfulVoted2 = (JSON.parse(localStorage.getItem("helpful_voted")||"[]")).includes(isbn);
-        const helpfulBtn2 = book.description
-          ? `<div class="helpful-row">
-               <button class="helpful-btn${helpfulVoted2?' voted':''}" onclick="voteHelpful('${isbn}',this)" ${helpfulVoted2?'disabled':''}>
-                 👍 参考になった${helpfulCount2 > 0 ? `<span class="helpful-count">${helpfulCount2}</span>` : ''}
-               </button>
-             </div>`
-          : "";
-        descPlaceholder.outerHTML = `<div class="modal-section"><h3>📄 内容・収録作品</h3><p class="book-desc">${book.description}</p>${dateTag2}${aiScoreTag2}${helpfulBtn2}</div>`;
-      }
+      // 内容紹介・AI登録情報・参考ボタンを描画
+      _renderDescSection(isbn, book);
     } catch(e) {
       const availEl = document.getElementById("modal-avail-body");
       if (availEl) availEl.innerHTML = `<div class="avail-row"><span>取得できませんでした</span></div>`;
@@ -1034,6 +1005,7 @@ async function openModal(isbn, preloadedBook) {
     document.getElementById("modalContent").innerHTML = html;
     document.getElementById("modal-avail-body").innerHTML = availHtml;
     _bindModalEvents(isbn);
+    _renderDescSection(isbn, book);
   }
 }
 
