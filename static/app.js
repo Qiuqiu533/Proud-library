@@ -80,6 +80,7 @@ let currentTotal = 0;
 let ratingTarget = null;
 let ratingScore = 0;
 let currentSort = "";
+let currentPerPage = parseInt(localStorage.getItem("perPage") || "50");
 let logFilter = "all";
 
 // ===== localStorage helpers =====
@@ -315,6 +316,9 @@ async function loadBooks(keyword = "", page = 1) {
   currentPage = page;
   document.getElementById("bookGrid").innerHTML = '<div class="loading">読み込み中…</div>';
   document.getElementById("totalCount").textContent = "";
+  // キーワード検索はlibraryllife.net固定のため件数変更不可
+  const ppSel = document.getElementById("perPageSelect");
+  if (ppSel) { ppSel.disabled = !!keyword; ppSel.title = keyword ? "キーワード検索中は変更できません" : ""; }
   const res = await fetch(`/api/books?keyword=${encodeURIComponent(keyword)}&page=${page}`);
   const data = await res.json();
   currentTotal = data.total;
@@ -438,7 +442,9 @@ async function loadBooksByGenre(genre, page = 1) {
   currentPage = page;
   document.getElementById("bookGrid").innerHTML = '<div class="loading">読み込み中…</div>';
   document.getElementById("totalCount").textContent = "";
-  const res = await fetch(`/api/books/by-genre?genre=${encodeURIComponent(genre)}&page=${page}`);
+  const ppSel = document.getElementById("perPageSelect");
+  if (ppSel) { ppSel.disabled = false; ppSel.title = ""; }
+  const res = await fetch(`/api/books/by-genre?genre=${encodeURIComponent(genre)}&page=${page}&per=${currentPerPage}`);
   const data = await res.json();
   currentTotal = data.total;
   let books = data.books.map(b => ({ ...b, rating: b.rating || getRating(b.isbn) }));
@@ -1081,6 +1087,19 @@ document.getElementById("sortSelect").addEventListener("change", e => {
   currentSort = e.target.value;
   loadBooks(currentKeyword, currentPage);
 });
+
+document.getElementById("perPageSelect").addEventListener("change", e => {
+  currentPerPage = parseInt(e.target.value);
+  localStorage.setItem("perPage", currentPerPage);
+  if (currentGenre) loadBooksByGenre(currentGenre, 1);
+  else loadBooks(currentKeyword, 1);
+});
+
+// perPageSelectの初期値をlocalStorageから復元
+(function() {
+  const sel = document.getElementById("perPageSelect");
+  if (sel) sel.value = String(currentPerPage);
+})();
 
 document.querySelectorAll(".tab-btn").forEach(btn => {
   btn.addEventListener("click", () => {
