@@ -801,3 +801,38 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .related-thumb-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:1.8rem; color:#ccc; }
 .related-title { font-size:0.72rem; color:#333; margin-top:5px; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .related-author { font-size:0.68rem; color:#888; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* ===== 管理者アカウント管理 ===== */
+.au-list { display:flex; flex-direction:column; gap:10px; margin-bottom:16px; }
+.au-row { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; background:#f8f9fa; border-radius:10px; gap:10px; flex-wrap:wrap; }
+.au-info { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.au-code { font-family:monospace; font-size:0.88rem; font-weight:700; color:#3d6b4f; background:#e8f5ec; padding:2px 8px; border-radius:4px; }
+.au-name { font-size:0.95rem; font-weight:600; color:#333; }
+.au-role { font-size:0.75rem; font-weight:700; padding:2px 8px; border-radius:10px; }
+.au-master { background:#fff3cd; color:#a07000; border:1px solid #f0d060; }
+.au-admin { background:#e3f2fd; color:#1565c0; border:1px solid #90caf9; }
+.au-date { font-size:0.75rem; color:#aaa; }
+.au-self-label { font-size:0.8rem; color:#aaa; }
+.au-actions { display:flex; gap:6px; align-items:center; }
+.au-pw-btn { padding:5px 12px; font-size:0.8rem; border:1px solid #bbb; border-radius:6px; background:#fff; cursor:pointer; }
+.au-pw-btn:hover { background:#f0f0f0; }
+.au-del-btn { padding:5px 12px; font-size:0.8rem; border:1px solid #fcc; border-radius:6px; background:#fff; color:#c44; cursor:pointer; }
+.au-del-btn:hover { background:#fff3f3; }
+.au-form { display:flex; flex-direction:column; gap:10px; max-width:400px; }
+.au-input { padding:10px 12px; border:1px solid #ddd; border-radius:8px; font-size:0.9rem; width:100%; box-sizing:border-box; }
+.au-input:focus { outline:none; border-color:#3d6b4f; box-shadow:0 0 0 3px rgba(61,107,79,0.1); }
+
+/* ===== 読書メタ（日付・感想）===== */
+.read-meta-form { margin-top:14px; padding:14px; background:#f8f9f4; border-radius:10px; border:1px solid #e0ead5; }
+.read-meta-row { margin-bottom:12px; }
+.read-meta-label { display:block; font-size:0.82rem; color:#666; font-weight:600; margin-bottom:5px; }
+.read-meta-date { width:100%; padding:8px 12px; border:1px solid #ddd; border-radius:8px; font-size:0.9rem; box-sizing:border-box; }
+.read-meta-memo { width:100%; padding:8px 12px; border:1px solid #ddd; border-radius:8px; font-size:0.9rem; resize:vertical; box-sizing:border-box; font-family:inherit; }
+.read-meta-date:focus, .read-meta-memo:focus { outline:none; border-color:#3d6b4f; }
+.read-meta-count { font-size:0.75rem; color:#aaa; text-align:right; margin-top:3px; }
+.read-meta-save { align-self:flex-start; padding:8px 20px; }
+
+/* ===== 読書記録タブ メタ表示 ===== */
+.log-meta { padding:8px 10px; background:#f8f9f4; border-top:1px solid #eee; border-radius:0 0 8px 8px; margin:0 -1px -1px; }
+.log-meta-date { font-size:0.75rem; color:#888; margin-bottom:3px; }
+.log-meta-memo { font-size:0.78rem; color:#555; line-height:1.5; white-space:pre-wrap; word-break:break-all; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
