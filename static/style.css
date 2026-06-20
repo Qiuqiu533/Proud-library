@@ -421,7 +421,8 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 /* ===== 最近見た本 ===== */
 .recent-section { margin-bottom: 16px; }
 .recent-label { font-size: 0.72rem; color: #999; font-weight: 600; margin-bottom: 6px; letter-spacing: 0.03em; }
-.recent-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; }
+.recent-row { display: flex; flex-direction: row; gap: 8px; overflow-x: auto; padding-bottom: 6px; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+.recent-row .mini-card { flex: 0 0 90px; min-width: 90px; }
 .recent-label { font-size: 0.72rem; font-weight: 700; color: #3d6b4f; letter-spacing: 0.05em; margin-bottom: 8px; }
 /* .recent-thumb は mini-card に統合済み */
 
