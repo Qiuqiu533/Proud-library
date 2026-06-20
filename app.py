@@ -803,6 +803,7 @@ def fetch_books(keyword="", page=1):
 def fetch_book_detail(isbn):
     url = f"{LIBRARYLIFE_BASE}/booksearch/detail/{isbn}"
     result = {"isbn": isbn}
+    availability = []
     try:
         resp = _INERTIA_SESSION.get(url, timeout=10,
                                     headers=_inertia_headers())
