@@ -1371,32 +1371,36 @@ def api_books_batch():
 
 @app.route("/api/books/by-genre")
 def api_books_by_genre():
-    """ジャンル別・全件・キーワードDB検索（ページネーション付き）"""
+    """ジャンル別・全件・キーワード・受賞フィルターDB検索（ページネーション付き）"""
     genre   = request.args.get("genre", "")
     keyword = request.args.get("keyword", "").strip()
+    award   = request.args.get("award", "").strip()  # 受賞フィルター
     page    = int(request.args.get("page", 1))
     per     = min(int(request.args.get("per", 50)), 200)
     offset  = (page - 1) * per
     con = get_con()
     ph = "%s" if USE_PG else "?"
+    conditions = []
+    params_base = []
     if genre:
-        where = f"WHERE genre={ph}"
-        params_count = (genre,)
-        params_rows  = (genre, per, offset)
-        sql_count = f"SELECT COUNT(*) as cnt FROM genre_books {where}"
-        sql_rows  = f"SELECT isbn,genre,title,author,publisher,format FROM genre_books {where} ORDER BY isbn DESC LIMIT {ph} OFFSET {ph}"
-    elif keyword:
+        conditions.append(f"genre={ph}")
+        params_base.append(genre)
+    if keyword:
         like = f"%{keyword}%"
-        where = f"WHERE title LIKE {ph} OR author LIKE {ph}"
-        params_count = (like, like)
-        params_rows  = (like, like, per, offset)
-        sql_count = f"SELECT COUNT(*) as cnt FROM genre_books {where}"
-        sql_rows  = f"SELECT isbn,genre,title,author,publisher,format FROM genre_books {where} ORDER BY isbn DESC LIMIT {ph} OFFSET {ph}"
-    else:
-        params_count = ()
-        params_rows  = (per, offset)
-        sql_count = "SELECT COUNT(*) as cnt FROM genre_books"
-        sql_rows  = f"SELECT isbn,genre,title,author,publisher,format FROM genre_books ORDER BY isbn DESC LIMIT {ph} OFFSET {ph}"
+        conditions.append(f"(title LIKE {ph} OR author LIKE {ph})")
+        params_base.extend([like, like])
+    if award:
+        if USE_PG:
+            conditions.append(f"awards @> %s::jsonb")
+            params_base.append(json.dumps([{"award": award}]))
+        else:
+            conditions.append(f"awards LIKE {ph}")
+            params_base.append(f"%{award}%")
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    params_count = tuple(params_base)
+    params_rows  = tuple(params_base) + (per, offset)
+    sql_count = f"SELECT COUNT(*) as cnt FROM genre_books {where}"
+    sql_rows  = f"SELECT isbn,genre,title,author,publisher,format,awards FROM genre_books {where} ORDER BY isbn DESC LIMIT {ph} OFFSET {ph}"
     total_row = fetchone(con, sql_count, params_count)
     total = total_row["cnt"] if total_row else 0
     rows = fetchall(con, sql_rows, params_rows)
@@ -1408,8 +1412,14 @@ def api_books_by_genre():
         isbn13 = b["isbn"]
         isbn10 = isbn13_to_isbn10(isbn13) if isbn13.startswith("978") else ""
         cover  = get_cover_url(isbn13, isbn10)
-        result.append({**b, "isbn10": isbn10, "cover": cover, "rating": ratings.get(isbn13, {"score": 0, "votes": 0, "reviews": []})})
-    return jsonify({"books": result, "total": total, "page": page, "genre": genre, "keyword": keyword})
+        awards_val = b.get("awards") or []
+        if isinstance(awards_val, str):
+            try: awards_val = json.loads(awards_val)
+            except: awards_val = []
+        result.append({**b, "isbn10": isbn10, "cover": cover,
+                       "awards": awards_val,
+                       "rating": ratings.get(isbn13, {"score": 0, "votes": 0, "reviews": []})})
+    return jsonify({"books": result, "total": total, "page": page, "genre": genre, "keyword": keyword, "award": award})
 
 
 
@@ -1694,6 +1704,15 @@ def api_book(isbn):
     hint_title = request.args.get("title", "").strip()
     detail = fetch_book_detail(isbn, hint_title=hint_title)
     detail["rating"] = get_rating(isbn)
+    # DBからawards取得
+    con = get_con()
+    row = fetchone(con, "SELECT awards FROM genre_books WHERE isbn=%s", (isbn,))
+    con.close()
+    awards = (row.get("awards") or []) if row else []
+    if isinstance(awards, str):
+        try: awards = json.loads(awards)
+        except: awards = []
+    detail["awards"] = awards
     return jsonify(detail)
 
 
@@ -1712,6 +1731,59 @@ def api_book_description():
     con.commit()
     con.close()
     return jsonify({"ok": True})
+
+
+@app.route("/api/book-award", methods=["POST"])
+def api_book_award():
+    """受賞情報の設定（管理者のみ）"""
+    body = request.get_json()
+    password = body.get("password", "")
+    if password != get_admin_password() and password != get_board_password():
+        return jsonify({"error": "unauthorized"}), 401
+    isbn = body.get("isbn", "").strip()
+    awards = body.get("awards", [])  # [{award, year, type, rank}, ...]
+    if not isbn:
+        return jsonify({"error": "isbn required"}), 400
+    con = get_con()
+    execute(con, "UPDATE genre_books SET awards=%s WHERE isbn=%s", (json.dumps(awards, ensure_ascii=False), isbn))
+    con.commit()
+    con.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/book-awards/<isbn>")
+def api_book_awards_get(isbn):
+    """本の受賞情報取得"""
+    con = get_con()
+    row = fetchone(con, "SELECT awards FROM genre_books WHERE isbn=%s", (isbn,))
+    con.close()
+    if not row:
+        return jsonify({"awards": []})
+    awards = row.get("awards") or []
+    if isinstance(awards, str):
+        try: awards = json.loads(awards)
+        except: awards = []
+    return jsonify({"awards": awards})
+
+
+@app.route("/api/awards/list")
+def api_awards_list():
+    """受賞情報がある本の一覧（フィルター用）"""
+    con = get_con()
+    if USE_PG:
+        rows = fetchall(con, "SELECT isbn, title, author, awards FROM genre_books WHERE awards IS NOT NULL AND awards != '[]'::jsonb ORDER BY isbn DESC")
+    else:
+        rows = fetchall(con, "SELECT isbn, title, author, awards FROM genre_books WHERE awards IS NOT NULL AND awards != '[]' ORDER BY isbn DESC")
+    con.close()
+    result = []
+    for r in rows:
+        awards = r.get("awards") or []
+        if isinstance(awards, str):
+            try: awards = json.loads(awards)
+            except: awards = []
+        if awards:
+            result.append({"isbn": r["isbn"], "title": r["title"], "author": r["author"], "awards": awards})
+    return jsonify({"books": result})
 
 
 @app.route("/api/books/related/<isbn>")
