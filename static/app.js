@@ -327,6 +327,7 @@ async function loadBooks(keyword = "", page = 1) {
   });
   if (currentSort === "author") books.sort((a, b) => authorSortKey(a.author).localeCompare(authorSortKey(b.author), "ja"));
   if (currentSort === "fav") books.sort((a, b) => (isFav(b.isbn) ? 1 : 0) - (isFav(a.isbn) ? 1 : 0));
+  if (currentSort === "isbn_desc") books.sort((a, b) => (b.isbn || "").localeCompare(a.isbn || ""));
   document.getElementById("totalCount").textContent = `全 ${data.total.toLocaleString()} 件`;
   renderGrid("bookGrid", books);
   renderPagination("paginationTop", data.total, page, p => loadBooks(keyword, p));
@@ -449,6 +450,7 @@ async function loadBooksByGenre(genre, page = 1) {
   });
   if (currentSort === "author") books.sort((a, b) => authorSortKey(a.author).localeCompare(authorSortKey(b.author), "ja"));
   if (currentSort === "fav") books.sort((a, b) => (isFav(b.isbn) ? 1 : 0) - (isFav(a.isbn) ? 1 : 0));
+  if (currentSort === "isbn_desc") books.sort((a, b) => (b.isbn || "").localeCompare(a.isbn || ""));
   document.getElementById("totalCount").textContent = `全 ${data.total.toLocaleString()} 件（${genre}）`;
   renderGrid("bookGrid", books);
   renderPagination("paginationTop",    data.total, page, p => loadBooksByGenre(genre, p));
@@ -914,7 +916,9 @@ function _renderModalContent(isbn, book, rating) {
     <div class="modal-section" id="modal-avail-section">
       <h3>🏛️ 貸出状況</h3>
       <div id="modal-avail-body"><div class="loading" style="font-size:0.85rem;padding:8px 0">取得中…</div></div>
-    </div>`;
+    </div>
+
+    <div id="modal-related-placeholder"></div>`;
 }
 
 function _bindModalEvents(isbn) {
@@ -988,6 +992,7 @@ async function openModal(isbn, preloadedBook) {
       if (ratingInfoEl) ratingInfoEl.textContent = rating.score ? `${rating.score.toFixed(1)} / 5.0（${rating.votes}件）` : "まだ評価がありません";
       // 内容紹介・AI登録情報・参考ボタンを描画
       _renderDescSection(isbn, book);
+      _loadRelatedBooks(isbn);
     } catch(e) {
       const availEl = document.getElementById("modal-avail-body");
       if (availEl) availEl.innerHTML = `<div class="avail-row"><span>取得できませんでした</span></div>`;
@@ -1006,7 +1011,36 @@ async function openModal(isbn, preloadedBook) {
     document.getElementById("modal-avail-body").innerHTML = availHtml;
     _bindModalEvents(isbn);
     _renderDescSection(isbn, book);
+    _loadRelatedBooks(isbn);
   }
+}
+
+async function _loadRelatedBooks(isbn) {
+  const placeholder = document.getElementById("modal-related-placeholder");
+  if (!placeholder) return;
+  try {
+    const res = await fetch(`/api/books/related/${isbn}`);
+    const data = await res.json();
+    const renderCarousel = (books, label) => {
+      if (!books || books.length === 0) return "";
+      const items = books.map(b => {
+        const ndlFallback = `https://ndlsearch.ndl.go.jp/thumbnail/${b.isbn}.jpg`;
+        const imgOrPlaceholder = `<img src="${b.cover || ndlFallback}" alt="${esc(b.title)}" loading="lazy"
+          onerror="if(this.src!=='${ndlFallback}'){this.src='${ndlFallback}';}else{this.replaceWith(Object.assign(document.createElement('div'),{className:'related-thumb-placeholder',textContent:'📖'}));}">`;
+        return `<div class="related-card" onclick="openModal('${b.isbn}')" role="button" tabindex="0">
+          <div class="related-thumb">${imgOrPlaceholder}</div>
+          <div class="related-title">${esc(b.title)}</div>
+          <div class="related-author">${esc(b.author || "")}</div>
+        </div>`;
+      }).join("");
+      return `<div class="modal-section">
+        <h3>${label}</h3>
+        <div class="related-carousel">${items}</div>
+      </div>`;
+    };
+    const html = renderCarousel(data.same_author, "👤 同じ著者の本") + renderCarousel(data.same_genre, "📚 同じジャンルの本");
+    if (html) placeholder.outerHTML = html;
+  } catch(e) {}
 }
 
 function closeModal() {

@@ -673,3 +673,15 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .w-num { background:#3d6b4f; color:#fff; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700; flex-shrink:0; margin-top:1px; }
 .w-dot { width:8px; height:8px; border-radius:50%; background:#ddd; cursor:pointer; transition:background 0.2s; }
 .w-dot.active { background:#3d6b4f; width:22px; border-radius:4px; }
+
+/* ===== 関連本カルーセル ===== */
+.related-carousel { display:flex; gap:10px; overflow-x:auto; padding-bottom:8px; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; }
+.related-carousel::-webkit-scrollbar { height:4px; }
+.related-carousel::-webkit-scrollbar-thumb { background:#ccc; border-radius:2px; }
+.related-card { flex-shrink:0; width:90px; cursor:pointer; scroll-snap-align:start; }
+.related-card:hover .related-thumb { box-shadow:0 4px 12px rgba(0,0,0,0.2); transform:translateY(-2px); }
+.related-thumb { width:90px; height:126px; border-radius:6px; overflow:hidden; background:#f0f0f0; transition:box-shadow 0.2s, transform 0.2s; }
+.related-thumb img { width:100%; height:100%; object-fit:cover; }
+.related-thumb-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:1.8rem; color:#ccc; }
+.related-title { font-size:0.72rem; color:#333; margin-top:5px; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.related-author { font-size:0.68rem; color:#888; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
