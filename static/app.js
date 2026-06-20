@@ -77,6 +77,42 @@ document.getElementById("logoutBtn").addEventListener("click", () => {
 let currentPage = 1;
 let currentKeyword = "";
 let currentTotal = 0;
+let currentAward = "";  // 受賞フィルター
+
+// 受賞バッジスタイルマップ
+const AWARD_STYLE_MAP = {
+  "本屋大賞":         "honmia",
+  "本屋大賞ノミネート": "nominee",
+  "直木賞":           "naoki",
+  "芥川賞":           "akutagawa",
+  "山本周五郎賞":     "yamamoto",
+  "谷崎潤一郎賞":     "other",
+  "三島由紀夫賞":     "other",
+  "野間文芸賞":       "other",
+  "読売文学賞":       "other",
+  "江戸川乱歩賞":     "mystery",
+  "日本推理作家協会賞": "mystery",
+  "このミステリーがすごい！大賞": "mystery",
+  "本格ミステリ大賞": "mystery",
+  "日本SF大賞":       "sf",
+  "星雲賞":           "sf",
+};
+
+function awardStyleClass(awardName) {
+  return AWARD_STYLE_MAP[awardName] || "other";
+}
+
+function renderAwardBadges(awards) {
+  if (!awards || !awards.length) return "";
+  return `<div class="award-badges">${awards.map(a => {
+    const cls = awardStyleClass(a.award);
+    const year = a.year ? `'${String(a.year).slice(-2)}` : "";
+    const rank = a.rank && a.award === "本屋大賞" ? `${a.rank}位` : "";
+    const type = a.type === "nominee" ? "候補" : "受賞";
+    const label = `${a.award}${year}${rank ? " " + rank : ""}`;
+    return `<span class="award-badge award-badge--${cls}" title="${a.award} ${a.year || ""} ${type}">${label}</span>`;
+  }).join("")}</div>`;
+}
 let ratingTarget = null;
 let ratingScore = 0;
 let currentSort = "";
@@ -203,6 +239,7 @@ function renderCard(book, opts = {}) {
       <div class="book-meta">${esc(book.publisher || "")}</div>
       <div class="card-stars">${starsHtml(rating.score)}</div>
       <div class="avail-status" id="avail-${book.isbn}"></div>
+      ${renderAwardBadges(book.awards)}
     </div>`;
 
   div.querySelector(".fav-btn").addEventListener("click", e => {
@@ -321,7 +358,9 @@ async function loadBooks(keyword = "", page = 1) {
   let data;
   // キーワードあり・なし共にDB直接（タイトル・著者両方検索対応）
   if (ppSel) { ppSel.disabled = false; ppSel.title = ""; }
-  const res = await fetch(`/api/books/by-genre?keyword=${encodeURIComponent(keyword)}&page=${page}&per=${currentPerPage}`);
+  let url = `/api/books/by-genre?keyword=${encodeURIComponent(keyword)}&page=${page}&per=${currentPerPage}`;
+  if (currentAward) url += `&award=${encodeURIComponent(currentAward)}`;
+  const res = await fetch(url);
   data = await res.json();
 
   currentTotal = data.total;
@@ -888,6 +927,7 @@ function _renderModalContent(isbn, book, rating) {
       <div class="modal-cover">${book.cover ? `<img src="${book.cover}" alt="${esc(book.title)}" onerror="this.parentElement.innerHTML='<div class=\\'modal-cover-placeholder\\'>📖</div>'">` : '<div class="modal-cover-placeholder">📖</div>'}</div>
       <div class="modal-header">
         <h2>${esc(book.title) || "タイトル不明"}</h2>
+        ${book.awards && book.awards.length ? `<div class="award-badges modal-awards">${renderAwardBadges(book.awards).replace('<div class="award-badges">', '').replace('</div>', '')}</div>` : '<div id="modal-awards-placeholder"></div>'}
         ${infoTable}
         <button class="fav-btn-large ${fav ? 'active' : ''}" data-isbn="${isbn}">
           ${fav ? '❤️ お気に入り済み' : '🤍 お気に入りに追加'}
@@ -1102,6 +1142,17 @@ document.getElementById("perPageSelect").addEventListener("change", e => {
   localStorage.setItem("perPage", currentPerPage);
   if (currentGenre) loadBooksByGenre(currentGenre, 1);
   else loadBooks(currentKeyword, 1);
+});
+
+// 受賞フィルターピル
+document.querySelectorAll(".award-pill").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".award-pill").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    currentAward = btn.dataset.award || "";
+    currentGenre = "";
+    loadBooks(currentKeyword, 1);
+  });
 });
 
 // perPageSelectの初期値をlocalStorageから復元
@@ -3069,6 +3120,81 @@ if (!localStorage.getItem("welcomeSeen")) {
   setTimeout(showWelcome, 800);
 }
 
+// ── 受賞情報（管理者） ────────────────────────────────────────────────────
+const AWARD_OPTIONS = [
+  "本屋大賞","本屋大賞ノミネート","直木賞","芥川賞",
+  "山本周五郎賞","谷崎潤一郎賞","三島由紀夫賞","野間文芸賞",
+  "読売文学賞","川端康成文学賞","吉川英治文学賞","柴田錬三郎賞",
+  "江戸川乱歩賞","日本推理作家協会賞","このミステリーがすごい！大賞",
+  "本格ミステリ大賞","鮎川哲也賞","日本SF大賞","星雲賞",
+  "日本ファンタジーノベル大賞","日本ホラー小説大賞",
+  "小説すばる新人賞","オール讀物新人賞","新潮新人賞","群像新人文学賞",
+  "文學界新人賞","すばる文学賞","メフィスト賞","電撃小説大賞",
+];
+
+function addAwardEntry(award = "", year = new Date().getFullYear(), type = "winner", rank = "") {
+  const container = document.getElementById("awardEntries");
+  const idx = container.children.length;
+  const div = document.createElement("div");
+  div.className = "award-entry";
+  div.style.cssText = "display:flex;gap:6px;align-items:center;background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:8px;flex-wrap:wrap;";
+  div.innerHTML = `
+    <select class="award-entry-name" style="flex:2;min-width:140px;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:0.82rem">
+      ${AWARD_OPTIONS.map(a => `<option value="${a}" ${a===award?"selected":""}>${a}</option>`).join("")}
+    </select>
+    <input class="award-entry-year" type="number" value="${year}" min="1950" max="2099" style="width:70px;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:0.82rem" placeholder="年">
+    <select class="award-entry-type" style="padding:6px;border:1px solid #ddd;border-radius:6px;font-size:0.82rem">
+      <option value="winner" ${type==="winner"?"selected":""}>受賞</option>
+      <option value="nominee" ${type==="nominee"?"selected":""}>候補/ノミネート</option>
+    </select>
+    <input class="award-entry-rank" type="number" value="${rank}" min="1" max="10" style="width:54px;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:0.82rem" placeholder="順位">
+    <button onclick="this.parentElement.remove()" style="background:#fee;border:1px solid #fcc;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:0.82rem">✕</button>`;
+  container.appendChild(div);
+}
+
+async function saveBookAwards() {
+  const isbn = document.getElementById("descIsbn").value.trim();
+  const msg = document.getElementById("awardMsg");
+  if (!isbn) { msg.textContent = "⚠️ 上のISBNを入力してください"; return; }
+  const entries = [...document.getElementById("awardEntries").children].map(div => {
+    const award = div.querySelector(".award-entry-name").value;
+    const year = parseInt(div.querySelector(".award-entry-year").value) || null;
+    const type = div.querySelector(".award-entry-type").value;
+    const rank = parseInt(div.querySelector(".award-entry-rank").value) || null;
+    return { award, year, type, ...(rank ? {rank} : {}) };
+  });
+  const pass = sessionStorage.getItem("board_pass") || boardPassword;
+  if (!pass) { msg.textContent = "⚠️ 再ログインしてください"; return; }
+  msg.textContent = "保存中...";
+  try {
+    const res = await fetch("/api/book-award", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({password: pass, isbn, awards: entries})
+    });
+    if (res.ok) {
+      msg.textContent = "✅ 受賞情報を保存しました";
+      document.getElementById("awardEntries").innerHTML = "";
+      setTimeout(() => { msg.textContent = ""; }, 3000);
+    } else {
+      const err = await res.json().catch(() => ({}));
+      msg.textContent = "❌ 保存失敗: " + (err.error || res.status);
+    }
+  } catch(e) {
+    msg.textContent = "❌ 通信エラー";
+  }
+}
+
+// ISBNが入力されたとき既存の受賞情報もロード
+async function lookupBookAwards(isbn) {
+  const res = await fetch(`/api/book-awards/${isbn}`).catch(() => null);
+  if (!res || !res.ok) return;
+  const data = await res.json();
+  const container = document.getElementById("awardEntries");
+  container.innerHTML = "";
+  (data.awards || []).forEach(a => addAwardEntry(a.award, a.year, a.type, a.rank || ""));
+}
+
 // ── 書評入力（管理者） ─────────────────────────────────────────────────────
 async function lookupBookForDesc() {
   const isbn = document.getElementById("descIsbn").value.trim();
@@ -3081,6 +3207,7 @@ async function lookupBookForDesc() {
     if (book.title) {
       info.textContent = `📖 ${book.title}${book.author ? " / " + book.author : ""}`;
       info.style.display = "block";
+      lookupBookAwards(isbn);
       if (false) { // 既存書評は自動ロードしない（誤上書き防止）
         document.getElementById("descText").value = book.description;
         document.getElementById("descCount").textContent = `（${book.description.length}/600文字）`;

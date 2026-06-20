@@ -113,6 +113,24 @@
         <button class="genre-btn" data-genre="児童文学" data-mode="genre">👦 児童文学</button>
       </div>
 
+      <!-- 受賞フィルター -->
+      <div class="award-filter-row" id="awardFilterRow">
+        <span class="award-filter-label">🏆 受賞：</span>
+        <div class="award-filter-pills">
+          <button class="award-pill active" data-award="">すべて</button>
+          <button class="award-pill award-pill--honmia" data-award="本屋大賞">本屋大賞</button>
+          <button class="award-pill award-pill--nominee" data-award="本屋大賞ノミネート">本屋大賞ノミネート</button>
+          <button class="award-pill award-pill--naoki" data-award="直木賞">直木賞</button>
+          <button class="award-pill award-pill--akutagawa" data-award="芥川賞">芥川賞</button>
+          <button class="award-pill award-pill--other" data-award="山本周五郎賞">山本周五郎賞</button>
+          <button class="award-pill award-pill--other" data-award="谷崎潤一郎賞">谷崎潤一郎賞</button>
+          <button class="award-pill award-pill--other" data-award="三島由紀夫賞">三島由紀夫賞</button>
+          <button class="award-pill award-pill--mystery" data-award="江戸川乱歩賞">乱歩賞</button>
+          <button class="award-pill award-pill--mystery" data-award="日本推理作家協会賞">推理作家協会賞</button>
+          <button class="award-pill award-pill--sf" data-award="日本SF大賞">SF大賞</button>
+        </div>
+      </div>
+
       <div class="controls-row">
         <span id="totalCount" class="total-count" aria-live="polite" aria-atomic="true"></span>
         <div class="filter-bar">
@@ -657,6 +675,15 @@
         </div>
         <button class="btn-primary" onclick="saveBookDesc()" style="width:100%">💾 保存する</button>
         <p id="descMsg" style="margin-top:8px;font-size:0.85rem;text-align:center"></p>
+
+        <!-- 受賞情報入力 -->
+        <hr style="margin:20px 0;border-color:#eee">
+        <h4 style="margin:0 0 10px">🏆 受賞情報の登録</h4>
+        <p style="font-size:0.82rem;color:#666;margin-bottom:10px">上のISBN検索で本を選んだ後、受賞情報を追加・保存できます。</p>
+        <div id="awardEntries" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
+        <button class="btn-secondary" onclick="addAwardEntry()" style="width:100%;margin-bottom:8px">＋ 受賞情報を追加</button>
+        <button class="btn-primary" onclick="saveBookAwards()" style="width:100%;background:#e65100">🏆 受賞情報を保存する</button>
+        <p id="awardMsg" style="margin-top:8px;font-size:0.85rem;text-align:center"></p>
       </div>
 
       <!-- 新着登録 -->
