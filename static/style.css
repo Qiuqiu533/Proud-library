@@ -184,6 +184,7 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .no-content { color: #bbb; font-size: 0.85rem; }
 .book-desc { font-size: 0.88rem; color: #444; line-height: 1.75; }
 .manual-review-date { display: block; margin-top: 6px; font-size: 0.75rem; color: #888; text-align: right; }
+.desc-rating { display: block; margin-top: 3px; font-size: 0.75rem; color: #f57c00; text-align: right; }
 .external-links { display: flex; gap: 8px; flex-wrap: wrap; }
 .ext-link { padding: 6px 13px; border-radius: 7px; font-size: 0.8rem; font-weight: 600; text-decoration: none; border: 1.5px solid; transition: opacity .15s; }
 .ext-link:hover { opacity: 0.75; }
