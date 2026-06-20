@@ -551,6 +551,29 @@ async function loadNews() {
   list.innerHTML = items.map(item => newsItemHtml(item, false)).join("");
 }
 
+async function loadNoBooksReview() {
+  const el = document.getElementById("noReviewItems");
+  if (!el) return;
+  try {
+    const res = await fetch("/api/books/no-review");
+    const data = await res.json();
+    if (!data.books || data.books.length === 0) {
+      el.innerHTML = '<span style="color:#4caf50">✅ 書評未登録の本はありません</span>';
+      return;
+    }
+    el.innerHTML = data.books.map(b =>
+      `<div style="padding:4px 0;border-bottom:1px solid #ffe082;cursor:pointer;display:flex;align-items:center;gap:8px"
+            onclick="document.getElementById('descIsbn').value='${esc(b.isbn)}';lookupBookForDesc()">
+        <span style="color:#f57c00;font-size:0.8rem">▶</span>
+        <span><b>${esc(b.title)}</b> <span style="color:#888">${esc(b.author||'')}</span></span>
+      </div>`
+    ).join("") + (data.total > data.books.length
+      ? `<div style="color:#888;padding:4px 0;font-size:0.8rem">他 ${data.total - data.books.length} 件...</div>` : "");
+  } catch(e) {
+    el.innerHTML = '<span style="color:#999">取得できませんでした</span>';
+  }
+}
+
 async function loadAdminNews() {
   const list = document.getElementById("adminNewsList");
   if (!list) return;
@@ -897,7 +920,8 @@ async function openModal(isbn, preloadedBook) {
 
     // 貸出状況・評価・詳細情報を非同期で取得して更新
     try {
-      const res = await fetch(`/api/book/${isbn}`);
+      const titleHint = encodeURIComponent(preloadedBook.title || "");
+      const res = await fetch(`/api/book/${isbn}?title=${titleHint}`);
       const book = await res.json();
       const availEl = document.getElementById("modal-avail-body");
       if (availEl) {
@@ -1250,7 +1274,14 @@ function openBoardPanel() {
   const lbl = document.getElementById("chatSenderLabel");
   if (lbl) lbl.textContent = boardSenderName ? `👤 ${boardSenderName}` : "";
   document.getElementById("boardPanel").style.display = "flex";
-  loadAdminNews();
+  // デフォルトタブを「書評入力」に設定
+  document.querySelectorAll(".board-tab").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll(".board-tab-panel").forEach(p => p.classList.remove("active"));
+  const bookdescTab = document.querySelector('.board-tab[data-btab="bookdesc"]');
+  const bookdescPanel = document.getElementById("btab-bookdesc");
+  if (bookdescTab) bookdescTab.classList.add("active");
+  if (bookdescPanel) bookdescPanel.classList.add("active");
+  loadNoBooksReview();
 }
 
 // Board tabs
