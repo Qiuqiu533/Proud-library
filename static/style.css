@@ -207,11 +207,12 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .modal-close:hover { background: #e0ddd8; }
 .modal-close-bottom { display: none; width: 100%; margin-top: 20px; padding: 12px; background: #f5f3f0; border: none; border-radius: 10px; font-size: 0.92rem; color: #555; cursor: pointer; font-family: inherit; justify-content: center; align-items: center; gap: 6px; }
 .modal-content { display: flex; flex-direction: column; gap: 18px; }
-.modal-top { display: flex; gap: 20px; align-items: flex-start; }
-.modal-cover { width: 160px; flex-shrink: 0; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); overflow: hidden; }
+.modal-top { display: flex; gap: 24px; align-items: flex-start; }
+.modal-cover { width: 200px; flex-shrink: 0; border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,0.18); overflow: hidden; }
 .modal-cover img { width: 100%; display: block; }
-.modal-cover-placeholder { width: 160px; height: 230px; background: linear-gradient(135deg, #c8d8c0, #a0b89a); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; border-radius: 8px; }
-.modal-header h2 { font-size: 1.45rem; line-height: 1.4; margin-bottom: 6px; }
+.modal-cover-placeholder { width: 200px; height: 290px; background: linear-gradient(135deg, #c8d8c0, #a0b89a); display: flex; align-items: center; justify-content: center; font-size: 3rem; border-radius: 10px; }
+.modal-cover-awards { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px; }
+.modal-header h2 { font-size: 1.45rem; line-height: 1.4; margin-bottom: 8px; }
 .modal-awards { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
 .modal-awards .award-badge { font-size: 0.75rem; padding: 3px 9px; }
 .modal-author { color: #555; font-size: 0.92rem; margin-bottom: 10px; }
@@ -274,8 +275,8 @@ body { padding-bottom: env(safe-area-inset-bottom); }
   .modal-overlay { align-items: flex-end; padding: 0; }
   .modal-box { border-radius: 16px 16px 0 0; max-height: 92vh; padding: 20px 16px; }
   .modal-top { gap: 14px; }
-  .modal-cover { width: 120px; }
-  .modal-cover-placeholder { width: 120px; height: 175px; font-size: 2rem; }
+  .modal-cover { width: 140px; }
+  .modal-cover-placeholder { width: 140px; height: 200px; font-size: 2rem; }
   .modal-header h2 { font-size: 1.05rem; }
   .info-row { flex-direction: column; gap: 4px; }
   .info-label { min-width: unset; }
