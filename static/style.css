@@ -95,7 +95,16 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 /* ===== Award badges ===== */
 .award-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .award-badge { font-size: 0.65rem; font-weight: 700; padding: 2px 6px; border-radius: 8px; display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; line-height: 1.4; }
-.award-badge--honmia    { background: #fff8e1; color: #e65100; border: 1px solid #ffcc02; }
+/* 1位（大賞）: 金色・光沢・王冠アイコン */
+.award-badge--rank1 {
+  background: linear-gradient(135deg, #ffe066 0%, #ffd700 50%, #ffb300 100%);
+  color: #5a3a00;
+  border: 1.5px solid #f0a500;
+  box-shadow: 0 1px 4px rgba(255,193,7,0.5), inset 0 1px 0 rgba(255,255,255,0.4);
+  font-size: 0.7rem;
+  padding: 3px 8px;
+}
+.award-badge--honmia    { background: #fff3cd; color: #c45e00; border: 1px solid #ffc107; }
 .award-badge--nominee   { background: #f3f3f3; color: #555; border: 1px solid #ccc; }
 .award-badge--naoki     { background: #ede7f6; color: #4527a0; border: 1px solid #b39ddb; }
 .award-badge--akutagawa { background: #fce4ec; color: #880e4f; border: 1px solid #f48fb1; }
