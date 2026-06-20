@@ -894,7 +894,7 @@ def fetch_book_detail(isbn, hint_title=""):
             c1, c2 = _title_core(t1), _title_core(t2)
             return c1 == c2 or c1 in t2 or c2 in t1 or c1 in c2 or c2 in c1
 
-        cached = fetchone(dc, f"SELECT title, author, description, manual_review, manual_review_date, ai_review_date, ai_review_score, ai_model FROM genre_books WHERE isbn={ph}", (isbn,))
+        cached = fetchone(dc, f"SELECT title, author, description, manual_review, manual_review_date, ai_review_date, ai_review_score, ai_model, helpful_count FROM genre_books WHERE isbn={ph}", (isbn,))
 
         # ISBNで見つかったがタイトルが一致しない場合 → タイトルで再検索
         if cached and cached.get("description") and lib_title:
@@ -933,6 +933,10 @@ def fetch_book_detail(isbn, hint_title=""):
                 result["ai_review_score"] = int(ai_s)
             if ai_m:
                 result["ai_model"] = ai_m
+        if cached and result.get("description"):
+            hc = cached.get("helpful_count")
+            if hc:
+                result["helpful_count"] = int(hc)
     except Exception:
         pass
     if isbn13 and isbn13.startswith("978"):
@@ -1689,6 +1693,21 @@ def api_book_description():
     con.commit()
     con.close()
     return jsonify({"ok": True})
+
+
+@app.route("/api/helpful", methods=["POST"])
+@rate_limit(limit=5, window=60)
+def api_helpful():
+    body = request.get_json()
+    isbn = body.get("isbn", "").strip()
+    if not isbn:
+        return jsonify({"error": "isbn required"}), 400
+    con = get_con()
+    execute(con, "UPDATE genre_books SET helpful_count = COALESCE(helpful_count,0) + 1 WHERE isbn=%s" if USE_PG else "UPDATE genre_books SET helpful_count = COALESCE(helpful_count,0) + 1 WHERE isbn=?", (isbn,))
+    con.commit()
+    row = fetchone(con, "SELECT helpful_count FROM genre_books WHERE isbn=%s" if USE_PG else "SELECT helpful_count FROM genre_books WHERE isbn=?", (isbn,))
+    con.close()
+    return jsonify({"helpful_count": row["helpful_count"] if row else 1})
 
 
 @app.route("/api/rate", methods=["POST"])

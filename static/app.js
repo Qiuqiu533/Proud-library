@@ -95,6 +95,24 @@ async function saveRating(isbn, score, review) {
   return await res.json();
 }
 
+async function voteHelpful(isbn, btn) {
+  try {
+    const res = await fetch("/api/helpful", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isbn })
+    });
+    const data = await res.json();
+    const voted = JSON.parse(localStorage.getItem("helpful_voted") || "[]");
+    if (!voted.includes(isbn)) voted.push(isbn);
+    localStorage.setItem("helpful_voted", JSON.stringify(voted));
+    btn.disabled = true;
+    btn.classList.add("voted");
+    const count = data.helpful_count || 1;
+    btn.innerHTML = `👍 参考になった<span class="helpful-count">${count}</span>`;
+  } catch(e) {}
+}
+
 function isFav(isbn) { return localStorage.getItem("fav_" + isbn) === "1"; }
 function toggleFav(isbn) {
   if (isFav(isbn)) localStorage.removeItem("fav_" + isbn);
@@ -836,10 +854,19 @@ function _renderModalContent(isbn, book, rating) {
       const modelName = book.ai_model || "AI";
       dateTag = `<span class="manual-review-date">AI登録：${afmt}（${modelName}）</span>`;
     }
-    const ratingTag = rating && rating.score
-      ? `<span class="desc-rating">評価：${"★".repeat(Math.round(rating.score))}${"☆".repeat(5-Math.round(rating.score))} ${rating.score.toFixed(1)}（${rating.votes}件）</span>`
+    const aiScoreTag = book.ai_review_score
+      ? `<span class="desc-rating">書評品質スコア：${book.ai_review_score}点</span>`
       : "";
-    descHtml = `<div class="modal-section"><h3>📄 内容・収録作品</h3><p class="book-desc">${esc(book.description)}</p>${dateTag}${ratingTag}</div>`;
+    const helpfulCount = book.helpful_count || 0;
+    const helpfulVoted = (JSON.parse(localStorage.getItem("helpful_voted")||"[]")).includes(isbn);
+    const helpfulBtn = book.description
+      ? `<div class="helpful-row">
+           <button class="helpful-btn${helpfulVoted?' voted':''}" onclick="voteHelpful('${isbn}',this)" ${helpfulVoted?'disabled':''}>
+             👍 参考になった${helpfulCount > 0 ? `<span class="helpful-count">${helpfulCount}</span>` : ''}
+           </button>
+         </div>`
+      : "";
+    descHtml = `<div class="modal-section"><h3>📄 内容・収録作品</h3><p class="book-desc">${esc(book.description)}</p>${dateTag}${aiScoreTag}${helpfulBtn}</div>`;
   }
 
   return `
@@ -976,10 +1003,19 @@ async function openModal(isbn, preloadedBook) {
           const modelName2 = book.ai_model || "AI";
           dateTag2 = `<span class="manual-review-date">AI登録：${afmt2}（${modelName2}）</span>`;
         }
-        const ratingTag2 = rating && rating.score
-          ? `<span class="desc-rating">評価：${"★".repeat(Math.round(rating.score))}${"☆".repeat(5-Math.round(rating.score))} ${rating.score.toFixed(1)}（${rating.votes}件）</span>`
+        const aiScoreTag2 = book.ai_review_score
+          ? `<span class="desc-rating">書評品質スコア：${book.ai_review_score}点</span>`
           : "";
-        descPlaceholder.outerHTML = `<div class="modal-section"><h3>📄 内容・収録作品</h3><p class="book-desc">${book.description}</p>${dateTag2}${ratingTag2}</div>`;
+        const helpfulCount2 = book.helpful_count || 0;
+        const helpfulVoted2 = (JSON.parse(localStorage.getItem("helpful_voted")||"[]")).includes(isbn);
+        const helpfulBtn2 = book.description
+          ? `<div class="helpful-row">
+               <button class="helpful-btn${helpfulVoted2?' voted':''}" onclick="voteHelpful('${isbn}',this)" ${helpfulVoted2?'disabled':''}>
+                 👍 参考になった${helpfulCount2 > 0 ? `<span class="helpful-count">${helpfulCount2}</span>` : ''}
+               </button>
+             </div>`
+          : "";
+        descPlaceholder.outerHTML = `<div class="modal-section"><h3>📄 内容・収録作品</h3><p class="book-desc">${book.description}</p>${dateTag2}${aiScoreTag2}${helpfulBtn2}</div>`;
       }
     } catch(e) {
       const availEl = document.getElementById("modal-avail-body");
