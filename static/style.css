@@ -147,6 +147,8 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .log-filter-btn.active { background: #3d6b4f; color: white; border-color: #3d6b4f; }
 
 /* ===== News ===== */
+/* お知らせ・開館情報：センタリング */
+#tab-news, #tab-info { max-width: 760px; margin-left: auto; margin-right: auto; }
 .news-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .btn-admin-toggle { padding: 6px 14px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 8px; cursor: pointer; font-size: 0.82rem; font-family: inherit; }
 .admin-panel { background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 12px; padding: 20px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px; }
