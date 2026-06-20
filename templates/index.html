@@ -86,22 +86,22 @@
     <!-- Books tab -->
     <div id="tab-books" class="tab-panel active">
 
-      <!-- 新着・最近見た 折りたたみ -->
-      <div id="topSectionsWrapper">
-        <!-- 新着図書（トップ表示） -->
-        <div class="top-new-section" id="topNewSection" style="display:none">
-          <div class="top-new-label">🆕 新着図書</div>
-          <div id="topNewRow" class="top-new-row"></div>
+      <!-- 新着図書（トップ表示） -->
+      <div class="top-new-section" id="topNewSection" style="display:none">
+        <div class="section-label-row">
+          <span class="top-new-label">🆕 新着図書</span>
+          <button class="section-toggle-btn" id="toggleTopNew" onclick="toggleSection('topNew')"></button>
         </div>
-
-        <!-- 最近見た本 -->
-        <div id="recentBooksSection" class="recent-section" style="display:none">
-          <div class="recent-label">🕐 最近見た本</div>
-          <div id="recentBooksRow" class="recent-row"></div>
-        </div>
+        <div id="topNewRow" class="top-new-row"></div>
       </div>
-      <div style="text-align:right; padding: 2px 4px 4px;">
-        <button id="toggleTopSections" class="toggle-top-btn" onclick="toggleTopSections()"></button>
+
+      <!-- 最近見た本 -->
+      <div id="recentBooksSection" class="recent-section" style="display:none">
+        <div class="section-label-row">
+          <span class="recent-label">🕐 最近見た本</span>
+          <button class="section-toggle-btn" id="toggleRecent" onclick="toggleSection('recent')"></button>
+        </div>
+        <div id="recentBooksRow" class="recent-row"></div>
       </div>
 
       <!-- ジャンルフィルター（表紙ずれ解消まで非表示） -->
