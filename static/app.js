@@ -613,6 +613,22 @@ async function loadNew() {
   if (label) label.style.display = "none";
   renderGrid("newGrid", data.books, { showArrived: data.source === "registered" });
   applyAvailCache(data.books.map(b => b.isbn).filter(Boolean));
+  // 新着バッジ: 前回訪問より新しい本の件数を表示
+  _updateNewArrivalBadge(data.books);
+  localStorage.setItem("lastNewVisit", Date.now());
+}
+
+function _updateNewArrivalBadge(books) {
+  const badge = document.getElementById("newArrivalBadge");
+  if (!badge) return;
+  const lastVisit = parseInt(localStorage.getItem("lastNewVisit") || "0");
+  if (!lastVisit) { badge.style.display = "none"; return; }
+  const newCount = books.filter(b => {
+    if (!b.arrived_at) return false;
+    return new Date(b.arrived_at).getTime() > lastVisit;
+  }).length;
+  if (newCount > 0) { badge.textContent = newCount > 9 ? "9+" : newCount; badge.style.display = "inline-flex"; }
+  else badge.style.display = "none";
 }
 
 // ===== Favorites =====
@@ -627,8 +643,35 @@ async function loadFavorites() {
 }
 
 // ===== Reading log =====
+function renderLogStats() {
+  const statsEl = document.getElementById("logStats");
+  if (!statsEl) return;
+  const all = getLogEntries();
+  const read = all.filter(e => e.status === "読んだ").length;
+  const reading = all.filter(e => e.status === "読書中").length;
+  const want = all.filter(e => e.status === "読みたい").length;
+  const thisMonth = (() => {
+    const now = new Date();
+    return all.filter(e => {
+      if (e.status !== "読んだ") return false;
+      const m = getReadMeta(e.isbn);
+      if (!m.date) return false;
+      const d = new Date(m.date);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    }).length;
+  })();
+  if (!all.length) { statsEl.innerHTML = ""; return; }
+  statsEl.innerHTML = `
+    <div class="log-stat-item"><span class="log-stat-num">${read}</span><span class="log-stat-label">✅ 読んだ</span></div>
+    <div class="log-stat-item"><span class="log-stat-num">${reading}</span><span class="log-stat-label">📖 読書中</span></div>
+    <div class="log-stat-item"><span class="log-stat-num">${want}</span><span class="log-stat-label">🔖 読みたい</span></div>
+    <div class="log-stat-item log-stat-month"><span class="log-stat-num">${thisMonth}</span><span class="log-stat-label">今月読んだ</span></div>
+  `;
+}
+
 async function loadLog(filter = "all") {
   logFilter = filter;
+  renderLogStats();
   document.querySelectorAll(".log-filter-btn").forEach(b => b.classList.toggle("active", b.dataset.status === filter));
   const grid = document.getElementById("logGrid");
   let entries = getLogEntries();
@@ -706,6 +749,23 @@ function newsItemHtml(item, showDelete) {
     </div>`;
 }
 
+// ===== お知らせ既読管理 =====
+function getReadNewsIds() {
+  try { return new Set(JSON.parse(localStorage.getItem("readNewsIds") || "[]")); } catch { return new Set(); }
+}
+function markNewsRead(id) {
+  const s = getReadNewsIds(); s.add(String(id));
+  localStorage.setItem("readNewsIds", JSON.stringify([...s]));
+}
+function updateNewsBadge(items) {
+  const readIds = getReadNewsIds();
+  const unread = items.filter(i => !readIds.has(String(i.id))).length;
+  const badge = document.getElementById("newsUnreadBadge");
+  if (!badge) return;
+  if (unread > 0) { badge.textContent = unread > 9 ? "9+" : unread; badge.style.display = "inline-flex"; }
+  else badge.style.display = "none";
+}
+
 async function loadNews() {
   const list = document.getElementById("newsList");
   if (!list) return;
@@ -713,7 +773,14 @@ async function loadNews() {
   const res = await fetch("/api/announcements");
   const items = await res.json();
   if (!items.length) { list.innerHTML = '<div class="loading">お知らせはまだありません。</div>'; return; }
-  list.innerHTML = items.map(item => newsItemHtml(item, false)).join("");
+  const readIds = getReadNewsIds();
+  list.innerHTML = items.map(item => {
+    const isUnread = !readIds.has(String(item.id));
+    return `<div class="${isUnread ? 'news-unread' : ''}">${newsItemHtml(item, false)}</div>`;
+  }).join("");
+  // 表示したら既読にする
+  items.forEach(i => markNewsRead(i.id));
+  updateNewsBadge([]);
 }
 
 async function loadNoBooksReview() {
@@ -1040,15 +1107,17 @@ function _renderModalContent(isbn, book, rating) {
 
     <div class="modal-section">
       <h3>💬 コメント</h3>
+      <p style="font-size:0.75rem;color:#aaa;margin-bottom:8px">※ 作品内容の重大なネタバレはご遠慮ください。他の読者が楽しめるよう配慮をお願いします。</p>
       ${reviewsHtml}
     </div>
 
     <div class="modal-section">
-      <h3>🔗 外部リンク</h3>
-      <div class="external-links">
-        <a class="ext-link ext-link-ndl" href="${ndlUrl}" target="_blank">国立国会図書館</a>
-        <a class="ext-link ext-link-meter" href="${meterUrl}" target="_blank">読書メーター</a>
-        <a class="ext-link ext-link-lib" href="${libUrl}" target="_blank">図書館生活</a>
+      <h3>🔗 外部リンク・予約</h3>
+      <a class="ext-link ext-link-reserve" href="${libUrl}" target="_blank" rel="noopener">🔖 図書館生活で予約・確認</a>
+      <div class="external-links" style="margin-top:8px">
+        <a class="ext-link ext-link-ndl" href="${ndlUrl}" target="_blank" rel="noopener">国立国会図書館</a>
+        <a class="ext-link ext-link-meter" href="${meterUrl}" target="_blank" rel="noopener">読書メーター</a>
+        <a class="ext-link ext-link-lib" href="${libUrl}" target="_blank" rel="noopener">図書館生活</a>
       </div>
     </div>
 
@@ -1637,6 +1706,34 @@ document.querySelectorAll(".board-tab").forEach(btn => {
     }
   });
 
+  // ISBN一括インポート
+  document.getElementById("bulkImportBtn")?.addEventListener("click", async () => {
+    const raw = (document.getElementById("bulkIsbnInput")?.value || "").trim();
+    const arrived_at = document.getElementById("bulkArrivalDate")?.value;
+    const prog = document.getElementById("bulkImportProgress");
+    if (!raw) { if (prog) prog.innerHTML = '<span style="color:#e05">ISBNを入力してください</span>'; return; }
+    if (!arrived_at) { if (prog) prog.innerHTML = '<span style="color:#e05">入荷日を入力してください</span>'; return; }
+    const isbns = raw.split("\n").map(s => s.trim().replace(/-/g, "")).filter(s => /^\d{10,13}$/.test(s)).slice(0, 50);
+    if (!isbns.length) { if (prog) prog.innerHTML = '<span style="color:#e05">有効なISBNが見つかりません（10桁または13桁の数字）</span>'; return; }
+    if (prog) prog.innerHTML = `<span style="color:#555">0/${isbns.length}件処理中…</span>`;
+    let ok = 0, fail = 0;
+    for (let i = 0; i < isbns.length; i++) {
+      const isbn = isbns[i];
+      if (prog) prog.innerHTML = `<span style="color:#555">${i + 1}/${isbns.length}件処理中… (✅${ok} ❌${fail})</span>`;
+      try {
+        const res = await fetch("/api/new-arrivals", {
+          method: "POST", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({password: boardPassword, isbn, arrived_at, title: "", author: "", publisher: "", cover: ""})
+        });
+        if (res.ok) ok++; else fail++;
+      } catch { fail++; }
+      await new Promise(r => setTimeout(r, 200)); // API負荷軽減
+    }
+    if (prog) prog.innerHTML = `<span style="color:#3d6b4f">✅ 完了：${ok}件登録、${fail}件失敗</span>`;
+    document.getElementById("bulkIsbnInput").value = "";
+    loadNewArrivalAdmin();
+  });
+
   document.getElementById("arrivalRegisterBtn")?.addEventListener("click", async () => {
     const isbn = document.getElementById("arrivalIsbn").value.trim().replace(/-/g, "");
     const arrived_at = document.getElementById("arrivalDate").value;
@@ -2087,6 +2184,7 @@ function switchBoardTab(tabKey) {
   if (tabKey === "staffchat") initStaffChat();
   if (tabKey === "settings") loadAdminQr();
   if (tabKey === "adminusers") loadAdminUsers();
+  if (tabKey === "collections") loadAdminCollections();
   if (tabKey === "bookdesc") {
     document.getElementById("descIsbn").value = "";
     document.getElementById("descText").value = "";
@@ -2472,11 +2570,22 @@ document.getElementById("submitCal").addEventListener("click", async () => {
 // Initial load
 checkAuth();
 loadBooks();
+loadCollections();
 loadTopNew();
 loadReqList();
 renderRecentBooks();
 applyTopSectionsState();
 // loadGenreCounts(); // ジャンルフィルター非表示中
+
+// 起動時: お知らせバッジ（未読カウント）を初期化
+(async () => {
+  try {
+    const res = await fetch("/api/announcements");
+    if (!res.ok) return;
+    const items = await res.json();
+    updateNewsBadge(items);
+  } catch {}
+})();
 
 // #44 スリープ対策: 4分ごとにpingしてサービスを起こしておく
 setInterval(() => fetch("/ping").catch(() => {}), 4 * 60 * 1000);
@@ -3761,6 +3870,123 @@ document.querySelectorAll(".board-tab").forEach(btn => {
     }
   });
 });
+
+// ===== 特集コーナー =====
+async function loadCollections() {
+  const sec = document.getElementById("collectionsSection");
+  const list = document.getElementById("collectionsList");
+  if (!sec || !list) return;
+  try {
+    const res = await fetch("/api/collections");
+    if (!res.ok) return;
+    const cols = await res.json();
+    if (!cols.length) { sec.style.display = "none"; return; }
+    sec.style.display = "block";
+    list.innerHTML = cols.map(c => `
+      <div class="collection-block">
+        <div class="collection-header">${c.emoji} <strong>${esc(c.title)}</strong>${c.description ? ` <span class="collection-desc">${esc(c.description)}</span>` : ""}</div>
+        <div class="collection-count">${c.count}冊</div>
+        <div class="related-carousel" id="col-books-${c.id}"><div class="loading" style="font-size:0.8rem">読み込み中…</div></div>
+      </div>
+    `).join("");
+    // 各特集の本を取得
+    for (const c of cols) {
+      if (!c.isbns.length) continue;
+      try {
+        const br = await fetch(`/api/books/batch?isbns=${c.isbns.join(",")}`);
+        const books = await br.json();
+        const container = document.getElementById(`col-books-${c.id}`);
+        if (!container) continue;
+        const items = books.filter(Boolean).map(b => {
+          const ndlFallback = `https://ndlsearch.ndl.go.jp/thumbnail/${b.isbn}.jpg`;
+          return `<div class="related-card" onclick="openModal('${b.isbn}')" role="button" tabindex="0">
+            <div class="related-thumb"><img src="${b.cover || ndlFallback}" alt="${esc(b.title)}" loading="lazy" onerror="if(this.src!=='${ndlFallback}'){this.src='${ndlFallback}';}else{this.style.display='none';}"></div>
+            <div class="related-title">${esc(b.title)}</div>
+            <div class="related-author">${esc(b.author || "")}</div>
+          </div>`;
+        }).join("");
+        container.innerHTML = items || "<span style='color:#aaa;font-size:0.8rem'>本が見つかりません</span>";
+      } catch {}
+    }
+  } catch {}
+}
+
+async function loadAdminCollections() {
+  const list = document.getElementById("adminCollectionList");
+  if (!list) return;
+  list.innerHTML = '<div class="loading">読み込み中…</div>';
+  const res = await fetch("/api/collections");
+  const cols = await res.json();
+  if (!cols.length) { list.innerHTML = '<div style="color:#aaa;padding:20px;text-align:center">まだ特集はありません<br>「＋ 新規特集」から作成できます</div>'; return; }
+  list.innerHTML = cols.map(c => `
+    <div class="col-admin-card" data-id="${c.id}">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:1.3rem">${c.emoji}</span>
+        <div style="flex:1">
+          <div style="font-weight:700">${esc(c.title)}</div>
+          ${c.description ? `<div style="font-size:0.8rem;color:#888">${esc(c.description)}</div>` : ""}
+          <div style="font-size:0.78rem;color:#aaa">ISBN ${c.count}冊 | 並び順: ${c.sort_order}</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="col-toggle-btn" data-id="${c.id}" data-active="${c.is_active}" style="padding:5px 10px;border:1px solid #ddd;border-radius:6px;background:#fff;cursor:pointer;font-size:0.8rem">${c.is_active ? "表示中" : "非表示"}</button>
+          <button class="col-del-btn" data-id="${c.id}" style="padding:5px 10px;border:1px solid #fcc;border-radius:6px;background:#fff;color:#c44;cursor:pointer;font-size:0.8rem">削除</button>
+        </div>
+      </div>
+    </div>
+  `).join("");
+  list.querySelectorAll(".col-toggle-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const newActive = btn.dataset.active === "true" ? false : true;
+      await fetch(`/api/collections/${btn.dataset.id}`, {
+        method: "PATCH", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({password: boardPassword, is_active: newActive})
+      });
+      loadAdminCollections();
+    });
+  });
+  list.querySelectorAll(".col-del-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("この特集を削除しますか？")) return;
+      await fetch(`/api/collections/${btn.dataset.id}`, {
+        method: "DELETE", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({password: boardPassword})
+      });
+      loadAdminCollections();
+    });
+  });
+  // フォームトグル
+  document.getElementById("collectionFormToggle")?.addEventListener("click", () => {
+    const f = document.getElementById("collectionForm");
+    if (f) f.style.display = f.style.display === "none" ? "block" : "none";
+  });
+  document.getElementById("collectionFormCancel")?.addEventListener("click", () => {
+    document.getElementById("collectionForm").style.display = "none";
+  });
+  document.getElementById("collectionSubmitBtn")?.addEventListener("click", async () => {
+    const title = (document.getElementById("colTitle")?.value || "").trim();
+    const desc = (document.getElementById("colDesc")?.value || "").trim();
+    const emoji = (document.getElementById("colEmoji")?.value || "📚").trim();
+    const isbnRaw = (document.getElementById("colIsbns")?.value || "");
+    const isbns = isbnRaw.split(/[\n,]/).map(s => s.trim().replace(/-/g,"")).filter(s => /^\d{10,13}$/.test(s));
+    const msg = document.getElementById("collectionMsg");
+    if (!title) { if (msg) { msg.textContent = "タイトルを入力してください"; msg.style.color = "#e05"; } return; }
+    const res = await fetch("/api/collections", {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({password: boardPassword, title, description: desc, emoji, isbns})
+    });
+    const data = await res.json();
+    if (res.ok && data.ok) {
+      if (msg) { msg.textContent = "✅ 作成しました"; msg.style.color = "#3d6b4f"; }
+      document.getElementById("colTitle").value = "";
+      document.getElementById("colDesc").value = "";
+      document.getElementById("colIsbns").value = "";
+      document.getElementById("collectionForm").style.display = "none";
+      loadAdminCollections();
+    } else {
+      if (msg) { msg.textContent = "❌ " + (data.error || "作成失敗"); msg.style.color = "#e05"; }
+    }
+  });
+}
 
 // ===== ウェルカムモーダル =====
 let welcomeSlide = 0;
