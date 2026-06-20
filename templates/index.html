@@ -605,24 +605,30 @@
       <button id="boardClose" class="board-close">✕ 閉じる</button>
     </div>
     <div class="board-tabs">
-      <button class="board-tab active" data-btab="adminnews">📢 お知らせ</button>
+      <button class="board-tab active" data-btab="dashboard">🏠 ダッシュボード</button>
+      <button class="board-tab" data-btab="adminnews">📢 お知らせ</button>
       <button class="board-tab" data-btab="bookdesc">📝 書評入力</button>
       <button class="board-tab" data-btab="newarrival">📥 新着登録</button>
       <button class="board-tab" data-btab="issues">📋 課題管理</button>
       <button class="board-tab" data-btab="brequest">📬 リクエスト</button>
-      <button class="board-tab" data-btab="stats">📊 蔵書統計</button>
       <button class="board-tab" data-btab="libschedule">🗓️ 休館日・イベント</button>
       <button class="board-tab" data-btab="calendar">📅 活動カレンダー</button>
-      <button class="board-tab" data-btab="analysis">📈 集計・分析</button>
-      <button class="board-tab" data-btab="swot">💡 強み・弱み</button>
       <button class="board-tab" data-btab="staffchat">💬 チャット</button>
       <button class="board-tab" data-btab="settings">⚙️ 設定</button>
       <button class="board-tab" data-btab="guide">📖 操作ガイド</button>
+      <button class="board-tab" data-btab="analytics">📊 分析・レポート</button>
     </div>
     <div class="board-body">
 
+      <!-- Dashboard -->
+      <div id="btab-dashboard" class="board-tab-panel active">
+        <div id="dashboardContent">
+          <div class="loading">読み込み中…</div>
+        </div>
+      </div>
+
       <!-- Admin News -->
-      <div id="btab-adminnews" class="board-tab-panel active">
+      <div id="btab-adminnews" class="board-tab-panel">
         <div class="board-section-header">
           <h3>お知らせを投稿</h3>
         </div>
@@ -773,11 +779,18 @@
 
       <!-- Loaned books -->
 
-      <!-- Stats -->
-      <div id="btab-stats" class="board-tab-panel">
-        <h3 style="margin-bottom:16px">蔵書統計・分析</h3>
-        <div id="statsContent"><div class="loading">読み込み中…</div></div>
-      </div>
+      <!-- Analytics (merged: stats + analysis + swot) -->
+      <div id="btab-analytics" class="board-tab-panel">
+        <div class="analytics-subnav" id="analyticsSubnav">
+          <button class="analytics-sub-btn active" data-asub="stats">📊 蔵書統計</button>
+          <button class="analytics-sub-btn" data-asub="analysis">📈 集計・分析</button>
+          <button class="analytics-sub-btn" data-asub="swot">💡 強み・弱み</button>
+        </div>
+        <!-- 蔵書統計 -->
+        <div id="asub-stats" class="analytics-sub-panel active">
+          <h3 style="margin-bottom:16px">蔵書統計・分析</h3>
+          <div id="statsContent"><div class="loading">読み込み中…</div></div>
+        </div>
 
       <!-- Lib Schedule -->
       <div id="btab-libschedule" class="board-tab-panel">
@@ -815,8 +828,8 @@
         <div id="calList" class="cal-list"><div class="loading">読み込み中…</div></div>
       </div>
 
-      <!-- Analysis -->
-      <div id="btab-analysis" class="board-tab-panel">
+        <!-- 集計・分析 -->
+        <div id="asub-analysis" class="analytics-sub-panel">
         <h3 style="margin-bottom:16px">📈 集計・分析レポート</h3>
         <p style="font-size:0.8rem;color:#888;margin-bottom:16px">データ取得日：2026年4月12日　出典：librarylife.net / openBD API</p>
 
@@ -908,10 +921,10 @@
             </tbody>
           </table>
         </div>
-      </div>
+        </div>
 
-      <!-- SWOT -->
-      <div id="btab-swot" class="board-tab-panel">
+        <!-- 強み・弱み -->
+        <div id="asub-swot" class="analytics-sub-panel">
         <h3 style="margin-bottom:4px">💡 強み・弱み・改善提案（SWOT分析）</h3>
         <p style="font-size:0.8rem;color:#888;margin-bottom:20px">プラウド船橋コミュニティ図書館 蔵書・運営分析レポート（2026年6月13日更新）</p>
 
@@ -1022,7 +1035,8 @@
             <div class="swot-item-body">ウェブアプリ（proud-library.onrender.com）をまだ知らない住民が多い可能性がある。マンションのお知らせ掲示板やエントランスのデジタルサイネージ、管理組合の広報誌でQRコード付き案内を掲示することで利用者を増やせる。「今日の1冊」や「お気に入り機能」などの便利な機能を具体的にアピールすると効果的。</div>
           </div>
         </div>
-      </div>
+        </div><!-- end asub-swot -->
+      </div><!-- end btab-analytics -->
 
       <!-- Staff Chat -->
       <div id="btab-staffchat" class="board-tab-panel">

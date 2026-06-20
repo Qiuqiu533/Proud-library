@@ -1465,14 +1465,14 @@ function openBoardPanel() {
   const lbl = document.getElementById("chatSenderLabel");
   if (lbl) lbl.textContent = boardSenderName ? `👤 ${boardSenderName}` : "";
   document.getElementById("boardPanel").style.display = "flex";
-  // デフォルトタブを「書評入力」に設定
+  // デフォルトタブを「ダッシュボード」に設定
   document.querySelectorAll(".board-tab").forEach(b => b.classList.remove("active"));
   document.querySelectorAll(".board-tab-panel").forEach(p => p.classList.remove("active"));
-  const bookdescTab = document.querySelector('.board-tab[data-btab="bookdesc"]');
-  const bookdescPanel = document.getElementById("btab-bookdesc");
-  if (bookdescTab) bookdescTab.classList.add("active");
-  if (bookdescPanel) bookdescPanel.classList.add("active");
-  loadNoBooksReview();
+  const dashTab = document.querySelector('.board-tab[data-btab="dashboard"]');
+  const dashPanel = document.getElementById("btab-dashboard");
+  if (dashTab) dashTab.classList.add("active");
+  if (dashPanel) dashPanel.classList.add("active");
+  loadDashboard();
 }
 
 // Board tabs
@@ -1482,9 +1482,10 @@ document.querySelectorAll(".board-tab").forEach(btn => {
     document.querySelectorAll(".board-tab-panel").forEach(p => p.classList.remove("active"));
     btn.classList.add("active");
     document.getElementById("btab-" + btn.dataset.btab).classList.add("active");
+    if (btn.dataset.btab === "dashboard") loadDashboard();
     if (btn.dataset.btab === "adminnews") loadAdminNews();
     if (btn.dataset.btab === "newarrival") loadNewArrivalAdmin();
-    if (btn.dataset.btab === "stats") loadStats();
+    if (btn.dataset.btab === "analytics") loadStats();
     if (btn.dataset.btab === "calendar") loadCalendar();
     if (btn.dataset.btab === "libschedule") loadLibSchedule();
     if (btn.dataset.btab === "issues") loadIssues();
@@ -1498,6 +1499,7 @@ document.querySelectorAll(".board-tab").forEach(btn => {
       document.getElementById("descCount").textContent = "（0/600文字）";
       document.getElementById("descBookInfo").style.display = "none";
       document.getElementById("descMsg").textContent = "";
+      loadNoBooksReview();
     }
   });
 });
@@ -1774,6 +1776,240 @@ document.getElementById("submitIssue").addEventListener("click", async () => {
     loadIssues();
   }
 });
+
+// ===== Dashboard =====
+async function loadDashboard() {
+  const el = document.getElementById("dashboardContent");
+  if (!el) return;
+  el.innerHTML = '<div class="loading">読み込み中…</div>';
+
+  const pw = boardPassword;
+  try {
+    const [reqRes, issueRes, newRes, dbRes, schedRes, genreRes, awardsRes] = await Promise.all([
+      fetch("/api/requests").catch(() => null),
+      fetch(`/api/issues?password=${encodeURIComponent(pw)}`).catch(() => null),
+      fetch("/api/new-arrivals").catch(() => null),
+      fetch(`/api/admin/db-size?password=${encodeURIComponent(pw)}`).catch(() => null),
+      fetch("/api/lib-schedule").catch(() => null),
+      fetch("/api/books/by-genre?per=1").catch(() => null),
+      fetch("/api/books/by-genre?award=%E6%9C%AC%E5%B1%8B%E5%A4%A7%E8%B3%9E&per=1").catch(() => null),
+    ]);
+
+    const reqs    = reqRes    && reqRes.ok    ? await reqRes.json()    : [];
+    const issues  = issueRes  && issueRes.ok  ? await issueRes.json()  : [];
+    const news    = newRes    && newRes.ok    ? await newRes.json()    : [];
+    const dbData  = dbRes     && dbRes.ok     ? await dbRes.json()     : null;
+    const sched   = schedRes  && schedRes.ok  ? await schedRes.json()  : [];
+    const genreData = genreRes && genreRes.ok ? await genreRes.json()  : null;
+
+    // 集計
+    const pendingReqs     = reqs.filter(r => r.type !== "feedback" && r.status === "pending");
+    const pendingFeedback = reqs.filter(r => r.type === "feedback" && (r.status === "pending" || r.status === "fb_received"));
+    const openIssues      = issues.filter(i => i.status !== "解決済み");
+    const newArrivalList  = Array.isArray(news) ? news : (news.books || []);
+    const totalBooks      = genreData ? genreData.total : 5156;
+
+    // DB使用量
+    let dbPct = null, dbMB = null, dbLimitMB = 512;
+    if (dbData && dbData.bytes) {
+      dbMB  = (dbData.bytes / 1024 / 1024).toFixed(1);
+      dbPct = Math.round(dbData.bytes / (dbLimitMB * 1024 * 1024) * 100);
+    }
+    const dbBarColor = dbPct >= 90 ? "#e05" : dbPct >= 70 ? "#f0a500" : "#3d6b4f";
+
+    // 直近の予定（今日以降 3件）
+    const today = new Date().toISOString().slice(0, 10);
+    const upcomingSched = sched
+      .filter(s => s.event_date >= today)
+      .sort((a, b) => a.event_date.localeCompare(b.event_date))
+      .slice(0, 4);
+
+    // 最新リクエスト 3件
+    const latestReqs = [...reqs].sort((a, b) => b.id - a.id).slice(0, 4);
+    // 未対応課題 3件
+    const latestIssues = openIssues.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)).slice(0, 4);
+
+    const alertLevel = (n) => n > 0 ? "dash-alert-red" : "dash-alert-green";
+    const alertIcon  = (n) => n > 0 ? "🔴" : "✅";
+
+    el.innerHTML = `
+      <div class="dash-updated">最終更新: ${new Date().toLocaleString("ja-JP", {month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"})}</div>
+
+      <!-- 要対応バナー -->
+      ${(pendingReqs.length + pendingFeedback.length + openIssues.length) > 0 ? `
+      <div class="dash-banner dash-banner-warn">
+        ⚠️ 要対応の項目があります — リクエスト未対応 <strong>${pendingReqs.length}</strong>件、意見・要望 <strong>${pendingFeedback.length}</strong>件、未解決課題 <strong>${openIssues.length}</strong>件
+      </div>` : `
+      <div class="dash-banner dash-banner-ok">
+        ✅ 要対応の項目はありません
+      </div>`}
+
+      <!-- 要対応カード -->
+      <div class="dash-section-title">🔴 要対応</div>
+      <div class="dash-card-row">
+        <div class="dash-card ${alertLevel(pendingReqs.length)} dash-clickable" onclick="switchBoardTab('brequest')">
+          <div class="dash-card-num">${pendingReqs.length}</div>
+          <div class="dash-card-label">未対応<br>本のリクエスト</div>
+          <div class="dash-card-action">確認 →</div>
+        </div>
+        <div class="dash-card ${alertLevel(pendingFeedback.length)} dash-clickable" onclick="switchBoardTab('brequest')">
+          <div class="dash-card-num">${pendingFeedback.length}</div>
+          <div class="dash-card-label">未対応<br>意見・要望</div>
+          <div class="dash-card-action">確認 →</div>
+        </div>
+        <div class="dash-card ${alertLevel(openIssues.length)} dash-clickable" onclick="switchBoardTab('issues')">
+          <div class="dash-card-num">${openIssues.length}</div>
+          <div class="dash-card-label">未解決<br>課題</div>
+          <div class="dash-card-action">確認 →</div>
+        </div>
+      </div>
+
+      <!-- 蔵書サマリー -->
+      <div class="dash-section-title">📚 蔵書サマリー</div>
+      <div class="dash-card-row">
+        <div class="dash-card dash-card-blue">
+          <div class="dash-card-num">${totalBooks.toLocaleString()}</div>
+          <div class="dash-card-label">総蔵書数（DB登録）</div>
+        </div>
+        <div class="dash-card dash-card-gold dash-clickable" onclick="switchBoardTab('analytics')">
+          <div class="dash-card-num">138</div>
+          <div class="dash-card-label">受賞・ノミネート作品</div>
+          <div class="dash-card-action">詳細 →</div>
+        </div>
+        <div class="dash-card dash-card-teal dash-clickable" onclick="switchBoardTab('newarrival')">
+          <div class="dash-card-num">${newArrivalList.length}</div>
+          <div class="dash-card-label">新着登録済み</div>
+          <div class="dash-card-action">管理 →</div>
+        </div>
+      </div>
+
+      <!-- DB使用量 -->
+      <div class="dash-section-title">🗄️ DB使用量（Neon 無料枠 512MB）</div>
+      <div class="dash-db-bar-wrap">
+        ${dbPct !== null ? `
+        <div class="dash-db-bar-track">
+          <div class="dash-db-bar-fill" style="width:${dbPct}%;background:${dbBarColor}"></div>
+        </div>
+        <div class="dash-db-bar-label">
+          <span>${dbMB} MB 使用 / 512 MB</span>
+          <span style="color:${dbBarColor};font-weight:700">${dbPct}%</span>
+          ${dbPct >= 90 ? '<span style="color:#e05;font-weight:700">⚠️ 残り僅か！画像削除を検討してください</span>' : ""}
+        </div>` : `<span style="color:#aaa;font-size:0.85rem">取得できませんでした</span>`}
+      </div>
+
+      <!-- 直近のイベント・休館 -->
+      <div class="dash-section-title">📅 直近のイベント・休館日
+        <button class="dash-more-btn" onclick="switchBoardTab('libschedule')">すべて見る →</button>
+      </div>
+      ${upcomingSched.length ? `
+      <div class="dash-list">
+        ${upcomingSched.map(s => {
+          const isClose = s.event_date <= new Date(Date.now()+3*86400000).toISOString().slice(0,10);
+          const typeLabel = s.type === "closed" ? "🚫 臨時休館" : "📅 イベント";
+          return `<div class="dash-list-item${isClose?" dash-list-urgent":""}">
+            <span class="dash-list-date">${s.event_date}</span>
+            <span class="dash-list-badge${s.type==="closed"?" dash-badge-closed":""}">${typeLabel}</span>
+            <span class="dash-list-text">${esc(s.title)}</span>
+          </div>`;
+        }).join("")}
+      </div>` : `<div class="dash-empty">直近の予定はありません</div>`}
+
+      <!-- 最新リクエスト -->
+      <div class="dash-section-title">📬 最新リクエスト
+        <button class="dash-more-btn" onclick="switchBoardTab('brequest')">すべて見る →</button>
+      </div>
+      ${latestReqs.length ? `
+      <div class="dash-list">
+        ${latestReqs.map(r => {
+          const statusCls = r.status === "pending" || r.status === "fb_received" ? " dash-list-urgent" : "";
+          const statusLabel = r.status === "pending" ? "🔴 未対応" : r.status === "approved" ? "✅ 承認" : r.status === "rejected" ? "❌ 却下" : r.status === "fb_received" ? "🔴 未対応" : r.status;
+          const typeLabel = r.type === "feedback" ? "💬 意見" : "📖 リクエスト";
+          return `<div class="dash-list-item${statusCls}">
+            <span class="dash-list-badge">${typeLabel}</span>
+            <span class="dash-list-text">${esc(r.title || r.body || "")}</span>
+            <span class="dash-list-status">${statusLabel}</span>
+          </div>`;
+        }).join("")}
+      </div>` : `<div class="dash-empty">リクエストはありません</div>`}
+
+      <!-- 未解決課題 -->
+      <div class="dash-section-title">📋 未解決課題
+        <button class="dash-more-btn" onclick="switchBoardTab('issues')">すべて見る →</button>
+      </div>
+      ${latestIssues.length ? `
+      <div class="dash-list">
+        ${latestIssues.map(i => {
+          const pCls = i.priority === "高" ? " dash-list-urgent" : "";
+          const pLabel = i.priority === "高" ? "🔴 高" : i.priority === "中" ? "🟡 中" : "🟢 低";
+          return `<div class="dash-list-item${pCls}">
+            <span class="dash-list-badge">${pLabel}</span>
+            <span class="dash-list-text">${esc(i.title)}</span>
+            <span class="dash-list-status" style="color:#888;font-size:0.78rem">${i.status}</span>
+          </div>`;
+        }).join("")}
+      </div>` : `<div class="dash-empty">✅ 未解決の課題はありません</div>`}
+
+      <!-- クイックアクション -->
+      <div class="dash-section-title">⚡ クイックアクション</div>
+      <div class="dash-quick-row">
+        <button class="dash-quick-btn" onclick="switchBoardTab('adminnews')">📢 お知らせを投稿</button>
+        <button class="dash-quick-btn" onclick="switchBoardTab('newarrival')">📥 新着本を登録</button>
+        <button class="dash-quick-btn" onclick="switchBoardTab('bookdesc')">📝 書評を入力</button>
+        <button class="dash-quick-btn" onclick="switchBoardTab('issues')">📋 課題を追加</button>
+        <button class="dash-quick-btn" onclick="switchBoardTab('staffchat')">💬 チャットを開く</button>
+        <button class="dash-quick-btn" onclick="switchBoardTab('settings')">⚙️ 設定</button>
+      </div>
+    `;
+
+    // analyticsサブタブのイベント設定（初回のみ）
+    _initAnalyticsSubTabs();
+
+  } catch(e) {
+    el.innerHTML = `<div style="color:#e05;padding:20px">読み込みエラー: ${e.message}</div>`;
+    console.error("loadDashboard error", e);
+  }
+}
+
+function switchBoardTab(tabKey) {
+  document.querySelectorAll(".board-tab").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll(".board-tab-panel").forEach(p => p.classList.remove("active"));
+  const btn = document.querySelector(`.board-tab[data-btab="${tabKey}"]`);
+  const panel = document.getElementById(`btab-${tabKey}`);
+  if (btn) btn.classList.add("active");
+  if (panel) panel.classList.add("active");
+  if (tabKey === "adminnews") loadAdminNews();
+  if (tabKey === "newarrival") loadNewArrivalAdmin();
+  if (tabKey === "analytics") loadStats();
+  if (tabKey === "calendar") loadCalendar();
+  if (tabKey === "libschedule") loadLibSchedule();
+  if (tabKey === "issues") loadIssues();
+  if (tabKey === "brequest") loadReqManage();
+  if (tabKey === "staffchat") initStaffChat();
+  if (tabKey === "settings") loadAdminQr();
+  if (tabKey === "bookdesc") {
+    document.getElementById("descIsbn").value = "";
+    document.getElementById("descText").value = "";
+    document.getElementById("descCount").textContent = "（0/600文字）";
+    document.getElementById("descBookInfo").style.display = "none";
+    loadNoBooksReview();
+  }
+  // スクロールを先頭に戻す
+  const boardBody = document.querySelector(".board-body");
+  if (boardBody) boardBody.scrollTop = 0;
+}
+
+function _initAnalyticsSubTabs() {
+  document.querySelectorAll(".analytics-sub-btn").forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll(".analytics-sub-btn").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".analytics-sub-panel").forEach(p => p.classList.remove("active"));
+      btn.classList.add("active");
+      const panel = document.getElementById("asub-" + btn.dataset.asub);
+      if (panel) panel.classList.add("active");
+      if (btn.dataset.asub === "stats") loadStats();
+    };
+  });
+}
 
 // ===== Stats =====
 async function loadStats() {
