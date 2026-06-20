@@ -830,7 +830,10 @@ function _renderModalContent(isbn, book, rating) {
       const formatted = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
       dateTag = `<span class="manual-review-date">司書登録：${formatted}</span>`;
     }
-    descHtml = `<div class="modal-section"><h3>📄 内容・収録作品</h3><p class="book-desc">${esc(book.description)}</p>${dateTag}</div>`;
+    const ratingTag = rating && rating.score
+      ? `<span class="desc-rating">評価：${"★".repeat(Math.round(rating.score))}${"☆".repeat(5-Math.round(rating.score))} ${rating.score.toFixed(1)}（${rating.votes}件）</span>`
+      : "";
+    descHtml = `<div class="modal-section"><h3>📄 内容・収録作品</h3><p class="book-desc">${esc(book.description)}</p>${dateTag}${ratingTag}</div>`;
   }
 
   return `
@@ -962,7 +965,10 @@ async function openModal(isbn, preloadedBook) {
           const fmt2 = `${d2.getFullYear()}年${d2.getMonth()+1}月${d2.getDate()}日`;
           dateTag2 = `<span class="manual-review-date">司書登録：${fmt2}</span>`;
         }
-        descPlaceholder.outerHTML = `<div class="modal-section"><h3>📄 内容・収録作品</h3><p class="book-desc">${book.description}</p>${dateTag2}</div>`;
+        const ratingTag2 = rating && rating.score
+          ? `<span class="desc-rating">評価：${"★".repeat(Math.round(rating.score))}${"☆".repeat(5-Math.round(rating.score))} ${rating.score.toFixed(1)}（${rating.votes}件）</span>`
+          : "";
+        descPlaceholder.outerHTML = `<div class="modal-section"><h3>📄 内容・収録作品</h3><p class="book-desc">${book.description}</p>${dateTag2}${ratingTag2}</div>`;
       }
     } catch(e) {
       const availEl = document.getElementById("modal-avail-body");
