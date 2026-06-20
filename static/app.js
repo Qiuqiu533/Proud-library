@@ -1018,9 +1018,14 @@ async function openModal(isbn, preloadedBook) {
 async function _loadRelatedBooks(isbn) {
   const placeholder = document.getElementById("modal-related-placeholder");
   if (!placeholder) return;
+  // このモーダルがどのISBN用かをマーク（非同期完了時に照合する）
+  placeholder.dataset.isbn = isbn;
   try {
     const res = await fetch(`/api/books/related/${isbn}`);
     const data = await res.json();
+    // fetch完了後、別の本のモーダルに切り替わっていたら描画しない
+    const current = document.getElementById("modal-related-placeholder");
+    if (!current || current.dataset.isbn !== isbn) return;
     const renderCarousel = (books, label) => {
       if (!books || books.length === 0) return "";
       const items = books.map(b => {
@@ -1039,7 +1044,7 @@ async function _loadRelatedBooks(isbn) {
       </div>`;
     };
     const html = renderCarousel(data.same_author, "👤 同じ著者の本") + renderCarousel(data.same_genre, "📚 同じジャンルの本");
-    if (html) placeholder.outerHTML = html;
+    if (html) current.outerHTML = html;
   } catch(e) {}
 }
 
