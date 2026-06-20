@@ -619,7 +619,8 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 /* トップ新着セクション */
 .top-new-section { background: linear-gradient(135deg, #f0faf4 0%, #e8f5ec 100%); border: 2px solid #b8ddc4; border-radius: 12px; padding: 10px 12px; margin-bottom: 14px; }
 .top-new-label { font-size: 0.72rem; font-weight: 700; color: #3d6b4f; letter-spacing: 0.05em; margin-bottom: 8px; }
-.top-new-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; }
+.top-new-row { display: flex; flex-direction: row; gap: 8px; overflow-x: auto; padding-bottom: 6px; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+.top-new-row .mini-card { flex: 0 0 90px; min-width: 90px; }
 
 /* ===== ミニカード（新着・最近見た本共通） ===== */
 .mini-card { cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
