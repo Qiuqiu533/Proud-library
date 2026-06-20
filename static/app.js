@@ -100,10 +100,14 @@ function _renderDescSection(isbn, book) {
   const placeholder = document.getElementById("modal-desc-placeholder");
   if (!placeholder) return;
   let dateTag = "";
-  if (book.manual_review && book.manual_review_date) {
-    const d = new Date(book.manual_review_date);
-    dateTag = `<span class="manual-review-date">司書登録：${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日</span>`;
-  } else if (!book.manual_review && book.ai_review_date) {
+  if (book.manual_review) {
+    if (book.manual_review_date) {
+      const d = new Date(book.manual_review_date);
+      dateTag = `<span class="manual-review-date">司書登録：${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日</span>`;
+    } else {
+      dateTag = `<span class="manual-review-date">司書登録</span>`;
+    }
+  } else if (book.ai_review_date) {
     const ad = new Date(book.ai_review_date);
     const modelName = book.ai_model || "AI";
     dateTag = `<span class="manual-review-date">AI登録：${ad.getFullYear()}年${ad.getMonth()+1}月${ad.getDate()}日（${modelName}）</span>`;
