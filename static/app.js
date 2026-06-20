@@ -446,25 +446,34 @@ function renderRecentBooks() {
   row.querySelectorAll(".mini-card").forEach(el => {
     el.addEventListener("click", () => openModal(el.dataset.isbn));
   });
-  section.style.display = topSectionsVisible() ? "" : "none";
+  if (localStorage.getItem("recentHidden") !== "1") section.style.display = "";
 }
 
-function topSectionsVisible() {
-  return localStorage.getItem("topSectionsHidden") !== "1";
+function isSectionVisible(key) {
+  return localStorage.getItem(key + "Hidden") !== "1";
 }
 
-function toggleTopSections() {
-  const hidden = !topSectionsVisible();
-  localStorage.setItem("topSectionsHidden", hidden ? "1" : "0");
-  applyTopSectionsState();
+function toggleSection(key) {
+  const visible = !isSectionVisible(key);
+  localStorage.setItem(key + "Hidden", visible ? "0" : "1");
+  applySectionState(key);
+}
+
+function applySectionState(key) {
+  const visible = isSectionVisible(key);
+  const sectionId = key === "topNew" ? "topNewSection" : "recentBooksSection";
+  const rowId    = key === "topNew" ? "topNewRow"     : "recentBooksRow";
+  const btnId    = key === "topNew" ? "toggleTopNew"  : "toggleRecent";
+  const label    = key === "topNew" ? "新着図書"       : "最近見た本";
+  const row  = document.getElementById(rowId);
+  const btn  = document.getElementById(btnId);
+  if (row) row.style.display = visible ? "" : "none";
+  if (btn) btn.textContent = visible ? `${label}を隠す ▲` : `${label}を表示 ▼`;
 }
 
 function applyTopSectionsState() {
-  const visible = topSectionsVisible();
-  const wrapper = document.getElementById("topSectionsWrapper");
-  const btn = document.getElementById("toggleTopSections");
-  if (wrapper) wrapper.style.display = visible ? "" : "none";
-  if (btn) btn.textContent = visible ? "新着・最近見た本を隠す ▲" : "新着・最近見た本を表示 ▼";
+  applySectionState("topNew");
+  applySectionState("recent");
 }
 
 function authorSortKey(author) {
@@ -556,7 +565,8 @@ async function loadTopNew() {
     row.querySelectorAll(".mini-card").forEach(el => {
       el.addEventListener("click", () => openModal(el.dataset.isbn, bookMap[el.dataset.isbn]));
     });
-    section.style.display = "block";
+    section.style.display = "";
+    applySectionState("topNew");
   } catch(e) {}
 }
 
