@@ -854,15 +854,35 @@ def fetch_book_detail(isbn):
     isbn10 = result.get("isbn10", "")
     isbn13 = result.get("isbn13", isbn)
     result["cover"] = get_cover_url(isbn13, isbn10)
-    # DBの書評を最優先で確認（管理者が登録した書評を常に優先する）
+    # DBの書評を最優先で確認（ISBNで引いた後、タイトルが一致するか必ず検証する）
     try:
         dc = get_con()
         ph = "%s" if USE_PG else "?"
         cached = fetchone(dc, f"SELECT title, author, description, manual_review, manual_review_date FROM genre_books WHERE isbn={ph}", (isbn,))
+        if not cached:
+            # ISBNで見つからない場合はタイトルで検索（図書館側ISBNとDBのISBNがずれているケース）
+            lib_title = result.get("title", "").strip()
+            if lib_title:
+                cached = fetchone(dc, f"SELECT title, author, description, manual_review, manual_review_date FROM genre_books WHERE title={ph}", (lib_title,))
         dc.close()
         if cached and cached.get("description"):
-            result["description"] = cached["description"]
-        if cached and cached.get("manual_review"):
+            # タイトル一致チェック：全く別の本の書評を表示しないための安全弁
+            lib_title = result.get("title", "").strip()
+            db_title = (cached.get("title") or "").strip()
+            def _title_core(t):
+                import re as _re
+                return _re.sub(r'[\s\(（【〈\[<＜].*', '', t).strip()
+            title_ok = (
+                not lib_title or not db_title or
+                _title_core(lib_title) == _title_core(db_title) or
+                _title_core(lib_title) in db_title or
+                _title_core(db_title) in lib_title
+            )
+            if title_ok:
+                result["description"] = cached["description"]
+            else:
+                app.logger.warning(f"ISBN-title mismatch skipped: isbn={isbn} lib='{lib_title}' db='{db_title}'")
+        if cached and cached.get("manual_review") and result.get("description"):
             result["manual_review"] = True
             d = cached.get("manual_review_date")
             if d:
