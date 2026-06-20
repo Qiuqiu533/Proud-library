@@ -177,8 +177,13 @@
 
           <!-- 方法①: URL -->
           <div class="req-field">
-            <label>① 📧 メールのURLを貼り付ける</label>
-            <input type="text" id="cardUrl" placeholder="https://www2.librarylife.net/card/..." style="font-size:0.78rem" />
+            <label>① 📧 librarylife.netの会員証URLを貼り付ける</label>
+            <p style="font-size:0.78rem;color:#e65100;background:#fff3e0;padding:8px;border-radius:6px;margin:4px 0 8px">
+              ⚠️ 2026年6月以降、会員証URLが個人ごとの新形式に変わりました。<br>
+              librarylife.netにログイン後、マイページ→会員証を開き、そのURLをコピーして貼り付けてください。<br>
+              <b>新URL形式：</b>https://www.librarylife.net/card/（英数字トークン）
+            </p>
+            <input type="text" id="cardUrl" placeholder="https://www.librarylife.net/card/..." style="font-size:0.78rem" />
             <button class="btn-primary" id="cardSaveUrlBtn" style="margin-top:8px;width:100%">💾 URLで会員証を登録する</button>
             <p id="cardUrlMsg" style="font-size:0.8rem;margin-top:6px"></p>
           </div>

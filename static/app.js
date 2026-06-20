@@ -2682,7 +2682,23 @@ function loadCard() {
           // cross-origin → iframeは機能しているのでそのまま
         }
       }, 5000);
-      iframe.onload = () => clearTimeout(iframeTimer);
+      iframe.onload = () => {
+        clearTimeout(iframeTimer);
+        // 同一オリジンで読めた場合に404チェック
+        try {
+          const doc = iframe.contentDocument || iframe.contentWindow?.document;
+          if (doc && (doc.title.includes("404") || doc.body?.innerText.includes("NOT FOUND") || doc.body?.innerText.includes("404"))) {
+            iframe.style.display = "none";
+            errEl.innerHTML = `⚠️ 会員証URLが無効（404）です。URLが変更されました。<br>
+              <button onclick="document.getElementById('cardResetBtn').click()" style="margin-top:8px;padding:6px 14px;background:#e65100;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.82rem">
+                🔄 URLを再登録する
+              </button>`;
+            errEl.style.display = "";
+          }
+        } catch(e) {
+          // cross-origin の場合は確認不可 → そのまま
+        }
+      };
 
     } else if (cardImg) {
       document.getElementById("cardIframeWrap").style.display = "none";
