@@ -416,14 +416,11 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .today-book-meta { font-size: 0.68rem; color: #889e90; }
 
 /* ===== 最近見た本 ===== */
-.recent-section { margin-bottom: 12px; }
+.recent-section { margin-bottom: 16px; }
 .recent-label { font-size: 0.72rem; color: #999; font-weight: 600; margin-bottom: 6px; letter-spacing: 0.03em; }
-.recent-row { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
-.recent-row::-webkit-scrollbar { display: none; }
-.recent-thumb { flex-shrink: 0; width: 50px; height: 70px; border-radius: 4px; overflow: hidden; cursor: pointer; box-shadow: 0 1px 5px rgba(0,0,0,0.18); transition: transform .15s, box-shadow .15s; background: #d0e8d8; }
-.recent-thumb:hover { transform: scale(1.1); box-shadow: 0 3px 10px rgba(0,0,0,0.22); }
-.recent-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.recent-thumb-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
+.recent-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; }
+.recent-label { font-size: 0.72rem; font-weight: 700; color: #3d6b4f; letter-spacing: 0.05em; margin-bottom: 8px; }
+/* .recent-thumb は mini-card に統合済み */
 
 /* ===== ジャンルフィルター ===== */
 .genre-select { display: none; padding: 7px 10px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; font-size: 0.85rem; outline: none; background: white; cursor: pointer; }
@@ -619,14 +616,16 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 /* トップ新着セクション */
 .top-new-section { background: linear-gradient(135deg, #f0faf4 0%, #e8f5ec 100%); border: 2px solid #b8ddc4; border-radius: 12px; padding: 10px 12px; margin-bottom: 14px; }
 .top-new-label { font-size: 0.72rem; font-weight: 700; color: #3d6b4f; letter-spacing: 0.05em; margin-bottom: 8px; }
-.top-new-row { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
-.top-new-row::-webkit-scrollbar { display: none; }
-.top-new-item { display: flex; flex-direction: column; align-items: center; cursor: pointer; flex-shrink: 0; width: 72px; gap: 4px; }
-.top-new-item:hover { opacity: 0.82; }
-.top-new-cover { width: 60px; height: 84px; object-fit: cover; border-radius: 5px; box-shadow: 0 2px 6px rgba(0,0,0,0.18); }
-.top-new-placeholder { width: 60px; height: 84px; background: #d0e8d8; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; }
-.top-new-title { font-size: 0.68rem; font-weight: 700; color: #1a3a28; line-height: 1.3; text-align: center; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; width: 100%; }
-.top-new-author { font-size: 0.62rem; color: #556b5a; text-align: center; width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.top-new-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; }
+
+/* ===== ミニカード（新着・最近見た本共通） ===== */
+.mini-card { cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
+.mini-card:hover .mini-card-cover { box-shadow: 0 4px 12px rgba(0,0,0,0.22); transform: translateY(-2px); }
+.mini-card-cover { width: 100%; aspect-ratio: 2/3; border-radius: 6px; overflow: hidden; background: #d0e8d8; box-shadow: 0 2px 6px rgba(0,0,0,0.15); transition: box-shadow 0.2s, transform 0.2s; }
+.mini-card-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mini-card-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; color: #aaa; }
+.mini-card-title { font-size: 0.68rem; font-weight: 600; color: #1a3a28; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.mini-card-author { font-size: 0.62rem; color: #556b5a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* 開館情報カレンダー */
 .info-row-cal { align-items: flex-start; }
