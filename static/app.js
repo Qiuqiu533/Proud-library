@@ -379,7 +379,7 @@ function saveRecentBook(isbn, title, cover) {
   try { recent = JSON.parse(localStorage.getItem("recent_books") || "[]"); } catch {}
   recent = recent.filter(b => b.isbn !== isbn);
   recent.unshift({ isbn, title: title || "", cover: cover || "" });
-  localStorage.setItem("recent_books", JSON.stringify(recent.slice(0, 20)));
+  localStorage.setItem("recent_books", JSON.stringify(recent.slice(0, 30)));
   renderRecentBooks();
 }
 
@@ -390,12 +390,16 @@ function renderRecentBooks() {
   const row = document.getElementById("recentBooksRow");
   if (!section || !row || !recent.length) { if (section) section.style.display = "none"; return; }
   row.innerHTML = recent.map(b => {
+    const ndlFallback = `https://ndlsearch.ndl.go.jp/thumbnail/${b.isbn}.jpg`;
     const img = b.cover
-      ? `<img src="${b.cover}" alt="${b.title}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'recent-thumb-placeholder\\'>📖</div>'">`
-      : `<div class="recent-thumb-placeholder">📖</div>`;
-    return `<div class="recent-thumb" data-isbn="${b.isbn}" title="${b.title}">${img}</div>`;
+      ? `<img src="${b.cover}" alt="${esc(b.title)}" loading="lazy" onerror="if(this.src!=='${ndlFallback}'){this.src='${ndlFallback}';}else{this.replaceWith(Object.assign(document.createElement('div'),{className:'mini-card-placeholder',textContent:'📖'}));}">`
+      : `<div class="mini-card-placeholder">📖</div>`;
+    return `<div class="mini-card" data-isbn="${b.isbn}">
+      <div class="mini-card-cover">${img}</div>
+      <div class="mini-card-title">${esc(b.title)}</div>
+    </div>`;
   }).join("");
-  row.querySelectorAll(".recent-thumb").forEach(el => {
+  row.querySelectorAll(".mini-card").forEach(el => {
     el.addEventListener("click", () => openModal(el.dataset.isbn));
   });
   section.style.display = "";
@@ -472,20 +476,22 @@ async function loadTopNew() {
   try {
     const res = await fetch("/api/books/new");
     const data = await res.json();
-    const books = (data.books || data).slice(0, 10);
+    const books = (data.books || data);
     if (!books.length) return;
     row.innerHTML = books.map(b => {
       const cover = b.cover || get_cover_url_js(b.isbn);
       const ndlFallback = `https://ndlsearch.ndl.go.jp/thumbnail/${b.isbn}.jpg`;
-      return `<div class="top-new-item" data-isbn="${b.isbn}">
-        <img class="top-new-cover" src="${cover}" alt="${esc(b.title)}" loading="lazy"
-          onerror="if(this.src!=='${ndlFallback}'){this.src='${ndlFallback}';}else{this.outerHTML='<div class=\\'top-new-placeholder\\'>📖</div>';}">
-        <div class="top-new-title">${esc(b.title)}</div>
-        <div class="top-new-author">${esc(b.author || "")}</div>
+      return `<div class="mini-card" data-isbn="${b.isbn}">
+        <div class="mini-card-cover">
+          <img src="${cover}" alt="${esc(b.title)}" loading="lazy"
+            onerror="if(this.src!=='${ndlFallback}'){this.src='${ndlFallback}';}else{this.replaceWith(Object.assign(document.createElement('div'),{className:'mini-card-placeholder',textContent:'📖'}));}">
+        </div>
+        <div class="mini-card-title">${esc(b.title)}</div>
+        <div class="mini-card-author">${esc(b.author || "")}</div>
       </div>`;
     }).join("");
     const bookMap = Object.fromEntries(books.map(b => [b.isbn, b]));
-    row.querySelectorAll(".top-new-item").forEach(el => {
+    row.querySelectorAll(".mini-card").forEach(el => {
       el.addEventListener("click", () => openModal(el.dataset.isbn, bookMap[el.dataset.isbn]));
     });
     section.style.display = "block";
