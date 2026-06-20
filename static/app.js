@@ -3443,6 +3443,179 @@ function chatMsgHtml(m) {
   </div>`;
 }
 
+// --- スレッド機能 ---
+let currentThreadId = null;
+let currentChatMode = "general"; // "general" | "threads" | "thread_detail"
+let threadPollTimer = null;
+
+function switchChatMode(mode) {
+  currentChatMode = mode;
+  document.getElementById("chatViewGeneral").style.display = mode === "general" ? "flex" : "none";
+  document.getElementById("chatViewThreadList").style.display = mode === "threads" ? "flex" : "none";
+  document.getElementById("chatViewThreadDetail").style.display = mode === "thread_detail" ? "flex" : "none";
+  document.getElementById("chatModeGeneral").classList.toggle("chat-mode-active", mode === "general");
+  document.getElementById("chatModeThread").classList.toggle("chat-mode-active", mode === "threads" || mode === "thread_detail");
+  if (mode === "threads") loadThreadList();
+}
+
+async function loadThreadList() {
+  const box = document.getElementById("chatThreadList");
+  if (!box) return;
+  try {
+    const res = await fetch(`/api/chat_threads?password=${encodeURIComponent(boardPassword)}`);
+    if (!res.ok) return;
+    const threads = await res.json();
+    if (!threads.length) {
+      box.innerHTML = '<div style="text-align:center;color:#bbb;padding:30px 0;font-size:0.9rem">スレッドはまだありません<br>「＋ 新スレッド」から作成できます</div>';
+      return;
+    }
+    box.innerHTML = threads.map(t => `
+      <div class="thread-card" data-thread-id="${t.id}" data-thread-title="${esc(t.title)}">
+        <div class="thread-card-title">${esc(t.title)}</div>
+        <div class="thread-card-meta">
+          <span>📝 ${t.msg_count}件</span>
+          <span>🕐 ${t.last_at || t.created_at}</span>
+          <span>作成: ${esc(t.created_by)}</span>
+        </div>
+      </div>
+    `).join("");
+    box.querySelectorAll(".thread-card").forEach(card => {
+      card.addEventListener("click", () => openThread(Number(card.dataset.threadId), card.dataset.threadTitle));
+    });
+  } catch(e) { console.error("thread list error", e); }
+}
+
+async function openThread(threadId, title) {
+  currentThreadId = threadId;
+  document.getElementById("chatThreadTitle").textContent = title;
+  currentChatMode = "thread_detail";
+  document.getElementById("chatViewGeneral").style.display = "none";
+  document.getElementById("chatViewThreadList").style.display = "none";
+  document.getElementById("chatViewThreadDetail").style.display = "flex";
+  document.getElementById("chatModeThread").classList.add("chat-mode-active");
+  await loadThreadMessages(true);
+  if (threadPollTimer) clearInterval(threadPollTimer);
+  threadPollTimer = setInterval(() => loadThreadMessages(), 5000);
+}
+
+async function loadThreadMessages(scrollToBottom = false) {
+  const box = document.getElementById("chatThreadMessages");
+  if (!box || !currentThreadId) return;
+  try {
+    const res = await fetch(`/api/staff_chat?thread_id=${currentThreadId}&password=${encodeURIComponent(boardPassword)}`);
+    if (!res.ok) return;
+    const msgs = await res.json();
+    msgs.reverse();
+    if (!msgs.length) {
+      box.innerHTML = '<div style="text-align:center;color:#bbb;padding:30px 0;font-size:0.9rem">まだメッセージはありません</div>';
+      return;
+    }
+    const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+    box.innerHTML = msgs.map(chatMsgHtml).join("");
+    box.querySelectorAll(".chat-del-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("このメッセージを削除しますか？")) return;
+        await fetch(`/api/staff_chat/${btn.dataset.id}`, {
+          method: "DELETE", headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({password: boardPassword})
+        });
+        loadThreadMessages();
+      });
+    });
+    if (scrollToBottom || atBottom) box.scrollTop = box.scrollHeight;
+  } catch(e) { console.error("thread msg error", e); }
+}
+
+function initThreadUI() {
+  // 戻るボタン
+  const backBtn = document.getElementById("chatBackToThreads");
+  if (backBtn) backBtn.onclick = () => {
+    if (threadPollTimer) { clearInterval(threadPollTimer); threadPollTimer = null; }
+    currentThreadId = null;
+    switchChatMode("threads");
+  };
+
+  // スレッド削除
+  const delBtn = document.getElementById("chatThreadDeleteBtn");
+  if (delBtn) delBtn.onclick = async () => {
+    if (!currentThreadId) return;
+    if (!confirm("このスレッドとメッセージを全て削除しますか？")) return;
+    await fetch(`/api/chat_threads/${currentThreadId}`, {
+      method: "DELETE", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({password: boardPassword})
+    });
+    if (threadPollTimer) { clearInterval(threadPollTimer); threadPollTimer = null; }
+    currentThreadId = null;
+    switchChatMode("threads");
+  };
+
+  // 新スレッドボタン
+  const newBtn = document.getElementById("chatNewThreadBtn");
+  const newForm = document.getElementById("chatNewThreadForm");
+  if (newBtn && newForm) {
+    newBtn.onclick = () => { newForm.style.display = newForm.style.display === "none" ? "block" : "none"; };
+  }
+  const cancelBtn = document.getElementById("chatNewThreadCancel");
+  if (cancelBtn) cancelBtn.onclick = () => { newForm.style.display = "none"; };
+
+  const submitBtn = document.getElementById("chatNewThreadSubmit");
+  if (submitBtn) submitBtn.onclick = async () => {
+    const title = (document.getElementById("chatNewThreadTitle").value || "").trim();
+    const msg = (document.getElementById("chatNewThreadMsg").value || "").trim();
+    if (!title) { alert("タイトルを入力してください"); return; }
+    const sender = boardSenderName || "匿名";
+    const res = await fetch("/api/chat_threads", {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({password: boardPassword, title, created_by: sender, first_message: msg})
+    });
+    const data = await res.json();
+    if (res.ok && data.ok) {
+      document.getElementById("chatNewThreadTitle").value = "";
+      document.getElementById("chatNewThreadMsg").value = "";
+      newForm.style.display = "none";
+      openThread(data.thread_id, title);
+    } else {
+      alert(data.error || "作成に失敗しました");
+    }
+  };
+
+  // スレッド内送信
+  const threadInput = document.getElementById("chatThreadInput");
+  const threadSendBtn = document.getElementById("chatThreadSendBtn");
+  const threadImgInput = document.getElementById("chatThreadImgInput");
+  let threadPendingImage = "";
+
+  if (threadImgInput) {
+    threadImgInput.onchange = async () => {
+      const file = threadImgInput.files[0];
+      if (!file) return;
+      threadPendingImage = await compressImage(file);
+      threadImgInput.value = "";
+    };
+  }
+
+  const sendThread = async () => {
+    if (!currentThreadId) return;
+    const msg = (threadInput ? threadInput.value.trim() : "");
+    if (!msg && !threadPendingImage) return;
+    const sender = boardSenderName || "匿名";
+    if (threadInput) threadInput.value = "";
+    if (threadSendBtn) threadSendBtn.disabled = true;
+    const image_data = threadPendingImage;
+    threadPendingImage = "";
+    await fetch("/api/staff_chat", {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({password: boardPassword, sender, message: msg, image_data, thread_id: currentThreadId})
+    });
+    if (threadSendBtn) threadSendBtn.disabled = false;
+    loadThreadMessages(true);
+    if (threadInput) threadInput.focus();
+  };
+
+  if (threadSendBtn) threadSendBtn.onclick = sendThread;
+  if (threadInput) threadInput.onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendThread(); } };
+}
+
 async function loadChatMessages(scrollToBottom = false) {
   const box = document.getElementById("chatMessages");
   if (!box) return;
@@ -3514,6 +3687,8 @@ function initStaffChat() {
   if (!boardSenderName && name) boardSenderName = name;
   if (lbl) lbl.textContent = boardSenderName ? `👤 ${boardSenderName}` : "👤 名前未設定";
 
+  initThreadUI();
+  switchChatMode("general");
   loadChatMessages(true);
   if (chatPollTimer) clearInterval(chatPollTimer);
   chatPollTimer = setInterval(() => loadChatMessages(), 5000);

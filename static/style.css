@@ -836,3 +836,11 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .log-meta { padding:8px 10px; background:#f8f9f4; border-top:1px solid #eee; border-radius:0 0 8px 8px; margin:0 -1px -1px; }
 .log-meta-date { font-size:0.75rem; color:#888; margin-bottom:3px; }
 .log-meta-memo { font-size:0.78rem; color:#555; line-height:1.5; white-space:pre-wrap; word-break:break-all; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+
+/* ===== スレッドチャット ===== */
+.chat-mode-btn { padding:6px 14px; border:1.5px solid #ddd; border-radius:8px; background:#fff; cursor:pointer; font-size:0.83rem; font-weight:600; color:#666; }
+.chat-mode-btn.chat-mode-active { background:#3d6b4f; color:#fff; border-color:#3d6b4f; }
+.thread-card { padding:12px 14px; background:#fff; border:1.5px solid #e0e0e0; border-radius:10px; cursor:pointer; transition:box-shadow 0.15s,border-color 0.15s; }
+.thread-card:hover { border-color:#3d6b4f; box-shadow:0 2px 8px rgba(61,107,79,0.12); }
+.thread-card-title { font-size:0.95rem; font-weight:600; color:#222; margin-bottom:5px; }
+.thread-card-meta { display:flex; gap:12px; font-size:0.76rem; color:#999; flex-wrap:wrap; }
