@@ -521,7 +521,7 @@ def _migrate_admin_users():
 
 
 def _migrate_add_card_columns():
-    """user_accounts に library_card_url/image カラムを追加（既存DBへの後付け）"""
+    """user_accounts に library_card_url/image カラム、genre_books に title_yomi カラムを追加"""
     try:
         con = get_con()
         if USE_PG:
@@ -530,7 +530,12 @@ def _migrate_add_card_columns():
                     con.cursor().execute(f"ALTER TABLE user_accounts ADD COLUMN {col} TEXT DEFAULT ''")
                     con.commit()
                 except Exception:
-                    pass
+                    con.rollback()
+            try:
+                con.cursor().execute("ALTER TABLE genre_books ADD COLUMN title_yomi TEXT DEFAULT ''")
+                con.commit()
+            except Exception:
+                con.rollback()
         else:
             for col in ("library_card_url", "library_card_image"):
                 try:
@@ -538,6 +543,11 @@ def _migrate_add_card_columns():
                     con.commit()
                 except Exception:
                     pass
+            try:
+                con.execute("ALTER TABLE genre_books ADD COLUMN title_yomi TEXT DEFAULT ''")
+                con.commit()
+            except Exception:
+                pass
         con.close()
     except Exception as e:
         print(f"card column migration error: {e}")
@@ -546,10 +556,9 @@ NDC_TO_GENRE = {
     # 日本文学
     "913": "文芸小説", "915": "文芸小説",
     "914": "エッセイ・評論", "916": "エッセイ・評論", "917": "エッセイ・評論",
-    "911": "文芸小説",  # 詩
-    "912": "文芸小説",  # 戯曲
-    # 時代・歴史小説
-    "9131": "時代小説・歴史小説",  # 日本小説（江戸以前テーマ多い）
+    "911": "エッセイ・評論",  # 詩
+    "912": "エッセイ・評論",  # 戯曲
+    "9131": "時代小説・歴史小説",
     # ミステリ
     "936": "ミステリ・推理",
     # 翻訳小説（各国文学）
@@ -562,61 +571,72 @@ NDC_TO_GENRE = {
     "970": "翻訳小説", "971": "翻訳小説", "973": "翻訳小説",
     "980": "翻訳小説", "981": "翻訳小説", "983": "翻訳小説",
     "990": "翻訳小説", "993": "翻訳小説",
-    # ファンタジー・SF（NDCでは小説内サブジャンルなので書名で補完）
     # 絵本・児童
     "726": "絵本・児童書", "E": "絵本・児童書",
     "Y8": "絵本・児童書", "Y81": "絵本・児童書", "Y82": "絵本・児童書",
     "Y9": "児童文学", "Y91": "児童文学", "Y92": "児童文学",
     # 自己啓発・ビジネス
-    "159": "実用・ハウツー",  # 人生訓
-    "336": "実用・ハウツー",  # 経営管理
-    "335": "実用・ハウツー",  # 企業・経営
-    "320": "実用・ハウツー",  # 法律
-    "330": "実用・ハウツー",  # 経済
-    "331": "実用・ハウツー",  # 経済学
-    "338": "実用・ハウツー",  # 金融
-    "141": "実用・ハウツー",  # 心理学
-    "143": "実用・ハウツー",  # 発達心理
-    "145": "実用・ハウツー",  # 異常心理
-    "146": "実用・ハウツー",  # 臨床心理
+    "159": "実用・ハウツー", "336": "実用・ハウツー", "335": "実用・ハウツー",
+    "320": "実用・ハウツー", "330": "実用・ハウツー", "331": "実用・ハウツー",
+    "338": "実用・ハウツー", "141": "実用・ハウツー", "143": "実用・ハウツー",
+    "145": "実用・ハウツー", "146": "実用・ハウツー", "370": "実用・ハウツー",
     # 健康・医療
     "490": "実用・ハウツー", "491": "実用・ハウツー", "492": "実用・ハウツー",
     "493": "実用・ハウツー", "494": "実用・ハウツー", "495": "実用・ハウツー",
     "496": "実用・ハウツー", "497": "実用・ハウツー", "498": "実用・ハウツー",
     # 料理・生活
-    "596": "実用・ハウツー",  # 料理
-    "590": "実用・ハウツー",  # 家政
-    "591": "実用・ハウツー",  # 家庭管理
-    "593": "実用・ハウツー",  # 被服
-    "597": "実用・ハウツー",  # 住居
-    "598": "実用・ハウツー",  # 家庭衛生
-    "370": "実用・ハウツー",  # 教育
+    "596": "実用・ハウツー", "590": "実用・ハウツー", "591": "実用・ハウツー",
+    "593": "実用・ハウツー", "597": "実用・ハウツー", "598": "実用・ハウツー",
     # 歴史・伝記
-    "210": "エッセイ・評論", "211": "エッセイ・評論", "212": "エッセイ・評論",
-    "213": "エッセイ・評論", "214": "エッセイ・評論", "215": "エッセイ・評論",
-    "216": "エッセイ・評論", "217": "エッセイ・評論", "218": "エッセイ・評論",
-    "219": "エッセイ・評論",
-    "280": "エッセイ・評論", "281": "エッセイ・評論", "289": "エッセイ・評論",
-    "230": "エッセイ・評論",  # 世界史
+    "210": "歴史・伝記", "211": "歴史・伝記", "212": "歴史・伝記",
+    "213": "歴史・伝記", "214": "歴史・伝記", "215": "歴史・伝記",
+    "216": "歴史・伝記", "217": "歴史・伝記", "218": "歴史・伝記",
+    "219": "歴史・伝記", "230": "歴史・伝記",
+    "280": "歴史・伝記", "281": "歴史・伝記", "289": "歴史・伝記",
     # 社会・ノンフィクション
     "300": "エッセイ・評論", "304": "エッセイ・評論",
     "360": "エッセイ・評論", "361": "エッセイ・評論",
-    "316": "エッセイ・評論",  # 民族問題
+    "316": "エッセイ・評論",
 }
 
-# タイトル・著者キーワードによる補完分類
+# タイトル・著者キーワードによる補完分類（優先順位順：より具体的なジャンルを先に）
 KEYWORD_GENRE = [
-    (["ミステリ","推理","刑事","探偵","殺人","犯罪","謎","サスペンス"], "ミステリ・推理"),
-    (["時代","武士","侍","江戸","幕末","忍者","剣客","藩","お城","将軍"], "時代小説・歴史小説"),
-    (["SF","宇宙","ロボット","人工知能","AI","未来","サイバー"], "ファンタジー・SF"),
-    (["ファンタジー","魔法","魔王","勇者","異世界","竜","ドラゴン","エルフ"], "ファンタジー・SF"),
-    (["絵本","えほん","ピクチャー"], "絵本・児童書"),
-    (["児童","こども","子ども","少年","少女"], "児童文学"),
-    (["料理","レシピ","クッキング","おかず","献立"], "実用・ハウツー"),
-    (["健康","ダイエット","医療","病気","症状","治療","養生"], "実用・ハウツー"),
-    (["ビジネス","仕事術","マネジメント","リーダー","起業","投資","株","マーケ"], "実用・ハウツー"),
-    (["自己啓発","習慣","成功","メンタル","マインド","思考法"], "実用・ハウツー"),
+    # ミステリ・推理（最も明確なキーワード）
+    (["ミステリ","推理","刑事","探偵","殺人","犯罪","謎解き","サスペンス","トリック","密室","アリバイ"], "ミステリ・推理"),
+    # 時代・歴史
+    (["時代小説","武士","侍","江戸","幕末","忍者","剣客","剣士","藩","将軍","大名","お奉行","岡っ引き","鬼平","池波"], "時代小説・歴史小説"),
+    (["戦国","信長","秀吉","家康","源氏","平家","幕府","藩士","勤皇","明治維新"], "時代小説・歴史小説"),
+    # SF
+    (["SF","宇宙","ロボット","人工知能","タイムスリップ","タイムトラベル","サイバー","ディストピア","クローン"], "ファンタジー・SF"),
+    # ファンタジー
+    (["ファンタジー","魔法","魔王","勇者","異世界","竜","ドラゴン","エルフ","精霊","魔女","魔術師"], "ファンタジー・SF"),
+    # ホラー
+    (["ホラー","怪談","心霊","幽霊","呪い","恐怖","怖い","オカルト","超自然","霊","怨霊","妖怪"], "ホラー・怪談"),
+    # 恋愛・青春
+    (["恋愛","ラブ","片思い","告白","恋人","青春","青い","初恋","純愛","ロマンス"], "恋愛・青春"),
+    (["高校生","大学生","学園","部活","友情","青春","思春期","卒業","入学","甲子園"], "恋愛・青春"),
+    # コミック・エッセイ（コミックエッセイは実用に近い）
+    (["コミックエッセイ","マンガエッセイ","育児マンガ","介護マンガ"], "エッセイ・評論"),
+    # 絵本・児童
+    (["絵本","えほん","ピクチャーブック"], "絵本・児童書"),
+    (["児童文学","子ども向け","読み聞かせ","お話絵本"], "児童文学"),
+    # 歴史・伝記
+    (["伝記","一代記","生涯","列伝","ノンフィクション","実話","ルポ","ドキュメント"], "歴史・伝記"),
+    (["昭和史","平成史","近代史","現代史","太平洋戦争","戦争体験"], "歴史・伝記"),
+    # 料理・生活
+    (["料理","レシピ","クッキング","おかず","献立","お菓子作り","パン作り"], "実用・ハウツー"),
+    # 健康
+    (["健康","ダイエット","医療","病気","症状","治療","養生","血圧","糖尿","介護","認知症"], "実用・ハウツー"),
+    # ビジネス
+    (["ビジネス","仕事術","マネジメント","リーダーシップ","起業","投資","株式","マーケティング","経営戦略"], "実用・ハウツー"),
+    (["自己啓発","習慣","成功法則","メンタル","マインドセット","思考法","モチベーション"], "実用・ハウツー"),
 ]
+
+def _hira_to_kata(s):
+    return "".join(chr(ord(c) + 96) if "ぁ" <= c <= "ゖ" else c for c in (s or ""))
+
+def _kata_to_hira(s):
+    return "".join(chr(ord(c) - 96) if "ァ" <= c <= "ヶ" else c for c in (s or ""))
 
 def _ndc_to_genre(ndc):
     if not ndc:
@@ -638,7 +658,7 @@ def _keyword_genre(title, author=""):
 def _migrate_ndc_genres():
     """OpenBD NDCコード＋キーワードでジャンル未分類の本を自動分類（改訂版で再実行）"""
     import datetime
-    CURRENT_VERSION = "v2"
+    CURRENT_VERSION = "v3"
     try:
         con = get_con()
         done = fetchone(con, "SELECT value FROM settings WHERE key='ndc_classify_done'")
@@ -684,6 +704,20 @@ def _migrate_ndc_genres():
                         if genre and isbn:
                             execute(con3, "UPDATE genre_books SET genre=? WHERE isbn=? AND (genre='' OR genre IS NULL OR genre='その他')", (genre, isbn))
                             ndc_updated += 1
+                        # 読み仮名（title_yomi）を取得
+                        title_details = item.get("onix", {}).get("DescriptiveDetail", {}).get("TitleDetail", [])
+                        yomi = ""
+                        for td in title_details:
+                            for te in td.get("TitleElement", []):
+                                if te.get("TitleElementLevel") == "01":
+                                    subtitle = te.get("Subtitle", {}).get("content", "") or te.get("Subtitle", "")
+                                    if subtitle and any("぀" <= c <= "ヿ" for c in subtitle):
+                                        yomi = subtitle
+                                        break
+                            if yomi:
+                                break
+                        if yomi and isbn:
+                            execute(con3, "UPDATE genre_books SET title_yomi=? WHERE isbn=?", (yomi, isbn))
                     except Exception:
                         pass
                 con3.commit(); con3.close()
@@ -714,6 +748,7 @@ def _ensure_db():
     threading.Thread(target=_migrate_add_type_reply_columns, daemon=True).start()
     threading.Thread(target=_migrate_add_staff_chat, daemon=True).start()
     threading.Thread(target=_migrate_lib_schedule, daemon=True).start()
+    threading.Thread(target=_migrate_resync_awards, daemon=True).start()
 
 
 def _migrate_add_staff_chat():
@@ -863,6 +898,30 @@ def _migrate_genre_map_to_db():
         print(f"genre_map.json → DB 移行完了")
     except Exception as e:
         print(f"genre migrate error: {e}")
+
+
+def _migrate_resync_awards():
+    """awards=NULLまたは[]の本を対象にawards_masterと再マッチング（バッジ未付与問題修正）"""
+    if not USE_PG:
+        return
+    try:
+        con = get_con()
+        done = fetchone(con, "SELECT value FROM settings WHERE key='awards_resync_done'")
+        if done and done.get("value") == "v1":
+            con.close()
+            return
+        rows = fetchall(con, "SELECT isbn, title, author FROM genre_books WHERE awards IS NULL OR awards = '[]'::jsonb")
+        updated = 0
+        for r in rows:
+            _sync_awards_from_master(con, r["isbn"], r["title"], r["author"])
+            updated += 1
+        if USE_PG:
+            execute(con, "INSERT INTO settings(key,value) VALUES('awards_resync_done','v1') ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value")
+        con.commit()
+        con.close()
+        print(f"awards resync: {updated} books re-matched")
+    except Exception as e:
+        print(f"awards resync error: {e}")
 
 
 def _sync_awards_from_master(con, isbn, title, author):
@@ -1662,8 +1721,10 @@ def api_books_by_genre():
         params_base.append(genre)
     if keyword:
         like = f"%{keyword}%"
-        conditions.append(f"(title LIKE {ph} OR author LIKE {ph})")
-        params_base.extend([like, like])
+        like_kata = f"%{_hira_to_kata(keyword)}%"
+        like_hira = f"%{_kata_to_hira(keyword)}%"
+        conditions.append(f"(title LIKE {ph} OR author LIKE {ph} OR title LIKE {ph} OR title LIKE {ph} OR title_yomi LIKE {ph})")
+        params_base.extend([like, like, like_kata, like_hira, like])
     if award:
         if USE_PG:
             if award == "本屋大賞":
@@ -2581,12 +2642,33 @@ def api_availability(isbn):
             if len(tds) >= 3 and tds[1].text.strip() and tds[2].text.strip():
                 availability.append({"library": tds[1].text.strip(), "status": tds[2].text.strip()})
         if not availability:
+            # スクレイピング結果なし → 30分キャッシュして "unknown" を返す（繰り返しアクセス防止）
+            try:
+                book_row = fetchone(con, "SELECT title, author FROM genre_books WHERE isbn=?", (isbn,))
+                title = book_row["title"] if book_row else ""
+                author = book_row["author"] if book_row else ""
+                if USE_PG:
+                    execute(con, """
+                        INSERT INTO availability_cache (isbn, status, title, author, updated_at)
+                        VALUES (%s, 'unknown', %s, %s, NOW() - INTERVAL '90 minutes')
+                        ON CONFLICT (isbn) DO UPDATE SET status='unknown', updated_at=NOW() - INTERVAL '90 minutes'
+                    """, (isbn, title, author))
+                else:
+                    execute(con, """
+                        INSERT OR REPLACE INTO availability_cache (isbn, status, title, author, updated_at)
+                        VALUES (?, 'unknown', ?, ?, datetime('now','-90 minutes','localtime'))
+                    """, (isbn, title, author))
+                con.commit()
+            except Exception:
+                pass
             con.close()
             return jsonify({"status": "unknown"})
         statuses = [a["status"] for a in availability]
-        if any(s in ("利用可能", "在架") for s in statuses):
+        AVAILABLE_WORDS = ("利用可能", "在架", "貸出可", "館内のみ", "開架", "配架中")
+        LOANED_WORDS = ("貸出中", "貸出", "予約中", "返却待ち", "禁帯出")
+        if any(any(w in s for w in AVAILABLE_WORDS) for s in statuses):
             result_status = "available"
-        elif any("貸出中" in s for s in statuses):
+        elif any(any(w in s for w in LOANED_WORDS) for s in statuses):
             result_status = "loaned"
         else:
             result_status = "unknown"

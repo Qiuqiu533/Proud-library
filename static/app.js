@@ -641,21 +641,19 @@ async function loadLog(filter = "all") {
   const validBooks = books.filter(Boolean);
   renderGrid("logGrid", validBooks);
   // 日付・感想をカード下に追記
-  validBooks.forEach(book => {
-    const meta = getReadMeta(book.isbn);
+  grid.querySelectorAll(".book-card").forEach(card => {
+    const favBtn = card.querySelector(".fav-btn");
+    if (!favBtn) return;
+    const isbn = favBtn.dataset.isbn;
+    if (!isbn) return;
+    const meta = getReadMeta(isbn);
     if (!meta.date && !meta.memo) return;
-    const cardEls = grid.querySelectorAll(".book-card");
-    cardEls.forEach(card => {
-      const btn = card.querySelector(`[data-isbn="${book.isbn}"]`);
-      if (!btn) return;
-      const existing = card.querySelector(".log-meta");
-      if (existing) return;
-      const metaDiv = document.createElement("div");
-      metaDiv.className = "log-meta";
-      if (meta.date) metaDiv.innerHTML += `<div class="log-meta-date">📅 ${meta.date}</div>`;
-      if (meta.memo) metaDiv.innerHTML += `<div class="log-meta-memo">${esc(meta.memo)}</div>`;
-      card.appendChild(metaDiv);
-    });
+    if (card.querySelector(".log-meta")) return;
+    const metaDiv = document.createElement("div");
+    metaDiv.className = "log-meta";
+    if (meta.date) metaDiv.innerHTML += `<div class="log-meta-date">📅 読んだ日：${meta.date}</div>`;
+    if (meta.memo) metaDiv.innerHTML += `<div class="log-meta-memo">✏️ ${esc(meta.memo)}</div>`;
+    card.appendChild(metaDiv);
   });
 }
 
