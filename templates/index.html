@@ -623,6 +623,11 @@
       <div id="btab-bookdesc" class="board-tab-panel">
         <h4 style="margin:0 0 12px">📝 書評・内容紹介の入力</h4>
         <p style="font-size:0.85rem;color:#666;margin-bottom:12px">ISBNを入力して書評を登録します。既存の書評は上書きされます（最大600文字）。</p>
+        <!-- 書評なし一覧 -->
+        <div id="noReviewList" style="margin-bottom:16px;background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:12px">
+          <div style="font-size:0.85rem;font-weight:600;margin-bottom:8px;color:#f57c00">📋 書評が未登録の本（手動登録が必要）</div>
+          <div id="noReviewItems" style="font-size:0.82rem;color:#555;max-height:180px;overflow-y:auto">読み込み中...</div>
+        </div>
         <div style="margin-bottom:10px">
           <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:4px">ISBN（13桁）</label>
           <div style="display:flex;gap:8px">

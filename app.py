@@ -800,7 +800,7 @@ def fetch_books(keyword="", page=1):
         return {"books": [], "total": 0, "page": page}
 
 
-def fetch_book_detail(isbn):
+def fetch_book_detail(isbn, hint_title=""):
     url = f"{LIBRARYLIFE_BASE}/booksearch/detail/{isbn}"
     result = {"isbn": isbn}
     availability = []
@@ -860,7 +860,8 @@ def fetch_book_detail(isbn):
         import re as _re
         dc = get_con()
         ph = "%s" if USE_PG else "?"
-        lib_title = result.get("title", "").strip()
+        # フロントエンドから渡されたタイトルを優先（図書館APIが失敗してもタイトル検証できる）
+        lib_title = result.get("title", "").strip() or hint_title
         lib_author = result.get("author", "").strip()
 
         def _title_core(t):
@@ -1613,9 +1614,31 @@ def api_books():
     return jsonify(data)
 
 
+@app.route("/api/books/no-review")
+def api_books_no_review():
+    """書評が未登録（NULLまたは空）の本一覧を返す"""
+    con = get_con()
+    rows = fetchall(con, """
+        SELECT isbn, title, author FROM genre_books
+        WHERE (description IS NULL OR description = '')
+          AND manual_review IS NOT TRUE
+        ORDER BY title
+        LIMIT 200
+    """)
+    con2 = get_con()
+    total_row = fetchone(con2, """
+        SELECT COUNT(*) as cnt FROM genre_books
+        WHERE (description IS NULL OR description = '')
+          AND manual_review IS NOT TRUE
+    """)
+    con.close(); con2.close()
+    return jsonify({"books": rows, "total": total_row["cnt"] if total_row else 0})
+
+
 @app.route("/api/book/<isbn>")
 def api_book(isbn):
-    detail = fetch_book_detail(isbn)
+    hint_title = request.args.get("title", "").strip()
+    detail = fetch_book_detail(isbn, hint_title=hint_title)
     detail["rating"] = get_rating(isbn)
     return jsonify(detail)
 
