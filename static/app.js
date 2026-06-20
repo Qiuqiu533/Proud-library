@@ -960,12 +960,15 @@ function _renderModalContent(isbn, book, rating) {
     : `<div class="no-content">まだコメントはありません</div>`;
   // 書評・AI登録情報はAPIデータ取得後に確実に描画するため、常にプレースホルダーを使用
 
+  const awardsHtml = book.awards && book.awards.length ? renderAwardBadges(book.awards) : '<div id="modal-awards-placeholder"></div>';
   return `
     <div class="modal-top">
-      <div class="modal-cover">${book.cover ? `<img src="${book.cover}" alt="${esc(book.title)}" onerror="this.parentElement.innerHTML='<div class=\\'modal-cover-placeholder\\'>📖</div>'">` : '<div class="modal-cover-placeholder">📖</div>'}</div>
+      <div class="modal-cover-wrap">
+        <div class="modal-cover">${book.cover ? `<img src="${book.cover}" alt="${esc(book.title)}" onerror="this.parentElement.innerHTML='<div class=\\'modal-cover-placeholder\\'>📖</div>'">` : '<div class="modal-cover-placeholder">📖</div>'}</div>
+        <div class="modal-cover-awards">${awardsHtml}</div>
+      </div>
       <div class="modal-header">
         <h2>${esc(book.title) || "タイトル不明"}</h2>
-        ${book.awards && book.awards.length ? `<div class="award-badges modal-awards">${renderAwardBadges(book.awards).replace('<div class="award-badges">', '').replace('</div>', '')}</div>` : '<div id="modal-awards-placeholder"></div>'}
         ${infoTable}
         <button class="fav-btn-large ${fav ? 'active' : ''}" data-isbn="${isbn}">
           ${fav ? '❤️ お気に入り済み' : '🤍 お気に入りに追加'}
