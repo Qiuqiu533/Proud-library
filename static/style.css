@@ -155,9 +155,9 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .modal-close-bottom { display: none; width: 100%; margin-top: 20px; padding: 12px; background: #f5f3f0; border: none; border-radius: 10px; font-size: 0.92rem; color: #555; cursor: pointer; font-family: inherit; justify-content: center; align-items: center; gap: 6px; }
 .modal-content { display: flex; flex-direction: column; gap: 18px; }
 .modal-top { display: flex; gap: 20px; align-items: flex-start; }
-.modal-cover { width: 120px; flex-shrink: 0; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); overflow: hidden; }
+.modal-cover { width: 160px; flex-shrink: 0; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); overflow: hidden; }
 .modal-cover img { width: 100%; display: block; }
-.modal-cover-placeholder { width: 120px; height: 175px; background: linear-gradient(135deg, #c8d8c0, #a0b89a); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; border-radius: 8px; }
+.modal-cover-placeholder { width: 160px; height: 230px; background: linear-gradient(135deg, #c8d8c0, #a0b89a); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; border-radius: 8px; }
 .modal-header h2 { font-size: 1.25rem; line-height: 1.4; margin-bottom: 6px; }
 .modal-author { color: #555; font-size: 0.92rem; margin-bottom: 10px; }
 .modal-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
@@ -219,8 +219,8 @@ body { padding-bottom: env(safe-area-inset-bottom); }
   .modal-overlay { align-items: flex-end; padding: 0; }
   .modal-box { border-radius: 16px 16px 0 0; max-height: 92vh; padding: 20px 16px; }
   .modal-top { gap: 14px; }
-  .modal-cover { width: 85px; }
-  .modal-cover-placeholder { width: 85px; height: 125px; font-size: 2rem; }
+  .modal-cover { width: 120px; }
+  .modal-cover-placeholder { width: 120px; height: 175px; font-size: 2rem; }
   .modal-header h2 { font-size: 1.05rem; }
   .info-row { flex-direction: column; gap: 4px; }
   .info-label { min-width: unset; }
@@ -420,7 +420,7 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .recent-label { font-size: 0.72rem; color: #999; font-weight: 600; margin-bottom: 6px; letter-spacing: 0.03em; }
 .recent-row { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
 .recent-row::-webkit-scrollbar { display: none; }
-.recent-thumb { flex-shrink: 0; width: 38px; height: 54px; border-radius: 4px; overflow: hidden; cursor: pointer; box-shadow: 0 1px 5px rgba(0,0,0,0.18); transition: transform .15s, box-shadow .15s; background: #d0e8d8; }
+.recent-thumb { flex-shrink: 0; width: 50px; height: 70px; border-radius: 4px; overflow: hidden; cursor: pointer; box-shadow: 0 1px 5px rgba(0,0,0,0.18); transition: transform .15s, box-shadow .15s; background: #d0e8d8; }
 .recent-thumb:hover { transform: scale(1.1); box-shadow: 0 3px 10px rgba(0,0,0,0.22); }
 .recent-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .recent-thumb-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
@@ -489,7 +489,7 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 
   .book-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .book-card { min-width: 0; }
-  .card-cover-wrap { height: 130px; }
+  .card-cover-wrap { height: 180px; }
   .book-title { font-size: 0.8rem; -webkit-line-clamp: 2; }
   .book-author { font-size: 0.73rem; }
   .book-meta { font-size: 0.7rem; }
