@@ -108,8 +108,21 @@ def fetchone(con, sql, params=()):
 # ── 定数 ────────────────────────────────────────────────────────────────
 LIBRARY_CODE = "0011"
 LIBRARYLIFE_BASE = "https://www.librarylife.net"
-_INERTIA_VERSION = "41d94b8935bef33f0a7fadd0e4bf2a77"
+_INERTIA_VERSION = "e2ba382f0f96863d6a3cbb3f36f44b4e"
 _INERTIA_SESSION = requests.Session()
+
+def _refresh_inertia_version():
+    """librarylife.netからInertiaバージョンを取得して更新する"""
+    global _INERTIA_VERSION
+    try:
+        resp = _INERTIA_SESSION.get(f"{LIBRARYLIFE_BASE}/", timeout=10)
+        import re as _re2
+        m = _re2.search(r'"version":"([a-f0-9]{32})"', resp.text)
+        if m:
+            _INERTIA_VERSION = m.group(1)
+            app.logger.info(f"Inertia version updated: {_INERTIA_VERSION}")
+    except Exception as e:
+        app.logger.error(f"_refresh_inertia_version error: {e}")
 OPENBD_API = "https://api.openbd.jp/v1/get"
 NDL_THUMB = "https://ndlsearch.ndl.go.jp/thumbnail/{isbn}.jpg"
 
@@ -778,6 +791,10 @@ def fetch_books(keyword="", page=1):
     try:
         resp = _INERTIA_SESSION.get(url, params=params, timeout=10,
                                     headers=_inertia_headers("books", "book-search/index"))
+        if resp.status_code == 409:
+            _refresh_inertia_version()
+            resp = _INERTIA_SESSION.get(url, params=params, timeout=10,
+                                        headers=_inertia_headers("books", "book-search/index"))
         data = resp.json()
         books_data = data.get("props", {}).get("books", {})
         raw = books_data.get("data", [])
@@ -807,6 +824,10 @@ def fetch_book_detail(isbn, hint_title=""):
     try:
         resp = _INERTIA_SESSION.get(url, timeout=10,
                                     headers=_inertia_headers())
+        if resp.status_code == 409:
+            _refresh_inertia_version()
+            resp = _INERTIA_SESSION.get(url, timeout=10,
+                                        headers=_inertia_headers())
         data = resp.json()
         book = data.get("props", {}).get("book", {})
         result["title"] = book.get("title", "")
