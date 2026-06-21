@@ -2324,10 +2324,14 @@ def api_books_no_review():
     """書評が未登録（NULLまたは空）の本一覧を返す"""
     con = get_con()
     rows = fetchall(con, """
-        SELECT isbn, title, author FROM genre_books
-        WHERE (description IS NULL OR description = '')
-          AND manual_review IS NOT TRUE
-        ORDER BY created_at DESC NULLS LAST
+        SELECT g.isbn, g.title, g.author
+        FROM genre_books g
+        LEFT JOIN (
+            SELECT isbn, MAX(arrived_at) as arrived_at FROM new_arrivals GROUP BY isbn
+        ) na ON g.isbn = na.isbn
+        WHERE (g.description IS NULL OR g.description = '')
+          AND g.manual_review IS NOT TRUE
+        ORDER BY na.arrived_at DESC NULLS LAST, g.title
         LIMIT 200
     """)
     con2 = get_con()
