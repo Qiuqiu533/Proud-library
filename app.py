@@ -1860,15 +1860,29 @@ def api_books_batch():
             result.append({"isbn": isbn, "title": isbn, "author": "", "publisher": "", "cover": "", "rating": {"score":0,"votes":0,"reviews":[]}})
     return jsonify(result)
 
+_KANA_ROWS = {
+    "あ": "あいうえおアイウエオ",
+    "か": "かきくけこがぎぐげごカキクケコガギグゲゴ",
+    "さ": "さしすせそざじずぜぞサシスセソザジズゼゾ",
+    "た": "たちつてとだぢづでどタチツテトダヂヅデド",
+    "な": "なにぬねのナニヌネノ",
+    "は": "はひふへほばびぶべぼぱぴぷぺぽハヒフヘホバビブベボパピプペポ",
+    "ま": "まみむめもマミムメモ",
+    "や": "やゆよャュョヤユヨ",
+    "ら": "らりるれろラリルレロ",
+    "わ": "わをんヲンワ",
+}
+
 @app.route("/api/books/by-genre")
 def api_books_by_genre():
-    """ジャンル別・全件・キーワード・受賞フィルターDB検索（ページネーション付き）"""
-    genre   = request.args.get("genre", "")
-    keyword = request.args.get("keyword", "").strip()
-    award   = request.args.get("award", "").strip()  # 受賞フィルター
-    page    = int(request.args.get("page", 1))
-    per     = min(int(request.args.get("per", 50)), 200)
-    offset  = (page - 1) * per
+    """ジャンル別・全件・キーワード・受賞・50音フィルターDB検索（ページネーション付き）"""
+    genre    = request.args.get("genre", "")
+    keyword  = request.args.get("keyword", "").strip()
+    award    = request.args.get("award", "").strip()
+    kana_row = request.args.get("kana_row", "").strip()  # あ/か/さ...
+    page     = int(request.args.get("page", 1))
+    per      = min(int(request.args.get("per", 50)), 200)
+    offset   = (page - 1) * per
     con = get_con()
     ph = "%s" if USE_PG else "?"
     conditions = []
@@ -1876,6 +1890,11 @@ def api_books_by_genre():
     if genre:
         conditions.append(f"genre={ph}")
         params_base.append(genre)
+    if kana_row and kana_row in _KANA_ROWS:
+        chars = _KANA_ROWS[kana_row]
+        kana_conds = " OR ".join([f"title_yomi LIKE {ph}" for _ in chars])
+        conditions.append(f"({kana_conds})")
+        params_base.extend([c + "%" for c in chars])
     if keyword:
         like = f"%{keyword}%"
         like_kata = f"%{_hira_to_kata(keyword)}%"
@@ -1898,8 +1917,9 @@ def api_books_by_genre():
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
     params_count = tuple(params_base)
     params_rows  = tuple(params_base) + (per, offset)
+    order = "title_yomi ASC, title ASC" if kana_row else "isbn DESC"
     sql_count = f"SELECT COUNT(*) as cnt FROM genre_books {where}"
-    sql_rows  = f"SELECT isbn,genre,title,author,publisher,format,awards FROM genre_books {where} ORDER BY isbn DESC LIMIT {ph} OFFSET {ph}"
+    sql_rows  = f"SELECT isbn,genre,title,author,publisher,format,awards FROM genre_books {where} ORDER BY {order} LIMIT {ph} OFFSET {ph}"
     total_row = fetchone(con, sql_count, params_count)
     total = total_row["cnt"] if total_row else 0
     rows = fetchall(con, sql_rows, params_rows)

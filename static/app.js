@@ -298,7 +298,8 @@ document.getElementById("logoutBtn").addEventListener("click", () => {
 let currentPage = 1;
 let currentKeyword = "";
 let currentTotal = 0;
-let currentAward = "";  // 受賞フィルター
+let currentAward = "";   // 受賞フィルター
+let currentKana  = "";   // 50音フィルター
 
 // 受賞バッジスタイルマップ
 const AWARD_STYLE_MAP = {
@@ -601,6 +602,7 @@ async function loadBooks(keyword = "", page = 1) {
   if (ppSel) { ppSel.disabled = false; ppSel.title = ""; }
   let url = `/api/books/by-genre?keyword=${encodeURIComponent(keyword)}&page=${page}&per=${currentPerPage}`;
   if (currentAward) url += `&award=${encodeURIComponent(currentAward)}`;
+  if (currentKana)  url += `&kana_row=${encodeURIComponent(currentKana)}`;
   const res = await fetch(url);
   data = await res.json();
 
@@ -1548,6 +1550,16 @@ document.querySelectorAll(".award-pill").forEach(btn => {
     btn.classList.add("active");
     currentAward = btn.dataset.award || "";
     currentGenre = "";
+    loadBooks(currentKeyword, 1);
+  });
+});
+
+document.querySelectorAll(".kana-pill").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".kana-pill").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    currentKana = btn.dataset.kana || "";
+    currentPage = 1;
     loadBooks(currentKeyword, 1);
   });
 });
