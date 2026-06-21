@@ -941,6 +941,7 @@ def _ensure_db():
     threading.Thread(target=_migrate_lib_schedule, daemon=True).start()
     threading.Thread(target=_migrate_seed_awards_master, daemon=True).start()
     threading.Thread(target=_migrate_resync_awards_v2, daemon=True).start()
+    threading.Thread(target=_migrate_resync_awards_v3, daemon=True).start()
     threading.Thread(target=_migrate_seed_award_books, daemon=True).start()
     threading.Thread(target=_verify_tables, daemon=True).start()
     threading.Thread(target=_migrate_title_yomi, daemon=True).start()
@@ -1214,19 +1215,20 @@ _AWARDS_SEED = [
     # ── 直木賞 ────────────────────────────────────────────────────
     ("直木賞", 2024, None, "受賞", "ともぐい", "河崎秋子"),
     ("直木賞", 2024, None, "受賞", "八月の御所グラウンド", "万城目学"),
+    ("直木賞", 2023, None, "受賞", "木挽町のあだ討ち", "永井紗耶子"),
+    ("直木賞", 2023, None, "受賞", "極楽征夷大将軍", "垣根涼介"),
     ("直木賞", 2023, None, "受賞", "しろがねの葉", "千早茜"),
     ("直木賞", 2022, None, "受賞", "黒牢城", "米澤穂信"),
     ("直木賞", 2022, None, "受賞", "夜に星を放つ", "窪美澄"),
-    ("直木賞", 2022, None, "受賞", "テスカトリポカ", "佐藤究"),
-    ("直木賞", 2022, None, "受賞", "心淋し川", "西條奈加"),
-    ("直木賞", 2021, None, "受賞", "また会う日まで", "池井戸潤"),
+    ("直木賞", 2021, None, "受賞", "テスカトリポカ", "佐藤究"),
+    ("直木賞", 2021, None, "受賞", "心淋し川", "西條奈加"),
     ("直木賞", 2021, None, "受賞", "星落ちて、なお", "澤田瞳子"),
-    ("直木賞", 2020, None, "受賞", "少女は卒業しない", "朝井リョウ"),
+    ("直木賞", 2020, None, "受賞", "少年と犬", "馳星周"),
     ("直木賞", 2020, None, "受賞", "熱源", "川越宗一"),
     ("直木賞", 2019, None, "受賞", "渦 妹背山婦女庭訓 魂結び", "大島真寿美"),
-    ("直木賞", 2019, None, "受賞", "べらぼうくん", "木下昌輝"),
-    ("直木賞", 2018, None, "受賞", "大きな鳥にさらわれないよう", "川上弘美"),
-    ("直木賞", 2018, None, "受賞", "サクリファイス", "近藤史恵"),
+    ("直木賞", 2018, None, "受賞", "ファーストラヴ", "島本理生"),
+    ("直木賞", 2018, None, "受賞", "銀河鉄道の父", "門井慶喜"),
+    ("直木賞", 2017, None, "受賞", "蜜蜂と遠雷", "恩田陸"),
     # ── 山本周五郎賞 ──────────────────────────────────────────────
     ("山本周五郎賞", 2024, None, "受賞", "スピノザの診察室", "夏川草介"),
     ("山本周五郎賞", 2023, None, "受賞", "汝、星のごとく", "凪良ゆう"),
@@ -1273,15 +1275,16 @@ def _migrate_seed_awards_master():
             _AWARDS_SEED
         )
         # awards_resync_doneをリセット → 再マッチング有効化
-        cur.execute("DELETE FROM settings WHERE key IN ('awards_resync_done','awards_resync_done_v2')")
+        cur.execute("DELETE FROM settings WHERE key IN ('awards_resync_done','awards_resync_done_v2','awards_resync_done_v3')")
         cur.execute("""
-            INSERT INTO settings(key,value) VALUES('awards_seed_done','v2')
+            INSERT INTO settings(key,value) VALUES('awards_seed_done','v3')
             ON CONFLICT(key) DO UPDATE SET value='v2'
         """)
         con.commit()
         con.close()
         print(f"[awards_seed] {len(_AWARDS_SEED)}件登録完了、全件再マッチング開始")
         _migrate_resync_awards_v2()
+        _migrate_resync_awards_v3()
     except Exception as e:
         print(f"[awards_seed] error: {e}")
 
@@ -1336,6 +1339,32 @@ def _migrate_resync_awards_v2():
         print(f"awards resync v2: {updated}冊全件マッチング完了")
     except Exception as e:
         print(f"awards resync v2 error: {e}")
+
+
+def _migrate_resync_awards_v3():
+    """直木賞シードデータ修正後の全件再マッチング (v3)"""
+    try:
+        con = get_con()
+        done = fetchone(con, "SELECT value FROM settings WHERE key='awards_resync_done_v3'")
+        if done and done.get("value") == "v1":
+            con.close()
+            return
+        rows = fetchall(con, "SELECT isbn, title, author FROM genre_books")
+        con.close()
+        updated = 0
+        for r in rows:
+            con = get_con()
+            _sync_awards_from_master(con, r["isbn"], r["title"], r["author"])
+            con.commit()
+            con.close()
+            updated += 1
+        con = get_con()
+        execute(con, "INSERT INTO settings(key,value) VALUES('awards_resync_done_v3','v1') ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value")
+        con.commit()
+        con.close()
+        print(f"awards resync v3: {updated}冊全件マッチング完了")
+    except Exception as e:
+        print(f"awards resync v3 error: {e}")
 
 
 # ── award_books シードデータ ───────────────────────────────────────────────
