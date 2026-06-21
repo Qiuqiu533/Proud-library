@@ -942,6 +942,7 @@ def _ensure_db():
     threading.Thread(target=_migrate_seed_awards_master, daemon=True).start()
     threading.Thread(target=_migrate_resync_awards_v2, daemon=True).start()
     threading.Thread(target=_migrate_resync_awards_v3, daemon=True).start()
+    threading.Thread(target=_migrate_resync_awards_v4, daemon=True).start()
     threading.Thread(target=_migrate_seed_award_books, daemon=True).start()
     threading.Thread(target=_verify_tables, daemon=True).start()
     threading.Thread(target=_migrate_title_yomi, daemon=True).start()
@@ -1229,6 +1230,11 @@ _AWARDS_SEED = [
     ("直木賞", 2018, None, "受賞", "ファーストラヴ", "島本理生"),
     ("直木賞", 2018, None, "受賞", "銀河鉄道の父", "門井慶喜"),
     ("直木賞", 2017, None, "受賞", "蜜蜂と遠雷", "恩田陸"),
+    ("直木賞", 1996, None, "受賞", "テロリストのパラソル", "藤原伊織"),
+    # ── 江戸川乱歩賞 ──────────────────────────────────────────────
+    ("江戸川乱歩賞", 1985, None, "受賞", "放課後", "東野圭吾"),
+    ("江戸川乱歩賞", 1995, None, "受賞", "テロリストのパラソル", "藤原伊織"),
+    ("江戸川乱歩賞", 1998, None, "受賞", "果つる底なき", "池井戸潤"),
     # ── 山本周五郎賞 ──────────────────────────────────────────────
     ("山本周五郎賞", 2024, None, "受賞", "スピノザの診察室", "夏川草介"),
     ("山本周五郎賞", 2023, None, "受賞", "汝、星のごとく", "凪良ゆう"),
@@ -1275,9 +1281,9 @@ def _migrate_seed_awards_master():
             _AWARDS_SEED
         )
         # awards_resync_doneをリセット → 再マッチング有効化
-        cur.execute("DELETE FROM settings WHERE key IN ('awards_resync_done','awards_resync_done_v2','awards_resync_done_v3')")
+        cur.execute("DELETE FROM settings WHERE key IN ('awards_resync_done','awards_resync_done_v2','awards_resync_done_v3','awards_resync_done_v4')")
         cur.execute("""
-            INSERT INTO settings(key,value) VALUES('awards_seed_done','v3')
+            INSERT INTO settings(key,value) VALUES('awards_seed_done','v4')
             ON CONFLICT(key) DO UPDATE SET value='v2'
         """)
         con.commit()
@@ -1285,6 +1291,7 @@ def _migrate_seed_awards_master():
         print(f"[awards_seed] {len(_AWARDS_SEED)}件登録完了、全件再マッチング開始")
         _migrate_resync_awards_v2()
         _migrate_resync_awards_v3()
+        _migrate_resync_awards_v4()
     except Exception as e:
         print(f"[awards_seed] error: {e}")
 
@@ -1339,6 +1346,32 @@ def _migrate_resync_awards_v2():
         print(f"awards resync v2: {updated}冊全件マッチング完了")
     except Exception as e:
         print(f"awards resync v2 error: {e}")
+
+
+def _migrate_resync_awards_v4():
+    """江戸川乱歩賞追加後の全件再マッチング (v4)"""
+    try:
+        con = get_con()
+        done = fetchone(con, "SELECT value FROM settings WHERE key='awards_resync_done_v4'")
+        if done and done.get("value") == "v1":
+            con.close()
+            return
+        rows = fetchall(con, "SELECT isbn, title, author FROM genre_books")
+        con.close()
+        updated = 0
+        for r in rows:
+            con = get_con()
+            _sync_awards_from_master(con, r["isbn"], r["title"], r["author"])
+            con.commit()
+            con.close()
+            updated += 1
+        con = get_con()
+        execute(con, "INSERT INTO settings(key,value) VALUES('awards_resync_done_v4','v1') ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value")
+        con.commit()
+        con.close()
+        print(f"awards resync v4: {updated}冊全件マッチング完了")
+    except Exception as e:
+        print(f"awards resync v4 error: {e}")
 
 
 def _migrate_resync_awards_v3():
