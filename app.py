@@ -926,6 +926,7 @@ def _ensure_db():
     threading.Thread(target=_migrate_add_staff_chat, daemon=True).start()
     threading.Thread(target=_migrate_lib_schedule, daemon=True).start()
     threading.Thread(target=_migrate_seed_awards_master, daemon=True).start()
+    threading.Thread(target=_migrate_resync_awards_v2, daemon=True).start()
     threading.Thread(target=_verify_tables, daemon=True).start()
     threading.Thread(target=_migrate_title_yomi, daemon=True).start()
     threading.Thread(target=_migrate_pubdate_openbd, daemon=True).start()
@@ -1219,6 +1220,13 @@ _AWARDS_SEED = [
     ("山本周五郎賞", 2020, None, "受賞", "流浪の月", "凪良ゆう"),
     ("山本周五郎賞", 2019, None, "受賞", "ひと", "小野寺史宜"),
     ("山本周五郎賞", 2018, None, "受賞", "かがみの孤城", "辻村深月"),
+    # ── 本格ミステリ大賞（小説部門）────────────────────────────────
+    ("本格ミステリ大賞", 2022, None, "受賞", "黒牢城", "米澤穂信"),
+    ("本格ミステリ大賞", 2021, None, "受賞", "medium 霊媒探偵城塚翡翠", "相沢沙呼"),
+    # ── 日本推理作家協会賞（長編および連作短編集部門）───────────────
+    ("推理作家協会賞", 2022, None, "受賞", "黒牢城", "米澤穂信"),
+    # ── 吉川英治文学賞 ──────────────────────────────────────────────
+    ("吉川英治文学賞", 2022, None, "受賞", "黒牢城", "米澤穂信"),
 ]
 
 
@@ -1229,7 +1237,7 @@ def _migrate_seed_awards_master():
     try:
         con = get_con()
         done = fetchone(con, "SELECT value FROM settings WHERE key='awards_seed_done'")
-        if done and done.get("value") == "v1":
+        if done and done.get("value") == "v2":
             con.close()
             return
         cur = con.cursor()
@@ -1250,15 +1258,15 @@ def _migrate_seed_awards_master():
             _AWARDS_SEED
         )
         # awards_resync_doneをリセット → 再マッチング有効化
-        cur.execute("DELETE FROM settings WHERE key='awards_resync_done'")
+        cur.execute("DELETE FROM settings WHERE key IN ('awards_resync_done','awards_resync_done_v2')")
         cur.execute("""
-            INSERT INTO settings(key,value) VALUES('awards_seed_done','v1')
-            ON CONFLICT(key) DO UPDATE SET value='v1'
+            INSERT INTO settings(key,value) VALUES('awards_seed_done','v2')
+            ON CONFLICT(key) DO UPDATE SET value='v2'
         """)
         con.commit()
         con.close()
-        print(f"[awards_seed] {len(_AWARDS_SEED)}件登録完了、再マッチング開始")
-        _migrate_resync_awards()
+        print(f"[awards_seed] {len(_AWARDS_SEED)}件登録完了、全件再マッチング開始")
+        _migrate_resync_awards_v2()
     except Exception as e:
         print(f"[awards_seed] error: {e}")
 
@@ -1285,6 +1293,34 @@ def _migrate_resync_awards():
         print(f"awards resync: {updated} books re-matched")
     except Exception as e:
         print(f"awards resync error: {e}")
+
+
+def _migrate_resync_awards_v2():
+    """全冊を対象にawards_masterと再マッチング（既存受賞データがある本にも追加賞を付与）"""
+    if not USE_PG:
+        return
+    try:
+        con = get_con()
+        done = fetchone(con, "SELECT value FROM settings WHERE key='awards_resync_done_v2'")
+        if done and done.get("value") == "v1":
+            con.close()
+            return
+        rows = fetchall(con, "SELECT isbn, title, author FROM genre_books")
+        con.close()
+        updated = 0
+        for r in rows:
+            con = get_con()
+            _sync_awards_from_master(con, r["isbn"], r["title"], r["author"])
+            con.commit()
+            con.close()
+            updated += 1
+        con = get_con()
+        execute(con, "INSERT INTO settings(key,value) VALUES('awards_resync_done_v2','v1') ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value")
+        con.commit()
+        con.close()
+        print(f"awards resync v2: {updated}冊全件マッチング完了")
+    except Exception as e:
+        print(f"awards resync v2 error: {e}")
 
 
 def _normalize_pubdate(s):
@@ -2197,8 +2233,13 @@ def api_books_by_genre():
         like = f"%{keyword}%"
         like_kata = f"%{_hira_to_kata(keyword)}%"
         like_hira = f"%{_kata_to_hira(keyword)}%"
-        conditions.append(f"(title LIKE {ph} OR author LIKE {ph} OR title LIKE {ph} OR title LIKE {ph} OR title_yomi LIKE {ph})")
-        params_base.extend([like, like, like_kata, like_hira, like])
+        # title/author: 元のキーワード + ひらがな/カタカナ変換
+        # title_yomi: ひらがな/カタカナ両方で部分一致
+        conditions.append(
+            f"(title LIKE {ph} OR author LIKE {ph} OR title LIKE {ph} OR title LIKE {ph}"
+            f" OR title_yomi LIKE {ph} OR title_yomi LIKE {ph} OR title_yomi LIKE {ph})"
+        )
+        params_base.extend([like, like, like_kata, like_hira, like, like_hira, like_kata])
     if award:
         if USE_PG:
             if award == "本屋大賞":
