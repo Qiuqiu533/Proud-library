@@ -127,6 +127,8 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .award-filter-label { font-size: 0.82rem; font-weight: 700; color: #3d6b4f; white-space: nowrap; }
 .award-filter-pills { display: flex; gap: 6px; flex-wrap: wrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .award-pill { padding: 5px 12px; border-radius: 20px; border: 1.5px solid #ddd; background: white; font-size: 0.8rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: all .18s; white-space: nowrap; flex-shrink: 0; }
+.kana-pill { padding: 4px 10px; border-radius: 16px; border: 1.5px solid #ddd; background: white; font-size: 0.78rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: all .18s; white-space: nowrap; }
+.kana-pill.active, .kana-pill:hover { border-color: #3d6b4f; color: #3d6b4f; background: #e8f5e9; }
 .award-pill.active, .award-pill:hover { border-color: #e65100; color: #e65100; background: #fff8e1; }
 .award-pill--honmia.active, .award-pill--honmia:hover     { border-color: #e65100; color: #e65100; background: #fff3e0; }
 .award-pill--nominee.active, .award-pill--nominee:hover   { border-color: #888; color: #444; background: #f5f5f5; }
