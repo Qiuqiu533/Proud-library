@@ -3,6 +3,14 @@
 let residentSession = null;
 try { residentSession = JSON.parse(sessionStorage.getItem("resident_session") || "null"); } catch {}
 
+function validateRoom(room) {
+  // 街区形式: 1-5 の街区番号 + ハイフン + 3〜4桁部屋番号
+  if (/^[1-5]-\d{3,4}$/.test(room)) return true;
+  // 戸建・任意: 6桁数字
+  if (/^\d{6}$/.test(room)) return true;
+  return false;
+}
+
 function showLoginTab(tab) {
   document.getElementById("loginForm").style.display    = tab === "login"    ? "" : "none";
   document.getElementById("registerForm").style.display = tab === "register" ? "" : "none";
@@ -115,6 +123,7 @@ document.getElementById("loginBtn").addEventListener("click", async () => {
   const pass = document.getElementById("residentPass").value;
   const err  = document.getElementById("loginError");
   if (!room || !pass) { err.textContent = "部屋番号とパスワードを入力してください"; return; }
+  if (!validateRoom(room)) { err.textContent = "部屋番号の形式が正しくありません（例：5-533 または 6桁数字）"; return; }
   err.textContent = "";
   const res = await fetch("/api/user/login", {
     method: "POST", headers: {"Content-Type": "application/json"},
@@ -155,6 +164,7 @@ document.getElementById("registerBtn").addEventListener("click", async () => {
   const email = (document.getElementById("regEmail").value || "").trim();
   const err   = document.getElementById("registerError");
   if (!room) { err.textContent = "部屋番号を入力してください"; return; }
+  if (!validateRoom(room)) { err.textContent = "部屋番号の形式が正しくありません（例：5-533 または 6桁数字）"; return; }
   if (pass.length < 6) { err.textContent = "パスワードは6文字以上で入力してください"; return; }
   if (pass !== pass2) { err.textContent = "パスワードが一致しません"; return; }
   err.textContent = "";
