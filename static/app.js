@@ -674,9 +674,10 @@ function renderRecentBooks() {
   const section = document.getElementById("recentBooksSection");
   const row = document.getElementById("recentBooksRow");
   if (!section || !row) return;
+  // セクション自体は常に表示（ボタンがセクション内にあるため隠すと戻せなくなる）
+  section.style.display = "";
   if (!recent.length) {
     row.innerHTML = '<span style="font-size:0.82rem;color:#aaa;padding:4px 0">本をクリックすると履歴が表示されます</span>';
-    if (localStorage.getItem("recentHidden") !== "1") section.style.display = "";
     return;
   }
   row.innerHTML = recent.map(b => {
@@ -692,7 +693,6 @@ function renderRecentBooks() {
   row.querySelectorAll(".mini-card").forEach(el => {
     el.addEventListener("click", () => openModal(el.dataset.isbn));
   });
-  if (localStorage.getItem("recentHidden") !== "1") section.style.display = "";
 }
 
 function isSectionVisible(key) {
