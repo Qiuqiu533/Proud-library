@@ -590,7 +590,7 @@ def _migrate_admin_users():
 
 
 def _migrate_add_card_columns():
-    """user_accounts に library_card_url/image カラム、genre_books に title_yomi カラムを追加"""
+    """user_accounts に library_card_url/image カラム、genre_books に title_yomi/pubdate カラムを追加"""
     try:
         con = get_con()
         if USE_PG:
@@ -600,11 +600,12 @@ def _migrate_add_card_columns():
                     con.commit()
                 except Exception:
                     con.rollback()
-            try:
-                con.cursor().execute("ALTER TABLE genre_books ADD COLUMN title_yomi TEXT DEFAULT ''")
-                con.commit()
-            except Exception:
-                con.rollback()
+            for col in ("title_yomi", "pubdate"):
+                try:
+                    con.cursor().execute(f"ALTER TABLE genre_books ADD COLUMN {col} TEXT DEFAULT ''")
+                    con.commit()
+                except Exception:
+                    con.rollback()
         else:
             for col in ("library_card_url", "library_card_image"):
                 try:
@@ -612,11 +613,12 @@ def _migrate_add_card_columns():
                     con.commit()
                 except Exception:
                     pass
-            try:
-                con.execute("ALTER TABLE genre_books ADD COLUMN title_yomi TEXT DEFAULT ''")
-                con.commit()
-            except Exception:
-                pass
+            for col in ("title_yomi", "pubdate"):
+                try:
+                    con.execute(f"ALTER TABLE genre_books ADD COLUMN {col} TEXT DEFAULT ''")
+                    con.commit()
+                except Exception:
+                    pass
         con.close()
     except Exception as e:
         print(f"card column migration error: {e}")
@@ -926,6 +928,7 @@ def _ensure_db():
     threading.Thread(target=_migrate_seed_awards_master, daemon=True).start()
     threading.Thread(target=_verify_tables, daemon=True).start()
     threading.Thread(target=_migrate_title_yomi, daemon=True).start()
+    threading.Thread(target=_migrate_pubdate_openbd, daemon=True).start()
 
 
 def _migrate_title_yomi():
@@ -1282,6 +1285,101 @@ def _migrate_resync_awards():
         print(f"awards resync: {updated} books re-matched")
     except Exception as e:
         print(f"awards resync error: {e}")
+
+
+def _normalize_pubdate(s):
+    """OpenBDのpubdate(YYYYMM or YYYYMMDD)をYYYY-MMに正規化してソートを統一する"""
+    if not s:
+        return ""
+    s = s.strip().replace("-", "")
+    if len(s) >= 6 and s[:6].isdigit():
+        return s[:4] + "-" + s[4:6]
+    return ""
+
+
+def _migrate_pubdate_openbd():
+    """Phase1: OpenBD一括取得でgenre_books.pubdateを埋める（6リクエスト・約30秒）"""
+    if not USE_PG:
+        return
+    try:
+        con = get_con()
+        flag = fetchone(con, "SELECT value FROM settings WHERE key='pubdate_openbd_done'")
+        if flag and flag.get("value") == "v1":
+            con.close()
+            return
+        rows = fetchall(con, "SELECT isbn FROM genre_books WHERE pubdate IS NULL OR pubdate = ''")
+        con.close()
+        if not rows:
+            return
+        isbns = [r["isbn"] for r in rows]
+        print(f"[pubdate_openbd] {len(isbns)}冊のpubdateをOpenBDから取得します")
+        updated = 0
+        for i in range(0, len(isbns), 1000):
+            batch = isbns[i:i + 1000]
+            try:
+                resp = requests.get(OPENBD_API, params={"isbn": ",".join(batch)}, timeout=30)
+                con = get_con()
+                for item in resp.json():
+                    if not item:
+                        continue
+                    summary = item.get("summary", {})
+                    isbn = summary.get("isbn", "")
+                    norm = _normalize_pubdate(summary.get("pubdate", "") or "")
+                    if isbn and norm:
+                        execute(con, "UPDATE genre_books SET pubdate=? WHERE isbn=? AND (pubdate IS NULL OR pubdate='')", (norm, isbn))
+                        updated += 1
+                con.commit()
+                con.close()
+            except Exception as e:
+                print(f"[pubdate_openbd] batch error: {e}")
+        print(f"[pubdate_openbd] {updated}冊更新完了")
+        con = get_con()
+        execute(con, "INSERT INTO settings(key,value) VALUES('pubdate_openbd_done','v1') ON CONFLICT(key) DO UPDATE SET value='v1'")
+        con.commit()
+        con.close()
+        # Phase2へ続行
+        threading.Thread(target=_migrate_pubdate_librarylife, daemon=True).start()
+    except Exception as e:
+        print(f"[pubdate_openbd] error: {e}")
+
+
+def _migrate_pubdate_librarylife():
+    """Phase2: OpenBDで取得できなかった本をlibrarylife.netから1冊ずつ補完（1秒/冊）"""
+    if not USE_PG:
+        return
+    try:
+        con = get_con()
+        flag = fetchone(con, "SELECT value FROM settings WHERE key='pubdate_ll_done'")
+        if flag and flag.get("value") == "v1":
+            con.close()
+            return
+        rows = fetchall(con, "SELECT isbn FROM genre_books WHERE pubdate IS NULL OR pubdate = ''")
+        con.close()
+        if not rows:
+            return
+        import time
+        print(f"[pubdate_ll] {len(rows)}冊をlibrarylifeから補完します")
+        updated = 0
+        for r in rows:
+            try:
+                detail = fetch_book_detail(r["isbn"])
+                norm = _normalize_pubdate(detail.get("pubdate", "") or "")
+                if norm:
+                    con = get_con()
+                    execute(con, "UPDATE genre_books SET pubdate=? WHERE isbn=?", (norm, r["isbn"]))
+                    con.commit()
+                    con.close()
+                    updated += 1
+                time.sleep(1)
+            except Exception:
+                pass
+        print(f"[pubdate_ll] {updated}冊補完完了")
+        con = get_con()
+        execute(con, "INSERT INTO settings(key,value) VALUES('pubdate_ll_done','v1') ON CONFLICT(key) DO UPDATE SET value='v1'")
+        con.commit()
+        con.close()
+    except Exception as e:
+        print(f"[pubdate_ll] error: {e}")
 
 
 def _sync_awards_from_master(con, isbn, title, author):
@@ -2117,7 +2215,7 @@ def api_books_by_genre():
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
     params_count = tuple(params_base)
     params_rows  = tuple(params_base) + (per, offset)
-    order = "title_yomi ASC, title ASC" if kana_row else "isbn DESC"
+    order = "title_yomi ASC, title ASC" if kana_row else "NULLIF(pubdate,'') DESC NULLS LAST, isbn DESC"
     sql_count = f"SELECT COUNT(*) as cnt FROM genre_books {where}"
     sql_rows  = f"SELECT isbn,genre,title,author,publisher,format,awards FROM genre_books {where} ORDER BY {order} LIMIT {ph} OFFSET {ph}"
     total_row = fetchone(con, sql_count, params_count)
