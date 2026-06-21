@@ -158,10 +158,15 @@ LIBRARY_INFO = {
     "note": "最新情報はlibrarlife.netをご確認ください。",
 }
 
-_ADMIN_PASSWORD_ENV    = os.environ.get("ADMIN_PASSWORD",    "kanri5533")
-_RESIDENT_PASSWORD_ENV = os.environ.get("RESIDENT_PASSWORD", "proudfunabashi")
-_BOARD_PASSWORD_ENV    = os.environ.get("BOARD_PASSWORD",    "kanri5533")
+_ADMIN_PASSWORD_ENV    = os.environ.get("ADMIN_PASSWORD",    "")
+_RESIDENT_PASSWORD_ENV = os.environ.get("RESIDENT_PASSWORD", "")
+_BOARD_PASSWORD_ENV    = os.environ.get("BOARD_PASSWORD",    "")
 _RESEND_API_KEY        = os.environ.get("RESEND_API_KEY",    "")
+
+# 起動時に必須環境変数の未設定を警告（パスワードはDBのsettingsテーブルにも保存されるため即時エラーにはしない）
+for _env_key, _env_val in [("ADMIN_PASSWORD", _ADMIN_PASSWORD_ENV), ("RESIDENT_PASSWORD", _RESIDENT_PASSWORD_ENV), ("BOARD_PASSWORD", _BOARD_PASSWORD_ENV)]:
+    if not _env_val:
+        print(f"[WARNING] 環境変数 {_env_key} が未設定です。Renderのダッシュボードで設定してください。")
 _APP_BASE_URL          = os.environ.get("APP_BASE_URL",      "https://proud-library.onrender.com")
 
 
@@ -573,7 +578,9 @@ def _migrate_admin_users():
             con.commit()
             row = fetchone(con, "SELECT id FROM admin_users WHERE role='master' LIMIT 1")
             if not row:
-                init_pw = get_board_password() or "kanri5533"
+                init_pw = get_board_password()
+                if not init_pw:
+                    raise RuntimeError("BOARD_PASSWORD 環境変数が未設定のため管理者初期化できません")
                 h, s = _hash_password(init_pw)
                 execute(con, "INSERT INTO admin_users (code, name, password_hash, salt, role) VALUES (?,?,?,?,?)",
                         ("A000", "秋山", h, s, "master"))
@@ -593,7 +600,9 @@ def _migrate_admin_users():
             con.commit()
             row = fetchone(con, "SELECT id FROM admin_users WHERE role='master' LIMIT 1")
             if not row:
-                init_pw = get_board_password() or "kanri5533"
+                init_pw = get_board_password()
+                if not init_pw:
+                    raise RuntimeError("BOARD_PASSWORD 環境変数が未設定のため管理者初期化できません")
                 h, s = _hash_password(init_pw)
                 execute(con, "INSERT INTO admin_users (code, name, password_hash, salt, role) VALUES (?,?,?,?,?)",
                         ("A000", "秋山", h, s, "master"))
