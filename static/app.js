@@ -128,6 +128,28 @@ function _bindEl(id, ev, fn) {
   if (el) el.addEventListener(ev, fn);
 }
 
+function _setupRoomAutoHyphen(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener("input", () => {
+    let v = el.value.replace(/[^\d\-]/g, "");
+    if (/^[1-5]\d/.test(v.replace("-", "")) && !v.includes("-")) {
+      v = v[0] + "-" + v.slice(1);
+    }
+    if (v !== el.value) el.value = v;
+  });
+  el.addEventListener("keydown", e => {
+    if (e.key === "Backspace" && el.value.endsWith("-")) {
+      e.preventDefault();
+      el.value = el.value.slice(0, -1);
+    }
+  });
+}
+
+_setupRoomAutoHyphen("loginRoom");
+_setupRoomAutoHyphen("regRoom");
+_setupRoomAutoHyphen("forgotRoom");
+
 _bindEl("tabLogin",    "click", () => showLoginTab("login"));
 _bindEl("tabRegister", "click", () => showLoginTab("register"));
 _bindEl("toForgotBtn", "click", () => showLoginTab("forgot"));
