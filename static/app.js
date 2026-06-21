@@ -219,19 +219,58 @@ document.getElementById("registerBtn").addEventListener("click", async () => {
   }
 });
 
+let _forgotResetToken = null;
+
 document.getElementById("forgotBtn").addEventListener("click", async () => {
   const room  = (document.getElementById("forgotRoom").value  || "").trim();
   const email = (document.getElementById("forgotEmail").value || "").trim();
   const msg   = document.getElementById("forgotMsg");
   if (!room || !email) { msg.style.color = "#e05"; msg.textContent = "部屋番号とメールアドレスを入力してください"; return; }
-  msg.style.color = "#888"; msg.textContent = "送信中...";
+  msg.style.color = "#888"; msg.textContent = "確認中...";
   const res = await fetch("/api/user/forgot-password", {
     method: "POST", headers: {"Content-Type": "application/json"},
     body: JSON.stringify({room, email})
   });
   const data = await res.json();
-  msg.style.color = res.ok ? "#2a7a2a" : "#e05";
-  msg.textContent = data.message || data.error || (res.ok ? "送信しました" : "エラーが発生しました");
+  if (res.ok && data.token) {
+    _forgotResetToken = data.token;
+    document.getElementById("forgotStep1").style.display = "none";
+    document.getElementById("forgotStep2").style.display = "";
+    msg.style.color = "#2a7a2a";
+    msg.textContent = "本人確認できました。新しいパスワードを入力してください。";
+  } else {
+    msg.style.color = "#e05";
+    msg.textContent = data.error || "エラーが発生しました";
+  }
+});
+
+document.getElementById("forgotResetBtn").addEventListener("click", async () => {
+  const p1  = (document.getElementById("forgotNewPass").value  || "");
+  const p2  = (document.getElementById("forgotNewPass2").value || "");
+  const msg = document.getElementById("forgotMsg");
+  if (p1.length < 6) { msg.style.color = "#e05"; msg.textContent = "6文字以上で入力してください"; return; }
+  if (p1 !== p2)     { msg.style.color = "#e05"; msg.textContent = "パスワードが一致しません"; return; }
+  msg.style.color = "#888"; msg.textContent = "設定中...";
+  const res = await fetch("/api/user/reset-password", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({token: _forgotResetToken, password: p1})
+  });
+  const data = await res.json();
+  if (res.ok) {
+    alert("パスワードを再設定しました。新しいパスワードでログインしてください。");
+    _forgotResetToken = null;
+    document.getElementById("forgotStep1").style.display = "";
+    document.getElementById("forgotStep2").style.display = "none";
+    document.getElementById("forgotRoom").value = "";
+    document.getElementById("forgotEmail").value = "";
+    document.getElementById("forgotNewPass").value = "";
+    document.getElementById("forgotNewPass2").value = "";
+    msg.textContent = "";
+    showLoginTab("login");
+  } else {
+    msg.style.color = "#e05";
+    msg.textContent = data.error || "エラーが発生しました";
+  }
 });
 
 document.getElementById("logoutBtn").addEventListener("click", () => {
