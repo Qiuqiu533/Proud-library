@@ -2327,7 +2327,7 @@ def api_books_no_review():
         SELECT isbn, title, author FROM genre_books
         WHERE (description IS NULL OR description = '')
           AND manual_review IS NOT TRUE
-        ORDER BY title
+        ORDER BY created_at DESC NULLS LAST
         LIMIT 200
     """)
     con2 = get_con()
