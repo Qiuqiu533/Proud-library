@@ -17,6 +17,11 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .login-btn:hover { opacity: 0.88; }
 .login-error { color: #e05; font-size: 0.85rem; min-height: 1.2em; margin-bottom: 8px; }
 .login-note { font-size: 0.75rem; color: #bbb; margin-top: 16px; }
+.login-tabs { display: flex; gap: 8px; margin-bottom: 20px; background: #f5f5f5; border-radius: 12px; padding: 4px; }
+.login-tab { flex: 1; padding: 10px; border: none; background: transparent; border-radius: 9px; font-family: inherit; font-size: 0.9rem; font-weight: 600; color: #888; cursor: pointer; transition: all .2s; }
+.login-tab-active { background: white; color: #2a4a37; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.login-link-btn { background: none; border: none; color: #3d6b4f; font-size: 0.82rem; cursor: pointer; text-decoration: underline; margin-top: 8px; padding: 4px; }
+.login-input { letter-spacing: normal; }
 .login-qr-section { margin-top: 20px; }
 .login-qr-divider { display: flex; align-items: center; gap: 10px; color: #ccc; font-size: 0.8rem; margin-bottom: 16px; }
 .login-qr-divider::before, .login-qr-divider::after { content: ""; flex: 1; height: 1px; background: #eee; }

@@ -5,6 +5,9 @@ import json
 import os
 import threading
 import time
+import secrets
+import smtplib
+from email.mime.text import MIMEText
 from collections import defaultdict
 
 # ── ジャンル別蔵書データ（Excelから事前生成）──────────────────────────────
@@ -140,6 +143,9 @@ LIBRARY_INFO = {
 _ADMIN_PASSWORD_ENV    = os.environ.get("ADMIN_PASSWORD",    "kanri5533")
 _RESIDENT_PASSWORD_ENV = os.environ.get("RESIDENT_PASSWORD", "proudfunabashi")
 _BOARD_PASSWORD_ENV    = os.environ.get("BOARD_PASSWORD",    "kanri5533")
+_GMAIL_USER            = os.environ.get("GMAIL_USER",        "")
+_GMAIL_APP_PASSWORD    = os.environ.get("GMAIL_APP_PASSWORD","")
+_APP_BASE_URL          = os.environ.get("APP_BASE_URL",      "https://proud-library.onrender.com")
 
 
 def get_setting(key, default=""):
@@ -254,11 +260,22 @@ def init_db():
             CREATE TABLE IF NOT EXISTS user_accounts (
                 room TEXT PRIMARY KEY,
                 pin TEXT NOT NULL,
+                email TEXT DEFAULT '',
+                password_hash TEXT DEFAULT '',
+                password_salt TEXT DEFAULT '',
                 favorites TEXT DEFAULT '[]',
                 reading_log TEXT DEFAULT '{}',
                 library_card_url TEXT DEFAULT '',
                 library_card_image TEXT DEFAULT '',
                 updated_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                token TEXT PRIMARY KEY,
+                room TEXT NOT NULL,
+                expires_at TIMESTAMP NOT NULL,
+                used BOOLEAN DEFAULT FALSE
             )
         """)
         cur.execute("""
@@ -412,11 +429,22 @@ def init_db():
             CREATE TABLE IF NOT EXISTS user_accounts (
                 room TEXT PRIMARY KEY,
                 pin TEXT NOT NULL,
+                email TEXT DEFAULT '',
+                password_hash TEXT DEFAULT '',
+                password_salt TEXT DEFAULT '',
                 favorites TEXT DEFAULT '[]',
                 reading_log TEXT DEFAULT '{}',
                 library_card_url TEXT DEFAULT '',
                 library_card_image TEXT DEFAULT '',
                 updated_at TEXT DEFAULT (datetime('now','localtime'))
+            )
+        """)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                token TEXT PRIMARY KEY,
+                room TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                used INTEGER DEFAULT 0
             )
         """)
         con.execute("""
@@ -575,6 +603,87 @@ def _migrate_add_card_columns():
         con.close()
     except Exception as e:
         print(f"card column migration error: {e}")
+
+
+def _migrate_add_user_auth_columns():
+    """user_accounts に email/password_hash/password_salt カラムを追加"""
+    try:
+        con = get_con()
+        if USE_PG:
+            for col, default in [("email", "''"), ("password_hash", "''"), ("password_salt", "''")]:
+                try:
+                    con.cursor().execute(f"ALTER TABLE user_accounts ADD COLUMN {col} TEXT DEFAULT {default}")
+                    con.commit()
+                except Exception:
+                    con.rollback()
+            try:
+                con.cursor().execute("""
+                    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                        token TEXT PRIMARY KEY,
+                        room TEXT NOT NULL,
+                        expires_at TIMESTAMP NOT NULL,
+                        used BOOLEAN DEFAULT FALSE
+                    )
+                """)
+                con.commit()
+            except Exception:
+                con.rollback()
+        else:
+            for col in ("email", "password_hash", "password_salt"):
+                try:
+                    con.execute(f"ALTER TABLE user_accounts ADD COLUMN {col} TEXT DEFAULT ''")
+                    con.commit()
+                except Exception:
+                    pass
+            try:
+                con.execute("""
+                    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                        token TEXT PRIMARY KEY,
+                        room TEXT NOT NULL,
+                        expires_at TEXT NOT NULL,
+                        used INTEGER DEFAULT 0
+                    )
+                """)
+                con.commit()
+            except Exception:
+                pass
+        con.close()
+    except Exception as e:
+        print(f"user auth column migration error: {e}")
+
+
+def _send_reset_email(to_email, room, token):
+    """Gmailでパスワードリセットメールを送信"""
+    if not _GMAIL_USER or not _GMAIL_APP_PASSWORD:
+        return False
+    reset_url = f"{_APP_BASE_URL}/reset-password?token={token}"
+    body = f"""プラウド船橋 コミュニティ図書館
+
+パスワードリセットのご依頼を受け付けました。
+
+下記のURLをクリックして、新しいパスワードを設定してください。
+（このリンクは30分間有効です）
+
+{reset_url}
+
+このメールに心当たりがない場合は、そのまま無視してください。
+
+─────────────────────────
+プラウド船橋 コミュニティ図書館
+"""
+    msg = MIMEText(body, "plain", "utf-8")
+    msg["Subject"] = "【プラウド船橋図書館】パスワードリセット"
+    msg["From"] = _GMAIL_USER
+    msg["To"] = to_email
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+            smtp.login(_GMAIL_USER, _GMAIL_APP_PASSWORD)
+            smtp.send_message(msg)
+        return True
+    except Exception as e:
+        print(f"email send error: {e}")
+        return False
+
 
 NDC_TO_GENRE = {
     # 日本文学
@@ -765,6 +874,7 @@ def _ensure_db():
     except Exception as e:
         print(f"DB init error: {e}")
     threading.Thread(target=_migrate_add_card_columns, daemon=True).start()
+    threading.Thread(target=_migrate_add_user_auth_columns, daemon=True).start()
     threading.Thread(target=_migrate_admin_users, daemon=True).start()
     threading.Thread(target=_migrate_genre_map_to_db, daemon=True).start()
     threading.Thread(target=_migrate_ndc_genres, daemon=True).start()
@@ -2534,25 +2644,60 @@ def api_chat_threads_delete(thread_id):
 
 
 # --- Cloud Sync ---
+def _user_auth_ok(user, password):
+    """パスワードハッシュで認証。旧PIN方式にも対応"""
+    if user.get("password_hash") and user.get("password_salt"):
+        return _verify_password(password, user["password_hash"], user["password_salt"])
+    # 旧PIN方式（後方互換）
+    return user.get("pin") == password
+
+
+@app.route("/api/user/register", methods=["POST"])
+def api_user_register():
+    body = request.get_json()
+    room     = (body.get("room")     or "").strip()
+    password = (body.get("password") or "").strip()
+    email    = (body.get("email")    or "").strip()
+    if not room or not password or len(password) < 6:
+        return jsonify({"error": "部屋番号と6文字以上のパスワードを入力してください"}), 400
+    con = get_con()
+    user = fetchone(con, "SELECT room, password_hash FROM user_accounts WHERE room=?", (room,))
+    if user and user.get("password_hash"):
+        con.close()
+        return jsonify({"error": "この部屋番号はすでに登録されています"}), 409
+    h, s = _hash_password(password)
+    if user is None:
+        execute(con, "INSERT INTO user_accounts (room, pin, email, password_hash, password_salt) VALUES (?,?,?,?,?)",
+                (room, password, email, h, s))
+    else:
+        if USE_PG:
+            execute(con, "UPDATE user_accounts SET email=?, password_hash=?, password_salt=?, updated_at=NOW() WHERE room=?", (email, h, s, room))
+        else:
+            execute(con, "UPDATE user_accounts SET email=?, password_hash=?, password_salt=?, updated_at=datetime('now','localtime') WHERE room=?", (email, h, s, room))
+    con.commit(); con.close()
+    return jsonify({"ok": True, "is_new": True})
+
+
 @app.route("/api/user/login", methods=["POST"])
 def api_user_login():
     body = request.get_json()
-    room = (body.get("room") or "").strip()
-    pin  = (body.get("pin")  or "").strip()
-    if not room or not pin or len(pin) < 4:
-        return jsonify({"error": "部屋番号と4桁以上のPINを入力してください"}), 400
+    room     = (body.get("room")     or "").strip()
+    password = (body.get("password") or body.get("pin") or "").strip()
+    if not room or not password:
+        return jsonify({"error": "部屋番号とパスワードを入力してください"}), 400
     con = get_con()
-    user = fetchone(con, "SELECT room, pin, favorites, reading_log, library_card_url, library_card_image FROM user_accounts WHERE room=?", (room,))
+    user = fetchone(con, "SELECT room, pin, email, password_hash, password_salt, favorites, reading_log, library_card_url, library_card_image FROM user_accounts WHERE room=?", (room,))
     if user is None:
-        execute(con, "INSERT INTO user_accounts (room, pin) VALUES (?,?)", (room, pin))
-        con.commit(); con.close()
-        return jsonify({"ok": True, "is_new": True, "favorites": [], "reading_log": {}, "library_card_url": "", "library_card_image": ""})
-    if user["pin"] != pin:
         con.close()
-        return jsonify({"error": "PINが違います"}), 401
+        return jsonify({"error": "この部屋番号は未登録です。まず新規登録してください"}), 404
+    if not _user_auth_ok(user, password):
+        con.close()
+        return jsonify({"error": "パスワードが違います"}), 401
     con.close()
     return jsonify({
-        "ok": True, "is_new": False,
+        "ok": True,
+        "room": user["room"],
+        "email": user.get("email") or "",
         "favorites": json.loads(user["favorites"] or "[]"),
         "reading_log": json.loads(user["reading_log"] or "{}"),
         "library_card_url": user.get("library_card_url") or "",
@@ -2563,13 +2708,13 @@ def api_user_login():
 @app.route("/api/user/sync", methods=["POST"])
 def api_user_sync():
     body = request.get_json()
-    room = (body.get("room") or "").strip()
-    pin  = (body.get("pin")  or "").strip()
-    if not room or not pin:
+    room     = (body.get("room")     or "").strip()
+    password = (body.get("password") or body.get("pin") or "").strip()
+    if not room or not password:
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
-    user = fetchone(con, "SELECT pin FROM user_accounts WHERE room=?", (room,))
-    if not user or user["pin"] != pin:
+    user = fetchone(con, "SELECT pin, password_hash, password_salt FROM user_accounts WHERE room=?", (room,))
+    if not user or not _user_auth_ok(user, password):
         con.close()
         return jsonify({"error": "unauthorized"}), 401
     favs = json.dumps(body.get("favorites", []), ensure_ascii=False)
@@ -2584,6 +2729,118 @@ def api_user_sync():
                 (favs, rlog, card_url, card_img, room))
     con.commit(); con.close()
     return jsonify({"ok": True})
+
+
+@app.route("/api/user/update-email", methods=["POST"])
+def api_user_update_email():
+    body = request.get_json()
+    room     = (body.get("room")     or "").strip()
+    password = (body.get("password") or body.get("pin") or "").strip()
+    email    = (body.get("email")    or "").strip()
+    if not room or not password or not email:
+        return jsonify({"error": "入力が不足しています"}), 400
+    con = get_con()
+    user = fetchone(con, "SELECT pin, password_hash, password_salt FROM user_accounts WHERE room=?", (room,))
+    if not user or not _user_auth_ok(user, password):
+        con.close()
+        return jsonify({"error": "認証に失敗しました"}), 401
+    if USE_PG:
+        execute(con, "UPDATE user_accounts SET email=?, updated_at=NOW() WHERE room=?", (email, room))
+    else:
+        execute(con, "UPDATE user_accounts SET email=?, updated_at=datetime('now','localtime') WHERE room=?", (email, room))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/user/change-password", methods=["POST"])
+def api_user_change_password():
+    body = request.get_json()
+    room         = (body.get("room")         or "").strip()
+    old_password = (body.get("old_password") or "").strip()
+    new_password = (body.get("new_password") or "").strip()
+    if not room or not old_password or not new_password or len(new_password) < 6:
+        return jsonify({"error": "6文字以上の新しいパスワードを入力してください"}), 400
+    con = get_con()
+    user = fetchone(con, "SELECT pin, password_hash, password_salt FROM user_accounts WHERE room=?", (room,))
+    if not user or not _user_auth_ok(user, old_password):
+        con.close()
+        return jsonify({"error": "現在のパスワードが違います"}), 401
+    h, s = _hash_password(new_password)
+    if USE_PG:
+        execute(con, "UPDATE user_accounts SET password_hash=?, password_salt=?, pin=?, updated_at=NOW() WHERE room=?", (h, s, new_password, room))
+    else:
+        execute(con, "UPDATE user_accounts SET password_hash=?, password_salt=?, pin=?, updated_at=datetime('now','localtime') WHERE room=?", (h, s, new_password, room))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/user/forgot-password", methods=["POST"])
+def api_user_forgot_password():
+    body  = request.get_json()
+    room  = (body.get("room")  or "").strip()
+    email = (body.get("email") or "").strip()
+    if not room or not email:
+        return jsonify({"error": "部屋番号とメールアドレスを入力してください"}), 400
+    con = get_con()
+    user = fetchone(con, "SELECT email FROM user_accounts WHERE room=?", (room,))
+    if not user or (user.get("email") or "").lower() != email.lower():
+        con.close()
+        # セキュリティのため成功と同じメッセージを返す
+        return jsonify({"ok": True, "message": "登録メールアドレスにリセットリンクを送信しました"})
+    token = secrets.token_urlsafe(32)
+    if USE_PG:
+        execute(con, "INSERT INTO password_reset_tokens (token, room, expires_at) VALUES (?, ?, NOW() + INTERVAL '30 minutes')", (token, room))
+    else:
+        execute(con, "INSERT INTO password_reset_tokens (token, room, expires_at) VALUES (?, ?, datetime('now','+30 minutes'))", (token, room))
+    con.commit(); con.close()
+    _send_reset_email(email, room, token)
+    return jsonify({"ok": True, "message": "登録メールアドレスにリセットリンクを送信しました"})
+
+
+@app.route("/api/user/reset-password", methods=["POST"])
+def api_user_reset_password():
+    body     = request.get_json()
+    token    = (body.get("token")    or "").strip()
+    password = (body.get("password") or "").strip()
+    if not token or not password or len(password) < 6:
+        return jsonify({"error": "6文字以上の新しいパスワードを入力してください"}), 400
+    con = get_con()
+    if USE_PG:
+        row = fetchone(con, "SELECT room, expires_at, used FROM password_reset_tokens WHERE token=?", (token,))
+    else:
+        row = fetchone(con, "SELECT room, expires_at, used FROM password_reset_tokens WHERE token=?", (token,))
+    if not row:
+        con.close()
+        return jsonify({"error": "無効なリンクです"}), 400
+    if row["used"]:
+        con.close()
+        return jsonify({"error": "このリンクはすでに使用済みです"}), 400
+    if USE_PG:
+        exp_check = fetchone(con, "SELECT (expires_at < NOW()) AS expired FROM password_reset_tokens WHERE token=?", (token,))
+        if exp_check and exp_check["expired"]:
+            con.close()
+            return jsonify({"error": "リンクの有効期限が切れています。再度お申し込みください"}), 400
+    else:
+        exp_check = fetchone(con, "SELECT (expires_at < datetime('now')) AS expired FROM password_reset_tokens WHERE token=?", (token,))
+        if exp_check and exp_check["expired"]:
+            con.close()
+            return jsonify({"error": "リンクの有効期限が切れています。再度お申し込みください"}), 400
+    room = row["room"]
+    h, s = _hash_password(password)
+    if USE_PG:
+        execute(con, "UPDATE user_accounts SET password_hash=?, password_salt=?, pin=?, updated_at=NOW() WHERE room=?", (h, s, password, room))
+        execute(con, "UPDATE password_reset_tokens SET used=TRUE WHERE token=?", (token,))
+    else:
+        execute(con, "UPDATE user_accounts SET password_hash=?, password_salt=?, pin=?, updated_at=datetime('now','localtime') WHERE room=?", (h, s, password, room))
+        execute(con, "UPDATE password_reset_tokens SET used=1 WHERE token=?", (token,))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/reset-password")
+def reset_password_page():
+    """パスワードリセットページ（メールリンクから遷移）"""
+    return render_template("index.html")
 
 
 # --- Password change ---
