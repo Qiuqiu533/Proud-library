@@ -43,8 +43,8 @@
 
       <!-- ログインタブ切替 -->
       <div class="login-tabs">
-        <button class="login-tab login-tab-active" id="tabLogin" onclick="showLoginTab('login')">ログイン</button>
-        <button class="login-tab" id="tabRegister" onclick="showLoginTab('register')">新規登録</button>
+        <button class="login-tab login-tab-active" id="tabLogin">ログイン</button>
+        <button class="login-tab" id="tabRegister">新規登録</button>
       </div>
 
       <!-- ログインフォーム -->
@@ -57,7 +57,7 @@
           <button id="loginBtn" class="login-btn">入室する</button>
         </div>
         <p id="loginError" class="login-error"></p>
-        <button class="login-link-btn" onclick="showLoginTab('forgot')">パスワードを忘れた方はこちら</button>
+        <button class="login-link-btn" id="toForgotBtn">パスワードを忘れた方はこちら</button>
       </div>
 
       <!-- 新規登録フォーム -->
@@ -85,7 +85,7 @@
           <button id="forgotBtn" class="login-btn">リセットリンクを送信</button>
         </div>
         <p id="forgotMsg" class="login-error"></p>
-        <button class="login-link-btn" onclick="showLoginTab('login')">ログインに戻る</button>
+        <button class="login-link-btn" id="toLoginBtn">ログインに戻る</button>
       </div>
 
       <div class="login-qr-section">

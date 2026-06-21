@@ -118,6 +118,11 @@ async function _initLoginQr() {
   } catch(e) {}
 }
 
+document.getElementById("tabLogin").addEventListener("click", () => showLoginTab("login"));
+document.getElementById("tabRegister").addEventListener("click", () => showLoginTab("register"));
+document.getElementById("toForgotBtn").addEventListener("click", () => showLoginTab("forgot"));
+document.getElementById("toLoginBtn").addEventListener("click", () => showLoginTab("login"));
+
 document.getElementById("loginBtn").addEventListener("click", async () => {
   const room = (document.getElementById("loginRoom").value || "").trim();
   const pass = document.getElementById("residentPass").value;
