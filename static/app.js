@@ -4558,3 +4558,113 @@ document.addEventListener("DOMContentLoaded", () => {
     btn.addEventListener("click", () => setTimeout(initAwardsTab, 0));
   });
 });
+
+// ===== 受賞作DB管理（管理者） =====
+async function loadAdminAwardBooks() {
+  const list = document.getElementById("adminAwardList");
+  const countEl = document.getElementById("awdCount");
+  if (!list) return;
+  const award = document.getElementById("awdFilterAward")?.value || "";
+  const pw = boardPassword;
+  list.innerHTML = '<div style="color:#aaa;padding:16px">読み込み中…</div>';
+  try {
+    const url = `/api/award-books/admin?password=${encodeURIComponent(pw)}&award=${encodeURIComponent(award)}`;
+    const res = await fetch(url);
+    if (!res.ok) { list.innerHTML = `<div style="color:#c44;padding:16px">取得エラー (${res.status})</div>`; return; }
+    const books = await res.json();
+    if (countEl) countEl.textContent = `${books.length}件`;
+    if (!books.length) { list.innerHTML = '<div style="color:#aaa;padding:16px">登録データなし</div>'; return; }
+    list.innerHTML = `
+      <table style="width:100%;border-collapse:collapse;font-size:0.82rem">
+        <thead>
+          <tr style="background:#f0f0f0;text-align:left">
+            <th style="padding:7px 8px;border-bottom:1px solid #ddd">賞名</th>
+            <th style="padding:7px 8px;border-bottom:1px solid #ddd">回</th>
+            <th style="padding:7px 8px;border-bottom:1px solid #ddd">年</th>
+            <th style="padding:7px 8px;border-bottom:1px solid #ddd">タイトル</th>
+            <th style="padding:7px 8px;border-bottom:1px solid #ddd">著者</th>
+            <th style="padding:7px 8px;border-bottom:1px solid #ddd">状態</th>
+            <th style="padding:7px 8px;border-bottom:1px solid #ddd"></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${books.map(b => `
+            <tr style="border-bottom:1px solid #eee" id="awdrow-${b.id}">
+              <td style="padding:6px 8px">${b.award}</td>
+              <td style="padding:6px 8px;text-align:center">${b.award_no ?? "—"}</td>
+              <td style="padding:6px 8px;text-align:center">${b.award_year ?? "—"}</td>
+              <td style="padding:6px 8px;font-weight:500">${b.title}</td>
+              <td style="padding:6px 8px">${b.author || "—"}</td>
+              <td style="padding:6px 8px">
+                <span style="font-size:0.75rem;padding:2px 7px;border-radius:10px;background:${b.status==='確認済'?'#e8f5e9':'#fff8e1'};color:${b.status==='確認済'?'#2e7d32':'#f57f17'}">
+                  ${b.status}
+                </span>
+              </td>
+              <td style="padding:6px 8px">
+                <button onclick="deleteAwardBook(${b.id})"
+                  style="font-size:0.75rem;padding:3px 8px;background:#ffebee;color:#c62828;border:1px solid #ef9a9a;border-radius:5px;cursor:pointer">
+                  削除
+                </button>
+              </td>
+            </tr>`).join("")}
+        </tbody>
+      </table>`;
+  } catch(e) {
+    list.innerHTML = `<div style="color:#c44;padding:16px">エラー: ${e.message}</div>`;
+  }
+}
+
+async function submitAwardBook() {
+  const msg = document.getElementById("awdMsg");
+  const award  = document.getElementById("awdAward")?.value?.trim();
+  const title  = document.getElementById("awdTitle")?.value?.trim();
+  const author = document.getElementById("awdAuthor")?.value?.trim();
+  const year   = parseInt(document.getElementById("awdYear")?.value) || null;
+  const no     = parseInt(document.getElementById("awdNo")?.value) || null;
+  const status = document.getElementById("awdStatus")?.value || "確認済";
+  if (!award || !title) { msg.textContent = "❌ 賞名とタイトルは必須です"; return; }
+  msg.textContent = "送信中…";
+  try {
+    const res = await fetch("/api/award-books", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ password: boardPassword, award, title, author, award_year: year, award_no: no, status })
+    });
+    if (res.ok) {
+      msg.textContent = "✅ 登録しました";
+      document.getElementById("awdTitle").value = "";
+      document.getElementById("awdAuthor").value = "";
+      document.getElementById("awdYear").value = "";
+      document.getElementById("awdNo").value = "";
+      loadAdminAwardBooks();
+      setTimeout(() => { msg.textContent = ""; }, 3000);
+    } else {
+      const err = await res.json().catch(() => ({}));
+      msg.textContent = "❌ " + (err.error || res.status);
+    }
+  } catch(e) { msg.textContent = "❌ 通信エラー"; }
+}
+
+async function deleteAwardBook(id) {
+  if (!confirm("この受賞作を削除しますか？")) return;
+  const res = await fetch(`/api/award-books/${id}`, {
+    method: "DELETE",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ password: boardPassword })
+  });
+  if (res.ok) {
+    document.getElementById(`awdrow-${id}`)?.remove();
+    const countEl = document.getElementById("awdCount");
+    if (countEl) {
+      const cur = parseInt(countEl.textContent) || 0;
+      countEl.textContent = `${Math.max(0, cur-1)}件`;
+    }
+  }
+}
+
+// btab切替時に読み込み
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll('.board-tab[data-btab="awarddb"]').forEach(btn => {
+    btn.addEventListener("click", () => setTimeout(loadAdminAwardBooks, 0));
+  });
+});
