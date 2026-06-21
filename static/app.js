@@ -29,7 +29,7 @@ function _enterApp() {
 
 async function _offerMigrateReadingLog() {
   if (!residentSession) return;
-  const localLogs = getAllReadStatuses();
+  const localLogs = getLogEntries();
   if (localLogs.length === 0) return;
   if (localStorage.getItem("reading_log_migrated_" + residentSession.room)) return;
   if (!confirm(`このデバイスに読書記録が${localLogs.length}件あります。\nアカウントに保存しますか？\n（以後は複数端末で同期されます）`)) return;
@@ -37,7 +37,7 @@ async function _offerMigrateReadingLog() {
   localLogs.forEach(({isbn, status}) => {
     reading_log[isbn] = {status, ...getReadMeta(isbn)};
   });
-  const favs = getFavs();
+  const favs = getFavIsbns();
   await fetch("/api/user/sync", {
     method: "POST", headers: {"Content-Type": "application/json"},
     body: JSON.stringify({room: residentSession.room, password: residentSession.password, favorites: favs, reading_log})
