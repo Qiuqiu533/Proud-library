@@ -1573,7 +1573,11 @@ document.querySelectorAll(".kana-pill").forEach(btn => {
     btn.classList.add("active");
     currentKana = btn.dataset.kana || "";
     currentPage = 1;
-    loadBooks(currentKeyword, 1);
+    // 50音フィルター選択時はキーワード検索をクリア（AND検索で0件になるため）
+    currentKeyword = "";
+    const si = document.getElementById("searchInput");
+    if (si) si.value = "";
+    loadBooks("", 1);
   });
 });
 
