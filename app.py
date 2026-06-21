@@ -913,32 +913,51 @@ def _ensure_db():
 
 
 def _migrate_title_yomi():
-    """title_yomiが空の本にpykakasiで読み仮名を一括生成する"""
+    """title_yomiが空の本にpykakasiで読み仮名を一括生成する（100件ずつバッチ）"""
     try:
+        # 完了フラグ確認（再起動のたびに全件処理しない）
+        con = get_con()
+        flag = fetchone(con, "SELECT value FROM settings WHERE key='title_yomi_done'")
+        con.close()
+        if flag and flag["value"] == "1":
+            return
         import pykakasi
         kks = pykakasi.kakasi()
         con = get_con()
         rows = fetchall(con, "SELECT isbn, title FROM genre_books WHERE title_yomi IS NULL OR title_yomi = ''")
+        con.close()
         if not rows:
-            con.close()
             print("[yomi] 全件登録済み")
             return
         print(f"[yomi] {len(rows)}件のよみがなを生成します")
         updated = 0
-        for r in rows:
-            try:
-                result = kks.convert(r["title"])
-                yomi = "".join(item["hira"] for item in result)
-                if yomi:
-                    execute(con, "UPDATE genre_books SET title_yomi=? WHERE isbn=?", (yomi, r["isbn"]))
-                    updated += 1
-            except Exception:
-                pass
+        batch_size = 100
+        for i in range(0, len(rows), batch_size):
+            batch = rows[i:i + batch_size]
+            con = get_con()
+            for r in batch:
+                try:
+                    result = kks.convert(r["title"])
+                    yomi = "".join(item["hira"] for item in result)
+                    if yomi:
+                        execute(con, "UPDATE genre_books SET title_yomi=? WHERE isbn=?", (yomi, r["isbn"]))
+                        updated += 1
+                except Exception:
+                    pass
+            con.commit()
+            con.close()
+            print(f"[yomi] {min(i + batch_size, len(rows))}/{len(rows)}件処理中...")
+        # 完了フラグ保存
+        con = get_con()
+        if USE_PG:
+            execute(con, "INSERT INTO settings(key,value) VALUES(%s,%s) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value", ("title_yomi_done", "1"))
+        else:
+            execute(con, "INSERT OR REPLACE INTO settings(key,value) VALUES(?,?)", ("title_yomi_done", "1"))
         con.commit()
         con.close()
-        print(f"[yomi] {updated}件のよみがなを登録しました")
+        print(f"[yomi] 完了: {updated}件登録しました")
     except ImportError:
-        print("[yomi] pykakasi未インストール。requirements.txtを確認してください")
+        print("[yomi] pykakasi未インストール")
     except Exception as e:
         print(f"[yomi] migrate error: {e}")
 
