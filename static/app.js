@@ -1919,6 +1919,7 @@ document.querySelectorAll(".board-tab").forEach(btn => {
       document.getElementById("descCount").textContent = "（0/600文字）";
       document.getElementById("descBookInfo").style.display = "none";
       document.getElementById("descMsg").textContent = "";
+      const b1 = document.getElementById("descAwardBadges"); if (b1) b1.innerHTML = "";
       loadNoBooksReview();
     }
   });
@@ -2433,6 +2434,7 @@ function switchBoardTab(tabKey) {
     document.getElementById("descBookInfo").style.display = "none";
     document.getElementById("descSearchResults").style.display = "none";
     document.getElementById("descTitleSearch").value = "";
+    const b2 = document.getElementById("descAwardBadges"); if (b2) b2.innerHTML = "";
     loadNoBooksReview();
   }
   // スクロールを先頭に戻す
@@ -4355,6 +4357,12 @@ async function lookupBookAwards(isbn) {
   const container = document.getElementById("awardEntries");
   container.innerHTML = "";
   (data.awards || []).forEach(a => addAwardEntry(a.award, a.year, a.type, a.rank || ""));
+  // 書評入力画面の受賞バッジ表示
+  const badgeEl = document.getElementById("descAwardBadges");
+  if (badgeEl) {
+    const html = renderAwardBadges(data.awards || []);
+    badgeEl.innerHTML = html || '<span style="font-size:0.78rem;color:#aaa">受賞歴なし（または未登録）</span>';
+  }
 }
 
 // ── 書評入力（管理者） ─────────────────────────────────────────────────────
