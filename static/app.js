@@ -4159,9 +4159,11 @@ async function loadAdminCollections() {
   const list = document.getElementById("adminCollectionList");
   if (!list) return;
   list.innerHTML = '<div class="loading">読み込み中…</div>';
-  const res = await fetch("/api/collections");
+  try {
+  const res = await fetch("/api/collections?all=1");
+  if (!res.ok) { list.innerHTML = `<div style="color:#c44;padding:16px">取得エラー (${res.status})</div>`; return; }
   const cols = await res.json();
-  if (!cols.length) { list.innerHTML = '<div style="color:#aaa;padding:20px;text-align:center">まだ特集はありません<br>「＋ 新規特集」から作成できます</div>'; return; }
+  if (!Array.isArray(cols) || !cols.length) { list.innerHTML = '<div style="color:#aaa;padding:20px;text-align:center">まだ特集はありません<br>「＋ 新規特集」から作成できます</div>'; return; }
   list.innerHTML = cols.map(c => `
     <div class="col-admin-card" data-id="${c.id}">
       <div style="display:flex;align-items:center;gap:8px">
@@ -4233,6 +4235,9 @@ async function loadAdminCollections() {
       if (msg) { msg.textContent = "❌ " + (data.error || "作成失敗"); msg.style.color = "#e05"; }
     }
   };
+  } catch(e) {
+    list.innerHTML = `<div style="color:#c44;padding:16px">読み込みエラー: ${e.message}</div>`;
+  }
 }
 
 // ===== ウェルカムモーダル =====

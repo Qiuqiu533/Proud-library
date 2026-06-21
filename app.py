@@ -2069,11 +2069,22 @@ def api_new_arrival_lookup():
 @app.route("/api/collections")
 def api_collections_get():
     con = get_con()
-    rows = fetchall(con, "SELECT id, title, description, emoji, isbns, is_active, sort_order FROM collections WHERE is_active=? ORDER BY sort_order, id", (True if USE_PG else 1,))
+    show_all = request.args.get("all") == "1"
+    try:
+        if show_all:
+            rows = fetchall(con, "SELECT id, title, description, emoji, isbns, is_active, sort_order FROM collections ORDER BY sort_order, id")
+        else:
+            rows = fetchall(con, "SELECT id, title, description, emoji, isbns, is_active, sort_order FROM collections WHERE is_active=? ORDER BY sort_order, id", (True if USE_PG else 1,))
+    except Exception as e:
+        con.close()
+        return jsonify({"error": str(e)}), 500
     con.close()
     result = []
     for r in rows:
-        isbns = json.loads(r["isbns"]) if isinstance(r["isbns"], str) else (r["isbns"] or [])
+        try:
+            isbns = json.loads(r["isbns"]) if isinstance(r["isbns"], str) else (r["isbns"] or [])
+        except Exception:
+            isbns = []
         result.append({**r, "isbns": isbns, "count": len(isbns)})
     return jsonify(result)
 
