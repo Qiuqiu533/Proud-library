@@ -6,8 +6,6 @@ import os
 import threading
 import time
 import secrets
-import smtplib
-from email.mime.text import MIMEText
 from collections import defaultdict
 
 # ── ジャンル別蔵書データ（Excelから事前生成）──────────────────────────────
@@ -143,8 +141,7 @@ LIBRARY_INFO = {
 _ADMIN_PASSWORD_ENV    = os.environ.get("ADMIN_PASSWORD",    "kanri5533")
 _RESIDENT_PASSWORD_ENV = os.environ.get("RESIDENT_PASSWORD", "proudfunabashi")
 _BOARD_PASSWORD_ENV    = os.environ.get("BOARD_PASSWORD",    "kanri5533")
-_GMAIL_USER            = os.environ.get("GMAIL_USER",        "")
-_GMAIL_APP_PASSWORD    = os.environ.get("GMAIL_APP_PASSWORD","")
+_RESEND_API_KEY        = os.environ.get("RESEND_API_KEY",    "")
 _APP_BASE_URL          = os.environ.get("APP_BASE_URL",      "https://proud-library.onrender.com")
 
 
@@ -653,8 +650,7 @@ def _migrate_add_user_auth_columns():
 
 
 def _send_reset_email(to_email, room, token):
-    """Gmailでパスワードリセットメールを送信"""
-    if not _GMAIL_USER or not _GMAIL_APP_PASSWORD:
+    if not _RESEND_API_KEY:
         return False
     reset_url = f"{_APP_BASE_URL}/reset-password?token={token}"
     body = f"""プラウド船橋 コミュニティ図書館
@@ -671,15 +667,14 @@ def _send_reset_email(to_email, room, token):
 ─────────────────────────
 プラウド船橋 コミュニティ図書館
 """
-    msg = MIMEText(body, "plain", "utf-8")
-    msg["Subject"] = "【プラウド船橋図書館】パスワードリセット"
-    msg["From"] = _GMAIL_USER
-    msg["To"] = to_email
     try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
-            smtp.login(_GMAIL_USER, _GMAIL_APP_PASSWORD)
-            smtp.send_message(msg)
-        return True
+        res = requests.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {_RESEND_API_KEY}", "Content-Type": "application/json"},
+            json={"from": "図書館 <onboarding@resend.dev>", "to": [to_email], "subject": "【プラウド船橋図書館】パスワードリセット", "text": body},
+            timeout=10
+        )
+        return res.status_code == 200
     except Exception as e:
         print(f"email send error: {e}")
         return False
