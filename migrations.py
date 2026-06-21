@@ -195,6 +195,12 @@ def init_db():
                 created_at TIMESTAMP DEFAULT NOW()
             )
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS applied_migrations (
+                name TEXT PRIMARY KEY,
+                applied_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
         con.commit()
     else:
         con.execute("""
@@ -364,8 +370,42 @@ def init_db():
                 created_at TEXT DEFAULT (datetime('now','localtime'))
             )
         """)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS applied_migrations (
+                name TEXT PRIMARY KEY,
+                applied_at TEXT DEFAULT (datetime('now','localtime'))
+            )
+        """)
         con.commit()
     con.close()
+
+
+# ── マイグレーション管理ヘルパー ──────────────────────────────────────────────
+def _migration_done(name: str) -> bool:
+    """applied_migrations テーブルで適用済みか確認する。"""
+    con = get_con()
+    try:
+        # applied_migrationsが存在しない場合（旧環境）はsettingsフォールバック
+        try:
+            row = fetchone(con, "SELECT name FROM applied_migrations WHERE name=?", (name,))
+            return row is not None
+        except Exception:
+            return False
+    finally:
+        con.close()
+
+
+def _mark_migration_done(name: str):
+    """applied_migrations テーブルに適用済みとして記録する。"""
+    con = get_con()
+    try:
+        if USE_PG:
+            execute(con, "INSERT INTO applied_migrations(name) VALUES(%s) ON CONFLICT DO NOTHING", (name,))
+        else:
+            execute(con, "INSERT OR IGNORE INTO applied_migrations(name) VALUES(?)", (name,))
+        con.commit()
+    finally:
+        con.close()
 
 
 def _migrate_admin_users():
@@ -782,11 +822,15 @@ def _migrate_seed_awards_master():
     """awards_masterにシードデータを投入し、genre_booksの受賞バッジを再マッチング"""
     if not USE_PG:
         return
+    # applied_migrationsで管理（旧settingsフラグとの後方互換も保持）
+    if _migration_done("awards_seed_v4"):
+        return
     try:
         con = get_con()
         done = fetchone(con, "SELECT value FROM settings WHERE key='awards_seed_done'")
-        if done and done.get("value") == "v2":
+        if done and done.get("value") == "v4":
             con.close()
+            _mark_migration_done("awards_seed_v4")
             return
         cur = con.cursor()
         cur.execute("""
@@ -812,6 +856,7 @@ def _migrate_seed_awards_master():
         """)
         con.commit()
         con.close()
+        _mark_migration_done("awards_seed_v4")
         print(f"[awards_seed] {len(_AWARDS_SEED)}件登録完了、全件再マッチング開始")
         _migrate_resync_awards_v2()
         _migrate_resync_awards_v3()
@@ -1067,25 +1112,37 @@ def _verify_tables():
         print(f"table verify error: {e}")
 
 
+def _run_all_migrations():
+    """全マイグレーションをシングルスレッドで順次実行する（race condition防止）。"""
+    steps = [
+        _migrate_add_card_columns,
+        _migrate_add_user_auth_columns,
+        _migrate_admin_users,
+        _migrate_genre_map_to_db,
+        _migrate_add_votes_column,
+        _migrate_add_type_reply_columns,
+        _migrate_add_staff_chat,
+        _migrate_lib_schedule,
+        _migrate_seed_awards_master,   # シード投入
+        _migrate_resync_awards_v2,     # 旧バージョン互換
+        _migrate_resync_awards_v3,
+        _migrate_resync_awards_v4,
+        _migrate_seed_award_books,
+        _migrate_title_yomi,
+        _migrate_pubdate_openbd,       # 完了後に librarylife を内部で起動
+        _migrate_ndc_genres,           # 重い処理は最後
+        _verify_tables,
+    ]
+    for step in steps:
+        try:
+            step()
+        except Exception as e:
+            print(f"[migration error] {step.__name__}: {e}")
+
+
 def _ensure_db():
     try:
         init_db()
     except Exception as e:
         print(f"DB init error: {e}")
-    threading.Thread(target=_migrate_add_card_columns, daemon=True).start()
-    threading.Thread(target=_migrate_add_user_auth_columns, daemon=True).start()
-    threading.Thread(target=_migrate_admin_users, daemon=True).start()
-    threading.Thread(target=_migrate_genre_map_to_db, daemon=True).start()
-    threading.Thread(target=_migrate_ndc_genres, daemon=True).start()
-    threading.Thread(target=_migrate_add_votes_column, daemon=True).start()
-    threading.Thread(target=_migrate_add_type_reply_columns, daemon=True).start()
-    threading.Thread(target=_migrate_add_staff_chat, daemon=True).start()
-    threading.Thread(target=_migrate_lib_schedule, daemon=True).start()
-    threading.Thread(target=_migrate_seed_awards_master, daemon=True).start()
-    threading.Thread(target=_migrate_resync_awards_v2, daemon=True).start()
-    threading.Thread(target=_migrate_resync_awards_v3, daemon=True).start()
-    threading.Thread(target=_migrate_resync_awards_v4, daemon=True).start()
-    threading.Thread(target=_migrate_seed_award_books, daemon=True).start()
-    threading.Thread(target=_verify_tables, daemon=True).start()
-    threading.Thread(target=_migrate_title_yomi, daemon=True).start()
-    threading.Thread(target=_migrate_pubdate_openbd, daemon=True).start()
+    threading.Thread(target=_run_all_migrations, daemon=True).start()
