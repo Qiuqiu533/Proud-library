@@ -735,6 +735,7 @@
       <button class="board-tab" data-btab="adminusers">👥 管理者設定</button>
       <button class="board-tab" data-btab="settings">⚙️ 設定</button>
       <button class="board-tab" data-btab="collections">🎯 特集管理</button>
+      <button class="board-tab" data-btab="awarddb">🏆 受賞作DB</button>
       <button class="board-tab" data-btab="guide">📖 操作ガイド</button>
       <button class="board-tab" data-btab="analytics">📊 分析・レポート</button>
     </div>
@@ -1361,6 +1362,84 @@
         <div id="adminCollectionList" style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
           <div class="loading">読み込み中…</div>
         </div>
+      </div>
+
+      <div id="btab-awarddb" class="board-tab-panel">
+        <h3 style="margin-bottom:16px">🏆 受賞作データベース管理</h3>
+
+        <!-- 登録フォーム -->
+        <div style="background:#f9f9f9;border:1px solid #e0e0e0;border-radius:10px;padding:16px;margin-bottom:20px">
+          <h4 style="margin:0 0 12px;font-size:0.95rem;color:#333">新規登録</h4>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+            <div>
+              <label style="font-size:0.8rem;color:#666;display:block;margin-bottom:3px">賞名</label>
+              <select id="awdAward" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;font-size:0.88rem">
+                <option value="三島由紀夫賞">三島由紀夫賞</option>
+                <option value="谷崎潤一郎賞">谷崎潤一郎賞</option>
+                <option value="江戸川乱歩賞">江戸川乱歩賞</option>
+                <option value="日本SF大賞">日本SF大賞</option>
+                <option value="日本ホラー小説大賞">日本ホラー小説大賞</option>
+                <option value="吉川英治文学賞">吉川英治文学賞</option>
+                <option value="推理作家協会賞">推理作家協会賞</option>
+                <option value="本格ミステリ大賞">本格ミステリ大賞</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:0.8rem;color:#666;display:block;margin-bottom:3px">年</label>
+              <input type="number" id="awdYear" placeholder="例: 2024" min="1950" max="2030"
+                style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;font-size:0.88rem;box-sizing:border-box">
+            </div>
+            <div>
+              <label style="font-size:0.8rem;color:#666;display:block;margin-bottom:3px">回次</label>
+              <input type="number" id="awdNo" placeholder="例: 37" min="1"
+                style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;font-size:0.88rem;box-sizing:border-box">
+            </div>
+            <div>
+              <label style="font-size:0.8rem;color:#666;display:block;margin-bottom:3px">ステータス</label>
+              <select id="awdStatus" style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;font-size:0.88rem">
+                <option value="確認済">確認済（公式）</option>
+                <option value="要確認">要確認</option>
+              </select>
+            </div>
+          </div>
+          <div style="margin-bottom:10px">
+            <label style="font-size:0.8rem;color:#666;display:block;margin-bottom:3px">タイトル</label>
+            <input type="text" id="awdTitle" placeholder="作品タイトル"
+              style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;font-size:0.88rem;box-sizing:border-box">
+          </div>
+          <div style="margin-bottom:14px">
+            <label style="font-size:0.8rem;color:#666;display:block;margin-bottom:3px">著者</label>
+            <input type="text" id="awdAuthor" placeholder="著者名"
+              style="width:100%;padding:7px;border:1px solid #ccc;border-radius:6px;font-size:0.88rem;box-sizing:border-box">
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <button onclick="submitAwardBook()"
+              style="padding:8px 20px;background:#3d6b4f;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:0.88rem;font-weight:600">
+              登録する
+            </button>
+            <span id="awdMsg" style="font-size:0.85rem"></span>
+          </div>
+        </div>
+
+        <!-- フィルター -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+          <select id="awdFilterAward" onchange="loadAdminAwardBooks()"
+            style="padding:6px 10px;border:1px solid #ccc;border-radius:6px;font-size:0.82rem">
+            <option value="">すべての賞</option>
+            <option value="三島由紀夫賞">三島由紀夫賞</option>
+            <option value="谷崎潤一郎賞">谷崎潤一郎賞</option>
+            <option value="江戸川乱歩賞">江戸川乱歩賞</option>
+            <option value="日本SF大賞">日本SF大賞</option>
+            <option value="日本ホラー小説大賞">日本ホラー小説大賞</option>
+            <option value="吉川英治文学賞">吉川英治文学賞</option>
+            <option value="推理作家協会賞">推理作家協会賞</option>
+            <option value="本格ミステリ大賞">本格ミステリ大賞</option>
+          </select>
+          <span id="awdCount" style="font-size:0.82rem;color:#888;align-self:center"></span>
+        </div>
+
+        <!-- 一覧 -->
+        <div id="adminAwardList" style="font-size:0.85rem"></div>
       </div>
 
       <div id="btab-guide" class="board-tab-panel">
