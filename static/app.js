@@ -1521,9 +1521,22 @@ function updateStarUI(n) {
   document.querySelectorAll(".star-opt").forEach((el, i) => el.classList.toggle("active", i < n));
 }
 
+function switchToBooksAndSearch(keyword) {
+  // 蔵書タブが非アクティブなら切り替えてから検索
+  const booksBtn = document.querySelector('.tab-btn[data-tab="books"]');
+  if (booksBtn && !booksBtn.classList.contains("active")) {
+    document.querySelectorAll(".tab-btn").forEach(b => { b.classList.remove("active"); b.setAttribute("aria-selected", "false"); });
+    document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+    booksBtn.classList.add("active");
+    booksBtn.setAttribute("aria-selected", "true");
+    document.getElementById("tab-books").classList.add("active");
+  }
+  loadBooks(keyword);
+}
+
 // ===== Events =====
-document.getElementById("searchBtn").addEventListener("click", () => loadBooks(document.getElementById("searchInput").value));
-document.getElementById("searchInput").addEventListener("keydown", e => { if (e.key === "Enter") loadBooks(document.getElementById("searchInput").value); });
+document.getElementById("searchBtn").addEventListener("click", () => switchToBooksAndSearch(document.getElementById("searchInput").value));
+document.getElementById("searchInput").addEventListener("keydown", e => { if (e.key === "Enter") switchToBooksAndSearch(document.getElementById("searchInput").value); });
 document.getElementById("modalClose").addEventListener("click", closeModal);
 document.getElementById("modalCloseBottom").addEventListener("click", closeModal);
 document.getElementById("modal").addEventListener("click", e => { if (e.target === document.getElementById("modal")) closeModal(); });
