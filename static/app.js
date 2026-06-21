@@ -4448,6 +4448,7 @@ async function saveBookDesc() {
       document.getElementById("descText").value = "";
       document.getElementById("descCount").textContent = "（0/600文字）";
       document.getElementById("descBookInfo").style.display = "none";
+      loadNoBooksReview();
       setTimeout(() => { msg.textContent = ""; }, 3000);
     } else {
       const err = await res.json().catch(() => ({}));
