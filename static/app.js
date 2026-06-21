@@ -118,10 +118,15 @@ async function _initLoginQr() {
   } catch(e) {}
 }
 
-document.getElementById("tabLogin").addEventListener("click", () => showLoginTab("login"));
-document.getElementById("tabRegister").addEventListener("click", () => showLoginTab("register"));
-document.getElementById("toForgotBtn").addEventListener("click", () => showLoginTab("forgot"));
-document.getElementById("toLoginBtn").addEventListener("click", () => showLoginTab("login"));
+function _bindEl(id, ev, fn) {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener(ev, fn);
+}
+
+_bindEl("tabLogin",    "click", () => showLoginTab("login"));
+_bindEl("tabRegister", "click", () => showLoginTab("register"));
+_bindEl("toForgotBtn", "click", () => showLoginTab("forgot"));
+_bindEl("toLoginBtn",  "click", () => showLoginTab("login"));
 
 document.getElementById("loginBtn").addEventListener("click", async () => {
   const room = (document.getElementById("loginRoom").value || "").trim();
@@ -2738,11 +2743,7 @@ setInterval(() => fetch("/ping").catch(() => {}), 4 * 60 * 1000);
 let residentPassword = sessionStorage.getItem("resident_pass") || "";
 let reqAdminPass = "";
 
-// Capture resident password on login
-document.getElementById("loginBtn").addEventListener("click", () => {
-  residentPassword = document.getElementById("residentPass").value;
-  sessionStorage.setItem("resident_pass", residentPassword);
-}, true);
+// residentPasswordは新認証システムではresidentSession.passwordで管理
 
 // Submit request
 // 部屋番号ハイフン自動挿入（1桁目1-5 → "X-"形式）
@@ -3273,9 +3274,9 @@ async function loadDbSize() {
     ${pct >= 80 ? '<p style="color:#c00;font-size:0.85rem">⚠️ 使用量が80%を超えています。古いお知らせの削除などをご検討ください。</p>' : ''}
     ${tables ? `<table class="guide-table" style="margin-top:12px"><tr><th>テーブル</th><th style="text-align:right">サイズ</th></tr>${tables}</table>` : ""}
     <button class="btn-board-add" id="dbSizeBtn" style="margin-top:12px">🔄 再確認</button>`;
-  document.getElementById("dbSizeBtn").addEventListener("click", loadDbSize);
+  const dbBtn = document.getElementById("dbSizeBtn");
+  if (dbBtn) dbBtn.addEventListener("click", loadDbSize);
 }
-document.getElementById("dbSizeBtn").addEventListener("click", loadDbSize);
 
 // ===== Admin QR =====
 // ===== 管理者アカウント管理 =====
