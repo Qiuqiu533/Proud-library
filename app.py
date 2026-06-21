@@ -1423,10 +1423,7 @@ def api_auth():
 @app.route("/api/login-qr-url")
 def api_login_qr_url():
     base = request.host_url.rstrip("/")
-    pw = get_resident_password()
-    import urllib.parse
-    qr_url = f"{base}/?qr={urllib.parse.quote(pw)}"
-    return jsonify({"url": qr_url})
+    return jsonify({"url": base + "/"})
 
 
 @app.route("/api/board/auth", methods=["POST"])
