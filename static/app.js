@@ -1,3 +1,8 @@
+// グローバルエラーキャッチャー（デバッグ用）
+window.onerror = function(msg, src, line, col, err) {
+  console.error('[JS ERROR]', msg, 'at', src, 'line', line);
+};
+
 // ===== Auth =====
 // residentSession: {room, password} をsessionStorageで保持
 let residentSession = null;
