@@ -77,12 +77,24 @@
 
       <!-- パスワードを忘れた -->
       <div id="forgotForm" style="display:none">
-        <p class="login-desc" style="margin-bottom:4px">登録済みの部屋番号とメールアドレスを入力してください。リセットリンクをお送りします。</p>
-        <p class="login-room-hint">部屋番号（例：5-533）</p>
-        <div class="login-form">
-          <input type="text" id="forgotRoom" placeholder="例：5-533" class="login-input" inputmode="numeric" autocomplete="off" />
-          <input type="email" id="forgotEmail" placeholder="登録メールアドレス" class="login-input" style="margin-top:10px" />
-          <button id="forgotBtn" class="login-btn">リセットリンクを送信</button>
+        <!-- ステップ1: 本人確認 -->
+        <div id="forgotStep1">
+          <p class="login-desc" style="margin-bottom:4px">登録済みの部屋番号とメールアドレスを入力してください。</p>
+          <p class="login-room-hint">部屋番号（例：5-533）</p>
+          <div class="login-form">
+            <input type="text" id="forgotRoom" placeholder="例：5-533" class="login-input" inputmode="numeric" autocomplete="off" />
+            <input type="email" id="forgotEmail" placeholder="登録メールアドレス" class="login-input" style="margin-top:10px" />
+            <button id="forgotBtn" class="login-btn">本人確認</button>
+          </div>
+        </div>
+        <!-- ステップ2: 新パスワード設定 -->
+        <div id="forgotStep2" style="display:none">
+          <p class="login-desc" style="margin-bottom:4px">新しいパスワードを設定してください。</p>
+          <div class="login-form">
+            <input type="password" id="forgotNewPass" placeholder="新しいパスワード（6文字以上）" class="login-input" />
+            <input type="password" id="forgotNewPass2" placeholder="確認（もう一度入力）" class="login-input" style="margin-top:10px" />
+            <button id="forgotResetBtn" class="login-btn">パスワードを設定する</button>
+          </div>
         </div>
         <p id="forgotMsg" class="login-error"></p>
         <button class="login-link-btn" id="toLoginBtn">ログインに戻る</button>

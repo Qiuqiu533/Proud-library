@@ -2790,16 +2790,14 @@ def api_user_forgot_password():
     user = fetchone(con, "SELECT email FROM user_accounts WHERE room=?", (room,))
     if not user or (user.get("email") or "").lower() != email.lower():
         con.close()
-        # セキュリティのため成功と同じメッセージを返す
-        return jsonify({"ok": True, "message": "登録メールアドレスにリセットリンクを送信しました"})
+        return jsonify({"error": "部屋番号またはメールアドレスが一致しません"}), 400
     token = secrets.token_urlsafe(32)
     if USE_PG:
         execute(con, "INSERT INTO password_reset_tokens (token, room, expires_at) VALUES (?, ?, NOW() + INTERVAL '30 minutes')", (token, room))
     else:
         execute(con, "INSERT INTO password_reset_tokens (token, room, expires_at) VALUES (?, ?, datetime('now','+30 minutes'))", (token, room))
     con.commit(); con.close()
-    _send_reset_email(email, room, token)
-    return jsonify({"ok": True, "message": "登録メールアドレスにリセットリンクを送信しました"})
+    return jsonify({"ok": True, "token": token})
 
 
 @app.route("/api/user/reset-password", methods=["POST"])
