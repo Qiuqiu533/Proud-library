@@ -4475,3 +4475,86 @@ async function saveBookDesc() {
     msg.textContent = "❌ 通信エラー";
   }
 }
+
+// ===== 受賞作一覧 =====
+let _currentAward = "";
+
+async function loadAwardBooks(award) {
+  _currentAward = award || "";
+  const list = document.getElementById("awardBooksList");
+  if (!list) return;
+  list.innerHTML = '<div style="color:#aaa;font-size:0.9rem;padding:20px 0;text-align:center">読み込み中…</div>';
+  try {
+    const url = award ? `/api/award-books?award=${encodeURIComponent(award)}` : "/api/award-books";
+    const res = await fetch(url);
+    const books = await res.json();
+    if (!books.length) {
+      list.innerHTML = '<div style="color:#aaa;font-size:0.9rem;padding:20px 0;text-align:center">受賞作データがありません</div>';
+      return;
+    }
+    // 年ごとにグループ化
+    const byYear = {};
+    for (const b of books) {
+      const k = `${b.award_year}_${b.award}`;
+      if (!byYear[k]) byYear[k] = { award: b.award, year: b.award_year, no: b.award_no, books: [] };
+      byYear[k].books.push(b);
+    }
+    const groups = Object.values(byYear).sort((a, b) => b.year - a.year || b.no - a.no);
+    list.innerHTML = groups.map(g => `
+      <div style="border:1px solid #e8e8e8;border-radius:10px;padding:12px 14px;background:#fff">
+        <div style="font-size:0.78rem;color:#888;margin-bottom:6px">
+          ${g.award} 第${g.no}回（${g.year}年）
+        </div>
+        ${g.books.map(b => `
+          <div style="display:flex;align-items:center;gap:10px;margin-top:${g.books.length > 1 ? "8px" : "0"}">
+            <div style="flex:1">
+              <div style="font-size:0.95rem;font-weight:600;color:#222">${b.title}</div>
+              <div style="font-size:0.82rem;color:#666;margin-top:2px">${b.author}</div>
+            </div>
+            ${b.in_library
+              ? `<span style="font-size:0.72rem;background:#e8f5e9;color:#2e7d32;padding:3px 8px;border-radius:12px;white-space:nowrap;cursor:pointer"
+                   onclick="switchToBooksAndSearch('${b.title.replace(/'/g,"\\'")}')">📖 蔵書あり</span>`
+              : `<span style="font-size:0.72rem;background:#f5f5f5;color:#aaa;padding:3px 8px;border-radius:12px;white-space:nowrap">未所蔵</span>`
+            }
+          </div>`).join("")}
+      </div>`).join("");
+  } catch(e) {
+    list.innerHTML = `<div style="color:#c44;font-size:0.9rem;padding:20px 0;text-align:center">読み込みエラー: ${e.message}</div>`;
+  }
+}
+
+async function initAwardsTab() {
+  const filterRow = document.getElementById("awardFilterRow");
+  if (!filterRow || filterRow.dataset.loaded) return;
+  filterRow.dataset.loaded = "1";
+  try {
+    const res = await fetch("/api/award-books/awards");
+    const awards = await res.json();
+    const all = [{ award: "すべて", count: awards.reduce((s, a) => s + a.count, 0) }, ...awards];
+    filterRow.innerHTML = all.map(a => `
+      <button class="award-filter-btn${a.award === "すべて" ? " active" : ""}"
+        data-award="${a.award === "すべて" ? "" : a.award}"
+        onclick="selectAwardFilter(this)"
+        style="padding:5px 12px;border-radius:16px;border:1px solid #ccc;background:${a.award==="すべて"?"#3d6b4f":"#fff"};color:${a.award==="すべて"?"#fff":"#444"};font-size:0.8rem;cursor:pointer">
+        ${a.award}（${a.count}）
+      </button>`).join("");
+  } catch(e) {}
+  loadAwardBooks("");
+}
+
+function selectAwardFilter(btn) {
+  document.querySelectorAll(".award-filter-btn").forEach(b => {
+    b.style.background = "#fff"; b.style.color = "#444";
+    b.classList.remove("active");
+  });
+  btn.style.background = "#3d6b4f"; btn.style.color = "#fff";
+  btn.classList.add("active");
+  loadAwardBooks(btn.dataset.award);
+}
+
+// 受賞作タブが開かれたときに初期化
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll('.tab-btn[data-tab="awards"]').forEach(btn => {
+    btn.addEventListener("click", () => setTimeout(initAwardsTab, 0));
+  });
+});
