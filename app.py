@@ -109,18 +109,31 @@ def fetchone(con, sql, params=()):
 # ── 定数 ────────────────────────────────────────────────────────────────
 LIBRARY_CODE = "0011"
 LIBRARYLIFE_BASE = "https://www.librarylife.net"
-_INERTIA_VERSION = "33c21f9547525fdf6b9eb7926ea63f06"
+_INERTIA_VERSION = "b51c5455938e97b0347aeb6ea4713dc5"
 _INERTIA_SESSION = requests.Session()
 
-def _refresh_inertia_version():
-    """librarylife.netからInertiaバージョンを取得して更新する"""
+import re as _re_inertia
+
+def _refresh_inertia_version(resp_409=None):
+    """librarylife.netからInertiaバージョンを取得して更新する。
+    resp_409: 409応答オブジェクトが渡された場合はそこから直接取得を試みる"""
     global _INERTIA_VERSION
+    # 409応答ボディからバージョンを直接取得（最も確実）
+    if resp_409 is not None:
+        try:
+            body = resp_409.json()
+            v = body.get("version") or body.get("props", {}).get("version")
+            if v and len(v) == 32:
+                _INERTIA_VERSION = v
+                app.logger.info(f"Inertia version from 409 body: {_INERTIA_VERSION}")
+                return
+        except Exception:
+            pass
+    # ホームページから取得
     try:
         resp = _INERTIA_SESSION.get(f"{LIBRARYLIFE_BASE}/", timeout=10)
-        import re as _re2
-        # data-page属性内はHTMLエンティティエンコードされているため両方試みる
-        m = (_re2.search(r'version&quot;:&quot;([a-f0-9]{32})', resp.text)
-             or _re2.search(r'"version":"([a-f0-9]{32})"', resp.text))
+        m = (_re_inertia.search(r'version&quot;:&quot;([a-f0-9]{32})', resp.text)
+             or _re_inertia.search(r'"version":"([a-f0-9]{32})"', resp.text))
         if m:
             _INERTIA_VERSION = m.group(1)
             app.logger.info(f"Inertia version updated: {_INERTIA_VERSION}")
@@ -128,6 +141,9 @@ def _refresh_inertia_version():
             app.logger.warning("Inertia version not found in response")
     except Exception as e:
         app.logger.error(f"_refresh_inertia_version error: {e}")
+
+# 起動時にバージョンを取得（古いハードコード値への依存を排除）
+threading.Thread(target=_refresh_inertia_version, daemon=True).start()
 OPENBD_API = "https://api.openbd.jp/v1/get"
 NDL_THUMB = "https://ndlsearch.ndl.go.jp/thumbnail/{isbn}.jpg"
 
@@ -1363,7 +1379,7 @@ def fetch_books(keyword="", page=1):
         resp = _INERTIA_SESSION.get(url, params=params, timeout=10,
                                     headers=_inertia_headers("books", "book-search/index"))
         if resp.status_code == 409:
-            _refresh_inertia_version()
+            _refresh_inertia_version(resp)
             resp = _INERTIA_SESSION.get(url, params=params, timeout=10,
                                         headers=_inertia_headers("books", "book-search/index"))
         data = resp.json()
@@ -1396,7 +1412,7 @@ def fetch_book_detail(isbn, hint_title=""):
         resp = _INERTIA_SESSION.get(url, timeout=10,
                                     headers=_inertia_headers())
         if resp.status_code == 409:
-            _refresh_inertia_version()
+            _refresh_inertia_version(resp)
             resp = _INERTIA_SESSION.get(url, timeout=10,
                                         headers=_inertia_headers())
         data = resp.json()
