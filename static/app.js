@@ -671,7 +671,12 @@ function renderRecentBooks() {
   try { recent = JSON.parse(localStorage.getItem("recent_books") || "[]"); } catch {}
   const section = document.getElementById("recentBooksSection");
   const row = document.getElementById("recentBooksRow");
-  if (!section || !row || !recent.length) { if (section) section.style.display = "none"; return; }
+  if (!section || !row) return;
+  if (!recent.length) {
+    row.innerHTML = '<span style="font-size:0.82rem;color:#aaa;padding:4px 0">本をクリックすると履歴が表示されます</span>';
+    if (localStorage.getItem("recentHidden") !== "1") section.style.display = "";
+    return;
+  }
   row.innerHTML = recent.map(b => {
     const ndlFallback = `https://ndlsearch.ndl.go.jp/thumbnail/${b.isbn}.jpg`;
     const img = b.cover
