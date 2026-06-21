@@ -150,6 +150,9 @@ _setupRoomAutoHyphen("loginRoom");
 _setupRoomAutoHyphen("regRoom");
 _setupRoomAutoHyphen("forgotRoom");
 
+_bindEl("descTitleSearch", "keydown", e => { if (e.key === "Enter") searchBookForDesc(); });
+_bindEl("descIsbn", "keydown", e => { if (e.key === "Enter") lookupBookForDesc(); });
+
 _bindEl("tabLogin",    "click", () => showLoginTab("login"));
 _bindEl("tabRegister", "click", () => showLoginTab("register"));
 _bindEl("toForgotBtn", "click", () => showLoginTab("forgot"));
@@ -2398,6 +2401,8 @@ function switchBoardTab(tabKey) {
     document.getElementById("descText").value = "";
     document.getElementById("descCount").textContent = "（0/600文字）";
     document.getElementById("descBookInfo").style.display = "none";
+    document.getElementById("descSearchResults").style.display = "none";
+    document.getElementById("descTitleSearch").value = "";
     loadNoBooksReview();
   }
   // スクロールを先頭に戻す
@@ -4323,6 +4328,49 @@ async function lookupBookAwards(isbn) {
 }
 
 // ── 書評入力（管理者） ─────────────────────────────────────────────────────
+async function searchBookForDesc() {
+  const kw = (document.getElementById("descTitleSearch").value || "").trim();
+  if (!kw) return;
+  const grid = document.getElementById("descSearchGrid");
+  const wrap = document.getElementById("descSearchResults");
+  grid.innerHTML = '<span style="font-size:0.82rem;color:#888">検索中...</span>';
+  wrap.style.display = "block";
+  try {
+    const res = await fetch(`/api/books/by-genre?keyword=${encodeURIComponent(kw)}&per=30`);
+    const data = await res.json();
+    const books = data.books || [];
+    if (!books.length) {
+      grid.innerHTML = '<span style="font-size:0.82rem;color:#888">該当する本が見つかりませんでした</span>';
+      return;
+    }
+    grid.innerHTML = books.map(b => {
+      const isbn10 = b.isbn10 || "";
+      const cover = isbn10
+        ? `https://images-na.ssl-images-amazon.com/images/P/${isbn10}.09.LZZZZZZZ.jpg`
+        : `https://ndlsearch.ndl.go.jp/thumbnail/${b.isbn}.jpg`;
+      return `<div onclick="selectDescBook('${esc(b.isbn)}','${esc(b.title)}')"
+        style="cursor:pointer;text-align:center;padding:4px;border-radius:8px;border:2px solid transparent;transition:border-color .15s"
+        onmouseover="this.style.borderColor='#3d6b4f'" onmouseout="this.style.borderColor='transparent'">
+        <img src="${cover}" alt="" style="width:100%;aspect-ratio:2/3;object-fit:cover;border-radius:4px;display:block;background:#e8e4dc"
+          onerror="this.style.background='#e8e4dc';this.src=''">
+        <div style="font-size:0.68rem;line-height:1.3;margin-top:4px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(b.title)}</div>
+      </div>`;
+    }).join("");
+  } catch(e) {
+    grid.innerHTML = '<span style="font-size:0.82rem;color:#e05">エラーが発生しました</span>';
+  }
+}
+
+function selectDescBook(isbn, title) {
+  document.getElementById("descIsbn").value = isbn;
+  document.getElementById("descSearchResults").style.display = "none";
+  document.getElementById("descTitleSearch").value = "";
+  const info = document.getElementById("descBookInfo");
+  info.textContent = `📖 ${title}`;
+  info.style.display = "block";
+  lookupBookAwards(isbn);
+}
+
 async function lookupBookForDesc() {
   const isbn = document.getElementById("descIsbn").value.trim();
   const info = document.getElementById("descBookInfo");
