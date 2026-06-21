@@ -763,6 +763,18 @@
           <div style="font-size:0.85rem;font-weight:600;margin-bottom:8px;color:#f57c00">📋 書評が未登録の本（手動登録が必要）</div>
           <div id="noReviewItems" style="font-size:0.82rem;color:#555;max-height:180px;overflow-y:auto">読み込み中...</div>
         </div>
+        <!-- 書名検索 -->
+        <div style="margin-bottom:12px">
+          <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:4px">📖 書名・著者名で検索</label>
+          <div style="display:flex;gap:8px">
+            <input type="text" id="descTitleSearch" class="login-input" placeholder="例：坊っちゃん、夏目漱石" style="flex:1;margin-bottom:0">
+            <button class="btn-secondary" onclick="searchBookForDesc()">検索</button>
+          </div>
+          <div id="descSearchResults" style="display:none;margin-top:10px;display:none">
+            <div style="font-size:0.82rem;color:#666;margin-bottom:6px">本を選んでください（クリックでISBNが反映されます）</div>
+            <div id="descSearchGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:10px;max-height:280px;overflow-y:auto"></div>
+          </div>
+        </div>
         <div style="margin-bottom:10px">
           <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:4px">ISBN（13桁）</label>
           <div style="display:flex;gap:8px">
