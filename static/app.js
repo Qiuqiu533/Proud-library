@@ -4141,7 +4141,7 @@ async function loadAdminCollections() {
     } else {
       if (msg) { msg.textContent = "❌ " + (data.error || "作成失敗"); msg.style.color = "#e05"; }
     }
-  });
+  };
 }
 
 // ===== ウェルカムモーダル =====
