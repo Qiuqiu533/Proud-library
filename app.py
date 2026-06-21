@@ -909,6 +909,38 @@ def _ensure_db():
     threading.Thread(target=_migrate_lib_schedule, daemon=True).start()
     threading.Thread(target=_migrate_resync_awards, daemon=True).start()
     threading.Thread(target=_verify_tables, daemon=True).start()
+    threading.Thread(target=_migrate_title_yomi, daemon=True).start()
+
+
+def _migrate_title_yomi():
+    """title_yomiが空の本にpykakasiで読み仮名を一括生成する"""
+    try:
+        import pykakasi
+        kks = pykakasi.kakasi()
+        con = get_con()
+        rows = fetchall(con, "SELECT isbn, title FROM genre_books WHERE title_yomi IS NULL OR title_yomi = ''")
+        if not rows:
+            con.close()
+            print("[yomi] 全件登録済み")
+            return
+        print(f"[yomi] {len(rows)}件のよみがなを生成します")
+        updated = 0
+        for r in rows:
+            try:
+                result = kks.convert(r["title"])
+                yomi = "".join(item["hira"] for item in result)
+                if yomi:
+                    execute(con, "UPDATE genre_books SET title_yomi=? WHERE isbn=?", (yomi, r["isbn"]))
+                    updated += 1
+            except Exception:
+                pass
+        con.commit()
+        con.close()
+        print(f"[yomi] {updated}件のよみがなを登録しました")
+    except ImportError:
+        print("[yomi] pykakasi未インストール。requirements.txtを確認してください")
+    except Exception as e:
+        print(f"[yomi] migrate error: {e}")
 
 
 def _migrate_add_staff_chat():
