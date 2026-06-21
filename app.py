@@ -109,7 +109,7 @@ def fetchone(con, sql, params=()):
 # ── 定数 ────────────────────────────────────────────────────────────────
 LIBRARY_CODE = "0011"
 LIBRARYLIFE_BASE = "https://www.librarylife.net"
-_INERTIA_VERSION = "e2ba382f0f96863d6a3cbb3f36f44b4e"
+_INERTIA_VERSION = "33c21f9547525fdf6b9eb7926ea63f06"
 _INERTIA_SESSION = requests.Session()
 
 def _refresh_inertia_version():
