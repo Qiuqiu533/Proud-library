@@ -2204,8 +2204,6 @@ async function loadDashboard() {
     const reqs   = d.requests  || [];
     const issues = d.issues    || [];
     const sched  = d.schedule  || [];
-    const dbData = d.db_bytes != null ? {bytes: d.db_bytes} : null;
-
     // 集計
     const pendingReqs     = reqs.filter(r => r.type !== "feedback" && r.status === "pending");
     const pendingFeedback = reqs.filter(r => r.type === "feedback" && (r.status === "pending" || r.status === "fb_received"));
@@ -2215,9 +2213,9 @@ async function loadDashboard() {
 
     // DB使用量
     let dbPct = null, dbMB = null, dbLimitMB = 512;
-    if (dbData && dbData.bytes) {
-      dbMB  = (dbData.bytes / 1024 / 1024).toFixed(1);
-      dbPct = Math.round(dbData.bytes / (dbLimitMB * 1024 * 1024) * 100);
+    if (d.db_total_mb != null) {
+      dbMB  = d.db_total_mb.toFixed(1);
+      dbPct = Math.round(d.db_total_mb / dbLimitMB * 100);
     }
     const dbBarColor = dbPct >= 90 ? "#e05" : dbPct >= 70 ? "#f0a500" : "#3d6b4f";
 

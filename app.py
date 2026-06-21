@@ -2855,7 +2855,7 @@ def api_admin_dashboard_data():
     con = get_con()
     try:
         # リクエスト
-        reqs = fetchall(con, "SELECT id,type,status,title,created_at FROM requests ORDER BY id DESC") or []
+        reqs = fetchall(con, "SELECT id,type,status,title,reason,room,votes,created_at,reply FROM book_requests ORDER BY id DESC") or []
         # 課題
         issues = fetchall(con, "SELECT id,title,status,sort_order FROM issues ORDER BY sort_order ASC, id ASC") or []
         # 新着登録数
@@ -2865,13 +2865,13 @@ def api_admin_dashboard_data():
         total_row = fetchone(con, "SELECT COUNT(*) AS cnt FROM genre_books")
         total_books = total_row["cnt"] if total_row else 0
         # スケジュール
-        sched = fetchall(con, "SELECT id,event_date,title,description FROM lib_schedule ORDER BY event_date ASC") or []
+        sched = fetchall(con, "SELECT id,event_date,title,description,type FROM lib_schedule ORDER BY event_date ASC") or []
         # DB使用量
-        db_bytes = None
+        db_total_mb = None
         if USE_PG:
-            size_row = fetchone(con, "SELECT pg_database_size(current_database()) AS bytes")
+            size_row = fetchone(con, "SELECT ROUND(pg_database_size(current_database()) / 1024.0 / 1024.0, 1) AS mb")
             if size_row:
-                db_bytes = size_row["bytes"]
+                db_total_mb = float(size_row["mb"])
         con.close()
         return jsonify({
             "requests": [dict(r) for r in reqs],
@@ -2879,7 +2879,7 @@ def api_admin_dashboard_data():
             "new_arrivals_count": new_count,
             "total_books": total_books,
             "schedule": [dict(s) for s in sched],
-            "db_bytes": db_bytes,
+            "db_total_mb": db_total_mb,
         })
     except Exception as e:
         con.close()
