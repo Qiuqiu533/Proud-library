@@ -2847,6 +2847,45 @@ def reset_password_page():
     return render_template("index.html")
 
 
+@app.route("/api/admin/dashboard-data")
+def api_admin_dashboard_data():
+    """ダッシュボード用データを1リクエストで返す"""
+    if request.args.get("password") != get_board_password():
+        return jsonify({"error": "unauthorized"}), 401
+    con = get_con()
+    try:
+        # リクエスト
+        reqs = fetchall(con, "SELECT id,type,status,title,created_at FROM requests ORDER BY id DESC") or []
+        # 課題
+        issues = fetchall(con, "SELECT id,title,status,sort_order FROM issues ORDER BY sort_order ASC, id ASC") or []
+        # 新着登録数
+        new_count_row = fetchone(con, "SELECT COUNT(*) AS cnt FROM new_arrivals")
+        new_count = new_count_row["cnt"] if new_count_row else 0
+        # 総蔵書数
+        total_row = fetchone(con, "SELECT COUNT(*) AS cnt FROM genre_books")
+        total_books = total_row["cnt"] if total_row else 0
+        # スケジュール
+        sched = fetchall(con, "SELECT id,event_date,title,description FROM lib_schedule ORDER BY event_date ASC") or []
+        # DB使用量
+        db_bytes = None
+        if USE_PG:
+            size_row = fetchone(con, "SELECT pg_database_size(current_database()) AS bytes")
+            if size_row:
+                db_bytes = size_row["bytes"]
+        con.close()
+        return jsonify({
+            "requests": [dict(r) for r in reqs],
+            "issues": [dict(i) for i in issues],
+            "new_arrivals_count": new_count,
+            "total_books": total_books,
+            "schedule": [dict(s) for s in sched],
+            "db_bytes": db_bytes,
+        })
+    except Exception as e:
+        con.close()
+        return jsonify({"error": str(e)}), 500
+
+
 # --- Password change ---
 @app.route("/api/admin/db-size")
 def api_db_size():

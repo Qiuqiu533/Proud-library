@@ -2197,29 +2197,21 @@ async function loadDashboard() {
 
   const pw = boardPassword;
   try {
-    const [reqRes, issueRes, newRes, dbRes, schedRes, genreRes, awardsRes] = await Promise.all([
-      fetch("/api/requests").catch(() => null),
-      fetch(`/api/issues?password=${encodeURIComponent(pw)}`).catch(() => null),
-      fetch("/api/new-arrivals").catch(() => null),
-      fetch(`/api/admin/db-size?password=${encodeURIComponent(pw)}`).catch(() => null),
-      fetch("/api/lib-schedule").catch(() => null),
-      fetch("/api/books/by-genre?per=1").catch(() => null),
-      fetch("/api/books/by-genre?award=%E6%9C%AC%E5%B1%8B%E5%A4%A7%E8%B3%9E&per=1").catch(() => null),
-    ]);
+    const res = await fetch(`/api/admin/dashboard-data?password=${encodeURIComponent(pw)}`);
+    if (!res.ok) throw new Error("dashboard-data fetch failed");
+    const d = await res.json();
 
-    const reqs    = reqRes    && reqRes.ok    ? await reqRes.json()    : [];
-    const issues  = issueRes  && issueRes.ok  ? await issueRes.json()  : [];
-    const news    = newRes    && newRes.ok    ? await newRes.json()    : [];
-    const dbData  = dbRes     && dbRes.ok     ? await dbRes.json()     : null;
-    const sched   = schedRes  && schedRes.ok  ? await schedRes.json()  : [];
-    const genreData = genreRes && genreRes.ok ? await genreRes.json()  : null;
+    const reqs   = d.requests  || [];
+    const issues = d.issues    || [];
+    const sched  = d.schedule  || [];
+    const dbData = d.db_bytes != null ? {bytes: d.db_bytes} : null;
 
     // 集計
     const pendingReqs     = reqs.filter(r => r.type !== "feedback" && r.status === "pending");
     const pendingFeedback = reqs.filter(r => r.type === "feedback" && (r.status === "pending" || r.status === "fb_received"));
     const openIssues      = issues.filter(i => i.status !== "解決済み");
-    const newArrivalList  = Array.isArray(news) ? news : (news.books || []);
-    const totalBooks      = genreData ? genreData.total : 5156;
+    const newArrivalList  = {length: d.new_arrivals_count || 0};
+    const totalBooks      = d.total_books || 0;
 
     // DB使用量
     let dbPct = null, dbMB = null, dbLimitMB = 512;
