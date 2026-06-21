@@ -2892,7 +2892,7 @@ def api_admin_dashboard_data():
         total_row = fetchone(con, "SELECT COUNT(*) AS cnt FROM genre_books")
         total_books = total_row["cnt"] if total_row else 0
         # スケジュール
-        sched = fetchall(con, "SELECT id,event_date,title,description,type FROM lib_schedule ORDER BY event_date ASC") or []
+        sched = fetchall(con, "SELECT id,event_date,title,type FROM lib_schedule ORDER BY event_date ASC") or []
         # DB使用量
         db_total_mb = None
         if USE_PG:
