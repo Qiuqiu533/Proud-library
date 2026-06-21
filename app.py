@@ -353,6 +353,20 @@ def init_db():
                 created_at TIMESTAMP DEFAULT NOW()
             )
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS award_books (
+                id SERIAL PRIMARY KEY,
+                award TEXT NOT NULL,
+                award_no INTEGER,
+                award_year INTEGER,
+                title TEXT NOT NULL,
+                author TEXT DEFAULT '',
+                isbn13 TEXT DEFAULT '',
+                summary TEXT DEFAULT '',
+                status TEXT DEFAULT '確認済',
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
         con.commit()
     else:
         con.execute("""
@@ -927,6 +941,7 @@ def _ensure_db():
     threading.Thread(target=_migrate_lib_schedule, daemon=True).start()
     threading.Thread(target=_migrate_seed_awards_master, daemon=True).start()
     threading.Thread(target=_migrate_resync_awards_v2, daemon=True).start()
+    threading.Thread(target=_migrate_seed_award_books, daemon=True).start()
     threading.Thread(target=_verify_tables, daemon=True).start()
     threading.Thread(target=_migrate_title_yomi, daemon=True).start()
     threading.Thread(target=_migrate_pubdate_openbd, daemon=True).start()
@@ -1321,6 +1336,125 @@ def _migrate_resync_awards_v2():
         print(f"awards resync v2: {updated}冊全件マッチング完了")
     except Exception as e:
         print(f"awards resync v2 error: {e}")
+
+
+# ── award_books シードデータ ───────────────────────────────────────────────
+_AWARD_BOOKS_SEED = [
+    # 三島由紀夫賞（公式確認済みのみ）
+    ("三島由紀夫賞", 1, 1988, "優雅で感傷的な日本野球", "高橋源一郎", "確認済"),
+    ("三島由紀夫賞", 3, 1990, "世紀末鯨鯢記", "久間十義", "確認済"),
+    ("三島由紀夫賞", 9, 1996, "折口信夫論", "松浦寿輝", "確認済"),
+    ("三島由紀夫賞", 19, 2006, "LOVE", "古川日出男", "確認済"),
+    ("三島由紀夫賞", 20, 2007, "1000の小説とバックベアード", "佐藤友哉", "確認済"),
+    ("三島由紀夫賞", 21, 2008, "切れた鎖", "田中慎弥", "確認済"),
+    ("三島由紀夫賞", 22, 2009, "夏の水の半魚人", "前田司郎", "確認済"),
+    ("三島由紀夫賞", 23, 2010, "クォンタム・ファミリーズ", "東浩紀", "確認済"),
+    ("三島由紀夫賞", 24, 2011, "こちらあみ子", "今村夏子", "確認済"),
+    ("三島由紀夫賞", 25, 2012, "私のいない高校", "青木淳悟", "確認済"),
+    ("三島由紀夫賞", 26, 2013, "しろいろの街の、その骨の体温の", "村田沙耶香", "確認済"),
+    ("三島由紀夫賞", 28, 2015, "私の恋人", "上田岳弘", "確認済"),
+    ("三島由紀夫賞", 29, 2016, "伯爵夫人", "蓮實重彦", "確認済"),
+    ("三島由紀夫賞", 30, 2017, "カブールの園", "宮内悠介", "確認済"),
+    ("三島由紀夫賞", 31, 2018, "無限の玄", "古谷田奈月", "確認済"),
+    ("三島由紀夫賞", 32, 2019, "いかれころ", "三国美千子", "確認済"),
+    ("三島由紀夫賞", 33, 2020, "かか", "宇佐見りん", "確認済"),
+    ("三島由紀夫賞", 34, 2021, "旅する練習", "乗代雄介", "確認済"),
+    ("三島由紀夫賞", 35, 2022, "ブロッコリー・レボリューション", "岡田利規", "確認済"),
+    ("三島由紀夫賞", 36, 2023, "植物少女", "朝比奈秋", "確認済"),
+    ("三島由紀夫賞", 37, 2024, "みどりいせき", "大田ステファニー歓人", "確認済"),
+    ("三島由紀夫賞", 38, 2025, "橘の家", "中西智佐乃", "確認済"),
+    ("三島由紀夫賞", 39, 2026, "はくしむるち", "豊永浩平", "確認済"),
+    # 谷崎潤一郎賞（初期・中央公論新社公式確認済み）
+    ("谷崎潤一郎賞", 1, 1965, "抱擁家族", "小島信夫", "確認済"),
+    ("谷崎潤一郎賞", 2, 1966, "沈黙", "遠藤周作", "確認済"),
+    ("谷崎潤一郎賞", 3, 1967, "友達", "安部公房", "確認済"),
+    ("谷崎潤一郎賞", 3, 1967, "万延元年のフットボール", "大江健三郎", "確認済"),
+    ("谷崎潤一郎賞", 6, 1970, "闇のなかの黒い馬", "埴谷雄高", "確認済"),
+    ("谷崎潤一郎賞", 6, 1970, "暗室", "吉行淳之介", "確認済"),
+    ("谷崎潤一郎賞", 7, 1971, "青年の環", "野間宏", "確認済"),
+    ("谷崎潤一郎賞", 8, 1972, "たった一人の反乱", "丸谷才一", "確認済"),
+    ("谷崎潤一郎賞", 9, 1973, "帰らざる夏", "加賀乙彦", "確認済"),
+    # 谷崎潤一郎賞（1985〜2000、第21〜36回）
+    ("谷崎潤一郎賞", 21, 1985, "新橋烏森口青春篇", "椎名誠", "確認済"),
+    ("谷崎潤一郎賞", 22, 1986, "静かな生活", "大江健三郎", "確認済"),
+    ("谷崎潤一郎賞", 23, 1987, "別れぬ理由", "渡辺淳一", "確認済"),
+    ("谷崎潤一郎賞", 26, 1990, "やすらかに今はねむり給え", "林京子", "確認済"),
+    ("谷崎潤一郎賞", 27, 1991, "シャンハイムーン", "井上ひさし", "確認済"),
+    ("谷崎潤一郎賞", 28, 1992, "花に問え", "瀬戸内寂聴", "確認済"),
+    ("谷崎潤一郎賞", 29, 1993, "マシアス・ギリの失脚", "池澤夏樹", "確認済"),
+    ("谷崎潤一郎賞", 30, 1994, "虹の岬", "辻井喬", "確認済"),
+    ("谷崎潤一郎賞", 31, 1995, "西行花伝", "辻邦生", "確認済"),
+    ("谷崎潤一郎賞", 33, 1997, "季節の記憶", "保坂和志", "確認済"),
+    ("谷崎潤一郎賞", 33, 1997, "路地", "三木卓", "確認済"),
+    ("谷崎潤一郎賞", 34, 1998, "火の山―山猿記", "津島佑子", "確認済"),
+    ("谷崎潤一郎賞", 35, 1999, "透光の樹", "高樹のぶ子", "確認済"),
+    ("谷崎潤一郎賞", 36, 2000, "遊動亭円木", "辻原登", "確認済"),
+    ("谷崎潤一郎賞", 36, 2000, "共生虫", "村上龍", "確認済"),
+    # 谷崎潤一郎賞（第37回〜第61回、中央公論新社公式確認済み）
+    ("谷崎潤一郎賞", 37, 2001, "センセイの鞄", "川上弘美", "確認済"),
+    ("谷崎潤一郎賞", 39, 2003, "容疑者の夜行列車", "多和田葉子", "確認済"),
+    ("谷崎潤一郎賞", 40, 2004, "雪沼とその周辺", "堀江敏幸", "確認済"),
+    ("谷崎潤一郎賞", 41, 2005, "風味絶佳", "山田詠美", "確認済"),
+    ("谷崎潤一郎賞", 41, 2005, "告白", "町田康", "確認済"),
+    ("谷崎潤一郎賞", 42, 2006, "ミーナの行進", "小川洋子", "確認済"),
+    ("谷崎潤一郎賞", 43, 2007, "爆心", "青来有一", "確認済"),
+    ("谷崎潤一郎賞", 44, 2008, "東京島", "桐野夏生", "確認済"),
+    ("谷崎潤一郎賞", 46, 2010, "ピストルズ", "阿部和重", "確認済"),
+    ("谷崎潤一郎賞", 47, 2011, "半島へ", "稲葉真弓", "確認済"),
+    ("谷崎潤一郎賞", 48, 2012, "さよならクリストファー・ロビン", "高橋源一郎", "確認済"),
+    ("谷崎潤一郎賞", 49, 2013, "愛の夢とか", "川上未映子", "確認済"),
+    ("谷崎潤一郎賞", 50, 2014, "九年前の祈り", "小野正嗣", "確認済"),
+    ("谷崎潤一郎賞", 51, 2015, "死んでいない者", "滝口悠生", "確認済"),
+    ("谷崎潤一郎賞", 52, 2016, "異類婚姻譚", "本谷有希子", "確認済"),
+    ("谷崎潤一郎賞", 53, 2017, "月の満ち欠け", "佐藤正午", "確認済"),
+    ("谷崎潤一郎賞", 54, 2018, "送り火", "高橋弘希", "確認済"),
+    ("谷崎潤一郎賞", 55, 2019, "飛族", "村田喜代子", "確認済"),
+    ("谷崎潤一郎賞", 56, 2020, "日本蒙昧前史", "磯﨑憲一郎", "確認済"),
+    ("谷崎潤一郎賞", 57, 2021, "アンソーシャル ディスタンス", "金原ひとみ", "確認済"),
+    ("谷崎潤一郎賞", 58, 2022, "ミトンとふびん", "吉本ばなな", "確認済"),
+    ("谷崎潤一郎賞", 59, 2023, "水車小屋のネネ", "津村記久子", "確認済"),
+    ("谷崎潤一郎賞", 60, 2024, "続きと始まり", "柴崎友香", "確認済"),
+    ("谷崎潤一郎賞", 61, 2025, "熊はどこにいるの", "木村紅美", "確認済"),
+]
+
+
+def _migrate_seed_award_books():
+    """award_booksテーブルに受賞作シードデータを投入する"""
+    if not USE_PG:
+        return
+    try:
+        con = get_con()
+        flag = fetchone(con, "SELECT value FROM settings WHERE key='award_books_seed_done'")
+        if flag and flag.get("value") == "v2":
+            con.close()
+            return
+        cur = con.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS award_books (
+                id SERIAL PRIMARY KEY,
+                award TEXT NOT NULL,
+                award_no INTEGER,
+                award_year INTEGER,
+                title TEXT NOT NULL,
+                author TEXT DEFAULT '',
+                isbn13 TEXT DEFAULT '',
+                summary TEXT DEFAULT '',
+                status TEXT DEFAULT '確認済',
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
+        # 既存データを一旦クリアして再投入
+        cur.execute("DELETE FROM award_books")
+        cur.executemany(
+            "INSERT INTO award_books (award, award_no, award_year, title, author, status) VALUES (%s,%s,%s,%s,%s,%s)",
+            _AWARD_BOOKS_SEED
+        )
+        cur.execute("INSERT INTO settings(key,value) VALUES('award_books_seed_done','v2') ON CONFLICT(key) DO UPDATE SET value='v2'")
+        con.commit()
+        con.close()
+        print(f"[award_books_seed] {len(_AWARD_BOOKS_SEED)}件投入完了")
+    except Exception as e:
+        print(f"[award_books_seed] error: {e}")
 
 
 def _normalize_pubdate(s):
@@ -2285,6 +2419,50 @@ def api_books_by_genre():
 @app.route("/api/stats")
 def api_stats():
     return jsonify(FULL_STATS)
+
+
+@app.route("/api/award-books")
+def api_award_books():
+    """受賞作一覧取得。?award=三島由紀夫賞 でフィルター"""
+    award = request.args.get("award", "").strip()
+    if not USE_PG:
+        return jsonify([])
+    con = get_con()
+    if award:
+        rows = fetchall(con, "SELECT * FROM award_books WHERE award=? AND status='確認済' ORDER BY award_year DESC, award_no DESC", (award,))
+    else:
+        rows = fetchall(con, "SELECT * FROM award_books WHERE status='確認済' ORDER BY award, award_year DESC, award_no DESC")
+    con.close()
+    # 蔵書との照合（タイトル+著者で近似一致）
+    try:
+        con2 = get_con()
+        lib_rows = fetchall(con2, "SELECT isbn, title, author FROM genre_books")
+        con2.close()
+        lib_map = {}
+        for r in lib_rows:
+            key = (r["title"].strip(), r["author"].strip())
+            lib_map[key] = r["isbn"]
+    except Exception:
+        lib_map = {}
+    result = []
+    for r in rows:
+        d = dict(r)
+        key = (d.get("title", "").strip(), d.get("author", "").strip())
+        d["in_library"] = key in lib_map
+        d["library_isbn"] = lib_map.get(key, "")
+        result.append(d)
+    return jsonify(result)
+
+
+@app.route("/api/award-books/awards")
+def api_award_books_awards():
+    """登録済み賞名一覧を返す"""
+    if not USE_PG:
+        return jsonify([])
+    con = get_con()
+    rows = fetchall(con, "SELECT DISTINCT award, COUNT(*) as cnt FROM award_books WHERE status='確認済' GROUP BY award ORDER BY award")
+    con.close()
+    return jsonify([{"award": r["award"], "count": r["cnt"]} for r in rows])
 
 
 @app.route("/api/new-arrivals")

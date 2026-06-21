@@ -145,6 +145,7 @@
       <button class="tab-btn" data-tab="info" role="tab" aria-selected="false">🏛️ 開館情報</button>
       <button class="tab-btn" data-tab="request" role="tab" aria-selected="false">📬 リクエスト</button>
       <button class="tab-btn" data-tab="reqlist" role="tab" aria-selected="false">📋 みんなのリクエスト一覧・投票</button>
+      <button class="tab-btn" data-tab="awards" role="tab" aria-selected="false">🏆 受賞作</button>
       <button class="tab-btn" data-tab="howto" role="tab" aria-selected="false">❓ 使い方</button>
     </div>
   </nav>
@@ -448,6 +449,17 @@
     </div>
 
     <!-- 使い方タブ -->
+    <div id="tab-awards" class="tab-panel">
+      <div style="max-width:680px;margin:0 auto;padding:16px">
+        <h2 style="font-size:1.2rem;margin-bottom:4px">🏆 受賞作一覧</h2>
+        <p style="font-size:0.82rem;color:#888;margin-bottom:14px">文学賞受賞作品データベース。蔵書にある本は「蔵書あり」と表示されます。</p>
+        <div id="awardFilterRow" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px"></div>
+        <div id="awardBooksList" style="display:flex;flex-direction:column;gap:10px">
+          <div style="color:#aaa;font-size:0.9rem;padding:20px 0;text-align:center">読み込み中…</div>
+        </div>
+      </div>
+    </div>
+
     <div id="tab-howto" class="tab-panel">
       <div style="max-width:680px;margin:0 auto;padding:16px">
         <h2 style="font-size:1.2rem;margin-bottom:4px">❓ 使い方ガイド</h2>
