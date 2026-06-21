@@ -118,10 +118,14 @@ def _refresh_inertia_version():
     try:
         resp = _INERTIA_SESSION.get(f"{LIBRARYLIFE_BASE}/", timeout=10)
         import re as _re2
-        m = _re2.search(r'"version":"([a-f0-9]{32})"', resp.text)
+        # data-page属性内はHTMLエンティティエンコードされているため両方試みる
+        m = (_re2.search(r'version&quot;:&quot;([a-f0-9]{32})', resp.text)
+             or _re2.search(r'"version":"([a-f0-9]{32})"', resp.text))
         if m:
             _INERTIA_VERSION = m.group(1)
             app.logger.info(f"Inertia version updated: {_INERTIA_VERSION}")
+        else:
+            app.logger.warning("Inertia version not found in response")
     except Exception as e:
         app.logger.error(f"_refresh_inertia_version error: {e}")
 OPENBD_API = "https://api.openbd.jp/v1/get"
