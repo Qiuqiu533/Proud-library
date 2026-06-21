@@ -867,6 +867,32 @@ def _migrate_ndc_genres():
     except Exception as e:
         print(f"NDC classify error: {e}")
 
+_REQUIRED_TABLES = [
+    "book_requests", "issues", "announcements", "genre_books",
+    "new_arrivals", "lib_schedule", "ratings", "user_accounts",
+    "admin_users", "settings", "staff_chat", "calendar_events",
+    "availability_cache", "password_reset_tokens",
+]
+
+def _verify_tables():
+    """起動時にテーブル名を検証してミスを早期検出する"""
+    try:
+        con = get_con()
+        if USE_PG:
+            rows = fetchall(con, "SELECT tablename FROM pg_tables WHERE schemaname='public'")
+            existing = {r["tablename"] for r in rows}
+        else:
+            rows = fetchall(con, "SELECT name FROM sqlite_master WHERE type='table'")
+            existing = {r["name"] for r in rows}
+        con.close()
+        missing = [t for t in _REQUIRED_TABLES if t not in existing]
+        if missing:
+            print(f"[WARNING] テーブルが見つかりません: {missing}")
+        else:
+            print(f"[OK] 全テーブル確認済み ({len(_REQUIRED_TABLES)}件)")
+    except Exception as e:
+        print(f"table verify error: {e}")
+
 def _ensure_db():
     try:
         init_db()
@@ -882,6 +908,7 @@ def _ensure_db():
     threading.Thread(target=_migrate_add_staff_chat, daemon=True).start()
     threading.Thread(target=_migrate_lib_schedule, daemon=True).start()
     threading.Thread(target=_migrate_resync_awards, daemon=True).start()
+    threading.Thread(target=_verify_tables, daemon=True).start()
 
 
 def _migrate_add_staff_chat():
