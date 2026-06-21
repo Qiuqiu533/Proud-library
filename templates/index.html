@@ -49,9 +49,10 @@
 
       <!-- ログインフォーム -->
       <div id="loginForm">
-        <p class="login-desc" style="margin-bottom:12px">ご入居者専用サービスです。</p>
+        <p class="login-desc" style="margin-bottom:4px">ご入居者専用サービスです。</p>
+        <p class="login-room-hint">街区住居：<b>1-533</b>（1街区533室）／戸建：<b>6桁の任意番号</b></p>
         <div class="login-form">
-          <input type="text" id="loginRoom" placeholder="部屋番号（例：101）" class="login-input" inputmode="numeric" />
+          <input type="text" id="loginRoom" placeholder="例：5-533 または 100001" class="login-input" inputmode="text" autocomplete="off" />
           <input type="password" id="residentPass" placeholder="パスワード" class="login-input" style="margin-top:10px" />
           <button id="loginBtn" class="login-btn">入室する</button>
         </div>
@@ -61,9 +62,10 @@
 
       <!-- 新規登録フォーム -->
       <div id="registerForm" style="display:none">
-        <p class="login-desc" style="margin-bottom:12px">初めての方は部屋番号・パスワード・メールアドレスを登録してください。</p>
+        <p class="login-desc" style="margin-bottom:4px">初めての方は部屋番号・パスワード・メールアドレスを登録してください。</p>
+        <p class="login-room-hint">街区住居：<b>1-533</b>（1街区533室）／戸建：<b>6桁の任意番号</b></p>
         <div class="login-form">
-          <input type="text" id="regRoom" placeholder="部屋番号（例：101）" class="login-input" inputmode="numeric" />
+          <input type="text" id="regRoom" placeholder="例：5-533 または 100001" class="login-input" inputmode="text" autocomplete="off" />
           <input type="password" id="regPass" placeholder="パスワード（6文字以上）" class="login-input" style="margin-top:10px" />
           <input type="password" id="regPass2" placeholder="パスワード確認" class="login-input" style="margin-top:10px" />
           <input type="email" id="regEmail" placeholder="メールアドレス（パスワードリセット用）" class="login-input" style="margin-top:10px" />
@@ -75,9 +77,10 @@
 
       <!-- パスワードを忘れた -->
       <div id="forgotForm" style="display:none">
-        <p class="login-desc" style="margin-bottom:12px">登録済みの部屋番号とメールアドレスを入力してください。リセットリンクをお送りします。</p>
+        <p class="login-desc" style="margin-bottom:4px">登録済みの部屋番号とメールアドレスを入力してください。リセットリンクをお送りします。</p>
+        <p class="login-room-hint">街区住居：<b>1-533</b> ／ 戸建：<b>6桁番号</b></p>
         <div class="login-form">
-          <input type="text" id="forgotRoom" placeholder="部屋番号" class="login-input" inputmode="numeric" />
+          <input type="text" id="forgotRoom" placeholder="例：5-533 または 100001" class="login-input" inputmode="text" autocomplete="off" />
           <input type="email" id="forgotEmail" placeholder="登録メールアドレス" class="login-input" style="margin-top:10px" />
           <button id="forgotBtn" class="login-btn">リセットリンクを送信</button>
         </div>

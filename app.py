@@ -2648,8 +2648,14 @@ def _user_auth_ok(user, password):
     """パスワードハッシュで認証。旧PIN方式にも対応"""
     if user.get("password_hash") and user.get("password_salt"):
         return _verify_password(password, user["password_hash"], user["password_salt"])
-    # 旧PIN方式（後方互換）
     return user.get("pin") == password
+
+import re as _re
+_ROOM_PATTERN = _re.compile(r'^[1-5]-\d{3,4}$|^\d{6}$')
+
+def _validate_room(room):
+    """部屋番号バリデーション: 街区形式(1-533)または6桁数字"""
+    return bool(_ROOM_PATTERN.match(room))
 
 
 @app.route("/api/user/register", methods=["POST"])
@@ -2660,6 +2666,8 @@ def api_user_register():
     email    = (body.get("email")    or "").strip()
     if not room or not password or len(password) < 6:
         return jsonify({"error": "部屋番号と6文字以上のパスワードを入力してください"}), 400
+    if not _validate_room(room):
+        return jsonify({"error": "部屋番号の形式が正しくありません（例：5-533 または 6桁数字）"}), 400
     con = get_con()
     user = fetchone(con, "SELECT room, password_hash FROM user_accounts WHERE room=?", (room,))
     if user and user.get("password_hash"):
@@ -2685,6 +2693,8 @@ def api_user_login():
     password = (body.get("password") or body.get("pin") or "").strip()
     if not room or not password:
         return jsonify({"error": "部屋番号とパスワードを入力してください"}), 400
+    if not _validate_room(room):
+        return jsonify({"error": "部屋番号の形式が正しくありません"}), 400
     con = get_con()
     user = fetchone(con, "SELECT room, pin, email, password_hash, password_salt, favorites, reading_log, library_card_url, library_card_image FROM user_accounts WHERE room=?", (room,))
     if user is None:

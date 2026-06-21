@@ -21,6 +21,7 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .login-tab { flex: 1; padding: 10px; border: none; background: transparent; border-radius: 9px; font-family: inherit; font-size: 0.9rem; font-weight: 600; color: #888; cursor: pointer; transition: all .2s; }
 .login-tab-active { background: white; color: #2a4a37; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
 .login-link-btn { background: none; border: none; color: #3d6b4f; font-size: 0.82rem; cursor: pointer; text-decoration: underline; margin-top: 8px; padding: 4px; }
+.login-room-hint { font-size: 0.78rem; color: #888; margin-bottom: 12px; line-height: 1.6; }
 .login-input { letter-spacing: normal; }
 .login-qr-section { margin-top: 20px; }
 .login-qr-divider { display: flex; align-items: center; gap: 10px; color: #ccc; font-size: 0.8rem; margin-bottom: 16px; }
