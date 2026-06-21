@@ -4400,7 +4400,7 @@ async function lookupBookForDesc() {
       info.textContent = `📖 ${book.title}${book.author ? " / " + book.author : ""}`;
       info.style.display = "block";
       lookupBookAwards(isbn);
-      if (false) { // 既存書評は自動ロードしない（誤上書き防止）
+      if (book.description) {
         document.getElementById("descText").value = book.description;
         document.getElementById("descCount").textContent = `（${book.description.length}/600文字）`;
       }
