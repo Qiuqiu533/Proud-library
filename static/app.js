@@ -1805,6 +1805,7 @@ document.getElementById("boardCode") && document.getElementById("boardCode").add
 
 document.getElementById("boardClose").addEventListener("click", () => {
   document.getElementById("boardPanel").style.display = "none";
+  document.body.style.overflow = "";
   if (reqPollTimer) { clearInterval(reqPollTimer); reqPollTimer = null; }
   lastSeenReqPending = null;
   lastSeenChatId = null;
@@ -1820,6 +1821,7 @@ document.getElementById("boardAdminLogout")?.addEventListener("click", () => {
   sessionStorage.removeItem("board_pass");
   sessionStorage.removeItem("board_name");
   document.getElementById("boardPanel").style.display = "none";
+  document.body.style.overflow = "";
   if (reqPollTimer) { clearInterval(reqPollTimer); reqPollTimer = null; }
 });
 
@@ -1847,6 +1849,7 @@ function openBoardPanel() {
   const lbl = document.getElementById("chatSenderLabel");
   if (lbl) lbl.textContent = boardSenderName ? `👤 ${boardSenderName}` : "";
   document.getElementById("boardPanel").style.display = "flex";
+  document.body.style.overflow = "hidden";
   applyRoleTabVisibility();
   // デフォルトタブを「ダッシュボード」に設定
   document.querySelectorAll(".board-tab").forEach(b => b.classList.remove("active"));
