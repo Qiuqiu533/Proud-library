@@ -1,9 +1,77 @@
 // ===== Auth =====
+// residentSession: {room, password} をsessionStorageで保持
+let residentSession = null;
+try { residentSession = JSON.parse(sessionStorage.getItem("resident_session") || "null"); } catch {}
+
+function showLoginTab(tab) {
+  document.getElementById("loginForm").style.display    = tab === "login"    ? "" : "none";
+  document.getElementById("registerForm").style.display = tab === "register" ? "" : "none";
+  document.getElementById("forgotForm").style.display   = tab === "forgot"   ? "" : "none";
+  document.getElementById("tabLogin").classList.toggle("login-tab-active",    tab === "login");
+  document.getElementById("tabRegister").classList.toggle("login-tab-active", tab === "register");
+}
+
+function _enterApp() {
+  document.getElementById("loginScreen").style.display = "none";
+  localStorage.setItem("resident_auth", "1");
+  // localStorageの読書記録をDBに移行提案
+  _offerMigrateReadingLog();
+  loadBooks();
+}
+
+async function _offerMigrateReadingLog() {
+  if (!residentSession) return;
+  const localLogs = getAllReadStatuses();
+  if (localLogs.length === 0) return;
+  if (localStorage.getItem("reading_log_migrated_" + residentSession.room)) return;
+  if (!confirm(`このデバイスに読書記録が${localLogs.length}件あります。\nアカウントに保存しますか？\n（以後は複数端末で同期されます）`)) return;
+  const reading_log = {};
+  localLogs.forEach(({isbn, status}) => {
+    reading_log[isbn] = {status, ...getReadMeta(isbn)};
+  });
+  const favs = getFavs();
+  await fetch("/api/user/sync", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({room: residentSession.room, password: residentSession.password, favorites: favs, reading_log})
+  });
+  localStorage.setItem("reading_log_migrated_" + residentSession.room, "1");
+  alert("読書記録をアカウントに保存しました。");
+}
+
 async function checkAuth() {
   const loginScreen = document.getElementById("loginScreen");
 
-  // QRパラメータによる自動ログイン
+  // パスワードリセットリンクの処理
   const urlParams = new URLSearchParams(window.location.search);
+  const resetToken = urlParams.get("token");
+  if (window.location.pathname === "/reset-password" && resetToken) {
+    document.getElementById("loginScreen").style.display = "none";
+    document.getElementById("resetPasswordScreen").style.display = "flex";
+    window.history.replaceState({}, "", "/");
+    document.getElementById("resetSubmitBtn").onclick = async () => {
+      const p1 = document.getElementById("resetNewPass").value;
+      const p2 = document.getElementById("resetNewPass2").value;
+      const err = document.getElementById("resetError");
+      if (p1.length < 6) { err.textContent = "6文字以上で入力してください"; return; }
+      if (p1 !== p2) { err.textContent = "パスワードが一致しません"; return; }
+      const res = await fetch("/api/user/reset-password", {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({token: resetToken, password: p1})
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert("パスワードを再設定しました。新しいパスワードでログインしてください。");
+        document.getElementById("resetPasswordScreen").style.display = "none";
+        document.getElementById("loginScreen").style.display = "flex";
+        _initLoginQr();
+      } else {
+        err.textContent = "❌ " + (data.error || "エラーが発生しました");
+      }
+    };
+    return;
+  }
+
+  // QRパラメータによる自動ログイン（共通パスワード方式との後方互換）
   const qrPw = urlParams.get("qr");
   if (qrPw) {
     const res = await fetch("/api/auth", {
@@ -12,15 +80,17 @@ async function checkAuth() {
     });
     if (res.ok) {
       localStorage.setItem("resident_auth", "1");
-      residentPassword = qrPw;
-      sessionStorage.setItem("resident_pass", qrPw);
-      // URLからqrパラメータを除去
       window.history.replaceState({}, "", window.location.pathname);
       loginScreen.style.display = "none";
       return;
     }
   }
 
+  // セッション復元
+  if (residentSession && residentSession.room) {
+    loginScreen.style.display = "none";
+    return;
+  }
   if (localStorage.getItem("resident_auth") === "1") {
     loginScreen.style.display = "none";
     return;
@@ -37,23 +107,39 @@ async function _initLoginQr() {
     if (!wrap || !data.url) return;
     wrap.innerHTML = "";
     new QRCode(wrap, {text: data.url, width: 160, height: 160, correctLevel: QRCode.CorrectLevel.M});
-  } catch(e) { /* QR生成失敗時は非表示のまま */ }
+  } catch(e) {}
 }
 
 document.getElementById("loginBtn").addEventListener("click", async () => {
+  const room = (document.getElementById("loginRoom").value || "").trim();
   const pass = document.getElementById("residentPass").value;
-  const err = document.getElementById("loginError");
-  if (!pass) { err.textContent = "パスワードを入力してください"; return; }
-  const res = await fetch("/api/auth", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ password: pass })
+  const err  = document.getElementById("loginError");
+  if (!room || !pass) { err.textContent = "部屋番号とパスワードを入力してください"; return; }
+  err.textContent = "";
+  const res = await fetch("/api/user/login", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({room, password: pass})
   });
+  const data = await res.json();
   if (res.ok) {
-    localStorage.setItem("resident_auth", "1");
-    document.getElementById("loginScreen").style.display = "none";
-    loadBooks();
+    residentSession = {room, password: pass};
+    sessionStorage.setItem("resident_session", JSON.stringify(residentSession));
+    // DBの読書記録をlocalStorageに反映
+    if (data.reading_log) {
+      Object.entries(data.reading_log).forEach(([isbn, val]) => {
+        const status = typeof val === "string" ? val : (val.status || "");
+        if (status) setReadStatus(isbn, status);
+        if (typeof val === "object" && val.date) saveReadMeta(isbn, {date: val.date, review: val.review || ""});
+      });
+    }
+    _enterApp();
   } else {
-    err.textContent = "❌ パスワードが違います";
+    // 未登録の場合は登録タブへ誘導
+    if (res.status === 404) {
+      err.textContent = "この部屋番号は未登録です。「新規登録」タブから登録してください。";
+    } else {
+      err.textContent = "❌ " + (data.error || "ログインできません");
+    }
     document.getElementById("residentPass").value = "";
   }
 });
@@ -62,9 +148,50 @@ document.getElementById("residentPass").addEventListener("keydown", e => {
   if (e.key === "Enter") document.getElementById("loginBtn").click();
 });
 
+document.getElementById("registerBtn").addEventListener("click", async () => {
+  const room  = (document.getElementById("regRoom").value  || "").trim();
+  const pass  = document.getElementById("regPass").value;
+  const pass2 = document.getElementById("regPass2").value;
+  const email = (document.getElementById("regEmail").value || "").trim();
+  const err   = document.getElementById("registerError");
+  if (!room) { err.textContent = "部屋番号を入力してください"; return; }
+  if (pass.length < 6) { err.textContent = "パスワードは6文字以上で入力してください"; return; }
+  if (pass !== pass2) { err.textContent = "パスワードが一致しません"; return; }
+  err.textContent = "";
+  const res = await fetch("/api/user/register", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({room, password: pass, email})
+  });
+  const data = await res.json();
+  if (res.ok) {
+    residentSession = {room, password: pass};
+    sessionStorage.setItem("resident_session", JSON.stringify(residentSession));
+    _enterApp();
+  } else {
+    err.textContent = "❌ " + (data.error || "登録できません");
+  }
+});
+
+document.getElementById("forgotBtn").addEventListener("click", async () => {
+  const room  = (document.getElementById("forgotRoom").value  || "").trim();
+  const email = (document.getElementById("forgotEmail").value || "").trim();
+  const msg   = document.getElementById("forgotMsg");
+  if (!room || !email) { msg.style.color = "#e05"; msg.textContent = "部屋番号とメールアドレスを入力してください"; return; }
+  msg.style.color = "#888"; msg.textContent = "送信中...";
+  const res = await fetch("/api/user/forgot-password", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({room, email})
+  });
+  const data = await res.json();
+  msg.style.color = res.ok ? "#2a7a2a" : "#e05";
+  msg.textContent = data.message || data.error || (res.ok ? "送信しました" : "エラーが発生しました");
+});
+
 document.getElementById("logoutBtn").addEventListener("click", () => {
   if (!confirm("ログアウトしますか？")) return;
+  residentSession = null;
   localStorage.removeItem("resident_auth");
+  sessionStorage.removeItem("resident_session");
   sessionStorage.removeItem("resident_pass");
   sessionStorage.removeItem("board_auth");
   sessionStorage.removeItem("board_pass");
@@ -72,8 +199,10 @@ document.getElementById("logoutBtn").addEventListener("click", () => {
   sessionStorage.removeItem("admin_session");
   adminSession = null;
   document.getElementById("loginScreen").style.display = "flex";
+  document.getElementById("loginRoom").value = "";
   document.getElementById("residentPass").value = "";
   document.getElementById("loginError").textContent = "";
+  showLoginTab("login");
 });
 
 // ===== State =====
@@ -2957,21 +3086,24 @@ function updateSyncUI() {
 }
 
 async function cloudSync() {
-  const u = getCloudUser();
+  const u = residentSession || getCloudUser();
   if (!u) return;
   const favs = getFavIsbns();
   const rlog = {};
   getLogEntries().forEach(e => { rlog[e.isbn] = e.status; });
   const card_url = localStorage.getItem("libraryCardUrl") || "";
   const card_img = localStorage.getItem("libraryCardImage") || "";
+  const pw = u.password || u.pin || "";
   try {
     await fetch("/api/user/sync", {
       method: "POST", headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({room: u.room, pin: u.pin, favorites: favs, reading_log: rlog,
+      body: JSON.stringify({room: u.room, password: pw, favorites: favs, reading_log: rlog,
         library_card_url: card_url, library_card_image: card_img})
     });
-    document.getElementById("syncFavCount").textContent = favs.length;
-    document.getElementById("syncLogCount").textContent = Object.keys(rlog).length;
+    const fc = document.getElementById("syncFavCount");
+    const lc = document.getElementById("syncLogCount");
+    if (fc) fc.textContent = favs.length;
+    if (lc) lc.textContent = Object.keys(rlog).length;
   } catch {}
 }
 

@@ -21,23 +21,76 @@
 <body>
 
   <!-- Login screen -->
+  <!-- パスワードリセット画面 -->
+  <div id="resetPasswordScreen" class="login-screen" style="display:none">
+    <div class="login-box">
+      <div class="login-logo">🔑</div>
+      <h1 class="login-title">パスワード再設定</h1>
+      <p class="login-desc">新しいパスワードを入力してください。</p>
+      <div class="login-form">
+        <input type="password" id="resetNewPass" placeholder="新しいパスワード（6文字以上）" class="login-input" />
+        <input type="password" id="resetNewPass2" placeholder="確認（もう一度入力）" class="login-input" style="margin-top:10px" />
+        <button id="resetSubmitBtn" class="login-btn" style="margin-top:14px">パスワードを設定する</button>
+      </div>
+      <p id="resetError" class="login-error"></p>
+    </div>
+  </div>
+
   <div id="loginScreen" class="login-screen">
     <div class="login-box">
       <div class="login-logo">📚</div>
       <h1 class="login-title">プラウド船橋<br>コミュニティ図書館</h1>
-      <p class="login-desc">ご入居者専用サービスです。<br>パスワードを入力してください。</p>
-      <div class="login-form">
-        <input type="password" id="residentPass" placeholder="パスワード" class="login-input" />
-        <button id="loginBtn" class="login-btn">入室する</button>
+
+      <!-- ログインタブ切替 -->
+      <div class="login-tabs">
+        <button class="login-tab login-tab-active" id="tabLogin" onclick="showLoginTab('login')">ログイン</button>
+        <button class="login-tab" id="tabRegister" onclick="showLoginTab('register')">新規登録</button>
       </div>
-      <p id="loginError" class="login-error"></p>
+
+      <!-- ログインフォーム -->
+      <div id="loginForm">
+        <p class="login-desc" style="margin-bottom:12px">ご入居者専用サービスです。</p>
+        <div class="login-form">
+          <input type="text" id="loginRoom" placeholder="部屋番号（例：101）" class="login-input" inputmode="numeric" />
+          <input type="password" id="residentPass" placeholder="パスワード" class="login-input" style="margin-top:10px" />
+          <button id="loginBtn" class="login-btn">入室する</button>
+        </div>
+        <p id="loginError" class="login-error"></p>
+        <button class="login-link-btn" onclick="showLoginTab('forgot')">パスワードを忘れた方はこちら</button>
+      </div>
+
+      <!-- 新規登録フォーム -->
+      <div id="registerForm" style="display:none">
+        <p class="login-desc" style="margin-bottom:12px">初めての方は部屋番号・パスワード・メールアドレスを登録してください。</p>
+        <div class="login-form">
+          <input type="text" id="regRoom" placeholder="部屋番号（例：101）" class="login-input" inputmode="numeric" />
+          <input type="password" id="regPass" placeholder="パスワード（6文字以上）" class="login-input" style="margin-top:10px" />
+          <input type="password" id="regPass2" placeholder="パスワード確認" class="login-input" style="margin-top:10px" />
+          <input type="email" id="regEmail" placeholder="メールアドレス（パスワードリセット用）" class="login-input" style="margin-top:10px" />
+          <button id="registerBtn" class="login-btn">登録して入室</button>
+        </div>
+        <p id="registerError" class="login-error"></p>
+        <p style="font-size:0.78rem;color:#888;margin-top:8px">※メールアドレスはパスワードリセット時のみ使用します</p>
+      </div>
+
+      <!-- パスワードを忘れた -->
+      <div id="forgotForm" style="display:none">
+        <p class="login-desc" style="margin-bottom:12px">登録済みの部屋番号とメールアドレスを入力してください。リセットリンクをお送りします。</p>
+        <div class="login-form">
+          <input type="text" id="forgotRoom" placeholder="部屋番号" class="login-input" inputmode="numeric" />
+          <input type="email" id="forgotEmail" placeholder="登録メールアドレス" class="login-input" style="margin-top:10px" />
+          <button id="forgotBtn" class="login-btn">リセットリンクを送信</button>
+        </div>
+        <p id="forgotMsg" class="login-error"></p>
+        <button class="login-link-btn" onclick="showLoginTab('login')">ログインに戻る</button>
+      </div>
+
       <div class="login-qr-section">
         <div class="login-qr-divider"><span>または</span></div>
         <p class="login-qr-label">📱 QRコードをスキャンして入室</p>
         <div id="loginQrCode" class="login-qr-wrap"></div>
         <p class="login-qr-note">掲示板のQRコードをカメラで読み取るとログインできます</p>
       </div>
-      <p class="login-note">パスワードは管理組合よりお知らせしています</p>
     </div>
   </div>
 
