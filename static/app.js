@@ -2516,9 +2516,14 @@ async function loadDashboard() {
 
   const pw = boardPassword;
   try {
-    const res = await fetch(`/api/admin/dashboard-data`, { headers: { "X-Password": pw } });
-    if (!res.ok) throw new Error("dashboard-data fetch failed");
-    const d = await res.json();
+    const [dashRes, awardsRes] = await Promise.all([
+      fetch(`/api/admin/dashboard-data`, { headers: { "X-Password": pw } }),
+      fetch(`/api/award-books/awards`),
+    ]);
+    if (!dashRes.ok) throw new Error("dashboard-data fetch failed");
+    const d = await dashRes.json();
+    const awardsData = awardsRes.ok ? await awardsRes.json() : [];
+    const awardCount = awardsData.reduce((s, a) => s + (a.count || 0), 0);
 
     const reqs   = d.requests  || [];
     const issues = d.issues    || [];
@@ -2593,7 +2598,7 @@ async function loadDashboard() {
           <div class="dash-card-label">総蔵書数（DB登録）</div>
         </div>
         <div class="dash-card dash-card-gold dash-clickable" onclick="switchBoardTab('awarddb')">
-          <div class="dash-card-num">138</div>
+          <div class="dash-card-num">${awardCount}</div>
           <div class="dash-card-label">受賞・ノミネート作品</div>
           <div class="dash-card-action">詳細 →</div>
         </div>
@@ -2832,7 +2837,40 @@ async function loadOpsStats() {
           }).join("")}
         </div>
       </div>
+    </div>
+    <div style="margin-top:20px;padding:14px;background:#f5f9f6;border:1px solid #d0e8d8;border-radius:10px">
+      <h4 style="color:#3d6b4f;margin:0 0 6px">🔄 在庫状況 一括チェック</h4>
+      <p style="font-size:0.78rem;color:#888;margin:0 0 10px">24時間以上未チェックの書籍をまとめて確認します（最大30冊）。完了まで数分かかる場合があります。</p>
+      <button id="availRefreshBtn" onclick="runAvailabilityRefresh()"
+        style="padding:8px 18px;background:#3d6b4f;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:0.85rem">
+        在庫チェック開始
+      </button>
+      <span id="availRefreshStatus" style="margin-left:10px;font-size:0.82rem;color:#666"></span>
     </div>`;
+}
+
+async function runAvailabilityRefresh() {
+  const btn = document.getElementById("availRefreshBtn");
+  const statusEl = document.getElementById("availRefreshStatus");
+  if (!btn || !statusEl) return;
+  btn.disabled = true;
+  statusEl.textContent = "対象ISBNを取得中…";
+  try {
+    const res = await fetch("/api/admin/availability-stale?limit=30", { headers: { "X-Password": boardPassword } });
+    if (!res.ok) { statusEl.textContent = "❌ 取得失敗"; btn.disabled = false; return; }
+    const items = await res.json();
+    if (!items.length) { statusEl.textContent = "✅ 全て最新です"; btn.disabled = false; return; }
+    let done = 0;
+    for (const item of items) {
+      statusEl.textContent = `チェック中… ${done}/${items.length}`;
+      await fetch(`/api/availability/${encodeURIComponent(item.isbn)}`).catch(() => {});
+      done++;
+    }
+    statusEl.textContent = `✅ ${done}件 更新完了`;
+  } catch(e) {
+    statusEl.textContent = "❌ エラー: " + e.message;
+  }
+  btn.disabled = false;
 }
 
 // ===== Stats =====
@@ -4995,17 +5033,17 @@ async function loadAwardBooks(award) {
     list.innerHTML = groups.map(g => `
       <div style="border:1px solid #e8e8e8;border-radius:10px;padding:12px 14px;background:#fff">
         <div style="font-size:0.78rem;color:#888;margin-bottom:6px">
-          ${g.award} 第${g.no}回（${g.year}年）
+          ${esc(g.award)} 第${g.no}回（${g.year}年）
         </div>
         ${g.books.map(b => `
           <div style="display:flex;align-items:center;gap:10px;margin-top:${g.books.length > 1 ? "8px" : "0"}">
             <div style="flex:1">
-              <div style="font-size:0.95rem;font-weight:600;color:#222">${b.title}</div>
-              <div style="font-size:0.82rem;color:#666;margin-top:2px">${b.author}</div>
+              <div style="font-size:0.95rem;font-weight:600;color:#222">${esc(b.title)}</div>
+              <div style="font-size:0.82rem;color:#666;margin-top:2px">${esc(b.author)}</div>
             </div>
             ${b.in_library
               ? `<span style="font-size:0.72rem;background:#e8f5e9;color:#2e7d32;padding:3px 8px;border-radius:12px;white-space:nowrap;cursor:pointer"
-                   onclick="switchToBooksAndSearch('${b.title.replace(/'/g,"\\'")}')">📖 蔵書あり</span>`
+                   onclick="switchToBooksAndSearch('${esc(b.title).replace(/'/g,"\\'")}')">📖 蔵書あり</span>`
               : `<span style="font-size:0.72rem;background:#f5f5f5;color:#aaa;padding:3px 8px;border-radius:12px;white-space:nowrap">未所蔵</span>`
             }
           </div>`).join("")}
@@ -5093,14 +5131,14 @@ async function loadAdminAwardBooks() {
         <tbody>
           ${books.map(b => `
             <tr style="border-bottom:1px solid #eee" id="awdrow-${b.id}">
-              <td style="padding:6px 8px">${b.award}</td>
+              <td style="padding:6px 8px">${esc(b.award)}</td>
               <td style="padding:6px 8px;text-align:center">${b.award_no ?? "—"}</td>
               <td style="padding:6px 8px;text-align:center">${b.award_year ?? "—"}</td>
-              <td style="padding:6px 8px;font-weight:500">${b.title}</td>
-              <td style="padding:6px 8px">${b.author || "—"}</td>
+              <td style="padding:6px 8px;font-weight:500">${esc(b.title)}</td>
+              <td style="padding:6px 8px">${esc(b.author || "—")}</td>
               <td style="padding:6px 8px">
                 <span style="font-size:0.75rem;padding:2px 7px;border-radius:10px;background:${b.status==='確認済'?'#e8f5e9':'#fff8e1'};color:${b.status==='確認済'?'#2e7d32':'#f57f17'}">
-                  ${b.status}
+                  ${esc(b.status)}
                 </span>
               </td>
               <td style="padding:6px 8px">

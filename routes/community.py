@@ -18,9 +18,13 @@ def _get_pw():
 @community_bp.route("/api/issues")
 def api_issues():
     con = get_con()
-    rows = fetchall(con, "SELECT id,title,body,priority,status,sort_order,created_at FROM issues ORDER BY sort_order ASC, id DESC")
-    con.close()
-    return jsonify([{**r, "created_at": str(r["created_at"])[:10]} for r in rows])
+    try:
+        rows = fetchall(con, "SELECT id,title,body,priority,status,sort_order,created_at FROM issues ORDER BY sort_order ASC, id DESC")
+        con.close()
+        return jsonify([{**r, "created_at": str(r["created_at"])[:10]} for r in rows])
+    except Exception as e:
+        con.close()
+        return jsonify({"error": str(e)}), 500
 
 
 @community_bp.route("/api/issues", methods=["POST"])
@@ -184,8 +188,12 @@ def api_delete_lib_schedule(sch_id):
 @community_bp.route("/api/announcements")
 def api_announcements():
     con = get_con()
-    rows = fetchall(con, "SELECT id, title, body, category, image_url, event_date, created_at FROM announcements ORDER BY id DESC")
-    con.close()
+    try:
+        rows = fetchall(con, "SELECT id, title, body, category, image_url, event_date, created_at FROM announcements ORDER BY id DESC")
+        con.close()
+    except Exception as e:
+        con.close()
+        return jsonify({"error": str(e)}), 500
     def parse_images(raw):
         if not raw:
             return []
@@ -252,9 +260,13 @@ def api_delete_announcement(ann_id):
 @community_bp.route("/api/requests")
 def api_requests():
     con = get_con()
-    rows = fetchall(con, "SELECT id,title,author,reason,room,status,votes,created_at,type,reply FROM book_requests ORDER BY id ASC")
-    con.close()
-    return jsonify([{**r, "created_at": str(r["created_at"])[:10], "type": r.get("type") or "request", "reply": r.get("reply") or ""} for r in rows])
+    try:
+        rows = fetchall(con, "SELECT id,title,author,reason,room,status,votes,created_at,type,reply FROM book_requests ORDER BY id ASC")
+        con.close()
+        return jsonify([{**r, "created_at": str(r["created_at"])[:10], "type": r.get("type") or "request", "reply": r.get("reply") or ""} for r in rows])
+    except Exception as e:
+        con.close()
+        return jsonify({"error": str(e)}), 500
 
 
 @community_bp.route("/api/requests/admin")
