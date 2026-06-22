@@ -27,8 +27,8 @@ function showLoginTab(tab) {
 function _enterApp() {
   document.getElementById("loginScreen").style.display = "none";
   localStorage.setItem("resident_auth", "1");
-  // localStorageの読書記録をDBに移行提案
   _offerMigrateReadingLog();
+  setTimeout(checkLoanReminders, 400);
   loadBooks();
 }
 
@@ -183,6 +183,7 @@ document.getElementById("loginBtn").addEventListener("click", async () => {
       });
     }
     _enterApp();
+    setTimeout(checkLoanReminders, 300);
   } else {
     // 未登録の場合は登録タブへ誘導
     if (res.status === 404) {
@@ -451,12 +452,49 @@ function getLogEntries() {
 function getReadMeta(isbn) {
   try { return JSON.parse(localStorage.getItem(_metaKey(isbn)) || "{}"); } catch { return {}; }
 }
-function setReadMeta(isbn, date, memo) {
+function setReadMeta(isbn, date, memo, due_date) {
+  const prev = getReadMeta(isbn);
   const obj = {};
   if (date) obj.date = date;
   if (memo) obj.memo = memo;
+  const dd = due_date !== undefined ? due_date : (prev.due_date || "");
+  if (dd) obj.due_date = dd;
   if (Object.keys(obj).length) localStorage.setItem(_metaKey(isbn), JSON.stringify(obj));
   else localStorage.removeItem(_metaKey(isbn));
+}
+function setDueDate(isbn, due_date) {
+  const prev = getReadMeta(isbn);
+  const obj = { ...prev };
+  if (due_date) obj.due_date = due_date;
+  else delete obj.due_date;
+  if (Object.keys(obj).length) localStorage.setItem(_metaKey(isbn), JSON.stringify(obj));
+  else localStorage.removeItem(_metaKey(isbn));
+}
+
+function checkLoanReminders() {
+  const entries = getLogEntries().filter(e => e.status === "借り中");
+  if (!entries.length) { _hideLoanBanner(); return; }
+  const today = new Date(); today.setHours(0,0,0,0);
+  const overdue = [], soon = [];
+  entries.forEach(e => {
+    const m = getReadMeta(e.isbn);
+    if (!m.due_date) return;
+    const due = new Date(m.due_date); due.setHours(0,0,0,0);
+    const diff = Math.round((due - today) / 86400000);
+    const title = m.title || e.isbn;
+    if (diff < 0) overdue.push({ isbn: e.isbn, title, diff });
+    else if (diff <= 3) soon.push({ isbn: e.isbn, title, diff });
+  });
+  if (!overdue.length && !soon.length) { _hideLoanBanner(); return; }
+  const lines = [];
+  overdue.forEach(b => lines.push(`<span class="loan-item loan-overdue">⚠️ 「${b.title || b.isbn}」が${Math.abs(b.diff)}日超過しています</span>`));
+  soon.forEach(b => lines.push(`<span class="loan-item loan-soon">📅 「${b.title || b.isbn}」の返却期限まであと${b.diff}日</span>`));
+  const banner = document.getElementById("loanReminderBanner");
+  if (banner) { banner.innerHTML = lines.join(""); banner.style.display = "flex"; }
+}
+function _hideLoanBanner() {
+  const b = document.getElementById("loanReminderBanner");
+  if (b) b.style.display = "none";
 }
 
 // ログイン時に旧キー（部屋番号なし）を新キーへ移行する
@@ -494,7 +532,7 @@ function statusBadge(s) {
 }
 
 function readStatusBadge(status) {
-  const map = { "読んだ": "badge-read", "読書中": "badge-reading", "読みたい": "badge-want" };
+  const map = { "読んだ": "badge-read", "読書中": "badge-reading", "読みたい": "badge-want", "借り中": "badge-borrowing" };
   return status ? `<span class="badge ${map[status] || ''}">${status}</span>` : "";
 }
 
@@ -1370,17 +1408,22 @@ function _renderModalContent(isbn, book, rating) {
     <div class="modal-section">
       <h3>📚 読書ステータス</h3>
       <div class="read-status-btns">
-        ${["読みたい","読書中","読んだ"].map(s => `
-          <button class="read-status-btn ${readStatus === s ? 'active' : ''}" data-status="${s}">${s === "読んだ" ? "✅" : s === "読書中" ? "📖" : "🔖"} ${s}</button>
+        ${["読みたい","読書中","読んだ","借り中"].map(s => `
+          <button class="read-status-btn ${readStatus === s ? 'active' : ''}" data-status="${s}">${s === "読んだ" ? "✅" : s === "読書中" ? "📖" : s === "借り中" ? "📦" : "🔖"} ${s}</button>
         `).join("")}
         ${readStatus ? `<button class="read-status-btn clear-btn" data-status="">✕ 解除</button>` : ""}
       </div>
       ${readStatus ? (() => { const m = getReadMeta(isbn); return `
       <div class="read-meta-form" id="readMetaForm">
+        ${readStatus === "借り中" ? `
+        <div class="read-meta-row">
+          <label class="read-meta-label">📅 返却予定日</label>
+          <input type="date" id="readDueDate" class="read-meta-date" value="${m.due_date || ''}" min="${new Date().toISOString().slice(0,10)}">
+        </div>` : `
         <div class="read-meta-row">
           <label class="read-meta-label">📅 読んだ日</label>
           <input type="date" id="readMetaDate" class="read-meta-date" value="${m.date || ''}" max="${new Date().toISOString().slice(0,10)}">
-        </div>
+        </div>`}
         <div class="read-meta-row">
           <label class="read-meta-label">✏️ 読書感想</label>
           <textarea id="readMetaMemo" class="read-meta-memo" rows="3" maxlength="300" placeholder="感想を入力（300文字まで）">${esc(m.memo || '')}</textarea>
@@ -1447,8 +1490,11 @@ function _bindModalEvents(isbn) {
   if (saveBtn) {
     saveBtn.addEventListener("click", () => {
       const date = (document.getElementById("readMetaDate") || {}).value || "";
+      const due_date = (document.getElementById("readDueDate") || {}).value || "";
       const memo = memoEl ? memoEl.value : "";
-      setReadMeta(isbn, date, memo);
+      setReadMeta(isbn, date, memo, due_date || undefined);
+      if (due_date) setDueDate(isbn, due_date);
+      checkLoanReminders();
       const saved = document.getElementById("readMetaSaved");
       if (saved) { saved.style.display = "inline"; setTimeout(() => { saved.style.display = "none"; }, 2000); }
     });

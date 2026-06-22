@@ -323,7 +323,8 @@ def init_db():
                 title TEXT DEFAULT '',
                 author TEXT DEFAULT '',
                 publisher TEXT DEFAULT '',
-                format TEXT DEFAULT ''
+                format TEXT DEFAULT '',
+                awards TEXT DEFAULT '[]'
             )
         """)
         con.execute("""
@@ -1136,6 +1137,28 @@ def _migrate_ratings_user_votes():
         con.close()
 
 
+def _migrate_genre_books_awards():
+    """genre_books テーブルに awards カラムを追加（SQLite/PG共通）。"""
+    if _migration_done("genre_books_awards_v1"):
+        return
+    con = get_con()
+    try:
+        if USE_PG:
+            cur = con.cursor()
+            cur.execute("ALTER TABLE genre_books ADD COLUMN IF NOT EXISTS awards JSONB DEFAULT '[]'::jsonb")
+        else:
+            cols = [row[1] for row in con.execute("PRAGMA table_info(genre_books)")]
+            if "awards" not in cols:
+                con.execute("ALTER TABLE genre_books ADD COLUMN awards TEXT DEFAULT '[]'")
+        con.commit()
+        _mark_migration_done("genre_books_awards_v1")
+        logger.info("[migration] genre_books.awards カラム追加完了")
+    except Exception as e:
+        logger.error(f"[migration] genre_books_awards error: %s", e)
+    finally:
+        con.close()
+
+
 def _run_all_migrations():
     """全マイグレーションをシングルスレッドで順次実行する（race condition防止）。"""
     steps = [
@@ -1156,6 +1179,7 @@ def _run_all_migrations():
         _migrate_pubdate_openbd,       # 完了後に librarylife を内部で起動
         _migrate_ndc_genres,           # 重い処理は最後
         _migrate_ratings_user_votes,   # ratings.user_votes カラム追加
+        _migrate_genre_books_awards,   # genre_books.awards カラム追加
         _verify_tables,
     ]
     for step in steps:
