@@ -404,10 +404,13 @@
             <label for="reqReason">リクエスト理由・一言（任意）</label>
             <textarea id="reqReason" placeholder="例：子どもと一緒に読みたいです。シリーズ全巻揃えてほしいです。" rows="3" maxlength="200"></textarea>
           </div>
-          <div class="req-field">
-            <label for="reqRoom">お名前・部屋番号（任意・街区番号を入力するとハイフンが自動で入ります）</label>
-            <input type="text" id="reqRoom" placeholder="例：5-533（5街区533室）またはお名前" maxlength="30" />
-            <p style="font-size:0.75rem;color:#aaa;margin:4px 0 0">※ 入力いただいた情報はリクエスト対応のみに使用し、第三者への提供は行いません。</p>
+          <div class="req-field" id="reqAuthArea">
+            <!-- JS で ログイン済み/未ログイン に応じて内容を書き換える -->
+            <p id="reqAuthNotice" style="font-size:0.85rem;color:#888;padding:8px;background:#f5f5f5;border-radius:8px">
+              ⏳ 認証情報を確認中…
+            </p>
+            <input type="hidden" id="reqRoom" />
+            <input type="hidden" id="reqPass" />
           </div>
           <button class="btn-primary req-submit-btn" id="reqSubmitBtn">📨 リクエストを送る</button>
           <p id="reqMsg" class="rate-msg" style="margin-top:10px"></p>
@@ -421,10 +424,12 @@
             <label for="fbTitle">件名 <span class="req-required">*</span></label>
             <input type="text" id="fbTitle" placeholder="例：返却方法について、〇〇コーナーの提案" maxlength="80" />
           </div>
-          <div class="req-field">
-            <label for="fbRoom">お名前・部屋番号（任意）</label>
-            <input type="text" id="fbRoom" placeholder="例：5-533またはお名前" maxlength="30" />
-            <p style="font-size:0.75rem;color:#aaa;margin:4px 0 0">※ 入力いただいた情報はご要望対応のみに使用し、第三者への提供は行いません。</p>
+          <div class="req-field" id="fbAuthArea">
+            <p id="fbAuthNotice" style="font-size:0.85rem;color:#888;padding:8px;background:#f5f5f5;border-radius:8px">
+              ⏳ 認証情報を確認中…
+            </p>
+            <input type="hidden" id="fbRoom" />
+            <input type="hidden" id="fbPass" />
           </div>
           <div class="req-field">
             <label for="fbBody">内容 <span class="req-required">*</span></label>

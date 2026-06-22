@@ -13,8 +13,16 @@ def pytest_configure(config):
         return
     db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data.db")
     con = sqlite3.connect(db_path)
+
+    # genre_books.awards カラム
     cols = [r[1] for r in con.execute("PRAGMA table_info(genre_books)")]
     if "awards" not in cols:
         con.execute("ALTER TABLE genre_books ADD COLUMN awards TEXT DEFAULT '[]'")
-        con.commit()
+
+    # ratings.user_votes カラム
+    r_cols = [r[1] for r in con.execute("PRAGMA table_info(ratings)")]
+    if "user_votes" not in r_cols:
+        con.execute("ALTER TABLE ratings ADD COLUMN user_votes TEXT DEFAULT '{}'")
+
+    con.commit()
     con.close()

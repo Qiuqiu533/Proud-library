@@ -139,3 +139,79 @@ def test_issues_list(client):
 def test_calendar_list(client):
     res = client.get("/api/calendar")
     assert res.status_code == 200
+
+def test_lib_schedule_list(client):
+    res = client.get("/api/lib-schedule")
+    assert res.status_code == 200
+    assert isinstance(json.loads(res.data), list)
+
+def test_announcements_list(client):
+    res = client.get("/api/announcements")
+    assert res.status_code == 200
+
+# ─── 書き込み系: 認証なし → 401 ───────────────────────────────────────────
+
+def test_post_request_no_auth(client):
+    """未認証（room/password なし）のリクエスト投稿は 401"""
+    res = client.post("/api/requests", json={"title": "テスト本"})
+    assert res.status_code == 401
+
+def test_post_request_wrong_password(client):
+    """存在しない部屋番号でのリクエスト投稿は 401"""
+    res = client.post("/api/requests",
+                      json={"title": "テスト本", "room": "9-999", "password": "wrongpass"})
+    assert res.status_code == 401
+
+def test_post_issue_wrong_auth(client):
+    """間違った管理者パスワードの課題投稿は 401"""
+    res = client.post("/api/issues",
+                      json={"title": "テスト課題", "password": "wrong_password_xyz"})
+    assert res.status_code == 401
+
+def test_post_calendar_wrong_auth(client):
+    """間違った管理者パスワードのカレンダー投稿は 401"""
+    res = client.post("/api/calendar",
+                      json={"title": "テストイベント", "event_date": "2026-07-01",
+                            "password": "wrong_password_xyz"})
+    assert res.status_code == 401
+
+def test_post_lib_schedule_wrong_auth(client):
+    """間違った管理者パスワードの休館日登録は 401"""
+    res = client.post("/api/lib-schedule",
+                      json={"title": "臨時休館", "event_date": "2026-07-01",
+                            "type": "closed", "password": "wrong_password_xyz"})
+    assert res.status_code == 401
+
+def test_delete_issue_wrong_auth(client):
+    """間違ったパスワードの課題削除は 401"""
+    res = client.delete("/api/issues/1", json={"password": "wrong_password_xyz"})
+    assert res.status_code == 401
+
+def test_patch_request_wrong_auth(client):
+    """間違ったパスワードのリクエストステータス変更は 401"""
+    res = client.patch("/api/requests/1",
+                       json={"status": "done", "password": "wrong_password_xyz"})
+    assert res.status_code == 401
+
+# ─── 評価・コメント 書き込み ──────────────────────────────────────────────
+
+def test_delete_review_wrong_room(client):
+    """他人のコメント削除（不正な review_id）は 400 または 404"""
+    res = client.delete("/api/rate/review",
+                        json={"isbn": "9784000000000", "room": "1-101",
+                              "password": "dummypass", "review_id": "nonexistent"})
+    assert res.status_code in (400, 401, 404)
+
+# ─── ユーザー: パスワード変更 ─────────────────────────────────────────────
+
+def test_change_password_no_auth(client):
+    """認証なしのパスワード変更は 400 または 401"""
+    res = client.post("/api/user/change-password",
+                      json={"room": "9-999", "old_password": "pass", "new_password": "short"})
+    assert res.status_code in (400, 401)
+
+def test_change_password_short(client):
+    """8文字未満の新パスワードは 400"""
+    res = client.post("/api/user/change-password",
+                      json={"room": "9-999", "old_password": "oldpass123", "new_password": "abc"})
+    assert res.status_code == 400

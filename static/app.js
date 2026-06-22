@@ -29,6 +29,7 @@ function _enterApp() {
   localStorage.setItem("resident_auth", "1");
   _offerMigrateReadingLog();
   setTimeout(checkLoanReminders, 400);
+  setTimeout(_updateReqAuthUI, 100);
   loadBooks();
 }
 
@@ -179,7 +180,10 @@ document.getElementById("loginBtn").addEventListener("click", async () => {
       Object.entries(data.reading_log).forEach(([isbn, val]) => {
         const status = typeof val === "string" ? val : (val.status || "");
         if (status) setReadStatus(isbn, status);
-        if (typeof val === "object" && val.date) setReadMeta(isbn, val.date, val.review || "");
+        if (typeof val === "object") {
+          if (val.date) setReadMeta(isbn, val.date, val.review || "", val.due_date || "");
+          else if (val.due_date) setDueDate(isbn, val.due_date);
+        }
       });
     }
     _enterApp();
@@ -1933,6 +1937,12 @@ document.getElementById("postNews")?.addEventListener("click", async () => {
 let boardPassword = "";
 let issueFilter = "all";
 
+// 管理者 fetch ヘルパー: X-Password ヘッダーを自動付与（ボディ内 password も後方互換で残す）
+function adminFetch(url, opts = {}) {
+  const headers = {"Content-Type": "application/json", "X-Password": boardPassword, ...(opts.headers || {})};
+  return fetch(url, {...opts, headers});
+}
+
 // 個人認証セッション
 let adminSession = JSON.parse(sessionStorage.getItem("admin_session") || "null");
 // adminSession = {code, name, role} or null
@@ -3050,18 +3060,51 @@ function setupRoomInput(id) {
 setupRoomInput("reqRoom");
 setupRoomInput("fbRoom");
 
+function _updateReqAuthUI() {
+  const u = residentSession || getCloudUser();
+  const notice = document.getElementById("reqAuthNotice");
+  const fbNotice = document.getElementById("fbAuthNotice");
+  const roomEl = document.getElementById("reqRoom");
+  const passEl = document.getElementById("reqPass");
+  const fbRoomEl = document.getElementById("fbRoom");
+  const fbPassEl = document.getElementById("fbPass");
+  if (u) {
+    const label = `<span style="color:#3d6b4f;font-weight:600">✅ ログイン中（${u.room}）</span><span style="color:#888;font-size:0.8rem"> — この部屋番号で送信します</span>`;
+    if (notice) notice.innerHTML = label;
+    if (fbNotice) fbNotice.innerHTML = label;
+    if (roomEl) roomEl.value = u.room;
+    if (passEl) passEl.value = u.password || u.pin || "";
+    if (fbRoomEl) fbRoomEl.value = u.room;
+    if (fbPassEl) fbPassEl.value = u.password || u.pin || "";
+  } else {
+    const msg = `<span style="color:#c00">🔒 リクエストにはログインが必要です。</span><br><a href="#" onclick="document.getElementById('loginScreen').style.display='flex';return false;" style="font-size:0.85rem;color:#5b8dd9">ログイン / 新規登録はこちら →</a>`;
+    if (notice) notice.innerHTML = msg;
+    if (fbNotice) fbNotice.innerHTML = msg;
+    if (roomEl) roomEl.value = "";
+    if (passEl) passEl.value = "";
+    if (fbRoomEl) fbRoomEl.value = "";
+    if (fbPassEl) fbPassEl.value = "";
+  }
+}
+_updateReqAuthUI();
+
 document.getElementById("reqSubmitBtn").addEventListener("click", async () => {
   const title = document.getElementById("reqTitle").value.trim();
   const author = document.getElementById("reqAuthor").value.trim();
   const reason = document.getElementById("reqReason").value.trim();
   const room = document.getElementById("reqRoom").value.trim();
+  const password = document.getElementById("reqPass").value.trim();
   const msg = document.getElementById("reqMsg");
   if (!title) { msg.textContent = "⚠️ 書名を入力してください"; msg.style.color = "#e05"; return; }
+  if (!room || !password) {
+    msg.textContent = "⚠️ リクエストにはログインが必要です";
+    msg.style.color = "#c00"; return;
+  }
   const btn = document.getElementById("reqSubmitBtn");
   btn.disabled = true; btn.textContent = "送信中…";
   const res = await fetch("/api/requests", {
     method: "POST", headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({title, author, reason, room})
+    body: JSON.stringify({title, author, reason, room, password})
   });
   btn.disabled = false; btn.textContent = "📨 リクエストを送る";
   if (res.ok) {
@@ -3070,11 +3113,14 @@ document.getElementById("reqSubmitBtn").addEventListener("click", async () => {
     document.getElementById("reqTitle").value = "";
     document.getElementById("reqAuthor").value = "";
     document.getElementById("reqReason").value = "";
-    document.getElementById("reqRoom").value = "";
     showReqToast("✅ リクエストを送信しました！");
   } else if (res.status === 429) {
     msg.textContent = "⚠️ 送信が多すぎます。しばらく時間をおいてから再試行してください。";
     msg.style.color = "#e07800";
+  } else if (res.status === 401) {
+    const d = await res.json().catch(() => ({}));
+    msg.textContent = "❌ " + (d.error || "認証エラーです。ログインし直してください");
+    msg.style.color = "#c00";
   } else {
     msg.textContent = "❌ 送信できませんでした。もう一度お試しください。";
     msg.style.color = "#e05";
@@ -3084,16 +3130,21 @@ document.getElementById("reqSubmitBtn").addEventListener("click", async () => {
 // ===== 図書館へのご要望フォーム =====
 document.getElementById("fbSubmitBtn").addEventListener("click", async () => {
   const title = document.getElementById("fbTitle").value.trim();
-  const body = document.getElementById("fbBody").value.trim();
+  const fbBody = document.getElementById("fbBody").value.trim();
   const room = document.getElementById("fbRoom").value.trim();
+  const password = document.getElementById("fbPass").value.trim();
   const msg = document.getElementById("fbMsg");
   if (!title) { msg.textContent = "⚠️ 件名を入力してください"; msg.style.color = "#e05"; return; }
-  if (!body) { msg.textContent = "⚠️ 内容を入力してください"; msg.style.color = "#e05"; return; }
+  if (!fbBody) { msg.textContent = "⚠️ 内容を入力してください"; msg.style.color = "#e05"; return; }
+  if (!room || !password) {
+    msg.textContent = "⚠️ ご要望にはログインが必要です";
+    msg.style.color = "#c00"; return;
+  }
   const btn = document.getElementById("fbSubmitBtn");
   btn.disabled = true; btn.textContent = "送信中…";
   const res = await fetch("/api/requests", {
     method: "POST", headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({title, author: "", reason: body, room, type: "feedback"})
+    body: JSON.stringify({title, author: "", reason: fbBody, room, password, type: "feedback"})
   });
   btn.disabled = false; btn.textContent = "📩 送信する";
   if (res.ok) {
@@ -3101,8 +3152,11 @@ document.getElementById("fbSubmitBtn").addEventListener("click", async () => {
     msg.style.color = "#3d6b4f";
     document.getElementById("fbTitle").value = "";
     document.getElementById("fbBody").value = "";
-    document.getElementById("fbRoom").value = "";
     showReqToast("✅ ご要望を送信しました！");
+  } else if (res.status === 401) {
+    const d = await res.json().catch(() => ({}));
+    msg.textContent = "❌ " + (d.error || "認証エラーです。ログインし直してください");
+    msg.style.color = "#c00";
   } else {
     msg.textContent = "❌ 送信できませんでした。もう一度お試しください。";
     msg.style.color = "#e05";
@@ -3387,7 +3441,10 @@ async function cloudSync() {
   if (!u) return;
   const favs = getFavIsbns();
   const rlog = {};
-  getLogEntries().forEach(e => { rlog[e.isbn] = e.status; });
+  getLogEntries().forEach(e => {
+    const meta = getReadMeta(e.isbn);
+    rlog[e.isbn] = meta.due_date ? {status: e.status, due_date: meta.due_date} : e.status;
+  });
   const card_url = localStorage.getItem("libraryCardUrl") || "";
   const card_img = localStorage.getItem("libraryCardImage") || "";
   const pw = u.password || u.pin || "";
