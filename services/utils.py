@@ -1,5 +1,6 @@
 import hashlib
 import secrets as _secrets
+import bcrypt
 import threading
 import time
 from collections import defaultdict
@@ -68,15 +69,23 @@ def _keyword_genre(title, author=""):
 
 
 def _hash_password(password, salt=None):
-    if salt is None:
-        salt = _secrets.token_hex(16)
-    h = hashlib.sha256((salt + password).encode()).hexdigest()
-    return h, salt
+    """bcrypt でハッシュ化。戻り値は (hash, "") — salt は bcrypt が内包するため空文字。"""
+    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=12))
+    return hashed.decode(), ""
 
 
 def _verify_password(password, password_hash, salt):
-    h, _ = _hash_password(password, salt)
+    """bcrypt ハッシュ（$2b$）と旧 SHA-256 ハッシュの両方を検証する。"""
+    if password_hash.startswith("$2b$") or password_hash.startswith("$2a$"):
+        return bcrypt.checkpw(password.encode(), password_hash.encode())
+    # 旧 SHA-256 方式（後方互換）
+    h = hashlib.sha256((salt + password).encode()).hexdigest()
     return h == password_hash
+
+
+def _is_bcrypt_hash(password_hash: str) -> bool:
+    """bcrypt ハッシュかどうか判定する。"""
+    return password_hash.startswith("$2b$") or password_hash.startswith("$2a$")
 
 
 def _send_reset_email(to_email, room, token):

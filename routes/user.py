@@ -3,7 +3,7 @@ import secrets
 import re as _re
 from flask import Blueprint, request, jsonify
 from database import get_con, execute, fetchone, USE_PG
-from services.utils import _hash_password, _verify_password, _send_reset_email
+from services.utils import _hash_password, _verify_password, _send_reset_email, _is_bcrypt_hash
 
 user_bp = Blueprint("user", __name__)
 
@@ -16,10 +16,24 @@ def _validate_room(room):
 
 
 def _user_auth_ok(user, password):
-    """パスワードハッシュで認証。旧PIN方式にも対応"""
-    if user.get("password_hash") and user.get("password_salt"):
-        return _verify_password(password, user["password_hash"], user["password_salt"])
+    """パスワードハッシュで認証。bcrypt・旧SHA-256・PIN の3方式に対応。"""
+    ph = user.get("password_hash", "")
+    salt = user.get("password_salt", "")
+    if ph:
+        return _verify_password(password, ph, salt)
     return user.get("pin") == password
+
+
+def _upgrade_to_bcrypt_if_needed(con, room, password, password_hash):
+    """旧 SHA-256 ハッシュなら bcrypt に再ハッシュしてDBを更新（ログイン成功後に呼ぶ）。"""
+    if _is_bcrypt_hash(password_hash):
+        return
+    new_hash, _ = _hash_password(password)
+    if USE_PG:
+        execute(con, "UPDATE user_accounts SET password_hash=?, password_salt='', updated_at=NOW() WHERE room=?", (new_hash, room))
+    else:
+        execute(con, "UPDATE user_accounts SET password_hash=?, password_salt='', updated_at=datetime('now','localtime') WHERE room=?", (new_hash, room))
+    con.commit()
 
 
 @user_bp.route("/api/user/register", methods=["POST"])
@@ -67,6 +81,8 @@ def api_user_login():
     if not _user_auth_ok(user, password):
         con.close()
         return jsonify({"error": "パスワードが違います"}), 401
+    # 旧 SHA-256 ハッシュなら透過的に bcrypt へ移行
+    _upgrade_to_bcrypt_if_needed(con, room, password, user.get("password_hash", ""))
     con.close()
     return jsonify({
         "ok": True,
