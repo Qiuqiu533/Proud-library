@@ -241,3 +241,50 @@ def api_db_size():
     except Exception as e:
         con.close()
         return jsonify({"error": str(e)}), 500
+
+
+@loans_bp.route("/api/admin/ops-stats")
+def api_ops_stats():
+    """運営統計: 貸出状況・評価・リクエスト対応サマリ"""
+    if request.headers.get("X-Password") != get_board_password():
+        return jsonify({"error": "unauthorized"}), 401
+    con = get_con()
+    try:
+        loaned_row = fetchone(con, "SELECT COUNT(*) AS cnt FROM availability_cache WHERE status='貸出中'")
+        loaned = loaned_row["cnt"] if loaned_row else 0
+        total_cached_row = fetchone(con, "SELECT COUNT(*) AS cnt FROM availability_cache")
+        total_cached = total_cached_row["cnt"] if total_cached_row else 0
+
+        genre_rows = fetchall(con, "SELECT genre, COUNT(*) AS cnt FROM genre_books GROUP BY genre ORDER BY cnt DESC LIMIT 10")
+
+        rating_row = fetchone(con, "SELECT COUNT(*) AS rated, SUM(votes) AS total_votes FROM ratings WHERE votes > 0")
+        top_rated = fetchall(con, """
+            SELECT r.isbn, g.title, r.score, r.votes
+            FROM ratings r LEFT JOIN genre_books g ON r.isbn = g.isbn
+            WHERE r.votes >= 2
+            ORDER BY r.score DESC, r.votes DESC LIMIT 5
+        """)
+
+        req_total_row = fetchone(con, "SELECT COUNT(*) AS cnt FROM book_requests WHERE type='request'")
+        req_done_row  = fetchone(con, "SELECT COUNT(*) AS cnt FROM book_requests WHERE type='request' AND status IN ('done','approved')")
+        fb_total_row  = fetchone(con, "SELECT COUNT(*) AS cnt FROM book_requests WHERE type='feedback'")
+        fb_done_row   = fetchone(con, "SELECT COUNT(*) AS cnt FROM book_requests WHERE type='feedback' AND status IN ('fb_done','fb_noted','fb_none','fb_rejected')")
+
+        member_row = fetchone(con, "SELECT COUNT(*) AS cnt FROM user_accounts")
+        con.close()
+        return jsonify({
+            "loaned": loaned,
+            "total_cached": total_cached,
+            "genres": [{"genre": r["genre"] or "未分類", "cnt": r["cnt"]} for r in genre_rows],
+            "rated_books": rating_row["rated"] if rating_row else 0,
+            "total_votes": rating_row["total_votes"] if rating_row else 0,
+            "top_rated": [{"isbn": r["isbn"], "title": r["title"] or r["isbn"], "score": r["score"], "votes": r["votes"]} for r in top_rated],
+            "req_total": req_total_row["cnt"] if req_total_row else 0,
+            "req_done":  req_done_row["cnt"]  if req_done_row  else 0,
+            "fb_total":  fb_total_row["cnt"]  if fb_total_row  else 0,
+            "fb_done":   fb_done_row["cnt"]   if fb_done_row   else 0,
+            "members":   member_row["cnt"]    if member_row    else 0,
+        })
+    except Exception as e:
+        con.close()
+        return jsonify({"error": str(e)}), 500

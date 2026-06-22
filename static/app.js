@@ -2723,8 +2723,60 @@ function _initAnalyticsSubTabs() {
       const panel = document.getElementById("asub-" + btn.dataset.asub);
       if (panel) panel.classList.add("active");
       if (btn.dataset.asub === "stats") loadStats();
+      if (btn.dataset.asub === "opsstats") loadOpsStats();
     };
   });
+}
+
+// ===== 運営統計 =====
+async function loadOpsStats() {
+  const el = document.getElementById("opsStatsContent");
+  if (!el) return;
+  el.innerHTML = '<div class="loading">読み込み中…</div>';
+  const res = await fetch("/api/admin/ops-stats", { headers: { "X-Password": boardPassword } }).catch(() => null);
+  if (!res || !res.ok) { el.innerHTML = '<div class="loading">取得失敗（管理者ログインが必要です）</div>'; return; }
+  const d = await res.json();
+  const pct = r => d[r + "_total"] ? Math.round(d[r + "_done"] / d[r + "_total"] * 100) : 0;
+  const bar = (p, color) => `<div style="background:#eee;border-radius:4px;height:8px;margin:4px 0 8px">
+    <div style="background:${color};height:8px;border-radius:4px;width:${p}%"></div></div>`;
+  el.innerHTML = `
+    <div class="stats-summary" style="flex-wrap:wrap;gap:12px;margin-bottom:20px">
+      <div class="stat-card"><div class="stat-num">${d.members}</div><div class="stat-label">👥 会員数</div></div>
+      <div class="stat-card"><div class="stat-num">${d.loaned}</div><div class="stat-label">📤 現在貸出中</div></div>
+      <div class="stat-card"><div class="stat-num">${d.total_cached}</div><div class="stat-label">🔍 貸出状況確認済</div></div>
+      <div class="stat-card"><div class="stat-num">${d.total_votes || 0}</div><div class="stat-label">⭐ 評価投票数</div></div>
+      <div class="stat-card"><div class="stat-num">${d.rated_books}</div><div class="stat-label">📚 評価された本</div></div>
+    </div>
+
+    <div style="display:flex;gap:20px;flex-wrap:wrap">
+      <div style="flex:1;min-width:200px">
+        <h4 style="color:#3d6b4f;margin-bottom:10px">📬 リクエスト対応状況</h4>
+        <div>本のリクエスト：${d.req_done}/${d.req_total}件 （${pct("req")}%）</div>
+        ${bar(pct("req"), "#3d6b4f")}
+        <div>ご意見・ご要望：${d.fb_done}/${d.fb_total}件 （${pct("fb")}%）</div>
+        ${bar(pct("fb"), "#5b8dd9")}
+      </div>
+      <div style="flex:1;min-width:200px">
+        <h4 style="color:#3d6b4f;margin-bottom:10px">⭐ 高評価 TOP5</h4>
+        ${d.top_rated.length ? d.top_rated.map((b,i) =>
+          `<div style="font-size:0.85rem;margin-bottom:5px">${i+1}. ${esc(b.title)} ${"★".repeat(Math.round(b.score))} ${b.score.toFixed(1)}（${b.votes}件）</div>`
+        ).join("") : '<div class="loading">評価データなし</div>'}
+      </div>
+    </div>
+
+    <h4 style="color:#3d6b4f;margin:16px 0 10px">📚 ジャンル別蔵書数（上位10）</h4>
+    <div style="display:flex;flex-direction:column;gap:5px">
+      ${d.genres.map(g => {
+        const maxCnt = d.genres[0]?.cnt || 1;
+        const p = Math.round(g.cnt / maxCnt * 100);
+        return `<div style="display:flex;align-items:center;gap:8px;font-size:0.83rem">
+          <span style="width:100px;color:#555">${esc(g.genre)}</span>
+          <div style="flex:1;background:#eee;border-radius:3px;height:14px">
+            <div style="background:#7ab898;height:14px;border-radius:3px;width:${p}%"></div></div>
+          <span style="width:50px;text-align:right;color:#444">${g.cnt}冊</span>
+        </div>`;
+      }).join("")}
+    </div>`;
 }
 
 // ===== Stats =====
