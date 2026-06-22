@@ -20,6 +20,11 @@
 </head>
 <body>
 
+  <!-- スリープ復帰バナー -->
+  <div id="wakeupBanner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#2a4a37;color:#fff;text-align:center;padding:10px 16px;font-size:0.88rem;box-shadow:0 2px 8px rgba(0,0,0,0.3)">
+    ⏳ サーバーを起動しています… <span id="wakeupSec">0</span>秒経過（通常30秒以内に完了します）
+  </div>
+
   <!-- Login screen -->
   <!-- パスワードリセット画面 -->
   <div id="resetPasswordScreen" class="login-screen" style="display:none">
@@ -162,6 +167,7 @@
       <div id="popularSection" style="display:none;margin-bottom:14px">
         <div class="section-label-row">
           <span class="top-new-label">⭐ 住民に人気の本</span>
+          <button id="togglePopular" class="toggle-section-btn" onclick="toggleSection('popular')">住民に人気の本を隠す ▲</button>
         </div>
         <div id="popularRow" class="related-carousel"></div>
       </div>
@@ -207,6 +213,11 @@
         <button class="genre-btn" data-genre="児童文学" data-mode="genre">👦 児童文学</button>
       </div>
 
+      <!-- 絞り込みフィルター（受賞・50音）トグル -->
+      <div style="display:flex;align-items:center;justify-content:flex-end;padding:2px 12px;background:#fff;border-bottom:1px solid #e8e4dc">
+        <button id="toggleFilterRows" onclick="toggleFilterRows()" style="font-size:0.75rem;color:#888;background:none;border:none;cursor:pointer;padding:4px 6px">絞り込み ▲</button>
+      </div>
+      <div id="filterRowsWrap">
       <!-- 受賞フィルター -->
       <div class="award-filter-row" id="awardFilterRow">
         <span class="award-filter-label">🏆 受賞：</span>
@@ -247,6 +258,7 @@
         </div>
       </div>
 
+      </div><!-- end filterRowsWrap -->
       <div class="controls-row">
         <span id="totalCount" class="total-count" aria-live="polite" aria-atomic="true"></span>
         <div class="filter-bar">

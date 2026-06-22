@@ -3044,6 +3044,31 @@ applyTopSectionsState();
 // #44 スリープ対策: 4分ごとにpingしてサービスを起こしておく
 setInterval(() => fetch("/ping").catch(() => {}), 4 * 60 * 1000);
 
+// スリープ復帰バナー: 初回fetchが5秒超で遅延している場合に表示
+(function() {
+  const banner = document.getElementById("wakeupBanner");
+  const secEl  = document.getElementById("wakeupSec");
+  if (!banner) return;
+  let shown = false, timer = null, counter = 0;
+  const wakeTimer = setTimeout(() => {
+    shown = true;
+    banner.style.display = "block";
+    timer = setInterval(() => { counter++; if (secEl) secEl.textContent = counter; }, 1000);
+  }, 5000);
+  function hideWakeupBanner() {
+    clearTimeout(wakeTimer);
+    if (timer) clearInterval(timer);
+    if (shown) { banner.style.opacity = "0"; banner.style.transition = "opacity 0.5s"; setTimeout(() => { banner.style.display = "none"; }, 500); }
+  }
+  const origFetch = window.fetch;
+  let firstDone = false;
+  window.fetch = function(...args) {
+    const p = origFetch.apply(this, args);
+    if (!firstDone) { firstDone = true; p.finally(hideWakeupBanner); }
+    return p;
+  };
+})();
+
 // ===== Book Requests =====
 let residentPassword = sessionStorage.getItem("resident_pass") || "";
 let reqAdminPass = "";
