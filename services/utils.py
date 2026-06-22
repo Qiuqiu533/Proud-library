@@ -1,7 +1,12 @@
+from __future__ import annotations
 import hashlib
 import secrets as _secrets
 import bcrypt
 import threading
+import logging
+from typing import Any
+
+logger = logging.getLogger(__name__)
 import time
 from collections import defaultdict
 
@@ -15,7 +20,7 @@ _rate_store = defaultdict(list)
 _rate_lock = threading.Lock()
 
 
-def _check_rate_limit(key, limit=5, window=60):
+def _check_rate_limit(key: str, limit: int = 5, window: int = 60) -> bool:
     """True=通過OK, False=制限超過。key単位でwindow秒間にlimit回まで許可。"""
     now = time.time()
     with _rate_lock:
@@ -42,15 +47,15 @@ def rate_limit(limit=5, window=60):
     return decorator
 
 
-def _hira_to_kata(s):
+def _hira_to_kata(s: str) -> str:
     return "".join(chr(ord(c) + 96) if "ぁ" <= c <= "ゖ" else c for c in (s or ""))
 
 
-def _kata_to_hira(s):
+def _kata_to_hira(s: str) -> str:
     return "".join(chr(ord(c) - 96) if "ァ" <= c <= "ヶ" else c for c in (s or ""))
 
 
-def _ndc_to_genre(ndc):
+def _ndc_to_genre(ndc: str) -> str:
     if not ndc:
         return ""
     for length in [4, 3, 2]:
@@ -60,7 +65,7 @@ def _ndc_to_genre(ndc):
     return ""
 
 
-def _keyword_genre(title, author=""):
+def _keyword_genre(title: str, author: str = "") -> str:
     text = (title or "") + " " + (author or "")
     for keywords, genre in KEYWORD_GENRE:
         if any(kw in text for kw in keywords):
@@ -68,13 +73,13 @@ def _keyword_genre(title, author=""):
     return ""
 
 
-def _hash_password(password, salt=None):
+def _hash_password(password: str, salt: str | None = None) -> tuple[str, str]:
     """bcrypt でハッシュ化。戻り値は (hash, "") — salt は bcrypt が内包するため空文字。"""
     hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=12))
     return hashed.decode(), ""
 
 
-def _verify_password(password, password_hash, salt):
+def _verify_password(password: str, password_hash: str, salt: str) -> bool:
     """bcrypt ハッシュ（$2b$）と旧 SHA-256 ハッシュの両方を検証する。"""
     if password_hash.startswith("$2b$") or password_hash.startswith("$2a$"):
         return bcrypt.checkpw(password.encode(), password_hash.encode())
@@ -115,7 +120,7 @@ def _send_reset_email(to_email, room, token):
         )
         return res.status_code == 200
     except Exception as e:
-        print(f"email send error: {e}")
+        logger.error(f"email send error: %s", e)
         return False
 
 
@@ -147,4 +152,4 @@ def auto_cleanup_images():
             con.commit()
         con.close()
     except Exception as e:
-        print(f"auto_cleanup_images error: {e}")
+        logger.error(f"auto_cleanup_images error: %s", e)

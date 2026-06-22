@@ -1,4 +1,6 @@
+from __future__ import annotations
 import os
+from typing import Any
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 USE_PG = bool(DATABASE_URL)
@@ -14,9 +16,9 @@ else:
     DB_PATH = os.path.join(os.path.dirname(__file__), "data.db")
 
 # ── コネクションプール（PostgreSQL のみ） ─────────────────────────────────────
-_pool = None
+_pool: Any = None
 
-def _get_pool():
+def _get_pool() -> Any:
     global _pool
     if _pool is None:
         _pool = pg_pool.ThreadedConnectionPool(minconn=1, maxconn=10, dsn=DATABASE_URL)
@@ -25,29 +27,29 @@ def _get_pool():
 
 class _PooledConnection:
     """プールから借りた接続をラップし、close() でプールに返却する。"""
-    def __init__(self, conn):
+    def __init__(self, conn: Any) -> None:
         self._conn = conn
 
-    def close(self):
+    def close(self) -> None:
         _get_pool().putconn(self._conn)
 
-    def commit(self):
+    def commit(self) -> None:
         self._conn.commit()
 
-    def rollback(self):
+    def rollback(self) -> None:
         self._conn.rollback()
 
-    def cursor(self):
+    def cursor(self) -> Any:
         return self._conn.cursor()
 
-    def execute(self, *args, **kwargs):
+    def execute(self, *args: Any, **kwargs: Any) -> Any:
         return self._conn.execute(*args, **kwargs)
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:
         return getattr(self._conn, name)
 
 
-def get_con():
+def get_con() -> Any:
     """DB接続を返す。PG はプールから取得、SQLite はそのまま開く。"""
     if USE_PG:
         return _PooledConnection(_get_pool().getconn())
@@ -57,7 +59,7 @@ def get_con():
         return con
 
 
-def execute(con, sql, params=()):
+def execute(con: Any, sql: str, params: tuple = ()) -> Any:
     """SQLiteの ? を PostgreSQL の %s に変換して実行する。"""
     if USE_PG:
         sql = sql.replace("?", "%s")
@@ -66,7 +68,7 @@ def execute(con, sql, params=()):
     return cur
 
 
-def fetchall(con, sql, params=()):
+def fetchall(con: Any, sql: str, params: tuple = ()) -> list[dict[str, Any]]:
     cur = execute(con, sql, params)
     rows = cur.fetchall()
     if USE_PG:
@@ -76,7 +78,7 @@ def fetchall(con, sql, params=()):
         return [dict(r) for r in rows]
 
 
-def fetchone(con, sql, params=()):
+def fetchone(con: Any, sql: str, params: tuple = ()) -> dict[str, Any] | None:
     cur = execute(con, sql, params)
     row = cur.fetchone()
     if row is None:
