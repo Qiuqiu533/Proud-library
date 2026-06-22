@@ -288,3 +288,30 @@ def api_ops_stats():
     except Exception as e:
         con.close()
         return jsonify({"error": str(e)}), 500
+
+
+@loans_bp.route("/api/admin/wishlist-summary")
+def api_wishlist_summary():
+    """読みたいリスト集計（購入判断用）: 複数人が登録している本を降順で返す"""
+    if request.headers.get("X-Password") != get_board_password():
+        return jsonify({"error": "unauthorized"}), 401
+    con = get_con()
+    try:
+        rows = fetchall(con, """
+            SELECT w.isbn, COUNT(*) AS wish_count, g.title, g.author
+            FROM wish_list w
+            LEFT JOIN genre_books g ON g.isbn = w.isbn
+            GROUP BY w.isbn, g.title, g.author
+            ORDER BY wish_count DESC, w.isbn
+            LIMIT 30
+        """)
+        con.close()
+        return jsonify([{
+            "isbn": r["isbn"],
+            "title": r["title"] or r["isbn"],
+            "author": r["author"] or "",
+            "wish_count": r["wish_count"],
+        } for r in rows])
+    except Exception as e:
+        con.close()
+        return jsonify({"error": str(e)}), 500

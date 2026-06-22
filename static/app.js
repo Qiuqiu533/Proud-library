@@ -2740,16 +2740,42 @@ function _initAnalyticsSubTabs() {
 }
 
 // ===== 運営統計 =====
+const _GENRE_LABEL = {
+  "文芸小説": "文芸小説", "その他（要分類）": "その他", "児童学習漫画": "学習漫画",
+  "絵本・児童書": "絵本・児童", "時代小説・歴史小説": "時代・歴史", "児童文学": "児童文学",
+  "ミステリ・推理": "ミステリ", "実用・ハウツー": "実用・HowTo", "児童学習書": "学習書",
+  "ファンタジー・SF": "ファンタジー/SF", "翻訳小説": "翻訳小説", "エッセイ・評論": "エッセイ",
+  "社会・ノンフィクション": "ノンフィクション", "恋愛・青春小説": "恋愛・青春",
+  "科学・学術": "科学・学術", "英語絵本": "英語絵本", "児童文学・YA": "児童文学・YA",
+};
+
 async function loadOpsStats() {
   const el = document.getElementById("opsStatsContent");
   if (!el) return;
   el.innerHTML = '<div class="loading">読み込み中…</div>';
-  const res = await fetch("/api/admin/ops-stats", { headers: { "X-Password": boardPassword } }).catch(() => null);
+  const headers = { "X-Password": boardPassword };
+  const [res, wishRes] = await Promise.all([
+    fetch("/api/admin/ops-stats", { headers }).catch(() => null),
+    fetch("/api/admin/wishlist-summary", { headers }).catch(() => null),
+  ]);
   if (!res || !res.ok) { el.innerHTML = '<div class="loading">取得失敗（管理者ログインが必要です）</div>'; return; }
   const d = await res.json();
+  const wishList = (wishRes && wishRes.ok) ? await wishRes.json() : [];
   const pct = r => d[r + "_total"] ? Math.round(d[r + "_done"] / d[r + "_total"] * 100) : 0;
   const bar = (p, color) => `<div style="background:#eee;border-radius:4px;height:8px;margin:4px 0 8px">
     <div style="background:${color};height:8px;border-radius:4px;width:${p}%"></div></div>`;
+
+  const wishHtml = wishList.length
+    ? wishList.map((b, i) => `
+      <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #f0ede8;font-size:0.85rem">
+        <span style="font-weight:700;color:#5b8dd9;min-width:28px;text-align:center;font-size:1rem">${b.wish_count}</span>
+        <div>
+          <div style="font-weight:600">${esc(b.title)}</div>
+          ${b.author ? `<div style="color:#888;font-size:0.78rem">${esc(b.author)}</div>` : ""}
+        </div>
+      </div>`).join("")
+    : '<div style="color:#aaa;font-size:0.85rem;padding:8px 0">まだ登録されていません</div>';
+
   el.innerHTML = `
     <div class="stats-summary" style="flex-wrap:wrap;gap:12px;margin-bottom:20px">
       <div class="stat-card"><div class="stat-num">${d.members}</div><div class="stat-label">👥 会員数</div></div>
@@ -2759,7 +2785,7 @@ async function loadOpsStats() {
       <div class="stat-card"><div class="stat-num">${d.rated_books}</div><div class="stat-label">📚 評価された本</div></div>
     </div>
 
-    <div style="display:flex;gap:20px;flex-wrap:wrap">
+    <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:20px">
       <div style="flex:1;min-width:200px">
         <h4 style="color:#3d6b4f;margin-bottom:10px">📬 リクエスト対応状況</h4>
         <div>本のリクエスト：${d.req_done}/${d.req_total}件 （${pct("req")}%）</div>
@@ -2771,22 +2797,32 @@ async function loadOpsStats() {
         <h4 style="color:#3d6b4f;margin-bottom:10px">⭐ 高評価 TOP5</h4>
         ${d.top_rated.length ? d.top_rated.map((b,i) =>
           `<div style="font-size:0.85rem;margin-bottom:5px">${i+1}. ${esc(b.title)} ${"★".repeat(Math.round(b.score))} ${b.score.toFixed(1)}（${b.votes}件）</div>`
-        ).join("") : '<div class="loading">評価データなし</div>'}
+        ).join("") : '<div style="color:#aaa;font-size:0.85rem">評価データなし</div>'}
       </div>
     </div>
 
-    <h4 style="color:#3d6b4f;margin:16px 0 10px">📚 ジャンル別蔵書数（上位10）</h4>
-    <div style="display:flex;flex-direction:column;gap:5px">
-      ${d.genres.map(g => {
-        const maxCnt = d.genres[0]?.cnt || 1;
-        const p = Math.round(g.cnt / maxCnt * 100);
-        return `<div style="display:flex;align-items:center;gap:8px;font-size:0.83rem">
-          <span style="width:100px;color:#555">${esc(g.genre)}</span>
-          <div style="flex:1;background:#eee;border-radius:3px;height:14px">
-            <div style="background:#7ab898;height:14px;border-radius:3px;width:${p}%"></div></div>
-          <span style="width:50px;text-align:right;color:#444">${g.cnt}冊</span>
-        </div>`;
-      }).join("")}
+    <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:20px">
+      <div style="flex:1;min-width:200px">
+        <h4 style="color:#3d6b4f;margin-bottom:6px">📚 読みたいリスト 購入候補（上位30冊）</h4>
+        <p style="font-size:0.75rem;color:#888;margin-bottom:8px">左の数字＝登録人数。複数人が希望している本は購入優先度が高いです。</p>
+        ${wishHtml}
+      </div>
+      <div style="flex:1;min-width:200px">
+        <h4 style="color:#3d6b4f;margin-bottom:10px">📂 ジャンル別蔵書数（上位10）</h4>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          ${d.genres.map(g => {
+            const maxCnt = d.genres[0]?.cnt || 1;
+            const p = Math.round(g.cnt / maxCnt * 100);
+            const label = _GENRE_LABEL[g.genre] || g.genre;
+            return `<div style="display:flex;align-items:center;gap:8px;font-size:0.83rem">
+              <span style="width:96px;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(label)}</span>
+              <div style="flex:1;background:#eee;border-radius:3px;height:14px">
+                <div style="background:#7ab898;height:14px;border-radius:3px;width:${p}%"></div></div>
+              <span style="width:50px;text-align:right;color:#444">${g.cnt}冊</span>
+            </div>`;
+          }).join("")}
+        </div>
+      </div>
     </div>`;
 }
 
