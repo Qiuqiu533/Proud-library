@@ -981,7 +981,7 @@ def _migrate_seed_award_books():
     try:
         con = get_con()
         flag = fetchone(con, "SELECT value FROM settings WHERE key='award_books_seed_done'")
-        if flag and flag.get("value") == "v3":
+        if flag and flag.get("value") == "v4":
             con.close()
             return
         cur = con.cursor()
@@ -1004,7 +1004,7 @@ def _migrate_seed_award_books():
             "INSERT INTO award_books (award, award_no, award_year, title, author, status) VALUES (%s,%s,%s,%s,%s,%s)",
             _AWARD_BOOKS_SEED
         )
-        cur.execute("INSERT INTO settings(key,value) VALUES('award_books_seed_done','v3') ON CONFLICT(key) DO UPDATE SET value='v3'")
+        cur.execute("INSERT INTO settings(key,value) VALUES('award_books_seed_done','v4') ON CONFLICT(key) DO UPDATE SET value='v4'")
         con.commit()
         con.close()
         logger.info(f"[award_books_seed] {len(_AWARD_BOOKS_SEED)}件投入完了")
