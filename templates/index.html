@@ -984,11 +984,11 @@
         <!-- 集計・分析 -->
         <div id="asub-analysis" class="analytics-sub-panel">
         <h3 style="margin-bottom:16px">📈 集計・分析レポート</h3>
-        <p style="font-size:0.8rem;color:#888;margin-bottom:16px">データ取得日：2026年4月12日　出典：librarylife.net / openBD API</p>
+        <p style="font-size:0.8rem;color:#888;margin-bottom:16px">出典：librarylife.net / openBD API　※蔵書数・受賞作数はリアルタイム、ジャンル別等は定期集計データ</p>
 
         <div class="analysis-summary-grid">
           <div class="analysis-stat-card">
-            <div class="analysis-stat-num">5,470</div>
+            <div class="analysis-stat-num" id="statTotalBooks">—</div>
             <div class="analysis-stat-label">総蔵書数</div>
           </div>
           <div class="analysis-stat-card">
@@ -1000,7 +1000,7 @@
             <div class="analysis-stat-label">価格データあり（65%）</div>
           </div>
           <div class="analysis-stat-card">
-            <div class="analysis-stat-num">44</div>
+            <div class="analysis-stat-num" id="statAwardCount">—</div>
             <div class="analysis-stat-label">受賞・ノミネート作品</div>
           </div>
         </div>
