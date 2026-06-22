@@ -34,14 +34,20 @@ def api_book(isbn):
     hint_title = request.args.get("title", "").strip()
     detail = fetch_book_detail(isbn, hint_title=hint_title)
     viewer_room = request.args.get("room", "").strip() or None
-    detail["rating"] = get_rating(isbn, viewer_room=viewer_room)
-    con = get_con()
-    row = fetchone(con, "SELECT awards FROM genre_books WHERE isbn=%s", (isbn,))
-    con.close()
-    awards = (row.get("awards") or []) if row else []
-    if isinstance(awards, str):
-        try: awards = json.loads(awards)
-        except: awards = []
+    try:
+        detail["rating"] = get_rating(isbn, viewer_room=viewer_room)
+    except Exception:
+        detail["rating"] = {"score": 0, "votes": 0, "reviews": [], "my_score": None}
+    try:
+        con = get_con()
+        row = fetchone(con, "SELECT awards FROM genre_books WHERE isbn=?", (isbn,))
+        con.close()
+        awards = (row.get("awards") or []) if row else []
+        if isinstance(awards, str):
+            try: awards = json.loads(awards)
+            except: awards = []
+    except Exception:
+        awards = []
     detail["awards"] = awards
     return jsonify(detail)
 
