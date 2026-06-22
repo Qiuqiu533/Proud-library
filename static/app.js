@@ -2573,7 +2573,7 @@ async function loadDashboard() {
           <div class="dash-card-label">未対応<br>本のリクエスト</div>
           <div class="dash-card-action">確認 →</div>
         </div>
-        <div class="dash-card ${alertLevel(pendingFeedback.length)} dash-clickable" onclick="switchBoardTab('brequest')">
+        <div class="dash-card ${alertLevel(pendingFeedback.length)} dash-clickable" onclick="switchBoardTabFeedback()">
           <div class="dash-card-num">${pendingFeedback.length}</div>
           <div class="dash-card-label">未対応<br>意見・要望</div>
           <div class="dash-card-action">確認 →</div>
@@ -2592,7 +2592,7 @@ async function loadDashboard() {
           <div class="dash-card-num">${totalBooks.toLocaleString()}</div>
           <div class="dash-card-label">総蔵書数（DB登録）</div>
         </div>
-        <div class="dash-card dash-card-gold dash-clickable" onclick="switchBoardTab('analytics')">
+        <div class="dash-card dash-card-gold dash-clickable" onclick="switchBoardTab('awarddb')">
           <div class="dash-card-num">138</div>
           <div class="dash-card-label">受賞・ノミネート作品</div>
           <div class="dash-card-action">詳細 →</div>
@@ -2690,6 +2690,15 @@ async function loadDashboard() {
     el.innerHTML = `<div style="color:#e05;padding:20px">読み込みエラー: ${e.message}</div>`;
     console.error("loadDashboard error", e);
   }
+}
+
+function switchBoardTabFeedback() {
+  switchBoardTab("brequest");
+  // 少し遅らせてフィードバックサブタブをアクティブにする
+  setTimeout(() => {
+    const fbBtn = document.querySelector('#btab-brequest .req-subtab-btn[data-subtab="feedback"]');
+    if (fbBtn) fbBtn.click();
+  }, 50);
 }
 
 function switchBoardTab(tabKey) {
