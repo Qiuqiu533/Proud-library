@@ -252,7 +252,7 @@ def api_requests():
 
 @community_bp.route("/api/requests/admin")
 def api_requests_admin():
-    pw = request.headers.get("X-Password", "") or request.args.get("password", "")
+    pw = request.headers.get("X-Password", "")
     if pw != get_admin_password() and pw != get_board_password():
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()

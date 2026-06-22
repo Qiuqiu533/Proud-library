@@ -112,7 +112,7 @@ def api_award_books_admin():
     if not USE_PG:
         return jsonify([])
     award = request.args.get("award", "").strip()
-    password = request.args.get("password", "")
+    password = request.headers.get("X-Password", "")
     if password != get_board_password():
         return jsonify({"error": "認証エラー"}), 403
     con = get_con()

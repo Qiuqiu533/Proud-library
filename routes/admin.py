@@ -7,7 +7,7 @@ admin_bp = Blueprint("admin", __name__)
 
 @admin_bp.route("/api/staff_chat", methods=["GET"])
 def api_staff_chat_get():
-    pw = request.args.get("password", "")
+    pw = request.headers.get("X-Password", "")
     if pw != get_board_password():
         return jsonify({"error": "unauthorized"}), 401
     thread_id = request.args.get("thread_id")
@@ -53,7 +53,7 @@ def api_staff_chat_delete(msg_id):
 
 @admin_bp.route("/api/chat_threads", methods=["GET"])
 def api_chat_threads_get():
-    pw = request.args.get("password", "")
+    pw = request.headers.get("X-Password", "")
     if pw != get_board_password():
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()

@@ -180,7 +180,7 @@ def api_availability_loaned():
 @loans_bp.route("/api/admin/dashboard-data")
 def api_admin_dashboard_data():
     """ダッシュボード用データを1リクエストで返す"""
-    if request.args.get("password") != get_board_password():
+    if request.headers.get("X-Password") != get_board_password():
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     try:
@@ -212,7 +212,7 @@ def api_admin_dashboard_data():
 
 @loans_bp.route("/api/admin/db-size")
 def api_db_size():
-    if request.args.get("password") != get_board_password():
+    if request.headers.get("X-Password") != get_board_password():
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     try:

@@ -48,7 +48,7 @@ def api_admin_login():
 
 @auth_bp.route("/api/admin/users", methods=["GET"])
 def api_admin_users_list():
-    pw = request.args.get("password", "")
+    pw = request.headers.get("X-Password", "")
     if pw != get_board_password():
         return jsonify({"error": "unauthorized"}), 401
     from database import fetchall
