@@ -250,7 +250,7 @@ def api_ops_stats():
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     try:
-        loaned_row = fetchone(con, "SELECT COUNT(*) AS cnt FROM availability_cache WHERE status='貸出中'")
+        loaned_row = fetchone(con, "SELECT COUNT(*) AS cnt FROM availability_cache WHERE status='loaned'")
         loaned = loaned_row["cnt"] if loaned_row else 0
         total_cached_row = fetchone(con, "SELECT COUNT(*) AS cnt FROM availability_cache")
         total_cached = total_cached_row["cnt"] if total_cached_row else 0

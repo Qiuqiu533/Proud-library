@@ -2174,7 +2174,7 @@ document.querySelectorAll(".board-tab").forEach(btn => {
     if (btn.dataset.btab === "dashboard") loadDashboard();
     if (btn.dataset.btab === "adminnews") loadAdminNews();
     if (btn.dataset.btab === "newarrival") loadNewArrivalAdmin();
-    if (btn.dataset.btab === "analytics") loadStats();
+    if (btn.dataset.btab === "analytics") loadOpsStats();
     if (btn.dataset.btab === "calendar") loadCalendar();
     if (btn.dataset.btab === "libschedule") loadLibSchedule();
     if (btn.dataset.btab === "issues") loadIssues();
@@ -2690,7 +2690,7 @@ function switchBoardTab(tabKey) {
   if (panel) panel.classList.add("active");
   if (tabKey === "adminnews") loadAdminNews();
   if (tabKey === "newarrival") loadNewArrivalAdmin();
-  if (tabKey === "analytics") loadStats();
+  if (tabKey === "analytics") loadOpsStats();
   if (tabKey === "calendar") loadCalendar();
   if (tabKey === "libschedule") loadLibSchedule();
   if (tabKey === "issues") loadIssues();
@@ -4545,13 +4545,16 @@ async function loadPopularBooks() {
     row.innerHTML = books.map(b => {
       const ndlFallback = `https://ndlsearch.ndl.go.jp/thumbnail/${b.isbn}.jpg`;
       const stars = b.score ? "★".repeat(Math.round(b.score)) + "☆".repeat(5 - Math.round(b.score)) : "";
-      return `<div class="related-card" onclick="openModal('${b.isbn}')" role="button" tabindex="0">
-        <div class="related-thumb"><img src="${b.cover || ndlFallback}" alt="${esc(b.title)}" loading="lazy"
-          onerror="if(this.src!=='${ndlFallback}'){this.src='${ndlFallback}';}else{this.style.display='none';}"></div>
-        <div class="related-title">${esc(b.title)}</div>
-        <div class="related-author" style="color:#f0a500;font-size:0.75rem">${stars} ${b.score.toFixed(1)}</div>
+      return `<div class="mini-card" data-isbn="${b.isbn}">
+        <div class="mini-card-cover"><img src="${b.cover || ndlFallback}" alt="${esc(b.title)}" loading="lazy"
+          onerror="if(this.src!=='${ndlFallback}'){this.src='${ndlFallback}';}else{this.replaceWith(Object.assign(document.createElement('div'),{className:'mini-card-placeholder',textContent:'📖'}));}"></div>
+        <div class="mini-card-title">${esc(b.title)}</div>
+        <div style="color:#f0a500;font-size:0.72rem;margin-top:2px">${stars} ${b.score.toFixed(1)}</div>
       </div>`;
     }).join("");
+    row.querySelectorAll(".mini-card").forEach(el => {
+      el.addEventListener("click", () => openModal(el.dataset.isbn));
+    });
   } catch {}
 }
 

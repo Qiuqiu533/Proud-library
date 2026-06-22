@@ -169,7 +169,7 @@
           <span class="top-new-label">⭐ 住民に人気の本</span>
           <button id="togglePopular" class="section-toggle-btn" onclick="toggleSection('popular')">住民に人気の本を隠す ▲</button>
         </div>
-        <div id="popularRow" class="related-carousel"></div>
+        <div id="popularRow" class="recent-row"></div>
       </div>
 
       <!-- 特集コーナー -->
@@ -961,13 +961,13 @@
       <!-- Analytics (merged: stats + analysis + swot) -->
       <div id="btab-analytics" class="board-tab-panel">
         <div class="analytics-subnav" id="analyticsSubnav">
-          <button class="analytics-sub-btn active" data-asub="stats">📊 蔵書統計</button>
+          <button class="analytics-sub-btn" data-asub="stats">📊 蔵書統計</button>
           <button class="analytics-sub-btn" data-asub="analysis">📈 集計・分析</button>
           <button class="analytics-sub-btn" data-asub="swot">💡 強み・弱み</button>
-          <button class="analytics-sub-btn" data-asub="opsstats">🏛️ 運営統計</button>
+          <button class="analytics-sub-btn active" data-asub="opsstats">🏛️ 運営統計</button>
         </div>
         <!-- 蔵書統計 -->
-        <div id="asub-stats" class="analytics-sub-panel active">
+        <div id="asub-stats" class="analytics-sub-panel">
           <h3 style="margin-bottom:16px">蔵書統計・分析</h3>
           <div id="statsContent"><div class="loading">読み込み中…</div></div>
         </div>
@@ -1182,7 +1182,7 @@
         </div><!-- end asub-swot -->
 
         <!-- 運営統計 -->
-        <div id="asub-opsstats" class="analytics-sub-panel">
+        <div id="asub-opsstats" class="analytics-sub-panel active">
           <h3 style="margin-bottom:16px">🏛️ 運営統計</h3>
           <div id="opsStatsContent"><div class="loading">読み込み中…</div></div>
         </div>

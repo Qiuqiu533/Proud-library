@@ -165,7 +165,7 @@ def api_stats():
 
 @books_bp.route("/api/books/popular")
 def api_books_popular():
-    """評価スコア上位の本（1票以上・上位8件）を返す"""
+    """評価スコア上位の本（1票以上・上位20件）を返す"""
     con = get_con()
     ph = "%s" if USE_PG else "?"
     sql = f"""
@@ -174,7 +174,7 @@ def api_books_popular():
         JOIN genre_books g ON g.isbn = r.isbn
         WHERE r.votes >= 1 AND r.score >= 1
         ORDER BY r.score DESC, r.votes DESC
-        LIMIT 8
+        LIMIT 20
     """
     rows = fetchall(con, sql, ())
     con.close()
