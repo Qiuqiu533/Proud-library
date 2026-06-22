@@ -271,9 +271,9 @@ def api_get_wishlist():
     if not authed:
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
-    items = fetchall(con, "SELECT isbn, created_at FROM wish_list WHERE room=? ORDER BY id DESC", (room,))
+    items = fetchall(con, "SELECT isbn, notify, created_at FROM wish_list WHERE room=? ORDER BY id DESC", (room,))
     con.close()
-    return jsonify([{**r, "created_at": str(r["created_at"])[:10]} for r in items])
+    return jsonify([{**r, "notify": bool(r.get("notify", True)), "created_at": str(r["created_at"])[:10]} for r in items])
 
 
 @user_bp.route("/api/wishlist", methods=["POST"])
@@ -297,6 +297,34 @@ def api_add_wishlist():
         return jsonify({"error": "db error"}), 500
     con.close()
     return jsonify({"ok": True})
+
+
+@user_bp.route("/api/wishlist/notify", methods=["PATCH"])
+def api_wishlist_notify():
+    """ウィッシュリストの通知ON/OFFを切り替える"""
+    body = request.get_json() or {}
+    room = _wish_auth(body)
+    if not room:
+        return jsonify({"error": "unauthorized"}), 401
+    isbn   = (body.get("isbn")   or "").strip()
+    notify = body.get("notify")
+    if not isbn or notify is None:
+        return jsonify({"error": "isbn and notify required"}), 400
+    notify_val = bool(notify)
+    con = get_con()
+    try:
+        if USE_PG:
+            execute(con, "UPDATE wish_list SET notify=%s WHERE room=%s AND isbn=%s",
+                    (notify_val, room, isbn))
+        else:
+            execute(con, "UPDATE wish_list SET notify=? WHERE room=? AND isbn=?",
+                    (1 if notify_val else 0, room, isbn))
+        con.commit()
+        con.close()
+        return jsonify({"ok": True, "notify": notify_val})
+    except Exception:
+        con.close()
+        return jsonify({"error": "db error"}), 500
 
 
 @user_bp.route("/api/wishlist", methods=["DELETE"])
