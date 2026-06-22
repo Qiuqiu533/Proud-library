@@ -1159,6 +1159,42 @@ def _migrate_genre_books_awards():
         con.close()
 
 
+def _migrate_wish_list():
+    """wish_list テーブルを追加（読みたい本ウィッシュリスト）。"""
+    if _migration_done("wish_list_v1"):
+        return
+    con = get_con()
+    try:
+        if USE_PG:
+            cur = con.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS wish_list (
+                    id SERIAL PRIMARY KEY,
+                    room TEXT NOT NULL,
+                    isbn TEXT NOT NULL,
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    UNIQUE(room, isbn)
+                )
+            """)
+        else:
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS wish_list (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    room TEXT NOT NULL,
+                    isbn TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(room, isbn)
+                )
+            """)
+        con.commit()
+        _mark_migration_done("wish_list_v1")
+        logger.info("[migration] wish_list テーブル追加完了")
+    except Exception as e:
+        logger.error(f"[migration] wish_list error: %s", e)
+    finally:
+        con.close()
+
+
 def _run_all_migrations():
     """全マイグレーションをシングルスレッドで順次実行する（race condition防止）。"""
     steps = [
@@ -1180,6 +1216,7 @@ def _run_all_migrations():
         _migrate_ndc_genres,           # 重い処理は最後
         _migrate_ratings_user_votes,   # ratings.user_votes カラム追加
         _migrate_genre_books_awards,   # genre_books.awards カラム追加
+        _migrate_wish_list,            # wish_list テーブル追加
         _verify_tables,
     ]
     for step in steps:

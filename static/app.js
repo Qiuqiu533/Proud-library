@@ -1416,6 +1416,9 @@ function _renderModalContent(isbn, book, rating) {
         <button class="fav-btn-large ${fav ? 'active' : ''}" data-isbn="${isbn}">
           ${fav ? '❤️ お気に入り済み' : '🤍 お気に入りに追加'}
         </button>
+        <button class="wish-btn-large" data-isbn="${isbn}" style="margin-top:6px;width:100%;padding:10px 14px;border-radius:20px;border:1.5px solid #5b8dd9;background:#f0f5ff;color:#3a6aaa;font-size:0.9rem;font-weight:700;cursor:pointer">
+          📚 読みたいリストに追加
+        </button>
       </div>
     </div>
 
@@ -1484,6 +1487,66 @@ function _renderModalContent(isbn, book, rating) {
     </div>`;
 }
 
+async function _initWishBtn(isbn) {
+  const btn = document.querySelector(".wish-btn-large");
+  if (!btn) return;
+  const u = residentSession || getCloudUser();
+  if (!u || !u.room) { btn.style.display = "none"; return; }
+  const inList = await isInWishlist(isbn, u.room);
+  _setWishBtn(btn, inList);
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    const cur = btn.classList.contains("active");
+    const body = { room: u.room, password: u.password || u.pin || "", isbn };
+    await fetch("/api/wishlist", { method: cur ? "DELETE" : "POST",
+      headers: {"Content-Type":"application/json"}, body: JSON.stringify(body) });
+    _setWishBtn(btn, !cur);
+    btn.disabled = false;
+    loadWishlistCard();
+  });
+}
+function _setWishBtn(btn, active) {
+  btn.classList.toggle("active", active);
+  btn.style.background = active ? "#5b8dd9" : "#f0f5ff";
+  btn.style.color = active ? "#fff" : "#3a6aaa";
+  btn.textContent = active ? "📚 読みたいリスト済み" : "📚 読みたいリストに追加";
+}
+async function isInWishlist(isbn, room) {
+  if (!room) return false;
+  try {
+    const res = await fetch(`/api/wishlist?room=${encodeURIComponent(room)}`);
+    if (!res.ok) return false;
+    const list = await res.json();
+    return Array.isArray(list) && list.some(w => w.isbn === isbn);
+  } catch { return false; }
+}
+async function loadWishlistCard() {
+  const sec  = document.getElementById("wishlistSection");
+  const grid = document.getElementById("wishlistGrid");
+  if (!sec || !grid) return;
+  const u = residentSession || getCloudUser();
+  if (!u || !u.room) { sec.style.display = "none"; return; }
+  const res = await fetch(`/api/wishlist?room=${encodeURIComponent(u.room)}`).catch(() => null);
+  if (!res || !res.ok) { sec.style.display = "none"; return; }
+  const list = await res.json();
+  if (!list.length) { sec.style.display = "none"; return; }
+  sec.style.display = "";
+  const isbns = list.map(w => w.isbn);
+  const bRes = await fetch("/api/books/batch", { method:"POST",
+    headers:{"Content-Type":"application/json"}, body: JSON.stringify({isbns}) });
+  const books = bRes.ok ? await bRes.json() : [];
+  const bookMap = Object.fromEntries(books.map(b => [b.isbn, b]));
+  grid.innerHTML = isbns.map(isbn => {
+    const b = bookMap[isbn] || { isbn, title: isbn };
+    const ndl = `https://ndlsearch.ndl.go.jp/thumbnail/${isbn}.jpg`;
+    return `<div class="mini-card" data-isbn="${isbn}" onclick="openModal('${isbn}')">
+      <img src="${b.cover || ndl}" alt="${esc(b.title)}" loading="lazy"
+        onerror="if(this.src!=='${ndl}')this.src='${ndl}';else this.style.display='none';">
+      <div class="mini-title">${esc(b.title)}</div>
+    </div>`;
+  }).join("");
+}
+
 function _bindModalEvents(isbn) {
   document.querySelector(".fav-btn-large").addEventListener("click", e => {
     toggleFav(isbn);
@@ -1491,6 +1554,7 @@ function _bindModalEvents(isbn) {
     e.currentTarget.classList.toggle("active", active);
     e.currentTarget.textContent = active ? "❤️ お気に入り済み" : "🤍 お気に入りに追加";
   });
+  _initWishBtn(isbn);
   document.querySelectorAll(".read-status-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       setReadStatus(isbn, btn.dataset.status);
@@ -1799,7 +1863,7 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
     if (btn.dataset.tab === "reqlist") loadReqList();
     if (btn.dataset.tab === "news") loadNews();
     if (btn.dataset.tab === "info") loadInfo();
-    if (btn.dataset.tab === "card") loadCard();
+    if (btn.dataset.tab === "card") { loadCard(); loadWishlistCard(); }
   });
 });
 

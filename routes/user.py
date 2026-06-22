@@ -2,7 +2,7 @@ import json
 import secrets
 import re as _re
 from flask import Blueprint, request, jsonify
-from database import get_con, execute, fetchone, USE_PG
+from database import get_con, execute, fetchone, fetchall, USE_PG
 from services.utils import _hash_password, _verify_password, _send_reset_email, _is_bcrypt_hash
 
 user_bp = Blueprint("user", __name__)
@@ -218,5 +218,78 @@ def api_user_reset_password():
     else:
         execute(con, "UPDATE user_accounts SET password_hash=?, password_salt=?, pin=?, updated_at=datetime('now','localtime') WHERE room=?", (h, s, password, room))
         execute(con, "UPDATE password_reset_tokens SET used=1 WHERE token=?", (token,))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+
+# --- Wish List ---
+def _wish_auth(body):
+    """room + password で住民認証。成功時 room を返す、失敗時 None。"""
+    from services.utils import _verify_password as vp, _is_bcrypt_hash
+    room     = (body.get("room")     or "").strip()
+    password = (body.get("password") or "").strip()
+    if not room or not password:
+        return None
+    con = get_con()
+    user = fetchone(con, "SELECT password_hash, password_salt, pin FROM user_accounts WHERE room=?", (room,))
+    con.close()
+    if not user:
+        return None
+    ph   = user.get("password_hash", "")
+    salt = user.get("password_salt", "")
+    if ph:
+        return room if vp(password, ph, salt) else None
+    return room if user.get("pin") == password else None
+
+
+@user_bp.route("/api/wishlist")
+def api_get_wishlist():
+    room = request.args.get("room", "").strip()
+    if not room:
+        return jsonify([])
+    con = get_con()
+    rows = fetchone(con, "SELECT 1 FROM user_accounts WHERE room=?", (room,))
+    if not rows:
+        con.close()
+        return jsonify({"error": "unauthorized"}), 401
+    items = fetchall(con, "SELECT isbn, created_at FROM wish_list WHERE room=? ORDER BY id DESC", (room,))
+    con.close()
+    return jsonify([{**r, "created_at": str(r["created_at"])[:10]} for r in items])
+
+
+@user_bp.route("/api/wishlist", methods=["POST"])
+def api_add_wishlist():
+    body = request.get_json() or {}
+    room = _wish_auth(body)
+    if not room:
+        return jsonify({"error": "unauthorized"}), 401
+    isbn = (body.get("isbn") or "").strip()
+    if not isbn:
+        return jsonify({"error": "isbn required"}), 400
+    con = get_con()
+    try:
+        if USE_PG:
+            execute(con, "INSERT INTO wish_list (room, isbn) VALUES (?,?) ON CONFLICT (room, isbn) DO NOTHING", (room, isbn))
+        else:
+            execute(con, "INSERT OR IGNORE INTO wish_list (room, isbn) VALUES (?,?)", (room, isbn))
+        con.commit()
+    except Exception:
+        con.close()
+        return jsonify({"error": "db error"}), 500
+    con.close()
+    return jsonify({"ok": True})
+
+
+@user_bp.route("/api/wishlist", methods=["DELETE"])
+def api_delete_wishlist():
+    body = request.get_json() or {}
+    room = _wish_auth(body)
+    if not room:
+        return jsonify({"error": "unauthorized"}), 401
+    isbn = (body.get("isbn") or "").strip()
+    if not isbn:
+        return jsonify({"error": "isbn required"}), 400
+    con = get_con()
+    execute(con, "DELETE FROM wish_list WHERE room=? AND isbn=?", (room, isbn))
     con.commit(); con.close()
     return jsonify({"ok": True})
