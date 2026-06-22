@@ -173,12 +173,13 @@ document.getElementById("loginBtn").addEventListener("click", async () => {
   if (res.ok) {
     residentSession = {room, password: pass};
     sessionStorage.setItem("resident_session", JSON.stringify(residentSession));
+    _migrateReadKeysToRoom(room);
     // DBの読書記録をlocalStorageに反映
     if (data.reading_log) {
       Object.entries(data.reading_log).forEach(([isbn, val]) => {
         const status = typeof val === "string" ? val : (val.status || "");
         if (status) setReadStatus(isbn, status);
-        if (typeof val === "object" && val.date) saveReadMeta(isbn, {date: val.date, review: val.review || ""});
+        if (typeof val === "object" && val.date) setReadMeta(isbn, val.date, val.review || "");
       });
     }
     _enterApp();
@@ -416,26 +417,53 @@ function getFavIsbns() {
   return Object.keys(localStorage).filter(k => k.startsWith("fav_") && localStorage[k] === "1").map(k => k.slice(4));
 }
 
-function getReadStatus(isbn) { return localStorage.getItem("read_" + isbn) || ""; }
+function _curRoom() {
+  return ((residentSession || getCloudUser()) || {}).room || "";
+}
+function _readKey(isbn) { const r = _curRoom(); return r ? `read_${r}_${isbn}` : `read_${isbn}`; }
+function _metaKey(isbn) { const r = _curRoom(); return r ? `readmeta_${r}_${isbn}` : `readmeta_${isbn}`; }
+
+function getReadStatus(isbn) { return localStorage.getItem(_readKey(isbn)) || ""; }
 function setReadStatus(isbn, status) {
-  if (status) localStorage.setItem("read_" + isbn, status);
-  else localStorage.removeItem("read_" + isbn);
+  if (status) localStorage.setItem(_readKey(isbn), status);
+  else localStorage.removeItem(_readKey(isbn));
   setTimeout(cloudSync, 500);
 }
 function getLogEntries() {
-  return Object.keys(localStorage).filter(k => k.startsWith("read_")).map(k => ({
-    isbn: k.slice(5), status: localStorage[k]
+  const prefix = (() => { const r = _curRoom(); return r ? `read_${r}_` : `read_`; })();
+  return Object.keys(localStorage).filter(k => k.startsWith(prefix)).map(k => ({
+    isbn: k.slice(prefix.length), status: localStorage[k]
   }));
 }
 function getReadMeta(isbn) {
-  try { return JSON.parse(localStorage.getItem("readmeta_" + isbn) || "{}"); } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem(_metaKey(isbn)) || "{}"); } catch { return {}; }
 }
 function setReadMeta(isbn, date, memo) {
   const obj = {};
   if (date) obj.date = date;
   if (memo) obj.memo = memo;
-  if (Object.keys(obj).length) localStorage.setItem("readmeta_" + isbn, JSON.stringify(obj));
-  else localStorage.removeItem("readmeta_" + isbn);
+  if (Object.keys(obj).length) localStorage.setItem(_metaKey(isbn), JSON.stringify(obj));
+  else localStorage.removeItem(_metaKey(isbn));
+}
+
+// ログイン時に旧キー（部屋番号なし）を新キーへ移行する
+function _migrateReadKeysToRoom(room) {
+  if (!room || localStorage.getItem(`read_keys_migrated_${room}`)) return;
+  Object.keys(localStorage).filter(k => k.startsWith("read_") && !k.startsWith(`read_${room}_`)).forEach(k => {
+    const isbn = k.slice(5);
+    if (!localStorage.getItem(`read_${room}_${isbn}`)) {
+      localStorage.setItem(`read_${room}_${isbn}`, localStorage[k]);
+    }
+    localStorage.removeItem(k);
+  });
+  Object.keys(localStorage).filter(k => k.startsWith("readmeta_") && !k.startsWith(`readmeta_${room}_`)).forEach(k => {
+    const isbn = k.slice(9);
+    if (!localStorage.getItem(`readmeta_${room}_${isbn}`)) {
+      localStorage.setItem(`readmeta_${room}_${isbn}`, localStorage[k]);
+    }
+    localStorage.removeItem(k);
+  });
+  localStorage.setItem(`read_keys_migrated_${room}`, "1");
 }
 
 // ===== Utility =====
@@ -3272,13 +3300,14 @@ document.getElementById("syncLoginBtn").addEventListener("click", async () => {
   if (!res.ok) { msg.textContent = "❌ " + (data.error || "エラー"); msg.style.color="#e05"; return; }
 
   setCloudUser({room, pin});
+  _migrateReadKeysToRoom(room);
   updateSyncUI();
 
   // クラウドデータをローカルにマージ
   if (!data.is_new) {
     (data.favorites || []).forEach(isbn => localStorage.setItem("fav_" + isbn, "1"));
     Object.entries(data.reading_log || {}).forEach(([isbn, status]) => {
-      if (status) localStorage.setItem("read_" + isbn, status);
+      if (status) localStorage.setItem(`read_${room}_${isbn}`, status);
     });
     if (data.library_card_url) {
       localStorage.setItem("libraryCardUrl", data.library_card_url);
