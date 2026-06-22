@@ -409,3 +409,61 @@ def test_wishlist_includes_notify_field(client):
     data = res.get_json()
     assert len(data) > 0
     assert "notify" in data[0]
+
+
+# ===== 招待コード =====
+
+def test_invite_codes_list_no_auth(client):
+    """未認証では招待コード一覧は 401"""
+    res = client.get("/api/admin/invite-codes", headers={"X-Password": "wrong"})
+    assert res.status_code == 401
+
+
+def test_invite_codes_issue_and_list(client):
+    """招待コード発行→一覧に表示される"""
+    res = client.post("/api/admin/invite-codes",
+                      json={"count": 3, "note": "テスト"},
+                      headers={"X-Password": ""})
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data.get("ok")
+    assert len(data.get("codes", [])) == 3
+
+    res2 = client.get("/api/admin/invite-codes", headers={"X-Password": ""})
+    assert res2.status_code == 200
+    codes_in_db = [r["code"] for r in res2.get_json()]
+    for c in data["codes"]:
+        assert c in codes_in_db
+
+
+def test_invite_validate_valid(client):
+    """有効な招待コードの検証は valid=True"""
+    issue = client.post("/api/admin/invite-codes",
+                        json={"count": 1},
+                        headers={"X-Password": ""})
+    code = issue.get_json()["codes"][0]
+    res = client.post("/api/invite/validate", json={"code": code})
+    assert res.status_code == 200
+    assert res.get_json().get("valid") is True
+
+
+def test_invite_validate_invalid(client):
+    """存在しないコードは valid=False"""
+    res = client.post("/api/invite/validate", json={"code": "XXXXXXXX"})
+    assert res.status_code == 400
+    assert res.get_json().get("valid") is False
+
+
+def test_invite_delete_unused(client):
+    """未使用コードの削除"""
+    issue = client.post("/api/admin/invite-codes",
+                        json={"count": 1},
+                        headers={"X-Password": ""})
+    code_id_list = client.get("/api/admin/invite-codes", headers={"X-Password": ""}).get_json()
+    issued_code = issue.get_json()["codes"][0]
+    target = next((r for r in code_id_list if r["code"] == issued_code), None)
+    assert target is not None
+    res = client.delete(f"/api/admin/invite-codes/{target['id']}",
+                        headers={"X-Password": ""})
+    assert res.status_code == 200
+    assert res.get_json().get("ok")

@@ -11,6 +11,7 @@ from routes.community import community_bp
 from routes.user import user_bp
 from routes.loans import loans_bp
 from routes.admin import admin_bp
+from routes.invite import invite_bp
 
 app.register_blueprint(pages_bp)
 app.register_blueprint(auth_bp)
@@ -20,6 +21,7 @@ app.register_blueprint(community_bp)
 app.register_blueprint(user_bp)
 app.register_blueprint(loans_bp)
 app.register_blueprint(admin_bp)
+app.register_blueprint(invite_bp)
 
 # ── DB初期化・マイグレーション ──────────────────────────────────────────────
 from migrations import _ensure_db

@@ -1232,6 +1232,46 @@ def _migrate_wish_list_notify():
         con.close()
 
 
+def _migrate_invite_codes():
+    """invite_codes テーブルを追加（招待コードによる登録制限）。"""
+    if _migration_done("invite_codes_v1"):
+        return
+    con = get_con()
+    try:
+        if USE_PG:
+            cur = con.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS invite_codes (
+                    id SERIAL PRIMARY KEY,
+                    code TEXT NOT NULL UNIQUE,
+                    note TEXT DEFAULT '',
+                    used_room TEXT DEFAULT '',
+                    used_at TIMESTAMPTZ,
+                    expires_at TIMESTAMPTZ,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+        else:
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS invite_codes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    code TEXT NOT NULL UNIQUE,
+                    note TEXT DEFAULT '',
+                    used_room TEXT DEFAULT '',
+                    used_at TIMESTAMP,
+                    expires_at TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+        con.commit()
+        _mark_migration_done("invite_codes_v1")
+        logger.info("[migration] invite_codes テーブル追加完了")
+    except Exception as e:
+        logger.error("[migration] invite_codes error: %s", e)
+    finally:
+        con.close()
+
+
 def _run_all_migrations():
     """全マイグレーションをシングルスレッドで順次実行する（race condition防止）。"""
     steps = [
@@ -1255,6 +1295,7 @@ def _run_all_migrations():
         _migrate_genre_books_awards,   # genre_books.awards カラム追加
         _migrate_wish_list,            # wish_list テーブル追加
         _migrate_wish_list_notify,     # 通知用カラム追加
+        _migrate_invite_codes,         # 招待コードテーブル追加
         _verify_tables,
     ]
     for step in steps:
