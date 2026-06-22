@@ -3347,14 +3347,26 @@ function reqAdminCardHtml(r) {
 }
 
 function bindReqAdminEvents(container) {
+  const REPLY_PROMPT_STATUSES = new Set(["fb_done", "fb_rejected", "fb_noted", "fb_none", "approved", "rejected", "done"]);
   container.querySelectorAll(".req-status-sel").forEach(sel => {
     sel.addEventListener("change", async () => {
+      const card = sel.closest(".req-admin-card");
+      const replyTA = card && card.querySelector(".req-reply-input");
+      if (REPLY_PROMPT_STATUSES.has(sel.value) && replyTA && !replyTA.value.trim()) {
+        replyTA.style.borderColor = "#e08a00";
+        replyTA.placeholder = "⚠️ 返答を入力してから保存してください（居住者に表示されます）";
+        replyTA.focus();
+        sel.value = sel.dataset.prev || sel.value;
+        return;
+      }
+      sel.dataset.prev = sel.value;
       await fetch(`/api/requests/${sel.dataset.id}`, {
         method:"PATCH", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({password: reqAdminPass, status: sel.value})
       });
       loadReqManage();
     });
+    sel.addEventListener("focus", () => { sel.dataset.prev = sel.value; });
   });
   container.querySelectorAll(".req-note-input").forEach(inp => {
     const save = async () => {
@@ -3366,10 +3378,14 @@ function bindReqAdminEvents(container) {
     inp.addEventListener("blur", save);
     inp.addEventListener("keydown", e => { if (e.key==="Enter") { save(); inp.blur(); }});
   });
+  container.querySelectorAll(".req-reply-input").forEach(ta => {
+    ta.addEventListener("input", () => { ta.style.borderColor = "#5b8dd9"; });
+  });
   container.querySelectorAll(".req-reply-save").forEach(btn => {
     btn.addEventListener("click", async () => {
       const id = btn.dataset.id;
-      const reply = container.querySelector(`.req-reply-input[data-id="${id}"]`).value.trim();
+      const ta = container.querySelector(`.req-reply-input[data-id="${id}"]`);
+      const reply = ta.value.trim();
       btn.textContent = "保存中…"; btn.disabled = true;
       await fetch(`/api/requests/${id}`, {
         method:"PATCH", headers:{"Content-Type":"application/json"},
