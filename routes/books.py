@@ -10,7 +10,7 @@ from database import get_con, execute, fetchone, fetchall, USE_PG
 from services.utils import rate_limit, _hira_to_kata, _kata_to_hira
 from services.books import (
     fetch_books, fetch_book_detail, get_cover_url, get_rating,
-    get_ratings_bulk, save_rating, isbn13_to_isbn10,
+    get_ratings_bulk, save_rating, delete_review, isbn13_to_isbn10,
     get_recent_isbns,
 )
 
@@ -33,7 +33,8 @@ def api_books():
 def api_book(isbn):
     hint_title = request.args.get("title", "").strip()
     detail = fetch_book_detail(isbn, hint_title=hint_title)
-    detail["rating"] = get_rating(isbn)
+    viewer_room = request.args.get("room", "").strip() or None
+    detail["rating"] = get_rating(isbn, viewer_room=viewer_room)
     con = get_con()
     row = fetchone(con, "SELECT awards FROM genre_books WHERE isbn=%s", (isbn,))
     con.close()
@@ -364,14 +365,52 @@ def api_helpful():
 @books_bp.route("/api/rate", methods=["POST"])
 @rate_limit(limit=10, window=60)
 def api_rate():
+    from database import fetchone as _fetchone
     body = request.get_json()
-    isbn = body.get("isbn", "")
-    score = int(body.get("score", 0))
+    isbn   = body.get("isbn", "")
+    score  = int(body.get("score", 0))
     review = body.get("review", "")
+    room   = (body.get("room") or "").strip() or None
+    password = (body.get("password") or "").strip()
     if not isbn or score < 1 or score > 5:
         return jsonify({"error": "invalid"}), 400
-    save_rating(isbn, score, review)
-    return jsonify(get_rating(isbn))
+    # ログイン済みユーザーは認証確認
+    if room:
+        con = get_con()
+        user = _fetchone(con, "SELECT password_hash, password_salt FROM user_accounts WHERE room=?", (room,))
+        con.close()
+        if not user:
+            room = None  # 未登録部屋は匿名扱い
+        else:
+            from services.utils import _verify_password
+            if not _verify_password(password, user["password_hash"], user.get("password_salt") or ""):
+                return jsonify({"error": "認証に失敗しました"}), 401
+    save_rating(isbn, score, review, room=room)
+    return jsonify(get_rating(isbn, viewer_room=room))
+
+
+@books_bp.route("/api/rate/review", methods=["DELETE"])
+@rate_limit(limit=20, window=60)
+def api_delete_review():
+    from database import fetchone as _fetchone
+    body = request.get_json()
+    isbn      = (body.get("isbn") or "").strip()
+    review_id = (body.get("review_id") or "").strip()
+    room      = (body.get("room") or "").strip()
+    password  = (body.get("password") or "").strip()
+    if not isbn or not review_id or not room:
+        return jsonify({"error": "invalid"}), 400
+    con = get_con()
+    user = _fetchone(con, "SELECT password_hash, password_salt FROM user_accounts WHERE room=?", (room,))
+    con.close()
+    if not user:
+        return jsonify({"error": "unauthorized"}), 401
+    from services.utils import _verify_password
+    if not _verify_password(password, user["password_hash"], user.get("password_salt") or ""):
+        return jsonify({"error": "認証に失敗しました"}), 401
+    if not delete_review(isbn, review_id, room):
+        return jsonify({"error": "削除できません"}), 404
+    return jsonify(get_rating(isbn, viewer_room=room))
 
 
 @books_bp.route("/api/book-description", methods=["POST"])

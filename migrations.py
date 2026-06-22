@@ -1116,6 +1116,26 @@ def _verify_tables():
         logger.error(f"table verify error: %s", e)
 
 
+def _migrate_ratings_user_votes():
+    """ratings テーブルに user_votes カラムを追加（部屋別スコア管理・重複投票防止）。"""
+    if _migration_done("ratings_user_votes_v1"):
+        return
+    if not USE_PG:
+        _mark_migration_done("ratings_user_votes_v1")
+        return
+    con = get_con()
+    try:
+        cur = con.cursor()
+        cur.execute("ALTER TABLE ratings ADD COLUMN IF NOT EXISTS user_votes TEXT DEFAULT '{}'")
+        con.commit()
+        _mark_migration_done("ratings_user_votes_v1")
+        logger.info("[migration] ratings.user_votes カラム追加完了")
+    except Exception as e:
+        logger.error(f"[migration] ratings_user_votes error: %s", e)
+    finally:
+        con.close()
+
+
 def _run_all_migrations():
     """全マイグレーションをシングルスレッドで順次実行する（race condition防止）。"""
     steps = [
@@ -1135,6 +1155,7 @@ def _run_all_migrations():
         _migrate_title_yomi,
         _migrate_pubdate_openbd,       # 完了後に librarylife を内部で起動
         _migrate_ndc_genres,           # 重い処理は最後
+        _migrate_ratings_user_votes,   # ratings.user_votes カラム追加
         _verify_tables,
     ]
     for step in steps:
