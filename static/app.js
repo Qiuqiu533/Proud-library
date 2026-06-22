@@ -808,14 +808,26 @@ function toggleSection(key) {
 
 function applySectionState(key) {
   const visible = isSectionVisible(key);
-  const sectionId = key === "topNew" ? "topNewSection" : "recentBooksSection";
-  const rowId    = key === "topNew" ? "topNewRow"     : "recentBooksRow";
-  const btnId    = key === "topNew" ? "toggleTopNew"  : "toggleRecent";
-  const label    = key === "topNew" ? "新着図書"       : "最近見た本";
-  const row  = document.getElementById(rowId);
-  const btn  = document.getElementById(btnId);
+  const maps = {
+    topNew:  { sectionId: "topNewSection",      rowId: "topNewRow",      btnId: "toggleTopNew",    label: "新着図書" },
+    recent:  { sectionId: "recentBooksSection", rowId: "recentBooksRow", btnId: "toggleRecent",    label: "最近見た本" },
+    popular: { sectionId: "popularSection",     rowId: "popularRow",     btnId: "togglePopular",   label: "住民に人気の本" },
+  };
+  const m = maps[key];
+  if (!m) return;
+  const row  = document.getElementById(m.rowId);
+  const btn  = document.getElementById(m.btnId);
   if (row) row.style.display = visible ? "" : "none";
-  if (btn) btn.textContent = visible ? `${label}を隠す ▲` : `${label}を表示 ▼`;
+  if (btn) btn.textContent = visible ? `${m.label}を隠す ▲` : `${m.label}を表示 ▼`;
+}
+
+function toggleFilterRows() {
+  const wrap = document.getElementById("filterRowsWrap");
+  const btn  = document.getElementById("toggleFilterRows");
+  if (!wrap) return;
+  const hidden = wrap.style.display === "none";
+  wrap.style.display = hidden ? "" : "none";
+  if (btn) btn.textContent = hidden ? "絞り込み ▲" : "絞り込み ▼";
 }
 
 function applyTopSectionsState() {
@@ -2556,7 +2568,8 @@ async function loadDashboard() {
       <div class="dash-list">
         ${latestReqs.map(r => {
           const statusCls = r.status === "pending" || r.status === "fb_received" ? " dash-list-urgent" : "";
-          const statusLabel = r.status === "pending" ? "🔴 未対応" : r.status === "approved" ? "✅ 承認" : r.status === "rejected" ? "❌ 却下" : r.status === "fb_received" ? "🔴 未対応" : r.status;
+          const _fbStatusMap = { pending:"🔴 未対応", approved:"✅ 承認", rejected:"❌ 却下", fb_received:"🔴 未対応", fb_noted:"🟡 確認済", fb_in_progress:"🔵 対応中", fb_resolved:"✅ 対応済", fb_wontfix:"⬛ 見送り" };
+          const statusLabel = _fbStatusMap[r.status] || r.status;
           const typeLabel = r.type === "feedback" ? "💬 意見" : "📖 リクエスト";
           return `<div class="dash-list-item${statusCls}">
             <span class="dash-list-badge">${typeLabel}</span>
@@ -4283,7 +4296,7 @@ function initStaffChat() {
   if (lbl) lbl.textContent = boardSenderName ? `👤 ${boardSenderName}` : "👤 名前未設定";
 
   initThreadUI();
-  switchChatMode("general");
+  switchChatMode("threads");
   loadChatMessages(true);
   if (chatPollTimer) clearInterval(chatPollTimer);
   chatPollTimer = setInterval(() => loadChatMessages(), 5000);
@@ -4370,6 +4383,7 @@ async function loadPopularBooks() {
     const books = await res.json();
     if (!books.length) return;
     sec.style.display = "block";
+    applySectionState("popular");
     row.innerHTML = books.map(b => {
       const ndlFallback = `https://ndlsearch.ndl.go.jp/thumbnail/${b.isbn}.jpg`;
       const stars = b.score ? "★".repeat(Math.round(b.score)) + "☆".repeat(5 - Math.round(b.score)) : "";
