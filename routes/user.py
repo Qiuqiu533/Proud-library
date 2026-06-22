@@ -245,7 +245,7 @@ def _wish_auth(body):
 @user_bp.route("/api/wishlist")
 def api_get_wishlist():
     room     = request.args.get("room", "").strip()
-    password = request.args.get("password", "").strip() or request.headers.get("X-Password", "").strip()
+    password = request.headers.get("X-Password", "").strip()
     if not room or not password:
         return jsonify({"error": "unauthorized"}), 401
     authed = _wish_auth({"room": room, "password": password})
