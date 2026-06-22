@@ -249,3 +249,49 @@ def test_ops_stats_no_auth(client):
     """認証なしの運営統計は 401"""
     res = client.get("/api/admin/ops-stats")
     assert res.status_code == 401
+
+
+def test_ops_stats_with_auth(client):
+    """正しい認証で運営統計が取得できる（テスト環境のboard_passwordは空文字）"""
+    res = client.get("/api/admin/ops-stats", headers={"X-Password": ""})
+    assert res.status_code == 200
+    data = res.get_json()
+    assert "loaned" in data
+    assert "genres" in data
+    assert "members" in data
+
+
+def test_wishlist_summary_no_auth(client):
+    """認証なしのウィッシュリスト集計は 401"""
+    res = client.get("/api/admin/wishlist-summary")
+    assert res.status_code == 401
+
+
+def test_wishlist_summary_with_auth(client):
+    """正しい認証でウィッシュリスト集計が取得できる（テスト環境のboard_passwordは空文字）"""
+    res = client.get("/api/admin/wishlist-summary", headers={"X-Password": ""})
+    assert res.status_code == 200
+    assert isinstance(res.get_json(), list)
+
+
+def test_award_books_list(client):
+    """受賞作一覧が取得できる"""
+    res = client.get("/api/award-books")
+    assert res.status_code == 200
+    assert isinstance(res.get_json(), list)
+
+
+def test_award_books_awards_list(client):
+    """受賞作フィルター用の賞一覧が取得できる"""
+    res = client.get("/api/award-books/awards")
+    assert res.status_code == 200
+    assert isinstance(res.get_json(), list)
+
+
+def test_award_books_post_wrong_auth(client):
+    """誤ったパスワードでの受賞作登録は 403"""
+    res = client.post("/api/award-books", json={
+        "password": "wrongpass", "award": "直木賞", "award_no": 1,
+        "award_year": 2020, "title": "テスト", "author": "著者"
+    })
+    assert res.status_code == 403
