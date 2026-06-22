@@ -780,6 +780,7 @@
       <button class="board-tab" data-btab="awarddb">🏆 受賞作DB</button>
       <button class="board-tab" data-btab="guide">📖 操作ガイド</button>
       <button class="board-tab" data-btab="analytics">📊 分析・レポート</button>
+      <button class="board-tab" data-btab="roadmap">🗺️ 公開ロードマップ</button>
     </div>
     <div class="board-body">
 
@@ -1196,6 +1197,116 @@
           <div id="opsStatsContent"><div class="loading">読み込み中…</div></div>
         </div>
       </div><!-- end btab-analytics -->
+
+      <!-- 公開ロードマップ -->
+      <div id="btab-roadmap" class="board-tab-panel">
+        <div style="max-width:780px;margin:0 auto;padding:16px">
+          <h3 style="margin-bottom:4px">🗺️ 公開ロードマップ</h3>
+          <p style="font-size:0.82rem;color:#888;margin-bottom:20px">目標：2026年内に全住民へ公開。管理者検証 → 少人数β → 全体公開の3段階。</p>
+
+          <!-- リスク評価 -->
+          <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:10px;padding:14px 16px;margin-bottom:20px">
+            <div style="font-weight:700;font-size:0.95rem;margin-bottom:10px">⚠️ 現時点で公開した場合のリスク</div>
+            <table style="width:100%;border-collapse:collapse;font-size:0.82rem">
+              <thead><tr style="background:#fff3cd">
+                <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #ffe082">リスク</th>
+                <th style="padding:6px 8px;text-align:center;border-bottom:1px solid #ffe082;white-space:nowrap">深刻度</th>
+                <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #ffe082">内容・対策</th>
+              </tr></thead>
+              <tbody>
+                <tr><td style="padding:6px 8px;border-bottom:1px solid #fff3cd">なりすまし登録</td><td style="padding:6px 8px;text-align:center;border-bottom:1px solid #fff3cd">🔴 高</td><td style="padding:6px 8px;border-bottom:1px solid #fff3cd">住民以外が他人の部屋番号で登録可。→ 招待コード or 部屋番号ホワイトリスト導入で解決</td></tr>
+                <tr><td style="padding:6px 8px;border-bottom:1px solid #fff3cd">ログイン総当たり攻撃</td><td style="padding:6px 8px;text-align:center;border-bottom:1px solid #fff3cd">🔴 高</td><td style="padding:6px 8px;border-bottom:1px solid #fff3cd">/api/user/login・register にレート制限なし。→ Phase 1 で実装</td></tr>
+                <tr><td style="padding:6px 8px;border-bottom:1px solid #fff3cd">パスワードリセット不動作</td><td style="padding:6px 8px;text-align:center;border-bottom:1px solid #fff3cd">🟡 中</td><td style="padding:6px 8px;border-bottom:1px solid #fff3cd">Resend APIキー未設定だとメール未着。→ Brevo設定と同時に解決</td></tr>
+                <tr><td style="padding:6px 8px;border-bottom:1px solid #fff3cd">Renderスリープ（初回遅延）</td><td style="padding:6px 8px;text-align:center;border-bottom:1px solid #fff3cd">🟡 中</td><td style="padding:6px 8px;border-bottom:1px solid #fff3cd">無操作15分でサーバーがスリープ。初回30〜60秒待ち。→ UX許容範囲内なら現状維持</td></tr>
+                <tr><td style="padding:6px 8px;border-bottom:1px solid #fff3cd">管理者パスワード漏洩</td><td style="padding:6px 8px;text-align:center;border-bottom:1px solid #fff3cd">🟡 中</td><td style="padding:6px 8px;border-bottom:1px solid #fff3cd">単一パスワードで全管理権限。→ 定期ローテーション運用で対応</td></tr>
+                <tr><td style="padding:6px 8px">メール未登録住民への通知欠落</td><td style="padding:6px 8px;text-align:center">🟢 低</td><td style="padding:6px 8px">任意登録のため通知が届かない場合あり。許容範囲</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- フェーズタイムライン -->
+          <div style="font-weight:700;font-size:0.95rem;margin-bottom:12px">📅 公開スケジュール</div>
+
+          <!-- Phase 1 -->
+          <div style="display:flex;gap:0;margin-bottom:0">
+            <div style="display:flex;flex-direction:column;align-items:center;min-width:44px">
+              <div style="width:32px;height:32px;border-radius:50%;background:#3d6b4f;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;flex-shrink:0">1</div>
+              <div style="width:2px;background:#ddd;flex:1;min-height:40px"></div>
+            </div>
+            <div style="padding:0 0 20px 12px;flex:1">
+              <div style="font-weight:700;font-size:0.9rem;color:#3d6b4f">Phase 1：管理者内部検証　<span style="color:#888;font-weight:400">2026年7月</span></div>
+              <div style="font-size:0.82rem;color:#555;margin-top:6px;line-height:1.7">
+                ☐ ログイン・登録 API へのレート制限実装<br>
+                ☐ 招待コード or 部屋番号ホワイトリスト機能実装<br>
+                ☐ Brevo SMTP 設定（空き待ち通知・パスワードリセット）<br>
+                ☐ 全機能エンドツーエンド動作確認<br>
+                ☐ 管理者マニュアル整備
+              </div>
+            </div>
+          </div>
+
+          <!-- Phase 2 -->
+          <div style="display:flex;gap:0;margin-bottom:0">
+            <div style="display:flex;flex-direction:column;align-items:center;min-width:44px">
+              <div style="width:32px;height:32px;border-radius:50%;background:#5a8f6e;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;flex-shrink:0">2</div>
+              <div style="width:2px;background:#ddd;flex:1;min-height:40px"></div>
+            </div>
+            <div style="padding:0 0 20px 12px;flex:1">
+              <div style="font-weight:700;font-size:0.9rem;color:#5a8f6e">Phase 2：住民β（10〜20名）　<span style="color:#888;font-weight:400">2026年8〜9月</span></div>
+              <div style="font-size:0.82rem;color:#555;margin-top:6px;line-height:1.7">
+                ☐ ライブラリーグループメンバーに限定公開（招待コード配布）<br>
+                ☐ フィードバック収集・UX改善<br>
+                ☐ 通知メール動作確認<br>
+                ☐ 不具合修正・安定性確認<br>
+                ☐ 利用規約・プライバシーポリシー文面を正式版に改訂
+              </div>
+            </div>
+          </div>
+
+          <!-- Phase 3 -->
+          <div style="display:flex;gap:0;margin-bottom:0">
+            <div style="display:flex;flex-direction:column;align-items:center;min-width:44px">
+              <div style="width:32px;height:32px;border-radius:50%;background:#7aaa8e;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;flex-shrink:0">3</div>
+              <div style="width:2px;background:#ddd;flex:1;min-height:40px"></div>
+            </div>
+            <div style="padding:0 0 20px 12px;flex:1">
+              <div style="font-weight:700;font-size:0.9rem;color:#7aaa8e">Phase 3：ソフトローンチ　<span style="color:#888;font-weight:400">2026年10〜11月</span></div>
+              <div style="font-size:0.82rem;color:#555;margin-top:6px;line-height:1.7">
+                ☐ 全住民向け告知（掲示・管理組合広報）<br>
+                ☐ 登録案内チラシ配布（QRコード付き）<br>
+                ☐ 利用者数・問い合わせ状況モニタリング<br>
+                ☐ Render Starter プラン検討（スリープ解消 $7/月）
+              </div>
+            </div>
+          </div>
+
+          <!-- Phase 4 -->
+          <div style="display:flex;gap:0;margin-bottom:0">
+            <div style="display:flex;flex-direction:column;align-items:center;min-width:44px">
+              <div style="width:32px;height:32px;border-radius:50%;background:#a0c4ae;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;flex-shrink:0">4</div>
+            </div>
+            <div style="padding:0 0 0 12px;flex:1">
+              <div style="font-weight:700;font-size:0.9rem;color:#a0c4ae">Phase 4：全体公開　<span style="color:#888;font-weight:400">2026年12月</span></div>
+              <div style="font-size:0.82rem;color:#555;margin-top:6px;line-height:1.7">
+                ☐ 正式公開アナウンス<br>
+                ☐ 管理組合への運用報告<br>
+                ☐ 次年度運営計画策定
+              </div>
+            </div>
+          </div>
+
+          <!-- 次のアクション -->
+          <div style="background:#e8f5e9;border:1px solid #c8e6c9;border-radius:10px;padding:14px 16px;margin-top:20px">
+            <div style="font-weight:700;font-size:0.9rem;margin-bottom:8px">🚀 Phase 1 で最優先実装すべき2項目</div>
+            <div style="font-size:0.84rem;color:#333;line-height:1.8">
+              <strong>① 登録APIへのレート制限</strong>　— 総当たり攻撃の防止。数行の追加で対応可能。<br>
+              <strong>② 招待コード機能</strong>　— なりすまし登録の根本対策。理事会が配布するコードがないと登録不可にする。
+            </div>
+          </div>
+
+          <p style="font-size:0.75rem;color:#aaa;margin-top:16px;text-align:right">最終更新：2026-06-22</p>
+        </div>
+      </div><!-- end btab-roadmap -->
 
       <!-- Lib Schedule -->
       <div id="btab-libschedule" class="board-tab-panel">
