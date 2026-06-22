@@ -97,6 +97,10 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .badge-read { background: #d4edda; color: #155724; }
 .badge-reading { background: #d1ecf1; color: #0c5460; }
 .badge-want { background: #fff3cd; color: #856404; }
+.badge-borrowing { background: #e8d5f5; color: #5a189a; }
+.loan-item { display: block; }
+.loan-overdue { color: #c62828; font-weight: 600; }
+.loan-soon { color: #e65100; }
 
 /* ===== Award badges ===== */
 .award-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
