@@ -130,7 +130,11 @@ def api_books_by_genre():
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
     params_count = tuple(params_base)
     params_rows  = tuple(params_base) + (per, offset)
-    order = "title_yomi ASC, title ASC" if kana_row else "NULLIF(pubdate,'') DESC NULLS LAST, isbn DESC"
+    _ALLOWED_ORDERS = {
+        "kana": "title_yomi ASC, title ASC",
+        "new":  "NULLIF(pubdate,'') DESC NULLS LAST, isbn DESC",
+    }
+    order = _ALLOWED_ORDERS["kana"] if kana_row else _ALLOWED_ORDERS["new"]
     sql_count = f"SELECT COUNT(*) as cnt FROM genre_books {where}"
     sql_rows  = f"SELECT isbn,genre,title,author,publisher,format,awards FROM genre_books {where} ORDER BY {order} LIMIT {ph} OFFSET {ph}"
     total_row = fetchone(con, sql_count, params_count)
