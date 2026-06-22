@@ -2562,6 +2562,12 @@ async function loadDashboard() {
     const newArrivalList  = {length: d.new_arrivals_count || 0};
     const totalBooks      = d.total_books || 0;
 
+    // stats画面のリアルタイム数値を更新
+    const stEl = document.getElementById("statTotalBooks");
+    if (stEl) stEl.textContent = totalBooks.toLocaleString();
+    const saEl = document.getElementById("statAwardCount");
+    if (saEl) saEl.textContent = awardCount.toLocaleString();
+
     // DB使用量
     let dbPct = null, dbMB = null, dbLimitMB = 512;
     if (d.db_total_mb != null) {
