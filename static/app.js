@@ -3182,28 +3182,31 @@ function getVotedIds() {
 }
 function saveVotedIds(ids) { localStorage.setItem("voted_requests", JSON.stringify(ids)); }
 
-function reqResidentCardHtml(r, votedIds) {
+function reqResidentCardHtml(r, votedIds, myRoom) {
   const isFb = r.type === "feedback";
-  const stLabel = {pending:"⏳ 検討中", approved:"✅ 購入決定", rejected:"❌ 見送り", done:"📦 入荷済",
+  const stLabel = {pending: isFb ? "📬 受付中" : "⏳ 検討中", approved:"✅ 購入決定", rejected:"❌ 見送り", done:"📦 入荷済",
     fb_received:"📬 受付中", fb_checking:"🔍 確認中", fb_done:"✅ 対応済", fb_rejected:"❌ 見送り",
     fb_pending:"⏳ 検討中", fb_noted:"📝 参考意見として受理", fb_none:"➖ 対応なし"};
-  const stColor = {pending:"#888", approved:"#3d8a4f", rejected:"#c00", done:"#555",
+  const stColor = {pending: isFb ? "#888" : "#888", approved:"#3d8a4f", rejected:"#c00", done:"#555",
     fb_received:"#888", fb_checking:"#5b8dd9", fb_done:"#3d8a4f", fb_rejected:"#c00",
     fb_pending:"#888", fb_noted:"#7a5c9a", fb_none:"#aaa"};
   const voted = votedIds.includes(r.id);
   const votes = r.votes || 0;
+  const isOwn = myRoom && r.room === myRoom;
   const borderColor = isFb ? "#5b8dd9" : "#3d6b4f";
   const bgColor = isFb ? "#f0f5ff" : "#f2f8f4";
+  const ownBadge = isOwn ? `<span style="font-size:0.72rem;color:#fff;background:#7a9a5c;border-radius:10px;padding:1px 7px;margin-left:6px">あなたの投稿</span>` : "";
   const voteBtn = isFb ? "" : `
     <button class="req-vote-btn${voted?" req-vote-done":""}" data-id="${r.id}" ${(r.status==="done"||r.status==="rejected")?"disabled":""}>
       👍 <span class="req-vote-count">${votes}</span>${voted?" 済":" 読みたい"}
     </button>`;
   return `
-  <div class="req-card" data-id="${r.id}" style="border-left:5px solid ${borderColor};background:${bgColor}">
+  <div class="req-card" data-id="${r.id}" style="border-left:5px solid ${borderColor};background:${bgColor}${isOwn?";box-shadow:0 0 0 1.5px "+borderColor:""}">
     <div class="req-card-header">
       <div class="req-card-left">
         <span class="req-book-title">${esc(r.title)}</span>
         ${r.author ? `<span class="req-author-badge">著：${esc(r.author)}</span>` : ""}
+        ${ownBadge}
       </div>
       <span class="req-status-badge" style="color:${stColor[r.status]||"#888"}">${stLabel[r.status]||""}</span>
     </div>
@@ -3243,15 +3246,13 @@ async function loadReqList() {
     const res = await fetch("/api/requests");
     const items = await res.json();
     const votedIds = getVotedIds();
-    const order = {pending:0, approved:1, rejected:2, done:3,
-      fb_received:0, fb_checking:1, fb_pending:1, fb_done:2, fb_noted:2, fb_rejected:3, fb_none:3};
-    const sorted = [...items].sort((a,b) => (order[a.status]??0) - (order[b.status]??0) || (b.votes||0) - (a.votes||0));
+    const myRoom = (residentSession || getCloudUser() || {}).room || "";
 
-    const books = sorted.filter(r => r.type !== "feedback");
-    const fbs = sorted.filter(r => r.type === "feedback");
+    const books = items.filter(r => r.type !== "feedback");
+    const fbs = items.filter(r => r.type === "feedback");
 
-    elBooks.innerHTML = books.length ? books.map(r => reqResidentCardHtml(r, votedIds)).join("") : '<div class="loading">まだ本のリクエストはありません</div>';
-    if (elFb) elFb.innerHTML = fbs.length ? fbs.map(r => reqResidentCardHtml(r, votedIds)).join("") : '<div class="loading">まだご要望・ご意見はありません</div>';
+    elBooks.innerHTML = books.length ? books.map(r => reqResidentCardHtml(r, votedIds, myRoom)).join("") : '<div class="loading">まだ本のリクエストはありません</div>';
+    if (elFb) elFb.innerHTML = fbs.length ? fbs.map(r => reqResidentCardHtml(r, votedIds, myRoom)).join("") : '<div class="loading">まだご要望・ご意見はありません</div>';
 
     bindVoteEvents(elBooks);
     if (elFb) bindVoteEvents(elFb);
