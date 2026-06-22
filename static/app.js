@@ -1525,7 +1525,7 @@ async function isInWishlist(isbn, room) {
   if (!room) return false;
   try {
     const _wu = residentSession || getCloudUser() || {};
-    const res = await fetch(`/api/wishlist?room=${encodeURIComponent(room)}&password=${encodeURIComponent(_wu.password || _wu.pin || "")}`);
+    const res = await fetch(`/api/wishlist?room=${encodeURIComponent(room)}`, { headers: { "X-Password": _wu.password || _wu.pin || "" } });
     if (!res.ok) return false;
     const list = await res.json();
     return Array.isArray(list) && list.some(w => w.isbn === isbn);
@@ -1537,7 +1537,7 @@ async function loadWishlistCard() {
   if (!sec || !grid) return;
   const u = residentSession || getCloudUser();
   if (!u || !u.room) { sec.style.display = "none"; return; }
-  const res = await fetch(`/api/wishlist?room=${encodeURIComponent(u.room)}&password=${encodeURIComponent(u.password || u.pin || "")}`).catch(() => null);
+  const res = await fetch(`/api/wishlist?room=${encodeURIComponent(u.room)}`, { headers: { "X-Password": u.password || u.pin || "" } }).catch(() => null);
   if (!res || !res.ok) { sec.style.display = "none"; return; }
   const list = await res.json();
   if (!list.length) { sec.style.display = "none"; return; }
