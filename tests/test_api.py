@@ -295,3 +295,80 @@ def test_award_books_post_wrong_auth(client):
         "award_year": 2020, "title": "テスト", "author": "著者"
     })
     assert res.status_code == 403
+
+
+# ─── POST/PATCH/DELETE 正常系テスト ─────────────────────────────────────────
+
+def test_wishlist_add_and_delete(client):
+    """ウィッシュリスト追加→削除の正常系（テスト用ユーザーを作成して検証）"""
+    # ユーザー登録
+    reg = client.post("/api/user/register", json={"room": "1-101", "password": "testpass1"})
+    assert reg.status_code in (200, 409)  # 既存でも可
+
+    # 追加
+    add = client.post("/api/wishlist", json={"room": "1-101", "password": "testpass1", "isbn": "9784000000001"})
+    assert add.status_code == 200
+    assert add.get_json().get("ok")
+
+    # GETで確認
+    get_res = client.get("/api/wishlist?room=1-101", headers={"X-Password": "testpass1"})
+    assert get_res.status_code == 200
+    isbns = [i["isbn"] for i in get_res.get_json()]
+    assert "9784000000001" in isbns
+
+    # 削除
+    delete = client.delete("/api/wishlist", json={"room": "1-101", "password": "testpass1", "isbn": "9784000000001"})
+    assert delete.status_code == 200
+    assert delete.get_json().get("ok")
+
+
+def test_post_request_ok(client):
+    """ログイン済みユーザーによるリクエスト投稿の正常系"""
+    client.post("/api/user/register", json={"room": "1-102", "password": "testpass1"})
+    res = client.post("/api/requests", json={
+        "title": "テスト本", "author": "著者名", "reason": "読みたい",
+        "room": "1-102", "password": "testpass1", "type": "request"
+    })
+    assert res.status_code == 200
+    assert res.get_json().get("ok")
+
+
+def test_post_feedback_ok(client):
+    """ログイン済みユーザーによるご要望投稿の正常系"""
+    client.post("/api/user/register", json={"room": "1-103", "password": "testpass1"})
+    res = client.post("/api/requests", json={
+        "title": "図書館の開館時間を延ばしてほしい", "reason": "希望",
+        "room": "1-103", "password": "testpass1", "type": "feedback"
+    })
+    assert res.status_code == 200
+    assert res.get_json().get("ok")
+
+
+def test_patch_request_status_ok(client):
+    """管理者によるリクエストステータス変更の正常系"""
+    # リクエストを取得して最初のIDに対してPATCH
+    reqs = client.get("/api/requests").get_json()
+    if not reqs:
+        return  # データなしはスキップ
+    req_id = reqs[0]["id"]
+    res = client.patch(f"/api/requests/{req_id}", json={"status": "approved"},
+                       headers={"X-Password": ""})
+    assert res.status_code == 200
+    assert res.get_json().get("ok")
+
+
+def test_user_login_ok(client):
+    """ユーザー登録→ログインの正常系"""
+    client.post("/api/user/register", json={"room": "1-104", "password": "testpass1"})
+    res = client.post("/api/user/login", json={"room": "1-104", "password": "testpass1"})
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data.get("ok")
+    assert data.get("room") == "1-104"
+
+
+def test_user_login_wrong_password(client):
+    """ログイン失敗（パスワード誤り）は 401"""
+    client.post("/api/user/register", json={"room": "1-105", "password": "testpass1"})
+    res = client.post("/api/user/login", json={"room": "1-105", "password": "wrongpass"})
+    assert res.status_code == 401

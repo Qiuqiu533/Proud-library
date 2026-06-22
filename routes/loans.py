@@ -177,6 +177,37 @@ def api_availability_loaned():
         return jsonify([]), 500
 
 
+@loans_bp.route("/api/admin/availability-stale")
+def api_availability_stale():
+    """24時間以上更新されていない書籍ISBNを最大N件返す（フロント側で順次チェックに使用）"""
+    if request.headers.get("X-Password") != get_board_password():
+        return jsonify({"error": "unauthorized"}), 401
+    limit = min(int(request.args.get("limit", 30)), 100)
+    con = get_con()
+    try:
+        if USE_PG:
+            rows = fetchall(con, """
+                SELECT g.isbn, g.title, a.updated_at FROM genre_books g
+                LEFT JOIN availability_cache a ON a.isbn = g.isbn
+                WHERE a.isbn IS NULL OR a.updated_at < NOW() - INTERVAL '24 hours'
+                ORDER BY a.updated_at ASC NULLS FIRST
+                LIMIT %s
+            """, (limit,))
+        else:
+            rows = fetchall(con, """
+                SELECT g.isbn, g.title, a.updated_at FROM genre_books g
+                LEFT JOIN availability_cache a ON a.isbn = g.isbn
+                WHERE a.isbn IS NULL OR a.updated_at < datetime('now','-24 hours','localtime')
+                ORDER BY a.updated_at ASC
+                LIMIT ?
+            """, (limit,))
+        con.close()
+        return jsonify([{"isbn": r["isbn"], "title": r["title"] or r["isbn"]} for r in rows])
+    except Exception as e:
+        con.close()
+        return jsonify({"error": str(e)}), 500
+
+
 @loans_bp.route("/api/admin/dashboard-data")
 def api_admin_dashboard_data():
     """ダッシュボード用データを1リクエストで返す"""
