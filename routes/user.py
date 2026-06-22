@@ -47,21 +47,25 @@ def api_user_register():
     if not _validate_room(room):
         return jsonify({"error": "部屋番号の形式が正しくありません（例：5-533 または 6桁数字）"}), 400
     con = get_con()
-    user = fetchone(con, "SELECT room, password_hash FROM user_accounts WHERE room=?", (room,))
-    if user and user.get("password_hash"):
-        con.close()
-        return jsonify({"error": "この部屋番号はすでに登録されています"}), 409
-    h, s = _hash_password(password)
-    if user is None:
-        execute(con, "INSERT INTO user_accounts (room, pin, email, password_hash, password_salt) VALUES (?,?,?,?,?)",
-                (room, password, email, h, s))
-    else:
-        if USE_PG:
-            execute(con, "UPDATE user_accounts SET email=?, password_hash=?, password_salt=?, updated_at=NOW() WHERE room=?", (email, h, s, room))
+    try:
+        user = fetchone(con, "SELECT room, password_hash FROM user_accounts WHERE room=?", (room,))
+        if user and user.get("password_hash"):
+            con.close()
+            return jsonify({"error": "この部屋番号はすでに登録されています"}), 409
+        h, s = _hash_password(password)
+        if user is None:
+            execute(con, "INSERT INTO user_accounts (room, pin, email, password_hash, password_salt) VALUES (?,?,?,?,?)",
+                    (room, password, email, h, s))
         else:
-            execute(con, "UPDATE user_accounts SET email=?, password_hash=?, password_salt=?, updated_at=datetime('now','localtime') WHERE room=?", (email, h, s, room))
-    con.commit(); con.close()
-    return jsonify({"ok": True, "is_new": True})
+            if USE_PG:
+                execute(con, "UPDATE user_accounts SET email=?, password_hash=?, password_salt=?, updated_at=NOW() WHERE room=?", (email, h, s, room))
+            else:
+                execute(con, "UPDATE user_accounts SET email=?, password_hash=?, password_salt=?, updated_at=datetime('now','localtime') WHERE room=?", (email, h, s, room))
+        con.commit(); con.close()
+        return jsonify({"ok": True, "is_new": True})
+    except Exception as e:
+        con.close()
+        return jsonify({"error": "登録処理中にエラーが発生しました。しばらく後に再試行してください"}), 500
 
 
 @user_bp.route("/api/user/login", methods=["POST"])
@@ -74,25 +78,28 @@ def api_user_login():
     if not _validate_room(room):
         return jsonify({"error": "部屋番号の形式が正しくありません"}), 400
     con = get_con()
-    user = fetchone(con, "SELECT room, pin, email, password_hash, password_salt, favorites, reading_log, library_card_url, library_card_image FROM user_accounts WHERE room=?", (room,))
-    if user is None:
+    try:
+        user = fetchone(con, "SELECT room, pin, email, password_hash, password_salt, favorites, reading_log, library_card_url, library_card_image FROM user_accounts WHERE room=?", (room,))
+        if user is None:
+            con.close()
+            return jsonify({"error": "この部屋番号は未登録です。まず新規登録してください"}), 404
+        if not _user_auth_ok(user, password):
+            con.close()
+            return jsonify({"error": "パスワードが違います"}), 401
+        _upgrade_to_bcrypt_if_needed(con, room, password, user.get("password_hash", ""))
         con.close()
-        return jsonify({"error": "この部屋番号は未登録です。まず新規登録してください"}), 404
-    if not _user_auth_ok(user, password):
+        return jsonify({
+            "ok": True,
+            "room": user["room"],
+            "email": user.get("email") or "",
+            "favorites": json.loads(user["favorites"] or "[]"),
+            "reading_log": json.loads(user["reading_log"] or "{}"),
+            "library_card_url": user.get("library_card_url") or "",
+            "library_card_image": user.get("library_card_image") or ""
+        })
+    except Exception as e:
         con.close()
-        return jsonify({"error": "パスワードが違います"}), 401
-    # 旧 SHA-256 ハッシュなら透過的に bcrypt へ移行
-    _upgrade_to_bcrypt_if_needed(con, room, password, user.get("password_hash", ""))
-    con.close()
-    return jsonify({
-        "ok": True,
-        "room": user["room"],
-        "email": user.get("email") or "",
-        "favorites": json.loads(user["favorites"] or "[]"),
-        "reading_log": json.loads(user["reading_log"] or "{}"),
-        "library_card_url": user.get("library_card_url") or "",
-        "library_card_image": user.get("library_card_image") or ""
-    })
+        return jsonify({"error": "ログイン処理中にエラーが発生しました。しばらく後に再試行してください"}), 500
 
 
 @user_bp.route("/api/user/sync", methods=["POST"])
@@ -103,22 +110,26 @@ def api_user_sync():
     if not room or not password:
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
-    user = fetchone(con, "SELECT pin, password_hash, password_salt FROM user_accounts WHERE room=?", (room,))
-    if not user or not _user_auth_ok(user, password):
+    try:
+        user = fetchone(con, "SELECT pin, password_hash, password_salt FROM user_accounts WHERE room=?", (room,))
+        if not user or not _user_auth_ok(user, password):
+            con.close()
+            return jsonify({"error": "unauthorized"}), 401
+        favs = json.dumps(body.get("favorites", []), ensure_ascii=False)
+        rlog = json.dumps(body.get("reading_log", {}), ensure_ascii=False)
+        card_url = (body.get("library_card_url") or "")[:2000]
+        card_img = body.get("library_card_image") or ""
+        if USE_PG:
+            execute(con, "UPDATE user_accounts SET favorites=?, reading_log=?, library_card_url=?, library_card_image=?, updated_at=NOW() WHERE room=?",
+                    (favs, rlog, card_url, card_img, room))
+        else:
+            execute(con, "UPDATE user_accounts SET favorites=?, reading_log=?, library_card_url=?, library_card_image=?, updated_at=datetime('now','localtime') WHERE room=?",
+                    (favs, rlog, card_url, card_img, room))
+        con.commit(); con.close()
+        return jsonify({"ok": True})
+    except Exception:
         con.close()
-        return jsonify({"error": "unauthorized"}), 401
-    favs = json.dumps(body.get("favorites", []), ensure_ascii=False)
-    rlog = json.dumps(body.get("reading_log", {}), ensure_ascii=False)
-    card_url = (body.get("library_card_url") or "")[:2000]
-    card_img = body.get("library_card_image") or ""
-    if USE_PG:
-        execute(con, "UPDATE user_accounts SET favorites=?, reading_log=?, library_card_url=?, library_card_image=?, updated_at=NOW() WHERE room=?",
-                (favs, rlog, card_url, card_img, room))
-    else:
-        execute(con, "UPDATE user_accounts SET favorites=?, reading_log=?, library_card_url=?, library_card_image=?, updated_at=datetime('now','localtime') WHERE room=?",
-                (favs, rlog, card_url, card_img, room))
-    con.commit(); con.close()
-    return jsonify({"ok": True})
+        return jsonify({"error": "同期処理中にエラーが発生しました"}), 500
 
 
 @user_bp.route("/api/user/update-email", methods=["POST"])
@@ -130,16 +141,20 @@ def api_user_update_email():
     if not room or not password or not email:
         return jsonify({"error": "入力が不足しています"}), 400
     con = get_con()
-    user = fetchone(con, "SELECT pin, password_hash, password_salt FROM user_accounts WHERE room=?", (room,))
-    if not user or not _user_auth_ok(user, password):
+    try:
+        user = fetchone(con, "SELECT pin, password_hash, password_salt FROM user_accounts WHERE room=?", (room,))
+        if not user or not _user_auth_ok(user, password):
+            con.close()
+            return jsonify({"error": "認証に失敗しました"}), 401
+        if USE_PG:
+            execute(con, "UPDATE user_accounts SET email=?, updated_at=NOW() WHERE room=?", (email, room))
+        else:
+            execute(con, "UPDATE user_accounts SET email=?, updated_at=datetime('now','localtime') WHERE room=?", (email, room))
+        con.commit(); con.close()
+        return jsonify({"ok": True})
+    except Exception:
         con.close()
-        return jsonify({"error": "認証に失敗しました"}), 401
-    if USE_PG:
-        execute(con, "UPDATE user_accounts SET email=?, updated_at=NOW() WHERE room=?", (email, room))
-    else:
-        execute(con, "UPDATE user_accounts SET email=?, updated_at=datetime('now','localtime') WHERE room=?", (email, room))
-    con.commit(); con.close()
-    return jsonify({"ok": True})
+        return jsonify({"error": "メール更新中にエラーが発生しました"}), 500
 
 
 @user_bp.route("/api/user/change-password", methods=["POST"])
@@ -151,17 +166,21 @@ def api_user_change_password():
     if not room or not old_password or not new_password or len(new_password) < 6:
         return jsonify({"error": "8文字以上の新しいパスワードを入力してください"}), 400
     con = get_con()
-    user = fetchone(con, "SELECT pin, password_hash, password_salt FROM user_accounts WHERE room=?", (room,))
-    if not user or not _user_auth_ok(user, old_password):
+    try:
+        user = fetchone(con, "SELECT pin, password_hash, password_salt FROM user_accounts WHERE room=?", (room,))
+        if not user or not _user_auth_ok(user, old_password):
+            con.close()
+            return jsonify({"error": "現在のパスワードが違います"}), 401
+        h, s = _hash_password(new_password)
+        if USE_PG:
+            execute(con, "UPDATE user_accounts SET password_hash=?, password_salt=?, pin=?, updated_at=NOW() WHERE room=?", (h, s, new_password, room))
+        else:
+            execute(con, "UPDATE user_accounts SET password_hash=?, password_salt=?, pin=?, updated_at=datetime('now','localtime') WHERE room=?", (h, s, new_password, room))
+        con.commit(); con.close()
+        return jsonify({"ok": True})
+    except Exception:
         con.close()
-        return jsonify({"error": "現在のパスワードが違います"}), 401
-    h, s = _hash_password(new_password)
-    if USE_PG:
-        execute(con, "UPDATE user_accounts SET password_hash=?, password_salt=?, pin=?, updated_at=NOW() WHERE room=?", (h, s, new_password, room))
-    else:
-        execute(con, "UPDATE user_accounts SET password_hash=?, password_salt=?, pin=?, updated_at=datetime('now','localtime') WHERE room=?", (h, s, new_password, room))
-    con.commit(); con.close()
-    return jsonify({"ok": True})
+        return jsonify({"error": "パスワード変更中にエラーが発生しました"}), 500
 
 
 @user_bp.route("/api/user/forgot-password", methods=["POST"])

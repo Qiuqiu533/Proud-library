@@ -1,3 +1,30 @@
+/**
+ * app.js — プラウド船橋コミュニティ図書館 フロントエンド
+ *
+ * ## セクション一覧（grep: "===== セクション名"）
+ *  Auth             L.6    認証・セッション管理
+ *  State            L.303  グローバル状態変数
+ *  localStorage     L.360  永続化ヘルパー
+ *  Utility          L.524  汎用ユーティリティ（esc, debounce等）
+ *  Book card        L.543  書籍カード描画
+ *  Pagination       L.652  ページネーション
+ *  Load books       L.675  書籍一覧ロード
+ *  Modal            L.1382 書籍詳細モーダル
+ *  Board            L.2023 理事会パネル（Dashboard/Issues/Stats/Calendar等）
+ *  Book Requests    L.3280 リクエスト・ご要望フォーム
+ *  クラウド同期     L.3677 お気に入り・読書ログ同期
+ *  パスワード変更   L.3830 住民パスワード変更
+ *  チャット         L.4259 スレッドチャット
+ *  受賞作一覧       L.5009 受賞作タブ（住民向け）
+ *  受賞作DB管理     L.5070 受賞作データベース管理（管理者）
+ *
+ * ## 主要グローバル変数
+ *  residentSession  現在ログイン中の住民セッション {room, password}
+ *  boardPassword    理事会パスワード（sessionStorage保持）
+ *  currentKeyword   蔵書タブの現在の検索キーワード
+ *  currentAward     受賞フィルター（空文字=すべて）
+ */
+
 // グローバルエラーキャッチャー（デバッグ用）
 window.onerror = function(msg, src, line, col, err) {
   console.error('[JS ERROR]', msg, 'at', src, 'line', line);
