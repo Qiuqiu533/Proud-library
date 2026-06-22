@@ -50,6 +50,8 @@ def api_user_register():
         return jsonify({"error": "部屋番号と8文字以上のパスワードを入力してください"}), 400
     if not _validate_room(room):
         return jsonify({"error": "部屋番号の形式が正しくありません（例：5-533 または 6桁数字）"}), 400
+    if not email or "@" not in email:
+        return jsonify({"error": "メールアドレスを入力してください（返却通知・パスワードリセットに使用します）"}), 400
 
     # 招待コード必須モードの検証
     if INVITE_REQUIRED:
@@ -241,7 +243,10 @@ def api_user_forgot_password():
     else:
         execute(con, "INSERT INTO password_reset_tokens (token, room, expires_at) VALUES (?, ?, datetime('now','+30 minutes'))", (token, room))
     con.commit(); con.close()
-    return jsonify({"ok": True, "token": token})
+    sent = _send_reset_email(email, room, token)
+    if not sent:
+        return jsonify({"error": "メール送信に失敗しました。管理者に直接お問い合わせください（メール設定が未完了の可能性があります）"}), 503
+    return jsonify({"ok": True})
 
 
 @user_bp.route("/api/user/reset-password", methods=["POST"])

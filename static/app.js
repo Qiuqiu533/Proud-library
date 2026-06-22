@@ -241,6 +241,7 @@ document.getElementById("registerBtn").addEventListener("click", async () => {
   if (!validateRoom(room)) { err.textContent = "部屋番号の形式が正しくありません（例：5-533 または 6桁数字）"; return; }
   if (pass.length < 8) { err.textContent = "パスワードは8文字以上で入力してください"; return; }
   if (pass !== pass2) { err.textContent = "パスワードが一致しません"; return; }
+  if (!email || !email.includes("@")) { err.textContent = "メールアドレスを正しく入力してください（返却通知・パスワードリセットに使用します）"; return; }
   err.textContent = "";
   const res = await fetch("/api/user/register", {
     method: "POST", headers: {"Content-Type": "application/json"},
@@ -5176,6 +5177,48 @@ function resetAwardFilter() {
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll('.tab-btn[data-tab="awards"]').forEach(btn => {
     btn.addEventListener("click", () => setTimeout(initAwardsTab, 0));
+  });
+});
+
+// ===== 操作ログ（管理者） =====
+
+async function loadAuditLog() {
+  const el = document.getElementById("auditLogContent");
+  if (!el) return;
+  el.innerHTML = '<div class="loading">読み込み中…</div>';
+  try {
+    const res = await fetch("/api/admin/audit-log", { headers: { "X-Password": boardPassword } });
+    if (!res.ok) { el.innerHTML = '<div style="color:#c44;padding:12px">取得エラー</div>'; return; }
+    const rows = await res.json();
+    if (!rows.length) { el.innerHTML = '<div style="color:#aaa;padding:12px">ログなし</div>'; return; }
+    el.innerHTML = `
+      <table style="width:100%;border-collapse:collapse;font-size:0.8rem">
+        <thead><tr style="background:#f0f0f0;text-align:left">
+          <th style="padding:6px 8px;border-bottom:1px solid #ddd;white-space:nowrap">日時</th>
+          <th style="padding:6px 8px;border-bottom:1px solid #ddd">操作</th>
+          <th style="padding:6px 8px;border-bottom:1px solid #ddd">対象</th>
+          <th style="padding:6px 8px;border-bottom:1px solid #ddd">詳細</th>
+          <th style="padding:6px 8px;border-bottom:1px solid #ddd">IP</th>
+        </tr></thead>
+        <tbody>
+          ${rows.map(r => `
+            <tr style="border-bottom:1px solid #f5f5f5">
+              <td style="padding:6px 8px;color:#888;white-space:nowrap">${esc(r.created_at)}</td>
+              <td style="padding:6px 8px;font-weight:600">${esc(r.action)}</td>
+              <td style="padding:6px 8px;color:#555">${esc(r.target || "")}</td>
+              <td style="padding:6px 8px;color:#888">${esc(r.detail || "")}</td>
+              <td style="padding:6px 8px;color:#aaa;font-size:0.75rem">${esc(r.ip || "")}</td>
+            </tr>`).join("")}
+        </tbody>
+      </table>`;
+  } catch(e) {
+    el.innerHTML = `<div style="color:#c44;padding:12px">エラー: ${e.message}</div>`;
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll('.board-tab[data-btab="auditlog"]').forEach(btn => {
+    btn.addEventListener("click", () => loadAuditLog());
   });
 });
 
