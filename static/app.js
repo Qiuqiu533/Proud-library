@@ -354,15 +354,28 @@ let logFilter = "all";
 
 // ===== localStorage helpers =====
 function getRating(isbn) {
-  return { score: 0, votes: 0, reviews: [] };
+  return { score: 0, votes: 0, reviews: [], my_score: null };
 }
 async function saveRating(isbn, score, review) {
+  const u = residentSession || getCloudUser();
+  const body = { isbn, score, review };
+  if (u) { body.room = u.room; body.password = u.password || u.pin || ""; }
   const res = await fetch("/api/rate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ isbn, score, review })
+    body: JSON.stringify(body)
   });
   return await res.json();
+}
+async function deleteReview(isbn, reviewId) {
+  const u = residentSession || getCloudUser();
+  if (!u) return null;
+  const res = await fetch("/api/rate/review", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ isbn, review_id: reviewId, room: u.room, password: u.password || u.pin || "" })
+  });
+  return res.ok ? await res.json() : null;
 }
 
 function _renderDescSection(isbn, book) {
@@ -1304,8 +1317,17 @@ function _renderModalContent(isbn, book, rating) {
     (book.isbn10 || (isbn13.startsWith("978") ? "" : "")) ? ["ISBN10", esc(book.isbn10 || "")] : null,
   ].filter(r => r && r[1]);
   const infoTable = infoRows.length ? `<dl class="book-info-dl">${infoRows.map(([k,v]) => `<div class="book-info-row"><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl>` : "";
+  const myRoom = (residentSession || getCloudUser() || {}).room || null;
   const reviewsHtml = rating.reviews && rating.reviews.length
-    ? rating.reviews.map(r => `<div class="review-item">💬 ${esc(r)}</div>`).join("")
+    ? rating.reviews.map(r => {
+        const text = typeof r === "string" ? r : (r.text || "");
+        const rid  = typeof r === "object" ? (r.id || "") : "";
+        const isOwn = myRoom && typeof r === "object" && r.room === myRoom;
+        const delBtn = isOwn && rid
+          ? `<button class="review-delete-btn" data-isbn="${isbn}" data-rid="${rid}" title="削除">✕</button>`
+          : "";
+        return `<div class="review-item">${delBtn}💬 ${esc(text)}</div>`;
+      }).join("")
     : `<div class="no-content">まだコメントはありません</div>`;
   // 書評・AI登録情報はAPIデータ取得後に確実に描画するため、常にプレースホルダーを使用
 
@@ -1355,7 +1377,10 @@ function _renderModalContent(isbn, book, rating) {
       <h3>⭐ みんなの評価</h3>
       <div class="big-stars">${rating.score ? "★".repeat(Math.round(rating.score)) + "☆".repeat(5 - Math.round(rating.score)) : "☆☆☆☆☆"}</div>
       <div class="rating-info">${rating.score ? `${rating.score.toFixed(1)} / 5.0（${rating.votes}件）` : "まだ評価がありません"}</div>
-      <button class="btn-rate" data-isbn="${isbn}">この本を評価する</button>
+      ${rating.my_score
+        ? `<div class="my-rating-info">あなたの評価：${"★".repeat(rating.my_score)}${"☆".repeat(5 - rating.my_score)}</div>
+           <button class="btn-rate btn-rate--rerate" data-isbn="${isbn}">評価を変更する</button>`
+        : `<button class="btn-rate" data-isbn="${isbn}">この本を評価する</button>`}
     </div>
 
     <div class="modal-section">
@@ -1410,10 +1435,61 @@ function _bindModalEvents(isbn) {
       if (saved) { saved.style.display = "inline"; setTimeout(() => { saved.style.display = "none"; }, 2000); }
     });
   }
-  document.querySelector(".btn-rate").addEventListener("click", () => {
+  const rateBtn = document.querySelector(".btn-rate");
+  if (rateBtn) rateBtn.addEventListener("click", () => {
     ratingTarget = isbn;
     openRateModal();
   });
+  const rerateBtn = document.querySelector(".btn-rate--rerate");
+  if (rerateBtn) rerateBtn.addEventListener("click", () => {
+    ratingTarget = isbn;
+    openRateModal();
+  });
+  // コメント削除ボタン
+  document.querySelectorAll(".review-delete-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("このコメントを削除しますか？")) return;
+      btn.disabled = true;
+      const data = await deleteReview(btn.dataset.isbn, btn.dataset.rid);
+      if (data) {
+        _updateReviewsSection(isbn, data);
+      } else {
+        alert("削除できませんでした");
+        btn.disabled = false;
+      }
+    });
+  });
+}
+
+function _updateReviewsSection(isbn, rating) {
+  const myRoom = (residentSession || getCloudUser() || {}).room || null;
+  const reviewsHtml = rating.reviews && rating.reviews.length
+    ? rating.reviews.map(r => {
+        const text = typeof r === "string" ? r : (r.text || "");
+        const rid  = typeof r === "object" ? (r.id || "") : "";
+        const isOwn = myRoom && typeof r === "object" && r.room === myRoom;
+        const delBtn = isOwn && rid
+          ? `<button class="review-delete-btn" data-isbn="${isbn}" data-rid="${rid}" title="削除">✕</button>`
+          : "";
+        return `<div class="review-item">${delBtn}💬 ${esc(text)}</div>`;
+      }).join("")
+    : `<div class="no-content">まだコメントはありません</div>`;
+  const section = Array.from(document.querySelectorAll(".modal-section"))
+    .find(el => el.querySelector("h3")?.textContent.includes("コメント"));
+  if (section) {
+    section.querySelectorAll(".review-item, .no-content").forEach(el => el.remove());
+    section.insertAdjacentHTML("beforeend", reviewsHtml);
+    // 新しい削除ボタンに再バインド
+    section.querySelectorAll(".review-delete-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("このコメントを削除しますか？")) return;
+        btn.disabled = true;
+        const data = await deleteReview(btn.dataset.isbn, btn.dataset.rid);
+        if (data) _updateReviewsSection(isbn, data);
+        else { alert("削除できませんでした"); btn.disabled = false; }
+      });
+    });
+  }
 }
 
 let _modalOpener = null;
@@ -1434,7 +1510,9 @@ async function openModal(isbn, preloadedBook) {
     // 貸出状況・評価・詳細情報を非同期で取得して更新
     try {
       const titleHint = encodeURIComponent(preloadedBook.title || "");
-      const res = await fetch(`/api/book/${isbn}?title=${titleHint}`);
+      const _room = (residentSession || getCloudUser() || {}).room || "";
+      const _roomParam = _room ? `&room=${encodeURIComponent(_room)}` : "";
+      const res = await fetch(`/api/book/${isbn}?title=${titleHint}${_roomParam}`);
       const book = await res.json();
       const availEl = document.getElementById("modal-avail-body");
       if (availEl) {
@@ -1470,18 +1548,7 @@ async function openModal(isbn, preloadedBook) {
       if (starsEl) starsEl.textContent = rating.score ? "★".repeat(Math.round(rating.score)) + "☆".repeat(5 - Math.round(rating.score)) : "☆☆☆☆☆";
       if (ratingInfoEl) ratingInfoEl.textContent = rating.score ? `${rating.score.toFixed(1)} / 5.0（${rating.votes}件）` : "まだ評価がありません";
       // コメントセクションも更新（初期描画では空で表示されているため）
-      const reviewsEl = document.querySelector(".modal-section .review-item")?.closest(".modal-section") ||
-        Array.from(document.querySelectorAll(".modal-section")).find(el => el.querySelector("h3")?.textContent.includes("コメント"));
-      if (reviewsEl) {
-        const reviewsHtml = rating.reviews && rating.reviews.length
-          ? rating.reviews.map(r => `<div class="review-item">💬 ${esc(r)}</div>`).join("")
-          : `<div class="no-content">まだコメントはありません</div>`;
-        const noContent = reviewsEl.querySelector(".no-content");
-        const existing = reviewsEl.querySelectorAll(".review-item");
-        existing.forEach(el => el.remove());
-        if (noContent) noContent.remove();
-        reviewsEl.insertAdjacentHTML("beforeend", reviewsHtml);
-      }
+      _updateReviewsSection(isbn, rating);
       // 内容紹介・AI登録情報・参考ボタンを描画
       _renderDescSection(isbn, book);
     } catch(e) {
@@ -1493,7 +1560,9 @@ async function openModal(isbn, preloadedBook) {
   } else {
     // preloadedBookなし（評価後の再表示など）：全データ取得してから表示
     document.getElementById("modalContent").innerHTML = '<div class="loading">読み込み中…</div>';
-    const res = await fetch(`/api/book/${isbn}`);
+    const _room2 = (residentSession || getCloudUser() || {}).room || "";
+    const _roomParam2 = _room2 ? `?room=${encodeURIComponent(_room2)}` : "";
+    const res = await fetch(`/api/book/${isbn}${_roomParam2}`);
     const book = await res.json();
     const rating = book.rating || { score: 0, votes: 0, reviews: [] };
     const availHtml = book.availability && book.availability.length

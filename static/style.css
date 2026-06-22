@@ -246,6 +246,10 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .rating-info { font-size: 0.82rem; color: #888; margin-bottom: 8px; }
 .btn-rate { padding: 8px 18px; background: #f0a500; color: white; border: none; border-radius: 8px; font-size: 0.88rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: background .2s; }
 .btn-rate:hover { background: #d49000; }
+.btn-rate--rerate { background: #888; }
+.btn-rate--rerate:hover { background: #666; }
+.my-rating-info { font-size: 0.9rem; color: #555; margin-bottom: 6px; }
+.review-delete-btn { background: none; border: none; cursor: pointer; color: #c00; font-size: 0.8rem; padding: 0 4px; float: right; line-height: 1; }
 .review-item { background: #f8f7f4; border-radius: 8px; padding: 9px 13px; font-size: 0.86rem; color: #444; line-height: 1.6; margin-bottom: 6px; }
 .no-content { color: #bbb; font-size: 0.85rem; }
 .book-desc { font-size: 0.88rem; color: #444; line-height: 1.75; }

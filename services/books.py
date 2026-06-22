@@ -2,6 +2,7 @@ import json
 import re as _re
 import threading
 import logging
+import uuid
 
 logger = logging.getLogger(__name__)
 import requests
@@ -282,17 +283,42 @@ def fetch_book_detail(isbn, hint_title=""):
     return result
 
 
-def get_rating(isbn):
+def _parse_reviews(raw) -> list:
+    """reviews カラムを [{id, room, text}] 形式に正規化する。旧形式（文字列配列）も変換。"""
+    items = json.loads(raw or "[]")
+    result = []
+    for item in items:
+        if isinstance(item, str):
+            result.append({"id": str(uuid.uuid4()), "room": None, "text": item})
+        elif isinstance(item, dict):
+            result.append(item)
+    return result
+
+
+def _parse_user_votes(raw) -> dict:
+    try:
+        return json.loads(raw or "{}")
+    except Exception:
+        return {}
+
+
+def get_rating(isbn, viewer_room: str | None = None):
     con = get_con()
-    row = fetchone(con, "SELECT score, votes, reviews FROM ratings WHERE isbn=?", (isbn,))
+    row = fetchone(con, "SELECT score, votes, reviews, user_votes FROM ratings WHERE isbn=?", (isbn,))
     con.close()
     if row:
-        return {"score": row["score"], "votes": row["votes"], "reviews": json.loads(row["reviews"])}
-    return {"score": 0, "votes": 0, "reviews": []}
+        reviews = _parse_reviews(row["reviews"])
+        user_votes = _parse_user_votes(row.get("user_votes") or "{}")
+        my_score = user_votes.get(viewer_room) if viewer_room else None
+        return {
+            "score": row["score"], "votes": row["votes"],
+            "reviews": reviews,
+            "my_score": my_score,
+        }
+    return {"score": 0, "votes": 0, "reviews": [], "my_score": None}
 
 
 def get_ratings_bulk(isbns):
-    """複数ISBNのレーティングを一括取得"""
     if not isbns:
         return {}
     con = get_con()
@@ -301,27 +327,64 @@ def get_ratings_bulk(isbns):
     con.close()
     result = {}
     for row in rows:
-        result[row["isbn"]] = {"score": row["score"], "votes": row["votes"], "reviews": json.loads(row["reviews"])}
+        result[row["isbn"]] = {"score": row["score"], "votes": row["votes"], "reviews": _parse_reviews(row["reviews"])}
     return result
 
 
-def save_rating(isbn, score, review=""):
+def save_rating(isbn: str, score: int, review: str = "", room: str | None = None) -> dict:
+    """評価を保存。room が指定された場合は同一ユーザーの重複投票を防ぐ（更新として扱う）。"""
     con = get_con()
-    existing = fetchone(con, "SELECT score, votes, reviews FROM ratings WHERE isbn=?", (isbn,))
+    existing = fetchone(con, "SELECT score, votes, reviews, user_votes FROM ratings WHERE isbn=?", (isbn,))
     if existing:
-        new_votes = existing["votes"] + 1
-        new_score = round((existing["score"] * existing["votes"] + score) / new_votes, 1)
-        reviews = json.loads(existing["reviews"])
-        if review:
-            reviews.append(review)
-        execute(con, "UPDATE ratings SET score=?, votes=?, reviews=? WHERE isbn=?",
-                (new_score, new_votes, json.dumps(reviews, ensure_ascii=False), isbn))
+        user_votes = _parse_user_votes(existing.get("user_votes") or "{}")
+        reviews = _parse_reviews(existing["reviews"])
+        if room and room in user_votes:
+            # 同一ユーザーの再投票 → スコアを更新、コメントは追加しない
+            old_score = user_votes[room]
+            user_votes[room] = score
+            total = sum(user_votes.values()) if user_votes else score
+            new_votes = len(user_votes)
+            new_score = round(total / new_votes, 1)
+        else:
+            new_votes = existing["votes"] + 1
+            new_score = round((existing["score"] * existing["votes"] + score) / new_votes, 1)
+            if room:
+                user_votes[room] = score
+            if review:
+                reviews.append({"id": str(uuid.uuid4()), "room": room, "text": review})
+        execute(con, "UPDATE ratings SET score=?, votes=?, reviews=?, user_votes=? WHERE isbn=?",
+                (new_score, new_votes,
+                 json.dumps(reviews, ensure_ascii=False),
+                 json.dumps(user_votes, ensure_ascii=False),
+                 isbn))
     else:
-        reviews = [review] if review else []
-        execute(con, "INSERT INTO ratings (isbn, score, votes, reviews) VALUES (?,?,?,?)",
-                (isbn, float(score), 1, json.dumps(reviews, ensure_ascii=False)))
+        user_votes = {room: score} if room else {}
+        reviews = [{"id": str(uuid.uuid4()), "room": room, "text": review}] if review else []
+        execute(con, "INSERT INTO ratings (isbn, score, votes, reviews, user_votes) VALUES (?,?,?,?,?)",
+                (isbn, float(score), 1,
+                 json.dumps(reviews, ensure_ascii=False),
+                 json.dumps(user_votes, ensure_ascii=False)))
     con.commit()
     con.close()
+
+
+def delete_review(isbn: str, review_id: str, room: str) -> bool:
+    """自分のコメントを削除する。room が一致する場合のみ削除可。"""
+    con = get_con()
+    existing = fetchone(con, "SELECT reviews FROM ratings WHERE isbn=?", (isbn,))
+    if not existing:
+        con.close()
+        return False
+    reviews = _parse_reviews(existing["reviews"])
+    new_reviews = [r for r in reviews if not (r.get("id") == review_id and r.get("room") == room)]
+    if len(new_reviews) == len(reviews):
+        con.close()
+        return False
+    execute(con, "UPDATE ratings SET reviews=? WHERE isbn=?",
+            (json.dumps(new_reviews, ensure_ascii=False), isbn))
+    con.commit()
+    con.close()
+    return True
 
 
 _recent_isbns_cache = {"isbns": [], "date": None}
