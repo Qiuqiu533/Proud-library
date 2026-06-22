@@ -215,3 +215,37 @@ def test_change_password_short(client):
     res = client.post("/api/user/change-password",
                       json={"room": "9-999", "old_password": "oldpass123", "new_password": "abc"})
     assert res.status_code == 400
+
+# ─── ウィッシュリスト ─────────────────────────────────────────────────────
+
+def test_wishlist_get_no_auth(client):
+    """パスワードなしのGETは 401"""
+    res = client.get("/api/wishlist?room=1-101")
+    assert res.status_code == 401
+
+def test_wishlist_get_wrong_password(client):
+    """存在しない部屋のGETは 401"""
+    res = client.get("/api/wishlist?room=9-999&password=wrongpass")
+    assert res.status_code == 401
+
+def test_wishlist_post_no_auth(client):
+    """認証なしのPOSTは 401"""
+    res = client.post("/api/wishlist",
+                      json={"room": "9-999", "password": "nopass", "isbn": "9784000000000"})
+    assert res.status_code == 401
+
+def test_wishlist_delete_no_auth(client):
+    """認証なしのDELETEは 401"""
+    res = client.delete("/api/wishlist",
+                        json={"room": "9-999", "password": "nopass", "isbn": "9784000000000"})
+    assert res.status_code == 401
+
+def test_wishlist_get_no_room(client):
+    """roomなしのGETは 401"""
+    res = client.get("/api/wishlist")
+    assert res.status_code == 401
+
+def test_ops_stats_no_auth(client):
+    """認証なしの運営統計は 401"""
+    res = client.get("/api/admin/ops-stats")
+    assert res.status_code == 401
