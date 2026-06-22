@@ -2238,7 +2238,7 @@ async function loadDashboard() {
 
   const pw = boardPassword;
   try {
-    const res = await fetch(`/api/admin/dashboard-data?password=${encodeURIComponent(pw)}`);
+    const res = await fetch(`/api/admin/dashboard-data`, { headers: { "X-Password": pw } });
     if (!res.ok) throw new Error("dashboard-data fetch failed");
     const d = await res.json();
 
@@ -3360,7 +3360,7 @@ async function loadDbSize() {
   const display = document.getElementById("dbSizeDisplay");
   if (!display) return;
   display.innerHTML = '<div class="loading">確認中…</div>';
-  const res = await fetch(`/api/admin/db-size?password=${encodeURIComponent(boardPassword)}`);
+  const res = await fetch(`/api/admin/db-size`, { headers: { "X-Password": boardPassword } });
   if (!res.ok) { display.innerHTML = '<p style="color:#e05">❌ 取得できませんでした</p>'; return; }
   const d = await res.json();
   const pct = d.percent;
@@ -3384,7 +3384,7 @@ async function loadAdminUsers() {
   const el = document.getElementById("adminUsersContent");
   if (!el) return;
   el.innerHTML = '<div class="loading">読み込み中…</div>';
-  const res = await fetch(`/api/admin/users?password=${encodeURIComponent(boardPassword)}`);
+  const res = await fetch(`/api/admin/users`, { headers: { "X-Password": boardPassword } });
   if (!res.ok) { el.innerHTML = '<div class="loading">読み込みに失敗しました</div>'; return; }
   const users = await res.json();
   const roleLabel = r => r === "master" ? '<span class="au-role au-master">マスター</span>' : '<span class="au-role au-admin">管理者</span>';
@@ -3817,7 +3817,7 @@ async function loadThreadList() {
   const box = document.getElementById("chatThreadList");
   if (!box) return;
   try {
-    const res = await fetch(`/api/chat_threads?password=${encodeURIComponent(boardPassword)}`);
+    const res = await fetch(`/api/chat_threads`, { headers: { "X-Password": boardPassword } });
     if (!res.ok) return;
     const threads = await res.json();
     if (!threads.length) {
@@ -3857,7 +3857,7 @@ async function loadThreadMessages(scrollToBottom = false) {
   const box = document.getElementById("chatThreadMessages");
   if (!box || !currentThreadId) return;
   try {
-    const res = await fetch(`/api/staff_chat?thread_id=${currentThreadId}&password=${encodeURIComponent(boardPassword)}`);
+    const res = await fetch(`/api/staff_chat?thread_id=${currentThreadId}`, { headers: { "X-Password": boardPassword } });
     if (!res.ok) return;
     const msgs = await res.json();
     msgs.reverse();
@@ -3975,7 +3975,7 @@ async function loadChatMessages(scrollToBottom = false) {
   const box = document.getElementById("chatMessages");
   if (!box) return;
   try {
-    const res = await fetch(`/api/staff_chat?password=${encodeURIComponent(boardPassword)}`);
+    const res = await fetch(`/api/staff_chat`, { headers: { "X-Password": boardPassword } });
     if (!res.ok) return;
     const msgs = await res.json();
     msgs.reverse();
@@ -4568,8 +4568,8 @@ async function loadAdminAwardBooks() {
   const pw = boardPassword;
   list.innerHTML = '<div style="color:#aaa;padding:16px">読み込み中…</div>';
   try {
-    const url = `/api/award-books/admin?password=${encodeURIComponent(pw)}&award=${encodeURIComponent(award)}`;
-    const res = await fetch(url);
+    const url = `/api/award-books/admin?award=${encodeURIComponent(award)}`;
+    const res = await fetch(url, { headers: { "X-Password": pw } });
     if (!res.ok) { list.innerHTML = `<div style="color:#c44;padding:16px">取得エラー (${res.status})</div>`; return; }
     const books = await res.json();
     if (countEl) countEl.textContent = `${books.length}件`;
