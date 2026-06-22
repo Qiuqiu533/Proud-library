@@ -151,6 +151,9 @@
   </nav>
   </div><!-- /sticky-header -->
 
+  <!-- 貸出期限リマインダーバナー -->
+  <div id="loanReminderBanner" style="display:none;flex-direction:column;gap:6px;background:#fff8e1;border-left:4px solid #f0a500;padding:10px 16px;margin:0 0 4px;font-size:0.88rem;line-height:1.6"></div>
+
   <main class="main-content" role="main">
     <!-- Books tab -->
     <div id="tab-books" class="tab-panel active">
@@ -946,42 +949,6 @@
           <div id="statsContent"><div class="loading">読み込み中…</div></div>
         </div>
 
-      <!-- Lib Schedule -->
-      <div id="btab-libschedule" class="board-tab-panel">
-        <div class="board-section-header">
-          <h3>🗓️ 休館日・イベント予定</h3>
-          <button class="btn-board-add" id="lsFormToggle">＋ 追加</button>
-        </div>
-        <div id="lsForm" class="board-form" style="display:none">
-          <select id="lsType" style="margin-bottom:6px;padding:8px;border-radius:8px;border:1.5px solid #cde;font-size:0.9rem;width:100%">
-            <option value="event">📅 イベント</option>
-            <option value="closed">🚫 臨時休館</option>
-          </select>
-          <input type="text" id="lsTitle" placeholder="イベント名 / 臨時休館の理由" />
-          <input type="date" id="lsDate" />
-          <button class="btn-primary" id="submitLs">登録する</button>
-          <p id="lsMsg" class="rate-msg"></p>
-        </div>
-        <div id="lsList" class="cal-list"><div class="loading">読み込み中…</div></div>
-      </div>
-
-      <!-- Calendar -->
-      <div id="btab-calendar" class="board-tab-panel">
-        <div class="board-section-header">
-          <h3>活動カレンダー・議事録</h3>
-          <button class="btn-board-add" id="calFormToggle">＋ 追加</button>
-        </div>
-        <div id="calForm" class="board-form" style="display:none">
-          <input type="text" id="calTitle" placeholder="イベント・会議名" />
-          <input type="date" id="calDate" />
-          <textarea id="calBody" placeholder="内容・メモ" rows="2"></textarea>
-          <textarea id="calMinutes" placeholder="議事録（任意）" rows="4"></textarea>
-          <button class="btn-primary" id="submitCal">登録する</button>
-          <p id="calMsg" class="rate-msg"></p>
-        </div>
-        <div id="calList" class="cal-list"><div class="loading">読み込み中…</div></div>
-      </div>
-
         <!-- 集計・分析 -->
         <div id="asub-analysis" class="analytics-sub-panel">
         <h3 style="margin-bottom:16px">📈 集計・分析レポート</h3>
@@ -1191,6 +1158,42 @@
         </div>
         </div><!-- end asub-swot -->
       </div><!-- end btab-analytics -->
+
+      <!-- Lib Schedule -->
+      <div id="btab-libschedule" class="board-tab-panel">
+        <div class="board-section-header">
+          <h3>🗓️ 休館日・イベント予定</h3>
+          <button class="btn-board-add" id="lsFormToggle">＋ 追加</button>
+        </div>
+        <div id="lsForm" class="board-form" style="display:none">
+          <select id="lsType" style="margin-bottom:6px;padding:8px;border-radius:8px;border:1.5px solid #cde;font-size:0.9rem;width:100%">
+            <option value="event">📅 イベント</option>
+            <option value="closed">🚫 臨時休館</option>
+          </select>
+          <input type="text" id="lsTitle" placeholder="イベント名 / 臨時休館の理由" />
+          <input type="date" id="lsDate" />
+          <button class="btn-primary" id="submitLs">登録する</button>
+          <p id="lsMsg" class="rate-msg"></p>
+        </div>
+        <div id="lsList" class="cal-list"><div class="loading">読み込み中…</div></div>
+      </div>
+
+      <!-- Calendar -->
+      <div id="btab-calendar" class="board-tab-panel">
+        <div class="board-section-header">
+          <h3>活動カレンダー・議事録</h3>
+          <button class="btn-board-add" id="calFormToggle">＋ 追加</button>
+        </div>
+        <div id="calForm" class="board-form" style="display:none">
+          <input type="text" id="calTitle" placeholder="イベント・会議名" />
+          <input type="date" id="calDate" />
+          <textarea id="calBody" placeholder="内容・メモ" rows="2"></textarea>
+          <textarea id="calMinutes" placeholder="議事録（任意）" rows="4"></textarea>
+          <button class="btn-primary" id="submitCal">登録する</button>
+          <p id="calMsg" class="rate-msg"></p>
+        </div>
+        <div id="calList" class="cal-list"><div class="loading">読み込み中…</div></div>
+      </div>
 
       <!-- Staff Chat -->
       <div id="btab-staffchat" class="board-tab-panel">
