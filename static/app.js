@@ -2632,7 +2632,7 @@ async function loadDashboard() {
       <div class="dash-list">
         ${latestReqs.map(r => {
           const statusCls = r.status === "pending" || r.status === "fb_received" ? " dash-list-urgent" : "";
-          const _fbStatusMap = { pending:"🔴 未対応", approved:"✅ 承認", rejected:"❌ 却下", fb_received:"🔴 未対応", fb_noted:"🟡 確認済", fb_in_progress:"🔵 対応中", fb_resolved:"✅ 対応済", fb_wontfix:"⬛ 見送り" };
+          const _fbStatusMap = { pending:"🔴 未対応", approved:"✅ 承認", rejected:"❌ 見送り", done:"📦 入荷済", fb_received:"📬 受付中", fb_checking:"🔍 確認中", fb_done:"✅ 対応済", fb_rejected:"❌ 見送り", fb_pending:"⏳ 検討中", fb_noted:"📝 参考意見", fb_none:"➖ 対応なし" };
           const statusLabel = _fbStatusMap[r.status] || r.status;
           const typeLabel = r.type === "feedback" ? "💬 意見" : "📖 リクエスト";
           return `<div class="dash-list-item${statusCls}">
