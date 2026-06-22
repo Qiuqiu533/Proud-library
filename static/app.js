@@ -1558,6 +1558,27 @@ async function isInWishlist(isbn, room) {
     return Array.isArray(list) && list.some(w => w.isbn === isbn);
   } catch { return false; }
 }
+async function toggleWishNotify(isbn, btn) {
+  const u = residentSession || getCloudUser();
+  if (!u) return;
+  const currentOn = btn.dataset.notify === "1";
+  const newOn = !currentOn;
+  try {
+    const res = await fetch("/api/wishlist/notify", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ room: u.room, password: u.password || u.pin || "", isbn, notify: newOn }),
+    });
+    if (!res.ok) return;
+    btn.dataset.notify = newOn ? "1" : "0";
+    btn.title = newOn ? "通知ON（タップでOFF）" : "通知OFF（タップでON）";
+    btn.style.background = newOn ? "#e8f5e9" : "#f5f5f5";
+    btn.style.color = newOn ? "#2e7d32" : "#999";
+    btn.style.borderColor = "#ddd";
+    btn.textContent = newOn ? "🔔 返却通知ON" : "🔕 通知OFF";
+  } catch (e) {}
+}
+
 async function loadWishlistCard() {
   const sec  = document.getElementById("wishlistSection");
   const grid = document.getElementById("wishlistGrid");
@@ -1574,13 +1595,23 @@ async function loadWishlistCard() {
     headers:{"Content-Type":"application/json"}, body: JSON.stringify({isbns}) });
   const books = bRes.ok ? await bRes.json() : [];
   const bookMap = Object.fromEntries(books.map(b => [b.isbn, b]));
+  const notifyMap = Object.fromEntries(list.map(w => [w.isbn, w.notify !== false]));
   grid.innerHTML = isbns.map(isbn => {
     const b = bookMap[isbn] || { isbn, title: isbn };
     const ndl = `https://ndlsearch.ndl.go.jp/thumbnail/${isbn}.jpg`;
-    return `<div class="mini-card" data-isbn="${isbn}" onclick="openModal('${isbn}')">
-      <img src="${b.cover || ndl}" alt="${esc(b.title)}" loading="lazy"
-        onerror="if(this.src!=='${ndl}')this.src='${ndl}';else this.style.display='none';">
-      <div class="mini-title">${esc(b.title)}</div>
+    const notifyOn = notifyMap[isbn];
+    return `<div class="mini-card" data-isbn="${isbn}">
+      <div onclick="openModal('${isbn}')" style="cursor:pointer">
+        <img src="${b.cover || ndl}" alt="${esc(b.title)}" loading="lazy"
+          onerror="if(this.src!=='${ndl}')this.src='${ndl}';else this.style.display='none';">
+        <div class="mini-title">${esc(b.title)}</div>
+      </div>
+      <button onclick="toggleWishNotify('${isbn}', this)"
+        data-notify="${notifyOn ? '1' : '0'}"
+        title="${notifyOn ? '通知ON（タップでOFF）' : '通知OFF（タップでON）'}"
+        style="margin-top:4px;width:100%;font-size:0.72rem;padding:3px 0;border:1px solid #ddd;border-radius:6px;background:${notifyOn ? '#e8f5e9' : '#f5f5f5'};color:${notifyOn ? '#2e7d32' : '#999'};cursor:pointer">
+        ${notifyOn ? '🔔 返却通知ON' : '🔕 通知OFF'}
+      </button>
     </div>`;
   }).join("");
 }

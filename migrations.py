@@ -1195,6 +1195,43 @@ def _migrate_wish_list():
         con.close()
 
 
+def _migrate_wish_list_notify():
+    """wish_list に通知用カラム notify / notified_at を追加。"""
+    if _migration_done("wish_list_notify_v1"):
+        return
+    con = get_con()
+    try:
+        if USE_PG:
+            cur = con.cursor()
+            try:
+                cur.execute("ALTER TABLE wish_list ADD COLUMN notify BOOLEAN NOT NULL DEFAULT TRUE")
+                con.commit()
+            except Exception:
+                con.rollback()
+            try:
+                cur.execute("ALTER TABLE wish_list ADD COLUMN notified_at TIMESTAMPTZ")
+                con.commit()
+            except Exception:
+                con.rollback()
+        else:
+            try:
+                con.execute("ALTER TABLE wish_list ADD COLUMN notify INTEGER NOT NULL DEFAULT 1")
+                con.commit()
+            except Exception:
+                pass
+            try:
+                con.execute("ALTER TABLE wish_list ADD COLUMN notified_at TIMESTAMP")
+                con.commit()
+            except Exception:
+                pass
+        _mark_migration_done("wish_list_notify_v1")
+        logger.info("[migration] wish_list notify カラム追加完了")
+    except Exception as e:
+        logger.error("[migration] wish_list_notify error: %s", e)
+    finally:
+        con.close()
+
+
 def _run_all_migrations():
     """全マイグレーションをシングルスレッドで順次実行する（race condition防止）。"""
     steps = [
@@ -1217,6 +1254,7 @@ def _run_all_migrations():
         _migrate_ratings_user_votes,   # ratings.user_votes カラム追加
         _migrate_genre_books_awards,   # genre_books.awards カラム追加
         _migrate_wish_list,            # wish_list テーブル追加
+        _migrate_wish_list_notify,     # 通知用カラム追加
         _verify_tables,
     ]
     for step in steps:

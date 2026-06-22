@@ -372,3 +372,40 @@ def test_user_login_wrong_password(client):
     client.post("/api/user/register", json={"room": "1-105", "password": "testpass1"})
     res = client.post("/api/user/login", json={"room": "1-105", "password": "wrongpass"})
     assert res.status_code == 401
+
+
+def test_wishlist_notify_toggle(client):
+    """ウィッシュリスト通知ON/OFF切り替えの正常系"""
+    client.post("/api/user/register", json={"room": "1-106", "password": "testpass1"})
+    client.post("/api/wishlist", json={"room": "1-106", "password": "testpass1", "isbn": "9784101092058"})
+    # 通知OFFに変更
+    res = client.patch("/api/wishlist/notify",
+                       json={"room": "1-106", "password": "testpass1",
+                             "isbn": "9784101092058", "notify": False})
+    assert res.status_code == 200
+    assert res.get_json().get("notify") is False
+    # 通知ONに戻す
+    res = client.patch("/api/wishlist/notify",
+                       json={"room": "1-106", "password": "testpass1",
+                             "isbn": "9784101092058", "notify": True})
+    assert res.status_code == 200
+    assert res.get_json().get("notify") is True
+
+
+def test_wishlist_notify_wrong_auth(client):
+    """認証失敗時は 401"""
+    res = client.patch("/api/wishlist/notify",
+                       json={"room": "1-106", "password": "wrongpass",
+                             "isbn": "9784101092058", "notify": False})
+    assert res.status_code == 401
+
+
+def test_wishlist_includes_notify_field(client):
+    """GET /api/wishlist のレスポンスに notify フィールドが含まれる"""
+    client.post("/api/user/register", json={"room": "1-107", "password": "testpass1"})
+    client.post("/api/wishlist", json={"room": "1-107", "password": "testpass1", "isbn": "9784101092058"})
+    res = client.get("/api/wishlist?room=1-107", headers={"X-Password": "testpass1"})
+    assert res.status_code == 200
+    data = res.get_json()
+    assert len(data) > 0
+    assert "notify" in data[0]
