@@ -644,8 +644,26 @@ async function loadBooks(keyword = "", page = 1) {
   let url = `/api/books/by-genre?keyword=${encodeURIComponent(keyword)}&page=${page}&per=${currentPerPage}`;
   if (currentAward) url += `&award=${encodeURIComponent(currentAward)}`;
   if (currentKana)  url += `&kana_row=${encodeURIComponent(currentKana)}`;
-  const res = await fetch(url);
-  data = await res.json();
+  // 3秒経っても返答がない場合はサーバー起動中メッセージを表示
+  const _slowTimer = setTimeout(() => {
+    const grid = document.getElementById("bookGrid");
+    if (grid && grid.innerHTML.includes("読み込み中")) {
+      grid.innerHTML = '<div class="loading">⏳ サーバー起動中です（最大50秒かかる場合があります）<br><small>しばらくそのままお待ちください…</small></div>';
+    }
+  }, 3000);
+  try {
+    const res = await fetch(url);
+    clearTimeout(_slowTimer);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    data = await res.json();
+  } catch(e) {
+    clearTimeout(_slowTimer);
+    const kw = keyword.replace(/'/g, "\\'");
+    document.getElementById("bookGrid").innerHTML =
+      `<div class="loading-error" style="grid-column:1/-1;width:100%;text-align:center">📡 蔵書の読み込みに失敗しました。<br>通信エラーまたはサーバーの起動中の可能性があります。<br><button class="btn-retry" onclick="loadBooks('${kw}',${page})">再試行する</button></div>`;
+    document.getElementById("totalCount").textContent = "";
+    return;
+  }
 
   currentTotal = data.total;
   let books = data.books.map(b => ({ ...b, rating: b.rating || getRating(b.isbn) }));
@@ -1560,23 +1578,29 @@ async function openModal(isbn, preloadedBook) {
   } else {
     // preloadedBookなし（評価後の再表示など）：全データ取得してから表示
     document.getElementById("modalContent").innerHTML = '<div class="loading">読み込み中…</div>';
-    const _room2 = (residentSession || getCloudUser() || {}).room || "";
-    const _roomParam2 = _room2 ? `?room=${encodeURIComponent(_room2)}` : "";
-    const res = await fetch(`/api/book/${isbn}${_roomParam2}`);
-    const book = await res.json();
-    const rating = book.rating || { score: 0, votes: 0, reviews: [] };
-    const availHtml = book.availability && book.availability.length
-      ? book.availability.map(a => {
-          const isProud = a.library && a.library.includes("プラウド");
-          return `<div class="avail-row${isProud ? " avail-row--proud" : ""}"><span>${a.library}</span>${statusBadge(a.status)}</div>`;
-        }).join("")
-      : `<div class="avail-row"><span>情報なし</span></div>`;
-    const html = _renderModalContent(isbn, book, rating);
-    document.getElementById("modalContent").innerHTML = html;
-    document.getElementById("modal-avail-body").innerHTML = availHtml;
-    _bindModalEvents(isbn);
-    _renderDescSection(isbn, book);
-    _loadRelatedBooks(isbn);
+    try {
+      const _room2 = (residentSession || getCloudUser() || {}).room || "";
+      const _roomParam2 = _room2 ? `?room=${encodeURIComponent(_room2)}` : "";
+      const res = await fetch(`/api/book/${isbn}${_roomParam2}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const book = await res.json();
+      const rating = book.rating || { score: 0, votes: 0, reviews: [] };
+      const availHtml = book.availability && book.availability.length
+        ? book.availability.map(a => {
+            const isProud = a.library && a.library.includes("プラウド");
+            return `<div class="avail-row${isProud ? " avail-row--proud" : ""}"><span>${a.library}</span>${statusBadge(a.status)}</div>`;
+          }).join("")
+        : `<div class="avail-row"><span>情報なし</span></div>`;
+      const html = _renderModalContent(isbn, book, rating);
+      document.getElementById("modalContent").innerHTML = html;
+      document.getElementById("modal-avail-body").innerHTML = availHtml;
+      _bindModalEvents(isbn);
+      _renderDescSection(isbn, book);
+      _loadRelatedBooks(isbn);
+    } catch(e) {
+      document.getElementById("modalContent").innerHTML =
+        `<div class="loading-error" style="text-align:center;padding:40px 20px;color:#c00;line-height:2">📡 書籍情報の取得に失敗しました。<br>通信エラーまたはサーバーの起動中の可能性があります。<br><button class="btn-retry" onclick="openModal('${isbn.replace(/'/g,"\\'")}')">再試行する</button></div>`;
+    }
   }
 }
 
