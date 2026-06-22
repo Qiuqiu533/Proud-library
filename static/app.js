@@ -234,7 +234,8 @@ document.getElementById("registerBtn").addEventListener("click", async () => {
   const room  = (document.getElementById("regRoom").value  || "").trim();
   const pass  = document.getElementById("regPass").value;
   const pass2 = document.getElementById("regPass2").value;
-  const email = (document.getElementById("regEmail").value || "").trim();
+  const email      = (document.getElementById("regEmail").value      || "").trim();
+  const inviteCode = (document.getElementById("regInviteCode")?.value || "").trim().toUpperCase();
   const err   = document.getElementById("registerError");
   if (!room) { err.textContent = "部屋番号を入力してください"; return; }
   if (!validateRoom(room)) { err.textContent = "部屋番号の形式が正しくありません（例：5-533 または 6桁数字）"; return; }
@@ -243,7 +244,7 @@ document.getElementById("registerBtn").addEventListener("click", async () => {
   err.textContent = "";
   const res = await fetch("/api/user/register", {
     method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({room, password: pass, email})
+    body: JSON.stringify({room, password: pass, email, invite_code: inviteCode})
   });
   const data = await res.json();
   if (res.ok) {
@@ -5175,6 +5176,86 @@ function resetAwardFilter() {
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll('.tab-btn[data-tab="awards"]').forEach(btn => {
     btn.addEventListener("click", () => setTimeout(initAwardsTab, 0));
+  });
+});
+
+// ===== 招待コード管理（管理者） =====
+
+async function loadInviteCodes() {
+  const el = document.getElementById("inviteCodesList");
+  if (!el) return;
+  el.innerHTML = '<div class="loading">読み込み中…</div>';
+  try {
+    const res = await fetch("/api/admin/invite-codes", { headers: { "X-Password": boardPassword } });
+    if (!res.ok) { el.innerHTML = '<div style="color:#c44;padding:12px">取得エラー</div>'; return; }
+    const codes = await res.json();
+    if (!codes.length) { el.innerHTML = '<div style="color:#aaa;padding:12px">発行済みコードなし</div>'; return; }
+    el.innerHTML = `
+      <table style="width:100%;border-collapse:collapse;font-size:0.82rem">
+        <thead><tr style="background:#f0f0f0;text-align:left">
+          <th style="padding:7px 8px;border-bottom:1px solid #ddd">コード</th>
+          <th style="padding:7px 8px;border-bottom:1px solid #ddd">メモ</th>
+          <th style="padding:7px 8px;border-bottom:1px solid #ddd">有効期限</th>
+          <th style="padding:7px 8px;border-bottom:1px solid #ddd">使用状況</th>
+          <th style="padding:7px 8px;border-bottom:1px solid #ddd">発行日</th>
+          <th style="padding:7px 8px;border-bottom:1px solid #ddd"></th>
+        </tr></thead>
+        <tbody>
+          ${codes.map(c => `
+            <tr style="border-bottom:1px solid #f0f0f0">
+              <td style="padding:7px 8px;font-family:monospace;font-size:0.95rem;font-weight:600;letter-spacing:0.08em">${esc(c.code)}</td>
+              <td style="padding:7px 8px;color:#666">${esc(c.note || "—")}</td>
+              <td style="padding:7px 8px;color:#666">${c.expires_at || "無期限"}</td>
+              <td style="padding:7px 8px">
+                ${c.used_room
+                  ? `<span style="color:#2e7d32;font-size:0.8rem">✅ ${esc(c.used_room)}（${c.used_at || ""}）</span>`
+                  : `<span style="color:#aaa;font-size:0.8rem">未使用</span>`}
+              </td>
+              <td style="padding:7px 8px;color:#888">${c.created_at}</td>
+              <td style="padding:7px 8px">
+                ${!c.used_room ? `<button onclick="deleteInviteCode(${c.id})" style="font-size:0.75rem;padding:3px 8px;border:1px solid #ccc;border-radius:4px;background:#fff;color:#c44;cursor:pointer">削除</button>` : ""}
+              </td>
+            </tr>`).join("")}
+        </tbody>
+      </table>`;
+  } catch(e) {
+    el.innerHTML = `<div style="color:#c44;padding:12px">エラー: ${e.message}</div>`;
+  }
+}
+
+async function issueInviteCodes() {
+  const count   = parseInt(document.getElementById("inviteCount")?.value || "1");
+  const note    = document.getElementById("inviteNote")?.value || "";
+  const expires = document.getElementById("inviteExpires")?.value || "";
+  const resEl   = document.getElementById("inviteIssueResult");
+  resEl.textContent = "発行中…";
+  try {
+    const res = await fetch("/api/admin/invite-codes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Password": boardPassword },
+      body: JSON.stringify({ count, note, expires_at: expires || null }),
+    });
+    const data = await res.json();
+    if (!res.ok) { resEl.textContent = "❌ " + (data.error || "エラー"); return; }
+    resEl.innerHTML = `✅ ${data.codes.length}件発行：<strong style="font-family:monospace;letter-spacing:0.08em">${data.codes.join("　")}</strong>`;
+    loadInviteCodes();
+  } catch(e) {
+    resEl.textContent = "❌ 通信エラー";
+  }
+}
+
+async function deleteInviteCode(id) {
+  if (!confirm("このコードを削除しますか？")) return;
+  await fetch(`/api/admin/invite-codes/${id}`, {
+    method: "DELETE", headers: { "X-Password": boardPassword },
+  });
+  loadInviteCodes();
+}
+
+// 招待コードタブを開いたときに読み込む
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll('.board-tab[data-btab="invitecodes"]').forEach(btn => {
+    btn.addEventListener("click", () => loadInviteCodes());
   });
 });
 

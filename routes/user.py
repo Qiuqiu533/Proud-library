@@ -3,7 +3,8 @@ import secrets
 import re as _re
 from flask import Blueprint, request, jsonify
 from database import get_con, execute, fetchone, fetchall, USE_PG
-from services.utils import _hash_password, _verify_password, _send_reset_email, _is_bcrypt_hash
+from services.utils import _hash_password, _verify_password, _send_reset_email, _is_bcrypt_hash, rate_limit
+from config import INVITE_REQUIRED
 
 user_bp = Blueprint("user", __name__)
 
@@ -37,15 +38,43 @@ def _upgrade_to_bcrypt_if_needed(con, room, password, password_hash):
 
 
 @user_bp.route("/api/user/register", methods=["POST"])
+@rate_limit(limit=5, window=60)
 def api_user_register():
     body = request.get_json()
-    room     = (body.get("room")     or "").strip()
-    password = (body.get("password") or "").strip()
-    email    = (body.get("email")    or "").strip()
+    room        = (body.get("room")         or "").strip()
+    password    = (body.get("password")     or "").strip()
+    email       = (body.get("email")        or "").strip()
+    invite_code = (body.get("invite_code")  or "").strip().upper()
+
     if not room or not password or len(password) < 8:
         return jsonify({"error": "部屋番号と8文字以上のパスワードを入力してください"}), 400
     if not _validate_room(room):
         return jsonify({"error": "部屋番号の形式が正しくありません（例：5-533 または 6桁数字）"}), 400
+
+    # 招待コード必須モードの検証
+    if INVITE_REQUIRED:
+        if not invite_code:
+            return jsonify({"error": "招待コードを入力してください"}), 400
+        con_inv = get_con()
+        ph = "%s" if USE_PG else "?"
+        if USE_PG:
+            inv_row = fetchone(con_inv, f"""
+                SELECT id, used_room FROM invite_codes
+                WHERE code={ph} AND (expires_at IS NULL OR expires_at > NOW())
+            """, (invite_code,))
+        else:
+            inv_row = fetchone(con_inv, f"""
+                SELECT id, used_room FROM invite_codes
+                WHERE code={ph} AND (expires_at IS NULL OR expires_at > datetime('now'))
+            """, (invite_code,))
+        if not inv_row:
+            con_inv.close()
+            return jsonify({"error": "招待コードが無効または期限切れです"}), 400
+        if inv_row["used_room"]:
+            con_inv.close()
+            return jsonify({"error": "この招待コードはすでに使用されています"}), 400
+        con_inv.close()
+
     con = get_con()
     try:
         user = fetchone(con, "SELECT room, password_hash FROM user_accounts WHERE room=?", (room,))
@@ -61,6 +90,15 @@ def api_user_register():
                 execute(con, "UPDATE user_accounts SET email=?, password_hash=?, password_salt=?, updated_at=NOW() WHERE room=?", (email, h, s, room))
             else:
                 execute(con, "UPDATE user_accounts SET email=?, password_hash=?, password_salt=?, updated_at=datetime('now','localtime') WHERE room=?", (email, h, s, room))
+
+        # 招待コードを使用済みにマーク
+        if INVITE_REQUIRED and invite_code:
+            ph = "%s" if USE_PG else "?"
+            if USE_PG:
+                execute(con, f"UPDATE invite_codes SET used_room={ph}, used_at=NOW() WHERE code={ph}", (room, invite_code))
+            else:
+                execute(con, f"UPDATE invite_codes SET used_room={ph}, used_at=datetime('now','localtime') WHERE code={ph}", (room, invite_code))
+
         con.commit(); con.close()
         return jsonify({"ok": True, "is_new": True})
     except Exception as e:
@@ -69,6 +107,7 @@ def api_user_register():
 
 
 @user_bp.route("/api/user/login", methods=["POST"])
+@rate_limit(limit=10, window=60)
 def api_user_login():
     body = request.get_json()
     room     = (body.get("room")     or "").strip()
@@ -184,6 +223,7 @@ def api_user_change_password():
 
 
 @user_bp.route("/api/user/forgot-password", methods=["POST"])
+@rate_limit(limit=3, window=60)
 def api_user_forgot_password():
     body  = request.get_json()
     room  = (body.get("room")  or "").strip()

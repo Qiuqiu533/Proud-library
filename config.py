@@ -34,6 +34,8 @@ _RESIDENT_PASSWORD_ENV = os.environ.get("RESIDENT_PASSWORD", "")
 _BOARD_PASSWORD_ENV    = os.environ.get("BOARD_PASSWORD",    "")
 _RESEND_API_KEY        = os.environ.get("RESEND_API_KEY",    "")
 _APP_BASE_URL          = os.environ.get("APP_BASE_URL",      "https://proud-library.onrender.com")
+# 招待コード必須フラグ: 環境変数 INVITE_REQUIRED=1 で有効化
+INVITE_REQUIRED        = os.environ.get("INVITE_REQUIRED", "0") == "1"
 
 # 起動時に必須環境変数の未設定を警告
 for _env_key, _env_val in [
