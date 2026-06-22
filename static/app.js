@@ -1463,12 +1463,25 @@ async function openModal(isbn, preloadedBook) {
         ].filter(r => r && r[1]);
         infoEl.innerHTML = rows.map(([k,v]) => `<div class="book-info-row"><dt>${k}</dt><dd>${v}</dd></div>`).join("");
       }
-      // 評価をサーバーデータで更新
+      // 評価・コメントをサーバーデータで更新
       const rating = book.rating || { score: 0, votes: 0, reviews: [] };
       const starsEl = document.querySelector(".big-stars");
       const ratingInfoEl = document.querySelector(".rating-info");
       if (starsEl) starsEl.textContent = rating.score ? "★".repeat(Math.round(rating.score)) + "☆".repeat(5 - Math.round(rating.score)) : "☆☆☆☆☆";
       if (ratingInfoEl) ratingInfoEl.textContent = rating.score ? `${rating.score.toFixed(1)} / 5.0（${rating.votes}件）` : "まだ評価がありません";
+      // コメントセクションも更新（初期描画では空で表示されているため）
+      const reviewsEl = document.querySelector(".modal-section .review-item")?.closest(".modal-section") ||
+        Array.from(document.querySelectorAll(".modal-section")).find(el => el.querySelector("h3")?.textContent.includes("コメント"));
+      if (reviewsEl) {
+        const reviewsHtml = rating.reviews && rating.reviews.length
+          ? rating.reviews.map(r => `<div class="review-item">💬 ${esc(r)}</div>`).join("")
+          : `<div class="no-content">まだコメントはありません</div>`;
+        const noContent = reviewsEl.querySelector(".no-content");
+        const existing = reviewsEl.querySelectorAll(".review-item");
+        existing.forEach(el => el.remove());
+        if (noContent) noContent.remove();
+        reviewsEl.insertAdjacentHTML("beforeend", reviewsHtml);
+      }
       // 内容紹介・AI登録情報・参考ボタンを描画
       _renderDescSection(isbn, book);
     } catch(e) {
