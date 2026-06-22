@@ -2953,6 +2953,7 @@ document.getElementById("submitCal").addEventListener("click", async () => {
 // Initial load
 checkAuth();
 loadBooks();
+loadPopularBooks();
 loadCollections();
 loadTopNew();
 loadReqList();
@@ -4255,6 +4256,29 @@ document.querySelectorAll(".board-tab").forEach(btn => {
 });
 
 // ===== 特集コーナー =====
+async function loadPopularBooks() {
+  const sec = document.getElementById("popularSection");
+  const row = document.getElementById("popularRow");
+  if (!sec || !row) return;
+  try {
+    const res = await fetch("/api/books/popular");
+    if (!res.ok) return;
+    const books = await res.json();
+    if (!books.length) return;
+    sec.style.display = "block";
+    row.innerHTML = books.map(b => {
+      const ndlFallback = `https://ndlsearch.ndl.go.jp/thumbnail/${b.isbn}.jpg`;
+      const stars = b.score ? "★".repeat(Math.round(b.score)) + "☆".repeat(5 - Math.round(b.score)) : "";
+      return `<div class="related-card" onclick="openModal('${b.isbn}')" role="button" tabindex="0">
+        <div class="related-thumb"><img src="${b.cover || ndlFallback}" alt="${esc(b.title)}" loading="lazy"
+          onerror="if(this.src!=='${ndlFallback}'){this.src='${ndlFallback}';}else{this.style.display='none';}"></div>
+        <div class="related-title">${esc(b.title)}</div>
+        <div class="related-author" style="color:#f0a500;font-size:0.75rem">${stars} ${b.score.toFixed(1)}</div>
+      </div>`;
+    }).join("");
+  } catch {}
+}
+
 async function loadCollections() {
   const sec = document.getElementById("collectionsSection");
   const list = document.getElementById("collectionsList");

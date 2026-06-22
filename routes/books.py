@@ -153,6 +153,34 @@ def api_stats():
     return jsonify(FULL_STATS)
 
 
+@books_bp.route("/api/books/popular")
+def api_books_popular():
+    """評価スコア上位の本（1票以上・上位8件）を返す"""
+    con = get_con()
+    ph = "%s" if USE_PG else "?"
+    sql = f"""
+        SELECT g.isbn, g.title, g.author, r.score, r.votes
+        FROM ratings r
+        JOIN genre_books g ON g.isbn = r.isbn
+        WHERE r.votes >= 1 AND r.score >= 1
+        ORDER BY r.score DESC, r.votes DESC
+        LIMIT 8
+    """
+    rows = fetchall(con, sql, ())
+    con.close()
+    result = []
+    for b in rows:
+        isbn13 = b["isbn"]
+        isbn10 = isbn13_to_isbn10(isbn13) if isbn13.startswith("978") else ""
+        result.append({
+            "isbn": isbn13, "isbn10": isbn10,
+            "title": b["title"], "author": b["author"],
+            "cover": get_cover_url(isbn13, isbn10),
+            "score": b["score"], "votes": b["votes"],
+        })
+    return jsonify(result)
+
+
 @books_bp.route("/api/new-arrivals")
 def api_get_new_arrivals():
     con = get_con()
