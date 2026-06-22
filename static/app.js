@@ -828,6 +828,16 @@ function toggleFilterRows() {
   const hidden = wrap.style.display === "none";
   wrap.style.display = hidden ? "" : "none";
   if (btn) btn.textContent = hidden ? "絞り込み ▲" : "絞り込み ▼";
+  localStorage.setItem("filterRowsHidden", hidden ? "0" : "1");
+}
+
+function applyFilterRowsState() {
+  const wrap = document.getElementById("filterRowsWrap");
+  const btn  = document.getElementById("toggleFilterRows");
+  if (!wrap) return;
+  const hidden = localStorage.getItem("filterRowsHidden") === "1";
+  wrap.style.display = hidden ? "none" : "";
+  if (btn) btn.textContent = hidden ? "絞り込み ▼" : "絞り込み ▲";
 }
 
 function applyTopSectionsState() {
@@ -1514,7 +1524,8 @@ function _setWishBtn(btn, active) {
 async function isInWishlist(isbn, room) {
   if (!room) return false;
   try {
-    const res = await fetch(`/api/wishlist?room=${encodeURIComponent(room)}`);
+    const _wu = residentSession || getCloudUser() || {};
+    const res = await fetch(`/api/wishlist?room=${encodeURIComponent(room)}&password=${encodeURIComponent(_wu.password || _wu.pin || "")}`);
     if (!res.ok) return false;
     const list = await res.json();
     return Array.isArray(list) && list.some(w => w.isbn === isbn);
@@ -1526,7 +1537,7 @@ async function loadWishlistCard() {
   if (!sec || !grid) return;
   const u = residentSession || getCloudUser();
   if (!u || !u.room) { sec.style.display = "none"; return; }
-  const res = await fetch(`/api/wishlist?room=${encodeURIComponent(u.room)}`).catch(() => null);
+  const res = await fetch(`/api/wishlist?room=${encodeURIComponent(u.room)}&password=${encodeURIComponent(u.password || u.pin || "")}`).catch(() => null);
   if (!res || !res.ok) { sec.style.display = "none"; return; }
   const list = await res.json();
   if (!list.length) { sec.style.display = "none"; return; }
@@ -3145,6 +3156,7 @@ loadTopNew();
 loadReqList();
 renderRecentBooks();
 applyTopSectionsState();
+applyFilterRowsState();
 // loadGenreCounts(); // ジャンルフィルター非表示中
 
 // 起動時: お知らせバッジ（未読カウント）を初期化

@@ -244,14 +244,14 @@ def _wish_auth(body):
 
 @user_bp.route("/api/wishlist")
 def api_get_wishlist():
-    room = request.args.get("room", "").strip()
-    if not room:
-        return jsonify([])
-    con = get_con()
-    rows = fetchone(con, "SELECT 1 FROM user_accounts WHERE room=?", (room,))
-    if not rows:
-        con.close()
+    room     = request.args.get("room", "").strip()
+    password = request.args.get("password", "").strip() or request.headers.get("X-Password", "").strip()
+    if not room or not password:
         return jsonify({"error": "unauthorized"}), 401
+    authed = _wish_auth({"room": room, "password": password})
+    if not authed:
+        return jsonify({"error": "unauthorized"}), 401
+    con = get_con()
     items = fetchall(con, "SELECT isbn, created_at FROM wish_list WHERE room=? ORDER BY id DESC", (room,))
     con.close()
     return jsonify([{**r, "created_at": str(r["created_at"])[:10]} for r in items])
