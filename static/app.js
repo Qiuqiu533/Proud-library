@@ -3208,29 +3208,26 @@ applyFilterRowsState();
 // #44 スリープ対策: 4分ごとにpingしてサービスを起こしておく
 setInterval(() => fetch("/ping").catch(() => {}), 4 * 60 * 1000);
 
-// スリープ復帰バナー: 初回fetchが5秒超で遅延している場合に表示
+// スリープ復帰バナー: /ping が5秒以内に応答しない場合に表示
 (function() {
   const banner = document.getElementById("wakeupBanner");
   const secEl  = document.getElementById("wakeupSec");
   if (!banner) return;
-  let shown = false, timer = null, counter = 0;
-  const wakeTimer = setTimeout(() => {
+  let shown = false, counterTimer = null, counter = 0;
+  const showTimer = setTimeout(() => {
     shown = true;
     banner.style.display = "block";
-    timer = setInterval(() => { counter++; if (secEl) secEl.textContent = counter; }, 1000);
+    counterTimer = setInterval(() => { counter++; if (secEl) secEl.textContent = counter; }, 1000);
   }, 5000);
   function hideWakeupBanner() {
-    clearTimeout(wakeTimer);
-    if (timer) clearInterval(timer);
-    if (shown) { banner.style.opacity = "0"; banner.style.transition = "opacity 0.5s"; setTimeout(() => { banner.style.display = "none"; }, 500); }
+    clearTimeout(showTimer);
+    if (counterTimer) clearInterval(counterTimer);
+    if (shown) { banner.style.opacity = "0"; banner.style.transition = "opacity 0.5s"; setTimeout(() => banner.style.display = "none", 500); }
   }
-  const origFetch = window.fetch;
-  let firstDone = false;
-  window.fetch = function(...args) {
-    const p = origFetch.apply(this, args);
-    if (!firstDone) { firstDone = true; p.finally(hideWakeupBanner); }
-    return p;
-  };
+  function tryPing() {
+    fetch("/ping").then(hideWakeupBanner).catch(() => setTimeout(tryPing, 4000));
+  }
+  tryPing();
 })();
 
 // ===== Book Requests =====
@@ -5024,6 +5021,10 @@ async function initAwardsTab() {
         style="padding:5px 12px;border-radius:16px;border:1px solid #ccc;background:${a.award==="すべて"?"#3d6b4f":"#fff"};color:${a.award==="すべて"?"#fff":"#444"};font-size:0.8rem;cursor:pointer">
         ${a.award}（${a.count}）
       </button>`).join("");
+    filterRow.insertAdjacentHTML("afterend",
+      `<div id="awardResetBar" style="display:none;margin-bottom:8px">
+        <button onclick="resetAwardFilter()" style="font-size:0.8rem;background:none;border:none;color:#3d6b4f;cursor:pointer;text-decoration:underline;padding:0">✕ 絞り込みを解除</button>
+       </div>`);
   } catch(e) {}
   loadAwardBooks("");
 }
@@ -5035,7 +5036,14 @@ function selectAwardFilter(btn) {
   });
   btn.style.background = "#3d6b4f"; btn.style.color = "#fff";
   btn.classList.add("active");
+  const resetBar = document.getElementById("awardResetBar");
+  if (resetBar) resetBar.style.display = btn.dataset.award ? "block" : "none";
   loadAwardBooks(btn.dataset.award);
+}
+
+function resetAwardFilter() {
+  const allBtn = document.querySelector('.award-filter-btn[data-award=""]');
+  if (allBtn) selectAwardFilter(allBtn);
 }
 
 // 受賞作タブが開かれたときに初期化
