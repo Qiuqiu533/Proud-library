@@ -3,6 +3,7 @@ from flask import Blueprint, request, jsonify
 from config import get_admin_password, get_board_password
 from database import get_con, execute, fetchone, fetchall
 from services.utils import rate_limit
+from services.audit import log_action
 
 community_bp = Blueprint("community", __name__)
 
@@ -223,6 +224,7 @@ def api_post_announcement():
     execute(con, "INSERT INTO announcements (title, body, category, image_url, event_date) VALUES (?,?,?,?,?)",
         (title, text, body.get("category","お知らせ"), json.dumps(images, ensure_ascii=False), event_date))
     con.commit(); con.close()
+    log_action("お知らせ投稿", title)
     return jsonify({"ok": True})
 
 
@@ -253,6 +255,7 @@ def api_delete_announcement(ann_id):
     con = get_con()
     execute(con, "DELETE FROM announcements WHERE id=?", (ann_id,))
     con.commit(); con.close()
+    log_action("お知らせ削除", f"id={ann_id}")
     return jsonify({"ok": True})
 
 
@@ -329,13 +332,17 @@ def api_update_request(req_id):
     if pw != get_admin_password() and pw != get_board_password():
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
+    detail_parts = []
     if "status" in body:
         execute(con, "UPDATE book_requests SET status=? WHERE id=?", (body["status"], req_id))
+        detail_parts.append(f"status={body['status']}")
     if "note" in body:
         execute(con, "UPDATE book_requests SET note=? WHERE id=?", (body["note"], req_id))
     if "reply" in body:
         execute(con, "UPDATE book_requests SET reply=? WHERE id=?", (body["reply"], req_id))
+        detail_parts.append("reply更新")
     con.commit(); con.close()
+    log_action("リクエスト対応", f"id={req_id}", ", ".join(detail_parts))
     return jsonify({"ok": True})
 
 
@@ -348,4 +355,5 @@ def api_delete_request(req_id):
     con = get_con()
     execute(con, "DELETE FROM book_requests WHERE id=?", (req_id,))
     con.commit(); con.close()
+    log_action("リクエスト削除", f"id={req_id}")
     return jsonify({"ok": True})

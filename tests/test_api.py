@@ -302,7 +302,7 @@ def test_award_books_post_wrong_auth(client):
 def test_wishlist_add_and_delete(client):
     """ウィッシュリスト追加→削除の正常系（テスト用ユーザーを作成して検証）"""
     # ユーザー登録
-    reg = client.post("/api/user/register", json={"room": "1-101", "password": "testpass1"})
+    reg = client.post("/api/user/register", json={"room": "1-101", "password": "testpass1", "email": "test101@example.com"})
     assert reg.status_code in (200, 409)  # 既存でも可
 
     # 追加
@@ -324,7 +324,7 @@ def test_wishlist_add_and_delete(client):
 
 def test_post_request_ok(client):
     """ログイン済みユーザーによるリクエスト投稿の正常系"""
-    client.post("/api/user/register", json={"room": "1-102", "password": "testpass1"})
+    client.post("/api/user/register", json={"room": "1-102", "password": "testpass1", "email": "test102@example.com"})
     res = client.post("/api/requests", json={
         "title": "テスト本", "author": "著者名", "reason": "読みたい",
         "room": "1-102", "password": "testpass1", "type": "request"
@@ -335,7 +335,7 @@ def test_post_request_ok(client):
 
 def test_post_feedback_ok(client):
     """ログイン済みユーザーによるご要望投稿の正常系"""
-    client.post("/api/user/register", json={"room": "1-103", "password": "testpass1"})
+    client.post("/api/user/register", json={"room": "1-103", "password": "testpass1", "email": "test103@example.com"})
     res = client.post("/api/requests", json={
         "title": "図書館の開館時間を延ばしてほしい", "reason": "希望",
         "room": "1-103", "password": "testpass1", "type": "feedback"
@@ -359,8 +359,8 @@ def test_patch_request_status_ok(client):
 
 def test_user_login_ok(client):
     """ユーザー登録→ログインの正常系"""
-    client.post("/api/user/register", json={"room": "1-104", "password": "testpass1"})
-    res = client.post("/api/user/login", json={"room": "1-104", "password": "testpass1"})
+    client.post("/api/user/register", json={"room": "1-104", "password": "testpass1", "email": "test104@example.com"})
+    res = client.post("/api/user/login", json={"room": "1-104", "password": "testpass1", "email": "test104@example.com"})
     assert res.status_code == 200
     data = res.get_json()
     assert data.get("ok")
@@ -369,14 +369,14 @@ def test_user_login_ok(client):
 
 def test_user_login_wrong_password(client):
     """ログイン失敗（パスワード誤り）は 401"""
-    client.post("/api/user/register", json={"room": "1-105", "password": "testpass1"})
+    client.post("/api/user/register", json={"room": "1-105", "password": "testpass1", "email": "test105@example.com"})
     res = client.post("/api/user/login", json={"room": "1-105", "password": "wrongpass"})
     assert res.status_code == 401
 
 
 def test_wishlist_notify_toggle(client):
     """ウィッシュリスト通知ON/OFF切り替えの正常系"""
-    client.post("/api/user/register", json={"room": "1-106", "password": "testpass1"})
+    client.post("/api/user/register", json={"room": "1-106", "password": "testpass1", "email": "test106@example.com"})
     client.post("/api/wishlist", json={"room": "1-106", "password": "testpass1", "isbn": "9784101092058"})
     # 通知OFFに変更
     res = client.patch("/api/wishlist/notify",
@@ -402,7 +402,7 @@ def test_wishlist_notify_wrong_auth(client):
 
 def test_wishlist_includes_notify_field(client):
     """GET /api/wishlist のレスポンスに notify フィールドが含まれる"""
-    client.post("/api/user/register", json={"room": "1-107", "password": "testpass1"})
+    client.post("/api/user/register", json={"room": "1-107", "password": "testpass1", "email": "test107@example.com"})
     client.post("/api/wishlist", json={"room": "1-107", "password": "testpass1", "isbn": "9784101092058"})
     res = client.get("/api/wishlist?room=1-107", headers={"X-Password": "testpass1"})
     assert res.status_code == 200

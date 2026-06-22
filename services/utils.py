@@ -11,7 +11,11 @@ import time
 from collections import defaultdict
 
 from flask import request, jsonify
-from config import KEYWORD_GENRE, NDC_TO_GENRE, _RESEND_API_KEY, _APP_BASE_URL
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from config import KEYWORD_GENRE, NDC_TO_GENRE, _RESEND_API_KEY, _APP_BASE_URL, \
+    _BREVO_SMTP_PASSWORD, _BREVO_SMTP_USER, _NOTIFY_FROM_EMAIL
 from database import get_con, execute, fetchone, USE_PG
 import requests as _requests
 
@@ -93,9 +97,27 @@ def _is_bcrypt_hash(password_hash: str) -> bool:
     return password_hash.startswith("$2b$") or password_hash.startswith("$2a$")
 
 
-def _send_reset_email(to_email, room, token):
-    if not _RESEND_API_KEY:
+def _send_email_brevo(to_email: str, subject: str, body: str) -> bool:
+    """Brevo SMTP でメール送信。未設定なら False を返す。"""
+    if not _BREVO_SMTP_PASSWORD or not _BREVO_SMTP_USER:
         return False
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"]    = _NOTIFY_FROM_EMAIL or _BREVO_SMTP_USER
+    msg["To"]      = to_email
+    msg.attach(MIMEText(body, "plain", "utf-8"))
+    try:
+        with smtplib.SMTP("smtp-relay.brevo.com", 587) as server:
+            server.starttls()
+            server.login(_BREVO_SMTP_USER, _BREVO_SMTP_PASSWORD)
+            server.sendmail(msg["From"], [to_email], msg.as_string())
+        return True
+    except Exception as e:
+        logger.error("Brevo send error: %s", e)
+        return False
+
+
+def _send_reset_email(to_email, room, token):
     reset_url = f"{_APP_BASE_URL}/reset-password?token={token}"
     body = f"""プラウド船橋 コミュニティ図書館
 
@@ -111,17 +133,28 @@ def _send_reset_email(to_email, room, token):
 ─────────────────────────
 プラウド船橋 コミュニティ図書館
 """
-    try:
-        res = _requests.post(
-            "https://api.resend.com/emails",
-            headers={"Authorization": f"Bearer {_RESEND_API_KEY}", "Content-Type": "application/json"},
-            json={"from": "図書館 <onboarding@resend.dev>", "to": [to_email], "subject": "【プラウド船橋図書館】パスワードリセット", "text": body},
-            timeout=10
-        )
-        return res.status_code == 200
-    except Exception as e:
-        logger.error(f"email send error: %s", e)
-        return False
+    subject = "【プラウド船橋図書館】パスワードリセット"
+
+    # Brevo SMTP を優先
+    if _BREVO_SMTP_PASSWORD and _BREVO_SMTP_USER:
+        return _send_email_brevo(to_email, subject, body)
+
+    # フォールバック: Resend API
+    if _RESEND_API_KEY:
+        try:
+            res = _requests.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {_RESEND_API_KEY}", "Content-Type": "application/json"},
+                json={"from": "図書館 <onboarding@resend.dev>", "to": [to_email], "subject": subject, "text": body},
+                timeout=10
+            )
+            return res.status_code == 200
+        except Exception as e:
+            logger.error("Resend error: %s", e)
+            return False
+
+    logger.warning("メール設定なし（BREVO_SMTP_PASSWORD/RESEND_API_KEY 未設定）")
+    return False
 
 
 def auto_cleanup_images():

@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from config import get_board_password
 from database import get_con, execute, fetchone, fetchall, USE_PG
+from services.audit import log_action
 
 awards_bp = Blueprint("awards", __name__)
 
@@ -70,6 +71,7 @@ def api_post_award_book():
             (award, no, year, title, author, status))
     con.commit()
     con.close()
+    log_action("受賞作登録", f"{award}／{title}", f"著者={author} 年={year}")
     return jsonify({"ok": True})
 
 

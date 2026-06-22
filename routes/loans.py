@@ -346,3 +346,23 @@ def api_wishlist_summary():
     except Exception as e:
         con.close()
         return jsonify({"error": str(e)}), 500
+
+
+@loans_bp.route("/api/admin/audit-log")
+def api_audit_log():
+    """管理者操作ログ（最新200件）"""
+    if request.headers.get("X-Password") != get_board_password():
+        return jsonify({"error": "unauthorized"}), 401
+    con = get_con()
+    try:
+        rows = fetchall(con, """
+            SELECT id, action, target, detail, ip, created_at
+            FROM audit_log
+            ORDER BY id DESC
+            LIMIT 200
+        """)
+        con.close()
+        return jsonify([{**r, "created_at": str(r["created_at"])[:16]} for r in rows])
+    except Exception as e:
+        con.close()
+        return jsonify({"error": str(e)}), 500

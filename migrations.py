@@ -1272,6 +1272,44 @@ def _migrate_invite_codes():
         con.close()
 
 
+def _migrate_audit_log():
+    """audit_log テーブルを追加（管理者操作ログ）。"""
+    if _migration_done("audit_log_v1"):
+        return
+    con = get_con()
+    try:
+        if USE_PG:
+            cur = con.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS audit_log (
+                    id SERIAL PRIMARY KEY,
+                    action TEXT NOT NULL,
+                    target TEXT DEFAULT '',
+                    detail TEXT DEFAULT '',
+                    ip TEXT DEFAULT '',
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+        else:
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS audit_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    action TEXT NOT NULL,
+                    target TEXT DEFAULT '',
+                    detail TEXT DEFAULT '',
+                    ip TEXT DEFAULT '',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+        con.commit()
+        _mark_migration_done("audit_log_v1")
+        logger.info("[migration] audit_log テーブル追加完了")
+    except Exception as e:
+        logger.error("[migration] audit_log error: %s", e)
+    finally:
+        con.close()
+
+
 def _run_all_migrations():
     """全マイグレーションをシングルスレッドで順次実行する（race condition防止）。"""
     steps = [
@@ -1296,6 +1334,7 @@ def _run_all_migrations():
         _migrate_wish_list,            # wish_list テーブル追加
         _migrate_wish_list_notify,     # 通知用カラム追加
         _migrate_invite_codes,         # 招待コードテーブル追加
+        _migrate_audit_log,            # 管理者操作ログ
         _verify_tables,
     ]
     for step in steps:
