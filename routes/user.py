@@ -42,8 +42,8 @@ def api_user_register():
     room     = (body.get("room")     or "").strip()
     password = (body.get("password") or "").strip()
     email    = (body.get("email")    or "").strip()
-    if not room or not password or len(password) < 6:
-        return jsonify({"error": "部屋番号と6文字以上のパスワードを入力してください"}), 400
+    if not room or not password or len(password) < 8:
+        return jsonify({"error": "部屋番号と8文字以上のパスワードを入力してください"}), 400
     if not _validate_room(room):
         return jsonify({"error": "部屋番号の形式が正しくありません（例：5-533 または 6桁数字）"}), 400
     con = get_con()
@@ -149,7 +149,7 @@ def api_user_change_password():
     old_password = (body.get("old_password") or "").strip()
     new_password = (body.get("new_password") or "").strip()
     if not room or not old_password or not new_password or len(new_password) < 6:
-        return jsonify({"error": "6文字以上の新しいパスワードを入力してください"}), 400
+        return jsonify({"error": "8文字以上の新しいパスワードを入力してください"}), 400
     con = get_con()
     user = fetchone(con, "SELECT pin, password_hash, password_salt FROM user_accounts WHERE room=?", (room,))
     if not user or not _user_auth_ok(user, old_password):
@@ -190,8 +190,8 @@ def api_user_reset_password():
     body     = request.get_json()
     token    = (body.get("token")    or "").strip()
     password = (body.get("password") or "").strip()
-    if not token or not password or len(password) < 6:
-        return jsonify({"error": "6文字以上の新しいパスワードを入力してください"}), 400
+    if not token or not password or len(password) < 8:
+        return jsonify({"error": "8文字以上の新しいパスワードを入力してください"}), 400
     con = get_con()
     row = fetchone(con, "SELECT room, expires_at, used FROM password_reset_tokens WHERE token=?", (token,))
     if not row:

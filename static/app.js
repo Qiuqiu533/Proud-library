@@ -65,7 +65,7 @@ async function checkAuth() {
       const p1 = document.getElementById("resetNewPass").value;
       const p2 = document.getElementById("resetNewPass2").value;
       const err = document.getElementById("resetError");
-      if (p1.length < 6) { err.textContent = "6文字以上で入力してください"; return; }
+      if (p1.length < 8) { err.textContent = "8文字以上で入力してください"; return; }
       if (p1 !== p2) { err.textContent = "パスワードが一致しません"; return; }
       const res = await fetch("/api/user/reset-password", {
         method: "POST", headers: {"Content-Type": "application/json"},
@@ -206,7 +206,7 @@ document.getElementById("registerBtn").addEventListener("click", async () => {
   const err   = document.getElementById("registerError");
   if (!room) { err.textContent = "部屋番号を入力してください"; return; }
   if (!validateRoom(room)) { err.textContent = "部屋番号の形式が正しくありません（例：5-533 または 6桁数字）"; return; }
-  if (pass.length < 6) { err.textContent = "パスワードは6文字以上で入力してください"; return; }
+  if (pass.length < 8) { err.textContent = "パスワードは8文字以上で入力してください"; return; }
   if (pass !== pass2) { err.textContent = "パスワードが一致しません"; return; }
   err.textContent = "";
   const res = await fetch("/api/user/register", {
@@ -252,7 +252,7 @@ document.getElementById("forgotResetBtn").addEventListener("click", async () => 
   const p1  = (document.getElementById("forgotNewPass").value  || "");
   const p2  = (document.getElementById("forgotNewPass2").value || "");
   const msg = document.getElementById("forgotMsg");
-  if (p1.length < 6) { msg.style.color = "#e05"; msg.textContent = "6文字以上で入力してください"; return; }
+  if (p1.length < 8) { msg.style.color = "#e05"; msg.textContent = "8文字以上で入力してください"; return; }
   if (p1 !== p2)     { msg.style.color = "#e05"; msg.textContent = "パスワードが一致しません"; return; }
   msg.style.color = "#888"; msg.textContent = "設定中...";
   const res = await fetch("/api/user/reset-password", {
@@ -3546,7 +3546,7 @@ async function loadAdminUsers() {
     <div class="au-form">
       <input type="text" id="auNewCode" placeholder="コード（例: A001）" class="au-input" maxlength="10">
       <input type="text" id="auNewName" placeholder="氏名" class="au-input" maxlength="20">
-      <input type="password" id="auNewPass" placeholder="初期パスワード（6文字以上）" class="au-input">
+      <input type="password" id="auNewPass" placeholder="初期パスワード（8文字以上）" class="au-input">
       <select id="auNewRole" class="au-input">
         <option value="admin">管理者</option>
         <option value="master">マスター</option>
@@ -3558,7 +3558,7 @@ async function loadAdminUsers() {
     <h4 style="margin:0 0 12px;font-size:0.95rem;color:#555">🔒 自分のパスワード変更</h4>
     <div class="au-form">
       <input type="password" id="auSelfCurPass" placeholder="現在のパスワード" class="au-input">
-      <input type="password" id="auSelfNewPass" placeholder="新しいパスワード（6文字以上）" class="au-input">
+      <input type="password" id="auSelfNewPass" placeholder="新しいパスワード（8文字以上）" class="au-input">
       <button id="auSelfPwBtn" class="btn-primary">変更</button>
       <p id="auSelfMsg" style="margin-top:8px;font-size:0.85rem"></p>
     </div>`;
