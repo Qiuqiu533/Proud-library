@@ -1,3 +1,6 @@
+import logging
+
+logger = logging.getLogger(__name__)
 import os
 import json
 
@@ -39,7 +42,7 @@ for _env_key, _env_val in [
     ("BOARD_PASSWORD", _BOARD_PASSWORD_ENV),
 ]:
     if not _env_val:
-        print(f"[WARNING] 環境変数 {_env_key} が未設定です。Renderのダッシュボードで設定してください。")
+        logger.warning(f"[WARNING] 環境変数 {_env_key} が未設定です。Renderのダッシュボードで設定してください。")
 
 _KANA_ROWS = {
     "あ": "あいうえおアイウエオ",

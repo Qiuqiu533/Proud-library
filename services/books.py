@@ -1,6 +1,9 @@
 import json
 import re as _re
 import threading
+import logging
+
+logger = logging.getLogger(__name__)
 import requests
 
 from config import (
@@ -35,7 +38,7 @@ def _refresh_inertia_version(resp_409=None):
         if m:
             _INERTIA_VERSION = m.group(1)
     except Exception as e:
-        print(f"_refresh_inertia_version error: {e}")
+        logger.error(f"_refresh_inertia_version error: %s", e)
 
 
 # 起動時にバージョンを取得
@@ -97,7 +100,7 @@ def fetch_books(keyword="", page=1):
             })
         return {"books": books, "total": total, "page": page}
     except Exception as e:
-        print(f"fetch_books error: {e}")
+        logger.error(f"fetch_books error: %s", e)
         return {"books": [], "total": 0, "page": page}
 
 
@@ -128,7 +131,7 @@ def fetch_book_detail(isbn, hint_title=""):
                 availability.append({"library": location, "status": state})
         result["availability"] = availability
     except Exception as e:
-        print(f"fetch_book_detail error: {e}")
+        logger.error(f"fetch_book_detail error: %s", e)
         result["availability"] = []
     # キャッシュ保存
     if availability:
@@ -369,7 +372,7 @@ def _build_recent_isbns():
         _recent_isbns_cache["date"] = today
         return recent
     except Exception as e:
-        print(f"recent_isbns build error: {e}")
+        logger.error(f"recent_isbns build error: %s", e)
         return []
 
 
@@ -413,7 +416,7 @@ def _save_genre_update_time():
                 ("genre_last_update", now))
         con.commit(); con.close()
     except Exception as e:
-        print(f"_save_genre_update_time error: {e}")
+        logger.error(f"_save_genre_update_time error: %s", e)
 
 
 def _classify_genre(ndc, title="", description=""):
@@ -454,12 +457,12 @@ def _auto_classify_new_books():
                 try:
                     last_dt = datetime.datetime.fromisoformat(last)
                     if (datetime.datetime.now() - last_dt).days < 7:
-                        print("ジャンル自動更新: 前回から7日未満のためスキップ")
+                        logger.info("ジャンル自動更新: 前回から7日未満のためスキップ")
                         return
                 except Exception:
                     pass
 
-            print("ジャンル自動更新: 開始...")
+            logger.info("ジャンル自動更新: 開始...")
             con = get_con()
             rows = fetchall(con, "SELECT isbn FROM genre_books")
             con.close()
@@ -480,15 +483,15 @@ def _auto_classify_new_books():
                     page += 1
                     time.sleep(0.8)
                 except Exception as e:
-                    print(f"ジャンル自動更新: ページ{page}取得エラー {e}")
+                    logger.info(f"ジャンル自動更新: ページ{page}取得エラー {e}")
                     break
 
             if not new_books:
-                print("ジャンル自動更新: 新しい本なし")
+                logger.info("ジャンル自動更新: 新しい本なし")
                 _save_genre_update_time()
                 return
 
-            print(f"ジャンル自動更新: {len(new_books)}冊の新しい本を分類中...")
+            logger.info(f"ジャンル自動更新: {len(new_books)}冊の新しい本を分類中...")
 
             batch_size = 100
             classified = 0
@@ -511,7 +514,7 @@ def _auto_classify_new_books():
                                 desc_map[isbn] = t.get("Text", "")
                                 break
                 except Exception as e:
-                    print(f"OpenBD バッチエラー: {e}")
+                    logger.info(f"OpenBD バッチエラー: {e}")
 
                 con = get_con()
                 for b in batch:
@@ -540,8 +543,8 @@ def _auto_classify_new_books():
                 time.sleep(0.5)
 
             _save_genre_update_time()
-            print(f"ジャンル自動更新: 完了 ({classified}冊追加)")
+            logger.info(f"ジャンル自動更新: 完了 ({classified}冊追加)")
         except Exception as e:
-            print(f"ジャンル自動更新エラー: {e}")
+            logger.info(f"ジャンル自動更新エラー: {e}")
 
     threading.Thread(target=_run, daemon=True).start()

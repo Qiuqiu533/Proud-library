@@ -1,5 +1,9 @@
+from __future__ import annotations
 import threading
+import logging
 import requests
+
+logger = logging.getLogger(__name__)
 
 from database import get_con, execute, fetchone, fetchall, USE_PG
 from config import GENRE_MAP, OPENBD_API
@@ -381,7 +385,7 @@ def init_db():
 
 
 # ── マイグレーション管理ヘルパー ──────────────────────────────────────────────
-def _migration_done(name: str) -> bool:
+def _migration_done(name: str) -> bool:  # noqa: D103
     """applied_migrations テーブルで適用済みか確認する。"""
     con = get_con()
     try:
@@ -459,7 +463,7 @@ def _migrate_admin_users():
                 con.commit()
         con.close()
     except Exception as e:
-        print(f"admin_users migration error: {e}")
+        logger.error(f"admin_users migration error: %s", e)
 
 
 def _migrate_add_card_columns():
@@ -494,7 +498,7 @@ def _migrate_add_card_columns():
                     pass
         con.close()
     except Exception as e:
-        print(f"card column migration error: {e}")
+        logger.error(f"card column migration error: %s", e)
 
 
 def _migrate_add_user_auth_columns():
@@ -541,7 +545,7 @@ def _migrate_add_user_auth_columns():
                 pass
         con.close()
     except Exception as e:
-        print(f"user auth column migration error: {e}")
+        logger.error(f"user auth column migration error: %s", e)
 
 
 def _migrate_ndc_genres():
@@ -606,7 +610,7 @@ def _migrate_ndc_genres():
                         pass
                 con3.commit(); con3.close()
             except Exception as e:
-                print(f"NDC batch error: {e}")
+                logger.error(f"NDC batch error: %s", e)
 
         con4 = get_con()
         if USE_PG:
@@ -614,9 +618,9 @@ def _migrate_ndc_genres():
         else:
             execute(con4, "INSERT OR REPLACE INTO settings(key,value) VALUES('ndc_classify_done',?)", (CURRENT_VERSION,))
         con4.commit(); con4.close()
-        print(f"NDC genre classification v2: keyword={kw_updated}, ndc={ndc_updated} books updated")
+        logger.info(f"NDC genre classification v2: keyword={kw_updated}, ndc={ndc_updated} books updated")
     except Exception as e:
-        print(f"NDC classify error: {e}")
+        logger.error(f"NDC classify error: %s", e)
 
 
 def _migrate_title_yomi():
@@ -633,9 +637,9 @@ def _migrate_title_yomi():
         rows = fetchall(con, "SELECT isbn, title FROM genre_books WHERE title_yomi IS NULL OR title_yomi = ''")
         con.close()
         if not rows:
-            print("[yomi] 全件登録済み")
+            logger.info("[yomi] 全件登録済み")
             return
-        print(f"[yomi] {len(rows)}件のよみがなを生成します")
+        logger.info(f"[yomi] {len(rows)}件のよみがなを生成します")
         updated = 0
         batch_size = 100
         for i in range(0, len(rows), batch_size):
@@ -652,7 +656,7 @@ def _migrate_title_yomi():
                     pass
             con.commit()
             con.close()
-            print(f"[yomi] {min(i + batch_size, len(rows))}/{len(rows)}件処理中...")
+            logger.info(f"[yomi] {min(i + batch_size, len(rows))}/{len(rows)}件処理中...")
         con = get_con()
         if USE_PG:
             execute(con, "INSERT INTO settings(key,value) VALUES(%s,%s) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value", ("title_yomi_done", "1"))
@@ -660,11 +664,11 @@ def _migrate_title_yomi():
             execute(con, "INSERT OR REPLACE INTO settings(key,value) VALUES(?,?)", ("title_yomi_done", "1"))
         con.commit()
         con.close()
-        print(f"[yomi] 完了: {updated}件登録しました")
+        logger.info(f"[yomi] 完了: {updated}件登録しました")
     except ImportError:
-        print("[yomi] pykakasi未インストール")
+        logger.info("[yomi] pykakasi未インストール")
     except Exception as e:
-        print(f"[yomi] migrate error: {e}")
+        logger.error(f"[yomi] migrate error: %s", e)
 
 
 def _migrate_add_staff_chat():
@@ -729,7 +733,7 @@ def _migrate_add_staff_chat():
         con.commit()
         con.close()
     except Exception as e:
-        print(f"migrate staff_chat error: {e}")
+        logger.error(f"migrate staff_chat error: %s", e)
 
 
 def _migrate_add_votes_column():
@@ -749,7 +753,7 @@ def _migrate_add_votes_column():
                 pass
         con.close()
     except Exception as e:
-        print(f"migrate votes error: {e}")
+        logger.error(f"migrate votes error: %s", e)
 
 
 def _migrate_add_type_reply_columns():
@@ -767,7 +771,7 @@ def _migrate_add_type_reply_columns():
                 if USE_PG: con.rollback()
         con.close()
     except Exception as e:
-        print(f"migrate type/reply error: {e}")
+        logger.error(f"migrate type/reply error: %s", e)
 
 
 def _migrate_lib_schedule():
@@ -796,7 +800,7 @@ def _migrate_lib_schedule():
         con.commit()
         con.close()
     except Exception as e:
-        print(f"migrate lib_schedule error: {e}")
+        logger.error(f"migrate lib_schedule error: %s", e)
 
 
 def _migrate_genre_map_to_db():
@@ -813,9 +817,9 @@ def _migrate_genre_map_to_db():
         _insert_genre_books(con, GENRE_MAP)
         con.commit()
         con.close()
-        print(f"genre_map.json → DB 移行完了")
+        logger.info(f"genre_map.json → DB 移行完了")
     except Exception as e:
-        print(f"genre migrate error: {e}")
+        logger.error(f"genre migrate error: %s", e)
 
 
 def _migrate_seed_awards_master():
@@ -857,12 +861,12 @@ def _migrate_seed_awards_master():
         con.commit()
         con.close()
         _mark_migration_done("awards_seed_v4")
-        print(f"[awards_seed] {len(_AWARDS_SEED)}件登録完了、全件再マッチング開始")
+        logger.info(f"[awards_seed] {len(_AWARDS_SEED)}件登録完了、全件再マッチング開始")
         _migrate_resync_awards_v2()
         _migrate_resync_awards_v3()
         _migrate_resync_awards_v4()
     except Exception as e:
-        print(f"[awards_seed] error: {e}")
+        logger.error(f"[awards_seed] error: %s", e)
 
 
 def _migrate_resync_awards():
@@ -884,9 +888,9 @@ def _migrate_resync_awards():
             execute(con, "INSERT INTO settings(key,value) VALUES('awards_resync_done','v1') ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value")
         con.commit()
         con.close()
-        print(f"awards resync: {updated} books re-matched")
+        logger.info(f"awards resync: {updated} books re-matched")
     except Exception as e:
-        print(f"awards resync error: {e}")
+        logger.error(f"awards resync error: %s", e)
 
 
 def _migrate_resync_awards_v2():
@@ -912,9 +916,9 @@ def _migrate_resync_awards_v2():
         execute(con, "INSERT INTO settings(key,value) VALUES('awards_resync_done_v2','v1') ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value")
         con.commit()
         con.close()
-        print(f"awards resync v2: {updated}冊全件マッチング完了")
+        logger.info(f"awards resync v2: {updated}冊全件マッチング完了")
     except Exception as e:
-        print(f"awards resync v2 error: {e}")
+        logger.error(f"awards resync v2 error: %s", e)
 
 
 def _migrate_resync_awards_v3():
@@ -938,9 +942,9 @@ def _migrate_resync_awards_v3():
         execute(con, "INSERT INTO settings(key,value) VALUES('awards_resync_done_v3','v1') ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value")
         con.commit()
         con.close()
-        print(f"awards resync v3: {updated}冊全件マッチング完了")
+        logger.info(f"awards resync v3: {updated}冊全件マッチング完了")
     except Exception as e:
-        print(f"awards resync v3 error: {e}")
+        logger.error(f"awards resync v3 error: %s", e)
 
 
 def _migrate_resync_awards_v4():
@@ -964,9 +968,9 @@ def _migrate_resync_awards_v4():
         execute(con, "INSERT INTO settings(key,value) VALUES('awards_resync_done_v4','v1') ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value")
         con.commit()
         con.close()
-        print(f"awards resync v4: {updated}冊全件マッチング完了")
+        logger.info(f"awards resync v4: {updated}冊全件マッチング完了")
     except Exception as e:
-        print(f"awards resync v4 error: {e}")
+        logger.error(f"awards resync v4 error: %s", e)
 
 
 def _migrate_seed_award_books():
@@ -1002,9 +1006,9 @@ def _migrate_seed_award_books():
         cur.execute("INSERT INTO settings(key,value) VALUES('award_books_seed_done','v2') ON CONFLICT(key) DO UPDATE SET value='v2'")
         con.commit()
         con.close()
-        print(f"[award_books_seed] {len(_AWARD_BOOKS_SEED)}件投入完了")
+        logger.info(f"[award_books_seed] {len(_AWARD_BOOKS_SEED)}件投入完了")
     except Exception as e:
-        print(f"[award_books_seed] error: {e}")
+        logger.error(f"[award_books_seed] error: %s", e)
 
 
 def _migrate_pubdate_openbd():
@@ -1022,7 +1026,7 @@ def _migrate_pubdate_openbd():
         if not rows:
             return
         isbns = [r["isbn"] for r in rows]
-        print(f"[pubdate_openbd] {len(isbns)}冊のpubdateをOpenBDから取得します")
+        logger.info(f"[pubdate_openbd] {len(isbns)}冊のpubdateをOpenBDから取得します")
         updated = 0
         for i in range(0, len(isbns), 1000):
             batch = isbns[i:i + 1000]
@@ -1041,15 +1045,15 @@ def _migrate_pubdate_openbd():
                 con.commit()
                 con.close()
             except Exception as e:
-                print(f"[pubdate_openbd] batch error: {e}")
-        print(f"[pubdate_openbd] {updated}冊更新完了")
+                logger.error(f"[pubdate_openbd] batch error: %s", e)
+        logger.info(f"[pubdate_openbd] {updated}冊更新完了")
         con = get_con()
         execute(con, "INSERT INTO settings(key,value) VALUES('pubdate_openbd_done','v1') ON CONFLICT(key) DO UPDATE SET value='v1'")
         con.commit()
         con.close()
         threading.Thread(target=_migrate_pubdate_librarylife, daemon=True).start()
     except Exception as e:
-        print(f"[pubdate_openbd] error: {e}")
+        logger.error(f"[pubdate_openbd] error: %s", e)
 
 
 def _migrate_pubdate_librarylife():
@@ -1068,7 +1072,7 @@ def _migrate_pubdate_librarylife():
             return
         import time
         from services.books import fetch_book_detail
-        print(f"[pubdate_ll] {len(rows)}冊をlibrarylifeから補完します")
+        logger.info(f"[pubdate_ll] {len(rows)}冊をlibrarylifeから補完します")
         updated = 0
         for r in rows:
             try:
@@ -1083,13 +1087,13 @@ def _migrate_pubdate_librarylife():
                 time.sleep(1)
             except Exception:
                 pass
-        print(f"[pubdate_ll] {updated}冊補完完了")
+        logger.info(f"[pubdate_ll] {updated}冊補完完了")
         con = get_con()
         execute(con, "INSERT INTO settings(key,value) VALUES('pubdate_ll_done','v1') ON CONFLICT(key) DO UPDATE SET value='v1'")
         con.commit()
         con.close()
     except Exception as e:
-        print(f"[pubdate_ll] error: {e}")
+        logger.error(f"[pubdate_ll] error: %s", e)
 
 
 def _verify_tables():
@@ -1105,11 +1109,11 @@ def _verify_tables():
         con.close()
         missing = [t for t in _REQUIRED_TABLES if t not in existing]
         if missing:
-            print(f"[WARNING] テーブルが見つかりません: {missing}")
+            logger.warning(f" テーブルが見つかりません: {missing}")
         else:
-            print(f"[OK] 全テーブル確認済み ({len(_REQUIRED_TABLES)}件)")
+            logger.info(f"[OK] 全テーブル確認済み ({len(_REQUIRED_TABLES)}件)")
     except Exception as e:
-        print(f"table verify error: {e}")
+        logger.error(f"table verify error: %s", e)
 
 
 def _run_all_migrations():
@@ -1137,12 +1141,12 @@ def _run_all_migrations():
         try:
             step()
         except Exception as e:
-            print(f"[migration error] {step.__name__}: {e}")
+            logger.error(f"[migration error] {step.__name__}: %s", e)
 
 
 def _ensure_db():
     try:
         init_db()
     except Exception as e:
-        print(f"DB init error: {e}")
+        logger.error(f"DB init error: %s", e)
     threading.Thread(target=_run_all_migrations, daemon=True).start()

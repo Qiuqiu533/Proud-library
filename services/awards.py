@@ -1,9 +1,15 @@
+from __future__ import annotations
+import logging
 import json
+from typing import Any
+
+logger = logging.getLogger(__name__)
+
 from database import get_con, execute, fetchall, fetchone, USE_PG
 from services.utils import _ndc_to_genre, _keyword_genre
 
 
-def _normalize_pubdate(s):
+def _normalize_pubdate(s: str | None) -> str:
     """OpenBDのpubdate(YYYYMM or YYYYMMDD)をYYYY-MMに正規化してソートを統一する"""
     if not s:
         return ""
@@ -13,7 +19,7 @@ def _normalize_pubdate(s):
     return ""
 
 
-def _sync_awards_from_master(con, isbn, title, author):
+def _sync_awards_from_master(con: Any, isbn: str, title: str, author: str) -> None:
     """awards_masterを参照して genre_books.awards を自動設定する"""
     if not USE_PG:
         return
@@ -48,10 +54,10 @@ def _sync_awards_from_master(con, isbn, title, author):
                 (json.dumps(matched, ensure_ascii=False), isbn)
             )
     except Exception as e:
-        print(f"awards sync error: {e}")
+        logger.error(f"awards sync error: %s", e)
 
 
-def _insert_genre_books(con, genre_map):
+def _insert_genre_books(con: Any, genre_map: dict[str, list[dict[str, Any]]]) -> None:
     """ジャンルマップをDBに一括挿入（descriptionを保持しつつ更新）"""
     for genre, books in genre_map.items():
         for b in books:
