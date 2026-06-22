@@ -1153,7 +1153,7 @@ async function loadAdminNews() {
   });
   list.querySelectorAll(".news-edit").forEach(btn => {
     btn.addEventListener("click", () => {
-      const form = document.getElementById(`news-edit-form-${btn.dataset.id}`);
+      const form = list.querySelector(`[id="news-edit-form-${btn.dataset.id}"]`);
       if (form) form.style.display = form.style.display === "none" ? "block" : "none";
     });
   });
@@ -2107,6 +2107,7 @@ document.querySelectorAll(".board-tab").forEach(btn => {
     if (btn.dataset.btab === "staffchat") initStaffChat();
     if (btn.dataset.btab === "settings") loadAdminQr();
     if (btn.dataset.btab === "adminusers") loadAdminUsers();
+    if (btn.dataset.btab === "collections") loadAdminCollections();
     if (btn.dataset.btab === "bookdesc") {
       document.getElementById("descIsbn").value = "";
       document.getElementById("descText").value = "";
