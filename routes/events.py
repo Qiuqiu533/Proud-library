@@ -245,11 +245,12 @@ def api_admin_create_event():
     image_data  = (body.get("image_data")  or "").strip()
     post_news   = body.get("post_news", True)  # お知らせ自動投稿フラグ
 
+    ph = "%s" if USE_PG else "?"
     con = get_con()
     try:
-        execute(con, """
+        execute(con, f"""
             INSERT INTO events (title, description, event_date, event_time, location, capacity, entry_deadline, status, image_data)
-            VALUES (?,?,?,?,?,?,?,?,?)
+            VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph})
         """, (title, description, event_date, event_time, location, capacity, deadline, status, image_data))
 
         # お知らせに自動投稿
@@ -258,9 +259,9 @@ def api_admin_create_event():
             if event_date:
                 time_str = f" {event_time}" if event_time else ""
                 news_body = f"📅 {event_date}{time_str}" + (f"\n📍 {location}" if location else "") + (f"\n\n{description}" if description else "")
-            execute(con, """
+            execute(con, f"""
                 INSERT INTO announcements (title, body, category, image_url, event_date)
-                VALUES (?,?,?,?,?)
+                VALUES ({ph},{ph},{ph},{ph},{ph})
             """, (title, news_body, "イベント", image_data, event_date or None))
 
         con.commit()
