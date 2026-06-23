@@ -238,10 +238,11 @@ def api_user_forgot_password():
         con.close()
         return jsonify({"error": "部屋番号またはメールアドレスが一致しません"}), 400
     token = secrets.token_urlsafe(32)
+    ph = "%s" if USE_PG else "?"
     if USE_PG:
-        execute(con, "INSERT INTO password_reset_tokens (token, room, expires_at) VALUES (?, ?, NOW() + INTERVAL '30 minutes')", (token, room))
+        execute(con, f"INSERT INTO password_reset_tokens (token, room, expires_at) VALUES ({ph}, {ph}, NOW() + INTERVAL '30 minutes')", (token, room))
     else:
-        execute(con, "INSERT INTO password_reset_tokens (token, room, expires_at) VALUES (?, ?, datetime('now','+30 minutes'))", (token, room))
+        execute(con, f"INSERT INTO password_reset_tokens (token, room, expires_at) VALUES ({ph}, {ph}, datetime('now','+30 minutes'))", (token, room))
     con.commit(); con.close()
     sent = _send_reset_email(email, room, token)
     if not sent:
@@ -256,8 +257,9 @@ def api_user_reset_password():
     password = (body.get("password") or "").strip()
     if not token or not password or len(password) < 8:
         return jsonify({"error": "8文字以上の新しいパスワードを入力してください"}), 400
+    ph = "%s" if USE_PG else "?"
     con = get_con()
-    row = fetchone(con, "SELECT room, expires_at, used FROM password_reset_tokens WHERE token=?", (token,))
+    row = fetchone(con, f"SELECT room, expires_at, used FROM password_reset_tokens WHERE token={ph}", (token,))
     if not row:
         con.close()
         return jsonify({"error": "無効なリンクです"}), 400
@@ -265,23 +267,23 @@ def api_user_reset_password():
         con.close()
         return jsonify({"error": "このリンクはすでに使用済みです"}), 400
     if USE_PG:
-        exp_check = fetchone(con, "SELECT (expires_at < NOW()) AS expired FROM password_reset_tokens WHERE token=?", (token,))
+        exp_check = fetchone(con, f"SELECT (expires_at < NOW()) AS expired FROM password_reset_tokens WHERE token={ph}", (token,))
         if exp_check and exp_check["expired"]:
             con.close()
             return jsonify({"error": "リンクの有効期限が切れています。再度お申し込みください"}), 400
     else:
-        exp_check = fetchone(con, "SELECT (expires_at < datetime('now')) AS expired FROM password_reset_tokens WHERE token=?", (token,))
+        exp_check = fetchone(con, f"SELECT (expires_at < datetime('now')) AS expired FROM password_reset_tokens WHERE token={ph}", (token,))
         if exp_check and exp_check["expired"]:
             con.close()
             return jsonify({"error": "リンクの有効期限が切れています。再度お申し込みください"}), 400
     room = row["room"]
     h, s = _hash_password(password)
     if USE_PG:
-        execute(con, "UPDATE user_accounts SET password_hash=?, password_salt=?, pin=?, updated_at=NOW() WHERE room=?", (h, s, password, room))
-        execute(con, "UPDATE password_reset_tokens SET used=TRUE WHERE token=?", (token,))
+        execute(con, f"UPDATE user_accounts SET password_hash={ph}, password_salt={ph}, pin={ph}, updated_at=NOW() WHERE room={ph}", (h, s, password, room))
+        execute(con, f"UPDATE password_reset_tokens SET used=TRUE WHERE token={ph}", (token,))
     else:
-        execute(con, "UPDATE user_accounts SET password_hash=?, password_salt=?, pin=?, updated_at=datetime('now','localtime') WHERE room=?", (h, s, password, room))
-        execute(con, "UPDATE password_reset_tokens SET used=1 WHERE token=?", (token,))
+        execute(con, f"UPDATE user_accounts SET password_hash={ph}, password_salt={ph}, pin={ph}, updated_at=datetime('now','localtime') WHERE room={ph}", (h, s, password, room))
+        execute(con, f"UPDATE password_reset_tokens SET used=1 WHERE token={ph}", (token,))
     con.commit(); con.close()
     return jsonify({"ok": True})
 
