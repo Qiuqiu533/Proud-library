@@ -5759,19 +5759,28 @@ function initTimelineTab() {
   if (u) {
     if (shareArea) shareArea.style.display = "";
     if (loginNote) loginNote.style.display = "none";
-    // 読書記録からselect optionsを生成
+    // 読書記録からselect optionsを生成（read_<room>_<isbn> キー形式）
     const select = document.getElementById("timelineIsbnSelect");
     if (select && select.options.length <= 1) {
-      const rlog = JSON.parse(localStorage.getItem("readingLog_" + u.room) || "{}");
-      Object.entries(rlog).forEach(([isbn, val]) => {
-        const status = typeof val === "string" ? val : (val.status || "");
-        const title = typeof val === "object" ? (val.title || isbn) : isbn;
-        const opt = document.createElement("option");
-        opt.value = isbn;
-        opt.dataset.status = status;
-        opt.textContent = `${status ? "[" + status + "] " : ""}${title}`;
-        select.appendChild(opt);
-      });
+      const prefix = `read_${u.room}_`;
+      // recent_books キャッシュからISBN→タイトルのマップを作成
+      let titleMap = {};
+      try {
+        const recent = JSON.parse(localStorage.getItem("recent_books") || "[]");
+        recent.forEach(b => { if (b.isbn) titleMap[b.isbn] = b.title || b.isbn; });
+      } catch(e) {}
+      Object.keys(localStorage)
+        .filter(k => k.startsWith(prefix))
+        .forEach(k => {
+          const isbn = k.slice(prefix.length);
+          const status = localStorage.getItem(k) || "";
+          const title = titleMap[isbn] || isbn;
+          const opt = document.createElement("option");
+          opt.value = isbn;
+          opt.dataset.status = status;
+          opt.textContent = `${status ? "[" + status + "] " : ""}${title}`;
+          select.appendChild(opt);
+        });
     }
   } else {
     if (shareArea) shareArea.style.display = "none";
