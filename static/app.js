@@ -5140,7 +5140,7 @@ async function loadAwardBooks(award) {
 }
 
 async function initAwardsTab() {
-  const filterRow = document.getElementById("awardFilterRow");
+  const filterRow = document.getElementById("awardTabFilter");
   if (!filterRow || filterRow.dataset.loaded) return;
   filterRow.dataset.loaded = "1";
   try {
