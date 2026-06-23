@@ -147,6 +147,7 @@
       <button class="tab-btn" data-tab="fav" role="tab" aria-selected="false">❤️ お気に入り</button>
       <button class="tab-btn" data-tab="log" role="tab" aria-selected="false">📝 読書記録</button>
       <button class="tab-btn" data-tab="card" role="tab" aria-selected="false">🪪 会員証</button>
+      <button class="tab-btn" data-tab="events" role="tab" aria-selected="false">🎫 イベント</button>
       <button class="tab-btn" data-tab="news" role="tab" aria-selected="false">📢 お知らせ<span id="newsUnreadBadge" class="notif-badge" style="display:none"></span></button>
       <button class="tab-btn" data-tab="info" role="tab" aria-selected="false">🏛️ 開館情報</button>
       <button class="tab-btn" data-tab="request" role="tab" aria-selected="false">📬 リクエスト</button>
@@ -388,6 +389,12 @@
         <button class="log-filter-btn" data-status="読みたい">🔖 読みたい</button>
       </div>
       <div class="book-grid" id="logGrid"><div class="loading">読み込み中…</div></div>
+    </div>
+
+    <!-- Events tab -->
+    <div id="tab-events" class="tab-panel">
+      <h2 class="section-title">🎫 イベント申込</h2>
+      <div id="eventsList"><div class="loading">読み込み中…</div></div>
     </div>
 
     <!-- News tab -->
@@ -772,6 +779,7 @@
       <button class="board-tab" data-btab="newarrival">📥 新着登録</button>
       <button class="board-tab" data-btab="issues">📋 課題管理</button>
       <button class="board-tab" data-btab="brequest">📬 リクエスト</button>
+      <button class="board-tab" data-btab="events-admin">🎫 イベント管理</button>
       <button class="board-tab" data-btab="libschedule">🗓️ 休館日・イベント</button>
       <button class="board-tab" data-btab="calendar">📅 活動記録</button>
       <button class="board-tab" data-btab="staffchat">💬 チャット</button>
@@ -1319,6 +1327,64 @@
           <p style="font-size:0.75rem;color:#aaa;margin-top:16px;text-align:right">最終更新：2026-06-22</p>
         </div>
       </div><!-- end btab-roadmap -->
+
+      <!-- イベント管理パネル -->
+      <div id="btab-events-admin" class="board-tab-panel">
+        <h3>🎫 イベント管理</h3>
+
+        <!-- イベント作成フォーム -->
+        <div class="admin-card" style="margin-bottom:16px">
+          <h4>新規イベント作成</h4>
+          <div style="display:grid;gap:8px;max-width:600px">
+            <input type="text" id="evTitle" placeholder="タイトル（必須）" style="padding:6px 10px;border:1px solid #ccc;border-radius:6px">
+            <textarea id="evDesc" rows="3" placeholder="概要・詳細（任意）" style="padding:6px 10px;border:1px solid #ccc;border-radius:6px;resize:vertical"></textarea>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <div>
+                <label style="font-size:0.8rem;color:#555">開催日</label>
+                <input type="date" id="evDate" style="display:block;padding:6px 10px;border:1px solid #ccc;border-radius:6px">
+              </div>
+              <div>
+                <label style="font-size:0.8rem;color:#555">開始時刻</label>
+                <input type="time" id="evTime" style="display:block;padding:6px 10px;border:1px solid #ccc;border-radius:6px">
+              </div>
+              <div>
+                <label style="font-size:0.8rem;color:#555">場所</label>
+                <input type="text" id="evLocation" placeholder="集会室A" style="display:block;padding:6px 10px;border:1px solid #ccc;border-radius:6px">
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <div>
+                <label style="font-size:0.8rem;color:#555">定員（0=無制限）</label>
+                <input type="number" id="evCapacity" value="0" min="0" style="display:block;width:100px;padding:6px 10px;border:1px solid #ccc;border-radius:6px">
+              </div>
+              <div>
+                <label style="font-size:0.8rem;color:#555">申込締切</label>
+                <input type="date" id="evDeadline" style="display:block;padding:6px 10px;border:1px solid #ccc;border-radius:6px">
+              </div>
+              <div>
+                <label style="font-size:0.8rem;color:#555">ステータス</label>
+                <select id="evStatus" style="display:block;padding:6px 10px;border:1px solid #ccc;border-radius:6px">
+                  <option value="open">受付中</option>
+                  <option value="closed">締切</option>
+                  <option value="hidden">非公開</option>
+                </select>
+              </div>
+            </div>
+            <button onclick="createEvent()" class="btn" style="width:fit-content">作成する</button>
+            <p id="evCreateMsg" style="font-size:0.85rem;color:#c00;min-height:1.2em"></p>
+          </div>
+        </div>
+
+        <!-- イベント一覧（管理者） -->
+        <div id="adminEventsList"><div class="loading">読み込み中…</div></div>
+
+        <!-- 参加者一覧モーダル風エリア -->
+        <div id="adminEntriesArea" style="display:none;margin-top:16px">
+          <h4 id="adminEntriesTitle"></h4>
+          <div id="adminEntriesTable"></div>
+        </div>
+      </div><!-- end btab-events-admin -->
+
 
       <!-- Lib Schedule -->
       <div id="btab-libschedule" class="board-tab-panel">
