@@ -433,7 +433,9 @@ function _renderDescSection(isbn, book) {
     <button class="helpful-btn${helpfulVoted?' voted':''}" onclick="voteHelpful('${isbn}',this)" ${helpfulVoted?'disabled':''}>
       👍 参考になった${helpfulCount > 0 ? `<span class="helpful-count">${helpfulCount}</span>` : ''}
     </button></div>`;
-  placeholder.outerHTML = `<div class="modal-section"><h3>📄 内容・収録作品</h3><p class="book-desc">${esc(book.description)}</p>${dateTag}${aiScoreTag}${helpfulBtn}</div>`;
+  const aiDisclaimer = (!book.manual_review && book.ai_review_date)
+    ? `<p class="ai-disclaimer">※ AI生成の書評です。内容は正確でない場合があります。</p>` : "";
+  placeholder.outerHTML = `<div class="modal-section"><h3>📄 内容・収録作品</h3><p class="book-desc">${esc(book.description)}</p>${aiDisclaimer}${dateTag}${aiScoreTag}${helpfulBtn}</div>`;
 }
 
 async function voteHelpful(isbn, btn) {
