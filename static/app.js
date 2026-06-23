@@ -5726,7 +5726,7 @@ async function loadTimeline() {
       </div>`;
     }).join("");
   } catch(e) {
-    feed.innerHTML = '<div class="timeline-empty">読み込みに失敗しました</div>';
+    feed.innerHTML = `<div class="timeline-empty">読み込みに失敗しました: ${e.message}</div>`;
   }
 }
 

@@ -31,31 +31,29 @@ def _auth(body):
 def api_timeline_list():
     """タイムライン一覧を返す（最新50件）。"""
     con = get_con()
-    if USE_PG:
+    try:
         rows = fetchall(con, """
             SELECT id, isbn, title, author, cover, status, comment, nickname, created_at
             FROM reading_timeline ORDER BY created_at DESC LIMIT 50
         """)
-    else:
-        rows = fetchall(con, """
-            SELECT id, isbn, title, author, cover, status, comment, nickname, created_at
-            FROM reading_timeline ORDER BY created_at DESC LIMIT 50
-        """)
-    con.close()
-    result = []
-    for r in rows:
-        result.append({
-            "id": r["id"],
-            "isbn": r["isbn"],
-            "title": r["title"],
-            "author": r["author"],
-            "cover": r["cover"],
-            "status": r["status"],
-            "comment": r["comment"],
-            "nickname": r["nickname"] or "住民",
-            "created_at": str(r["created_at"])[:10],
-        })
-    return jsonify(result)
+        result = []
+        for r in rows:
+            result.append({
+                "id": r["id"],
+                "isbn": r["isbn"],
+                "title": r["title"],
+                "author": r["author"],
+                "cover": r["cover"],
+                "status": r["status"],
+                "comment": r["comment"],
+                "nickname": r["nickname"] or "住民",
+                "created_at": str(r["created_at"])[:10],
+            })
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        con.close()
 
 
 @timeline_bp.route("/api/timeline", methods=["POST"])
