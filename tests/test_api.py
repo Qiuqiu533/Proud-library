@@ -467,3 +467,143 @@ def test_invite_delete_unused(client):
                         headers={"X-Password": ""})
     assert res.status_code == 200
     assert res.get_json().get("ok")
+
+
+# ── イベント申込テスト ──────────────────────────────────────────────────────
+
+def _register_user(client, room="1-101", password="pass1234", email="test@example.com"):
+    client.post("/api/user/register", json={"room": room, "password": password, "email": email})
+
+
+def _get_event_id(client, title):
+    events = client.get("/api/events").get_json()
+    ev = next((e for e in events if e["title"] == title), None)
+    assert ev is not None, f"イベント '{title}' が見つかりません"
+    return ev["id"]
+
+
+def test_events_list_public(client):
+    """公開イベント一覧が取得できる"""
+    res = client.get("/api/events")
+    assert res.status_code == 200
+    assert isinstance(res.get_json(), list)
+
+
+def test_admin_create_and_list_event(client):
+    """管理者がイベント作成→一覧取得"""
+    res = client.post("/api/admin/events",
+                      json={"title": "読書会テスト", "event_date": "2026-08-01",
+                            "capacity": 10, "status": "open"},
+                      headers={"X-Password": ""})
+    assert res.status_code == 200
+    assert res.get_json()["ok"]
+
+    events = client.get("/api/events").get_json()
+    assert any(e["title"] == "読書会テスト" for e in events)
+
+
+def test_event_entry_and_cancel(client):
+    """住民がイベント申込→キャンセル"""
+    _register_user(client, room="1-201", password="test5678", email="u201@test.com")
+    client.post("/api/admin/events",
+                json={"title": "映画上映会テスト", "event_date": "2026-09-01",
+                      "capacity": 5, "status": "open"},
+                headers={"X-Password": ""})
+    event_id = _get_event_id(client, "映画上映会テスト")
+
+    res = client.post(f"/api/events/{event_id}/entry",
+                      json={"room": "1-201", "password": "test5678", "name": "テスト住民"})
+    assert res.status_code == 200
+    assert res.get_json()["status"] == "confirmed"
+
+    events = client.get("/api/events").get_json()
+    ev = next(e for e in events if e["id"] == event_id)
+    assert ev["confirmed"] == 1
+
+    res2 = client.delete(f"/api/events/{event_id}/entry",
+                         json={"room": "1-201", "password": "test5678"})
+    assert res2.status_code == 200
+
+
+def test_event_waitlist(client):
+    """定員超でキャンセル待ちに登録"""
+    _register_user(client, room="1-301", password="test5678", email="u301@test.com")
+    _register_user(client, room="1-302", password="test5678", email="u302@test.com")
+    client.post("/api/admin/events",
+                json={"title": "定員テスト", "event_date": "2026-10-01",
+                      "capacity": 1, "status": "open"},
+                headers={"X-Password": ""})
+    event_id = _get_event_id(client, "定員テスト")
+
+    r1 = client.post(f"/api/events/{event_id}/entry",
+                     json={"room": "1-301", "password": "test5678"})
+    assert r1.get_json()["status"] == "confirmed"
+
+    r2 = client.post(f"/api/events/{event_id}/entry",
+                     json={"room": "1-302", "password": "test5678"})
+    assert r2.get_json()["status"] == "waitlist"
+
+    events = client.get("/api/events").get_json()
+    ev = next(e for e in events if e["id"] == event_id)
+    assert ev["confirmed"] == 1 and ev["waitlist"] == 1
+
+
+def test_event_waitlist_promotion(client):
+    """確定者キャンセル→キャンセル待ちが繰り上がる"""
+    _register_user(client, room="1-401", password="test5678", email="u401@test.com")
+    _register_user(client, room="1-402", password="test5678", email="u402@test.com")
+    client.post("/api/admin/events",
+                json={"title": "繰り上げテスト", "event_date": "2026-11-01",
+                      "capacity": 1, "status": "open"},
+                headers={"X-Password": ""})
+    event_id = _get_event_id(client, "繰り上げテスト")
+
+    client.post(f"/api/events/{event_id}/entry", json={"room": "1-401", "password": "test5678"})
+    client.post(f"/api/events/{event_id}/entry", json={"room": "1-402", "password": "test5678"})
+
+    client.delete(f"/api/events/{event_id}/entry", json={"room": "1-401", "password": "test5678"})
+
+    entries = client.get(f"/api/admin/events/{event_id}/entries",
+                         headers={"X-Password": ""}).get_json()
+    room402 = next(e for e in entries if e["room"] == "1-402")
+    assert not room402["is_waitlist"]
+
+
+def test_event_duplicate_entry(client):
+    """同じ部屋番号で二重申込は409"""
+    _register_user(client, room="1-501", password="test5678", email="u501@test.com")
+    client.post("/api/admin/events",
+                json={"title": "重複テスト", "event_date": "2026-12-01",
+                      "capacity": 10, "status": "open"},
+                headers={"X-Password": ""})
+    event_id = _get_event_id(client, "重複テスト")
+
+    client.post(f"/api/events/{event_id}/entry", json={"room": "1-501", "password": "test5678"})
+    r2 = client.post(f"/api/events/{event_id}/entry", json={"room": "1-501", "password": "test5678"})
+    assert r2.status_code == 409
+
+
+def test_event_unauth_entry(client):
+    """未認証の申込は401"""
+    client.post("/api/admin/events",
+                json={"title": "認証テスト", "event_date": "2026-12-15",
+                      "capacity": 5, "status": "open"},
+                headers={"X-Password": ""})
+    event_id = _get_event_id(client, "認証テスト")
+    res = client.post(f"/api/events/{event_id}/entry",
+                      json={"room": "9999", "password": "wrong"})
+    assert res.status_code == 401
+
+
+def test_admin_delete_event(client):
+    """管理者がイベント削除"""
+    client.post("/api/admin/events",
+                json={"title": "削除テスト固有", "event_date": "2026-12-31",
+                      "capacity": 0, "status": "open"},
+                headers={"X-Password": ""})
+    event_id = _get_event_id(client, "削除テスト固有")
+    res = client.delete(f"/api/admin/events/{event_id}", headers={"X-Password": ""})
+    assert res.status_code == 200
+    assert res.get_json()["ok"]
+    events = client.get("/api/events").get_json()
+    assert not any(e["title"] == "削除テスト固有" for e in events)
