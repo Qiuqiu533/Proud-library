@@ -25,6 +25,7 @@ from routes.loans import loans_bp
 from routes.admin import admin_bp
 from routes.invite import invite_bp
 from routes.events import events_bp
+from routes.timeline import timeline_bp
 
 app.register_blueprint(pages_bp)
 app.register_blueprint(auth_bp)
@@ -36,6 +37,7 @@ app.register_blueprint(loans_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(invite_bp)
 app.register_blueprint(events_bp)
+app.register_blueprint(timeline_bp)
 
 # ── DB初期化・マイグレーション ──────────────────────────────────────────────
 from migrations import _ensure_db

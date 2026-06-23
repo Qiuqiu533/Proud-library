@@ -1380,6 +1380,53 @@ def _migrate_events():
         con.close()
 
 
+def _migrate_reading_timeline():
+    """reading_timeline テーブルを追加（読書タイムライン機能）。"""
+    if _migration_done("reading_timeline_v1"):
+        return
+    con = get_con()
+    try:
+        if USE_PG:
+            cur = con.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS reading_timeline (
+                    id SERIAL PRIMARY KEY,
+                    room TEXT NOT NULL,
+                    isbn TEXT NOT NULL,
+                    title TEXT DEFAULT '',
+                    author TEXT DEFAULT '',
+                    cover TEXT DEFAULT '',
+                    status TEXT NOT NULL,
+                    comment TEXT DEFAULT '',
+                    nickname TEXT DEFAULT '',
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_timeline_created ON reading_timeline(created_at DESC)")
+        else:
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS reading_timeline (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    room TEXT NOT NULL,
+                    isbn TEXT NOT NULL,
+                    title TEXT DEFAULT '',
+                    author TEXT DEFAULT '',
+                    cover TEXT DEFAULT '',
+                    status TEXT NOT NULL,
+                    comment TEXT DEFAULT '',
+                    nickname TEXT DEFAULT '',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+        con.commit()
+        _mark_migration_done("reading_timeline_v1")
+        logger.info("[migration] reading_timeline テーブル追加完了")
+    except Exception as e:
+        logger.error("[migration] reading_timeline error: %s", e)
+    finally:
+        con.close()
+
+
 def _run_all_migrations():
     """全マイグレーションをシングルスレッドで順次実行する（race condition防止）。"""
     steps = [
@@ -1406,6 +1453,7 @@ def _run_all_migrations():
         _migrate_invite_codes,         # 招待コードテーブル追加
         _migrate_audit_log,            # 管理者操作ログ
         _migrate_events,               # イベント申込テーブル
+        _migrate_reading_timeline,     # 読書タイムライン
         _verify_tables,
     ]
     for step in steps:

@@ -5688,3 +5688,128 @@ document.addEventListener("DOMContentLoaded", () => {
     btn.addEventListener("click", () => setTimeout(loadAdminEvents, 0));
   });
 });
+
+// ===== 読書タイムライン =====
+
+async function loadTimeline() {
+  const feed = document.getElementById("timelineFeed");
+  if (!feed) return;
+  feed.innerHTML = '<div class="loading">読み込み中…</div>';
+  try {
+    const res = await fetch("/api/timeline");
+    const posts = await res.json();
+    if (!posts.length) {
+      feed.innerHTML = '<div class="timeline-empty">📚 まだ投稿がありません。最初の読書記録をシェアしてみましょう！</div>';
+      return;
+    }
+    const u = residentSession || getCloudUser();
+    feed.innerHTML = posts.map(p => {
+      const statusIcon = p.status === "読んだ" ? "✅" : p.status === "読書中" ? "📖" : p.status === "借り中" ? "📦" : "🔖";
+      const cover = p.cover
+        ? `<img class="timeline-card-cover" src="${esc(p.cover)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+        : "";
+      const placeholder = `<div class="timeline-card-cover-placeholder" ${p.cover ? 'style="display:none"' : ''}>📖</div>`;
+      const delBtn = u ? `<button class="timeline-delete-btn" onclick="deleteTimelinePost(${p.id})">✕ 削除</button>` : "";
+      return `<div class="timeline-card" id="tl-${p.id}">
+        ${cover}${placeholder}
+        <div class="timeline-card-body">
+          <div class="timeline-card-title" onclick="openModal('${esc(p.isbn)}')" style="cursor:pointer">${esc(p.title) || p.isbn}</div>
+          <div class="timeline-card-author">${esc(p.author)}</div>
+          <div class="timeline-card-meta">
+            <span class="timeline-card-status">${statusIcon} ${esc(p.status)}</span>
+            <span class="timeline-card-nickname">👤 ${esc(p.nickname)}</span>
+            <span class="timeline-card-date">${p.created_at}</span>
+            ${delBtn}
+          </div>
+          ${p.comment ? `<div class="timeline-card-comment">💬 ${esc(p.comment)}</div>` : ""}
+        </div>
+      </div>`;
+    }).join("");
+  } catch(e) {
+    feed.innerHTML = '<div class="timeline-empty">読み込みに失敗しました</div>';
+  }
+}
+
+async function deleteTimelinePost(postId) {
+  const u = residentSession || getCloudUser();
+  if (!u || !confirm("この投稿を削除しますか？")) return;
+  const res = await fetch(`/api/timeline/${postId}`, {
+    method: "DELETE",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({room: u.room, password: u.password || u.pin || ""})
+  });
+  if (res.ok) {
+    document.getElementById(`tl-${postId}`)?.remove();
+  }
+}
+
+function initTimelineTab() {
+  const u = residentSession || getCloudUser();
+  const shareArea = document.getElementById("timelineShareArea");
+  const loginNote = document.getElementById("timelineLoginNote");
+
+  if (u) {
+    if (shareArea) shareArea.style.display = "";
+    if (loginNote) loginNote.style.display = "none";
+    // 読書記録からselect optionsを生成
+    const select = document.getElementById("timelineIsbnSelect");
+    if (select && select.options.length <= 1) {
+      const rlog = JSON.parse(localStorage.getItem("readingLog_" + u.room) || "{}");
+      Object.entries(rlog).forEach(([isbn, val]) => {
+        const status = typeof val === "string" ? val : (val.status || "");
+        const title = typeof val === "object" ? (val.title || isbn) : isbn;
+        const opt = document.createElement("option");
+        opt.value = isbn;
+        opt.dataset.status = status;
+        opt.textContent = `${status ? "[" + status + "] " : ""}${title}`;
+        select.appendChild(opt);
+      });
+    }
+  } else {
+    if (shareArea) shareArea.style.display = "none";
+    if (loginNote) loginNote.style.display = "";
+  }
+  loadTimeline();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll('.tab-btn[data-tab="timeline"]').forEach(btn => {
+    btn.addEventListener("click", () => setTimeout(initTimelineTab, 0));
+  });
+
+  const shareBtn = document.getElementById("timelineShareBtn");
+  if (shareBtn) shareBtn.addEventListener("click", async () => {
+    const u = residentSession || getCloudUser();
+    if (!u) return;
+    const select = document.getElementById("timelineIsbnSelect");
+    const isbn = select?.value;
+    if (!isbn) { alert("本を選んでください"); return; }
+    const status = select.options[select.selectedIndex]?.dataset.status || "";
+    const comment = document.getElementById("timelineComment")?.value || "";
+    const nickname = document.getElementById("timelineNickname")?.value || "";
+    const msg = document.getElementById("timelineShareMsg");
+
+    // book情報を取得
+    let title = "", author = "", cover = "";
+    try {
+      const r = await fetch(`/api/book/${isbn}`);
+      const b = await r.json();
+      title = b.title || ""; author = b.author || ""; cover = b.cover || "";
+    } catch(e) {}
+
+    msg.style.color = "#888"; msg.textContent = "投稿中…";
+    const res = await fetch("/api/timeline", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({room: u.room, password: u.password || u.pin || "", isbn, title, author, cover, status, comment, nickname})
+    });
+    const data = await res.json();
+    if (res.ok) {
+      msg.style.color = "#2a7a2a"; msg.textContent = "✅ シェアしました！";
+      document.getElementById("timelineComment").value = "";
+      loadTimeline();
+    } else {
+      msg.style.color = "#e05"; msg.textContent = data.error || "エラーが発生しました";
+    }
+  });
+});

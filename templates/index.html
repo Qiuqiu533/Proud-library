@@ -153,6 +153,7 @@
       <button class="tab-btn" data-tab="request" role="tab" aria-selected="false">📬 リクエスト</button>
       <button class="tab-btn" data-tab="reqlist" role="tab" aria-selected="false">📋 みんなのリクエスト一覧・投票</button>
       <button class="tab-btn" data-tab="awards" role="tab" aria-selected="false">🏆 受賞作</button>
+      <button class="tab-btn" data-tab="timeline" role="tab" aria-selected="false">📣 みんなの読書</button>
       <button class="tab-btn" data-tab="howto" role="tab" aria-selected="false">❓ 使い方</button>
     </div>
   </nav>
@@ -506,6 +507,34 @@
         </div>
         <div id="awardBooksList" style="display:flex;flex-direction:column;gap:10px">
           <div style="color:#aaa;font-size:0.9rem;padding:20px 0;text-align:center">読み込み中…</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="tab-timeline" class="tab-panel">
+      <div style="max-width:680px;margin:0 auto;padding:16px">
+        <h2 class="section-title">📣 みんなの読書タイムライン</h2>
+        <p class="section-desc">住民がシェアした読書記録です。本の感想や近況をぜひ共有してください。</p>
+        <div id="timelineShareArea" style="display:none">
+          <div class="timeline-share-box">
+            <h3 style="font-size:0.95rem;margin-bottom:8px">📖 読書記録をシェアする</h3>
+            <p style="font-size:0.8rem;color:#888;margin-bottom:10px">読書記録タブで登録した本を選んでシェアできます</p>
+            <select id="timelineIsbnSelect" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:8px;margin-bottom:8px;font-size:0.9rem">
+              <option value="">-- 本を選んでください --</option>
+            </select>
+            <input id="timelineNickname" type="text" placeholder="ニックネーム（任意・未入力で「住民」）" maxlength="20"
+              style="width:100%;padding:8px;border:1px solid #ddd;border-radius:8px;margin-bottom:8px;font-size:0.9rem;box-sizing:border-box">
+            <textarea id="timelineComment" placeholder="一言コメント（任意・200文字以内）" maxlength="200" rows="3"
+              style="width:100%;padding:8px;border:1px solid #ddd;border-radius:8px;margin-bottom:8px;font-size:0.9rem;resize:vertical;box-sizing:border-box"></textarea>
+            <button id="timelineShareBtn" class="btn-primary" style="width:100%">📣 タイムラインにシェアする</button>
+            <div id="timelineShareMsg" style="margin-top:6px;font-size:0.85rem;text-align:center"></div>
+          </div>
+        </div>
+        <div id="timelineLoginNote" style="display:none;text-align:center;padding:16px;color:#888;font-size:0.85rem">
+          ログインするとシェア機能が使えます
+        </div>
+        <div id="timelineFeed" style="margin-top:16px">
+          <div class="loading">読み込み中…</div>
         </div>
       </div>
     </div>
