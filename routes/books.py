@@ -1,7 +1,51 @@
 import json
+import logging
 import concurrent.futures
 import requests
 from flask import Blueprint, request, jsonify
+
+logger = logging.getLogger(__name__)
+
+
+def _ensure_collections_table():
+    """collections テーブルと sort_order カラムを保証する。"""
+    from database import get_con, USE_PG
+    con = get_con()
+    try:
+        if USE_PG:
+            cur = con.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS collections (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    description TEXT DEFAULT '',
+                    emoji TEXT DEFAULT '📚',
+                    isbns TEXT DEFAULT '[]',
+                    is_active BOOLEAN DEFAULT TRUE,
+                    sort_order INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cur.execute("ALTER TABLE collections ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0")
+        else:
+            try:
+                con.execute("""CREATE TABLE IF NOT EXISTS collections (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL,
+                    description TEXT DEFAULT '', emoji TEXT DEFAULT '📚',
+                    isbns TEXT DEFAULT '[]', is_active INTEGER DEFAULT 1,
+                    sort_order INTEGER DEFAULT 0,
+                    created_at TEXT DEFAULT (datetime('now','localtime')))""")
+            except Exception:
+                pass
+            try:
+                con.execute("ALTER TABLE collections ADD COLUMN sort_order INTEGER DEFAULT 0")
+            except Exception:
+                pass
+        con.commit()
+    except Exception as e:
+        logger.error("[collections] _ensure_table error: %s", e)
+    finally:
+        con.close()
 from config import (
     get_admin_password, get_board_password, OPENBD_API,
     _KANA_ROWS, FULL_STATS,
@@ -523,6 +567,7 @@ def api_awards_list():
 
 @books_bp.route("/api/collections")
 def api_collections_get():
+    _ensure_collections_table()
     con = get_con()
     show_all = request.args.get("all") == "1"
     try:
