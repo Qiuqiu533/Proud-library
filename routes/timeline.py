@@ -2,8 +2,44 @@ from flask import Blueprint, request, jsonify
 from database import get_con, execute, fetchall, fetchone, USE_PG
 from config import get_resident_password
 from services.utils import rate_limit
+import logging
 
+logger = logging.getLogger(__name__)
 timeline_bp = Blueprint("timeline", __name__)
+
+
+def _ensure_table():
+    """reading_timeline テーブルが存在しない場合に作成する。"""
+    con = get_con()
+    try:
+        if USE_PG:
+            cur = con.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS reading_timeline (
+                    id SERIAL PRIMARY KEY,
+                    room TEXT NOT NULL,
+                    isbn TEXT NOT NULL,
+                    title TEXT DEFAULT '',
+                    author TEXT DEFAULT '',
+                    cover TEXT DEFAULT '',
+                    status TEXT NOT NULL,
+                    comment TEXT DEFAULT '',
+                    nickname TEXT DEFAULT '',
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_timeline_created ON reading_timeline(created_at DESC)")
+        else:
+            con.execute("""CREATE TABLE IF NOT EXISTS reading_timeline (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, room TEXT NOT NULL,
+                isbn TEXT NOT NULL, title TEXT DEFAULT '', author TEXT DEFAULT '',
+                cover TEXT DEFAULT '', status TEXT NOT NULL, comment TEXT DEFAULT '',
+                nickname TEXT DEFAULT '', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
+        con.commit()
+    except Exception as e:
+        logger.error("[timeline] _ensure_table error: %s", e)
+    finally:
+        con.close()
 
 
 def _auth(body):
@@ -29,6 +65,7 @@ def _auth(body):
 
 @timeline_bp.route("/api/timeline", methods=["GET"])
 def api_timeline_list():
+    _ensure_table()
     """タイムライン一覧を返す（最新50件）。"""
     con = get_con()
     try:
@@ -59,6 +96,7 @@ def api_timeline_list():
 @timeline_bp.route("/api/timeline", methods=["POST"])
 @rate_limit(limit=5, window=60)
 def api_timeline_post():
+    _ensure_table()
     """読書記録をタイムラインにシェアする。"""
     body = request.get_json()
     room = _auth(body)
@@ -73,25 +111,30 @@ def api_timeline_post():
     comment = (body.get("comment")  or "").strip()[:200]
     nickname = (body.get("nickname") or "").strip()[:20]
 
-    if not isbn or status not in ("読んだ", "読書中", "読みたい", "借り中"):
-        return jsonify({"error": "ISBN・ステータスは必須です"}), 400
+    if not isbn:
+        return jsonify({"error": "ISBNは必須です"}), 400
+    if status not in ("読んだ", "読書中", "読みたい", "借り中"):
+        return jsonify({"error": f"ステータスが不正です: '{status}'"}), 400
 
     con = get_con()
-    # 同一room+isbnの既存投稿は更新
-    existing = fetchone(con, "SELECT id FROM reading_timeline WHERE room=? AND isbn=?", (room, isbn))
-    if existing:
-        execute(con, """
-            UPDATE reading_timeline SET status=?, comment=?, nickname=?, title=?, author=?, cover=?
-            WHERE room=? AND isbn=?
-        """, (status, comment, nickname, title, author, cover, room, isbn))
-    else:
-        execute(con, """
-            INSERT INTO reading_timeline (room, isbn, title, author, cover, status, comment, nickname)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (room, isbn, title, author, cover, status, comment, nickname))
-    con.commit()
-    con.close()
-    return jsonify({"ok": True})
+    try:
+        existing = fetchone(con, "SELECT id FROM reading_timeline WHERE room=? AND isbn=?", (room, isbn))
+        if existing:
+            execute(con, """
+                UPDATE reading_timeline SET status=?, comment=?, nickname=?, title=?, author=?, cover=?
+                WHERE room=? AND isbn=?
+            """, (status, comment, nickname, title, author, cover, room, isbn))
+        else:
+            execute(con, """
+                INSERT INTO reading_timeline (room, isbn, title, author, cover, status, comment, nickname)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (room, isbn, title, author, cover, status, comment, nickname))
+        con.commit()
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        con.close()
 
 
 @timeline_bp.route("/api/timeline/<int:post_id>", methods=["DELETE"])
