@@ -5813,3 +5813,83 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+
+// ===== 図書館だより =====
+
+async function loadNewsletterHistory() {
+  const el = document.getElementById("nlHistory");
+  if (!el) return;
+  const pw = boardPassword || "";
+  const res = await fetch("/api/newsletter", { headers: { "X-Password": pw } });
+  if (!res.ok) { el.textContent = "履歴を取得できませんでした"; return; }
+  const rows = await res.json();
+  if (!rows.length) { el.textContent = "送信履歴がありません"; return; }
+  el.innerHTML = `<table style="width:100%;border-collapse:collapse">
+    <thead><tr style="background:#f5f5f5">
+      <th style="padding:6px;text-align:left;border-bottom:1px solid #ddd">日時</th>
+      <th style="padding:6px;text-align:left;border-bottom:1px solid #ddd">件名</th>
+      <th style="padding:6px;text-align:center;border-bottom:1px solid #ddd">送信数</th>
+      <th style="padding:6px;text-align:left;border-bottom:1px solid #ddd">差出人</th>
+    </tr></thead>
+    <tbody>${rows.map(r => `<tr>
+      <td style="padding:6px;border-bottom:1px solid #eee">${String(r.created_at).slice(0,10)}</td>
+      <td style="padding:6px;border-bottom:1px solid #eee">${esc(r.title)}</td>
+      <td style="padding:6px;border-bottom:1px solid #eee;text-align:center">${r.sent_count}人</td>
+      <td style="padding:6px;border-bottom:1px solid #eee">${esc(r.created_by)}</td>
+    </tr>`).join("")}</tbody>
+  </table>`;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  // 文字数カウンター
+  const nlBody = document.getElementById("nlBody");
+  const nlBodyCount = document.getElementById("nlBodyCount");
+  if (nlBody && nlBodyCount) {
+    nlBody.addEventListener("input", () => { nlBodyCount.textContent = nlBody.value.length; });
+  }
+
+  // タブクリックで履歴ロード
+  document.querySelectorAll('.board-tab[data-btab="newsletter"]').forEach(btn => {
+    btn.addEventListener("click", () => setTimeout(loadNewsletterHistory, 0));
+  });
+
+  // 送信ボタン
+  const nlSendBtn = document.getElementById("nlSendBtn");
+  if (nlSendBtn) nlSendBtn.addEventListener("click", async () => {
+    const title = document.getElementById("nlTitle")?.value.trim();
+    const body = document.getElementById("nlBody")?.value.trim();
+    const senderName = document.getElementById("nlSender")?.value.trim() || "図書館運営チーム";
+    const msg = document.getElementById("nlMsg");
+
+    if (!title) { msg.style.color = "#e05"; msg.textContent = "件名を入力してください"; return; }
+    if (!body) { msg.style.color = "#e05"; msg.textContent = "本文を入力してください"; return; }
+    if (!confirm(`「${title}」をメール登録済みの全住民に送信します。よろしいですか？`)) return;
+
+    const pw = boardPassword || "";
+    msg.style.color = "#888"; msg.textContent = "送信中…（住民数によっては時間がかかります）";
+    nlSendBtn.disabled = true;
+
+    try {
+      const res = await fetch("/api/newsletter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: pw, title, body, sender_name: senderName })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        msg.style.color = "#2a7a2a";
+        msg.textContent = `✅ 送信完了：${data.sent}人に送信${data.failed ? `（${data.failed}件失敗）` : ""}`;
+        document.getElementById("nlTitle").value = "";
+        document.getElementById("nlBody").value = "";
+        if (nlBodyCount) nlBodyCount.textContent = "0";
+        loadNewsletterHistory();
+      } else {
+        msg.style.color = "#e05"; msg.textContent = data.error || "エラーが発生しました";
+      }
+    } catch(e) {
+      msg.style.color = "#e05"; msg.textContent = "通信エラーが発生しました";
+    } finally {
+      nlSendBtn.disabled = false;
+    }
+  });
+});

@@ -1427,6 +1427,44 @@ def _migrate_reading_timeline():
         con.close()
 
 
+def _migrate_newsletters():
+    """newsletters テーブルを追加（図書館だより機能）。"""
+    if _migration_done("newsletters_v1"):
+        return
+    con = get_con()
+    try:
+        if USE_PG:
+            cur = con.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS newsletters (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    body TEXT NOT NULL,
+                    sent_count INTEGER DEFAULT 0,
+                    created_by TEXT DEFAULT '',
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+        else:
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS newsletters (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    body TEXT NOT NULL,
+                    sent_count INTEGER DEFAULT 0,
+                    created_by TEXT DEFAULT '',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+        con.commit()
+        _mark_migration_done("newsletters_v1")
+        logger.info("[migration] newsletters テーブル追加完了")
+    except Exception as e:
+        logger.error("[migration] newsletters error: %s", e)
+    finally:
+        con.close()
+
+
 def _run_all_migrations():
     """全マイグレーションをシングルスレッドで順次実行する（race condition防止）。"""
     steps = [
@@ -1454,6 +1492,7 @@ def _run_all_migrations():
         _migrate_audit_log,            # 管理者操作ログ
         _migrate_events,               # イベント申込テーブル
         _migrate_reading_timeline,     # 読書タイムライン
+        _migrate_newsletters,          # 図書館だより
         _verify_tables,
     ]
     for step in steps:
