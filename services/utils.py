@@ -110,7 +110,7 @@ def _send_email_brevo(to_email: str, subject: str, body: str) -> bool:
     msg["To"]      = to_email
     msg.attach(MIMEText(body, "plain", "utf-8"))
     try:
-        with smtplib.SMTP("smtp-relay.brevo.com", 587, timeout=15) as server:
+        with smtplib.SMTP("smtp-relay.brevo.com", 587, timeout=8) as server:
             server.starttls()
             server.login(_BREVO_SMTP_USER, _BREVO_SMTP_PASSWORD)
             server.sendmail(msg["From"], [to_email], msg.as_string())
