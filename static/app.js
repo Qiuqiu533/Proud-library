@@ -5603,15 +5603,22 @@ async function createEvent() {
 
   // 画像データ取得（ファイル優先、なければURL）
   let image_data = "";
-  const imageFile = document.getElementById("evImageFile")?.files?.[0];
-  if (imageFile) {
-    image_data = await new Promise(resolve => {
-      const reader = new FileReader();
-      reader.onload = e => resolve(e.target.result);
-      reader.readAsDataURL(imageFile);
-    });
-  } else {
-    image_data = document.getElementById("evImageUrl")?.value?.trim() || "";
+  try {
+    const imageFile = document.getElementById("evImageFile")?.files?.[0];
+    if (imageFile) {
+      image_data = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result);
+        reader.onerror = () => reject(new Error("画像の読み込みに失敗しました"));
+        reader.readAsDataURL(imageFile);
+      });
+    } else {
+      image_data = document.getElementById("evImageUrl")?.value?.trim() || "";
+    }
+  } catch(imgErr) {
+    msg.style.color = "#c00";
+    msg.textContent = "❌ " + imgErr.message;
+    return;
   }
 
   const body = {
