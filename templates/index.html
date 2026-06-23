@@ -147,8 +147,7 @@
       <button class="tab-btn" data-tab="fav" role="tab" aria-selected="false">❤️ お気に入り</button>
       <button class="tab-btn" data-tab="log" role="tab" aria-selected="false">📝 読書記録</button>
       <button class="tab-btn" data-tab="card" role="tab" aria-selected="false">🪪 会員証</button>
-      <button class="tab-btn" data-tab="events" role="tab" aria-selected="false">🎫 イベント</button>
-      <button class="tab-btn" data-tab="news" role="tab" aria-selected="false">📢 お知らせ<span id="newsUnreadBadge" class="notif-badge" style="display:none"></span></button>
+      <button class="tab-btn" data-tab="news" role="tab" aria-selected="false">📢 お知らせ・イベント<span id="newsUnreadBadge" class="notif-badge" style="display:none"></span></button>
       <button class="tab-btn" data-tab="info" role="tab" aria-selected="false">🏛️ 開館情報</button>
       <button class="tab-btn" data-tab="request" role="tab" aria-selected="false">📬 リクエスト</button>
       <button class="tab-btn" data-tab="reqlist" role="tab" aria-selected="false">📋 みんなのリクエスト一覧・投票</button>
@@ -393,17 +392,21 @@
     </div>
 
     <!-- Events tab -->
-    <div id="tab-events" class="tab-panel">
-      <h2 class="section-title">🎫 イベント申込</h2>
-      <div id="eventsList"><div class="loading">読み込み中…</div></div>
-    </div>
-
-    <!-- News tab -->
+    <!-- News + Events unified tab -->
     <div id="tab-news" class="tab-panel">
       <div class="news-header">
         <h2 class="section-title">📢 お知らせ・イベント</h2>
       </div>
-      <div id="newsList" class="news-list"><div class="loading">読み込み中…</div></div>
+      <!-- フィルターボタン -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+        <button class="news-filter-btn active" data-filter="all">すべて</button>
+        <button class="news-filter-btn" data-filter="news">📢 お知らせのみ</button>
+        <button class="news-filter-btn" data-filter="events">🎫 イベントのみ</button>
+      </div>
+      <!-- お知らせ一覧 -->
+      <div id="newsList" class="news-list news-filter-section" data-section="news"><div class="loading">読み込み中…</div></div>
+      <!-- イベント一覧 -->
+      <div id="eventsList" class="news-filter-section" data-section="events" style="margin-top:16px"><div class="loading">読み込み中…</div></div>
     </div>
 
     <!-- Library info tab -->
@@ -1400,6 +1403,16 @@
                 </select>
               </div>
             </div>
+            <div>
+              <label style="font-size:0.8rem;color:#555">📸 画像（任意）</label>
+              <input type="file" id="evImageFile" accept="image/*" style="display:block;margin-top:4px;font-size:0.85rem">
+              <input type="text" id="evImageUrl" placeholder="または画像URLを入力" style="display:block;margin-top:4px;width:100%;padding:6px 10px;border:1px solid #ccc;border-radius:6px;font-size:0.85rem">
+              <img id="evImagePreview" src="" alt="" style="display:none;max-width:200px;max-height:120px;margin-top:6px;border-radius:6px;object-fit:cover">
+            </div>
+            <label style="display:flex;align-items:center;gap:8px;font-size:0.88rem;cursor:pointer">
+              <input type="checkbox" id="evPostNews" checked style="width:16px;height:16px">
+              📢 作成時にお知らせにも自動投稿する
+            </label>
             <button onclick="createEvent()" class="btn" style="width:fit-content">作成する</button>
             <p id="evCreateMsg" style="font-size:0.85rem;color:#c00;min-height:1.2em"></p>
           </div>

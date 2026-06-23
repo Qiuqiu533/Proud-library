@@ -1931,7 +1931,7 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
       document.getElementById("reqMsg").textContent = "";
     }
     if (btn.dataset.tab === "reqlist") loadReqList();
-    if (btn.dataset.tab === "news") loadNews();
+    if (btn.dataset.tab === "news") { loadNews(); loadEvents(); }
     if (btn.dataset.tab === "info") loadInfo();
     if (btn.dataset.tab === "card") { loadCard(); loadWishlistCard(); }
   });
@@ -2070,7 +2070,7 @@ document.getElementById("postNews")?.addEventListener("click", async () => {
     if (edWrap) { edWrap.style.display = "none"; document.getElementById("newsEventDate").value = ""; }
     clearNewsImage();
     loadAdminNews();
-    loadNews();
+    loadNews(); loadEvents();
   } else if (res.status === 401) {
     document.getElementById("newsMsg").textContent = "❌ パスワードが違います";
   } else {
@@ -5583,6 +5583,20 @@ async function createEvent() {
   const title = document.getElementById("evTitle")?.value?.trim();
   if (!title) { msg.textContent = "❌ タイトルを入力してください"; return; }
   msg.textContent = "作成中…";
+
+  // 画像データ取得（ファイル優先、なければURL）
+  let image_data = "";
+  const imageFile = document.getElementById("evImageFile")?.files?.[0];
+  if (imageFile) {
+    image_data = await new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = e => resolve(e.target.result);
+      reader.readAsDataURL(imageFile);
+    });
+  } else {
+    image_data = document.getElementById("evImageUrl")?.value?.trim() || "";
+  }
+
   const body = {
     title,
     description: document.getElementById("evDesc")?.value?.trim() || "",
@@ -5592,6 +5606,8 @@ async function createEvent() {
     capacity:    parseInt(document.getElementById("evCapacity")?.value) || 0,
     entry_deadline: document.getElementById("evDeadline")?.value || null,
     status:      document.getElementById("evStatus")?.value || "open",
+    image_data,
+    post_news:   document.getElementById("evPostNews")?.checked ?? true,
   };
   try {
     const res = await fetch("/api/admin/events", {
@@ -5600,11 +5616,15 @@ async function createEvent() {
       body: JSON.stringify(body)
     });
     if (res.ok) {
-      msg.textContent = "✅ 作成しました";
+      const postNews = body.post_news;
+      msg.textContent = "✅ 作成しました" + (postNews ? "（お知らせにも投稿済み）" : "");
       document.getElementById("evTitle").value = "";
       document.getElementById("evDesc").value = "";
+      if (document.getElementById("evImageFile")) document.getElementById("evImageFile").value = "";
+      if (document.getElementById("evImageUrl")) document.getElementById("evImageUrl").value = "";
+      if (document.getElementById("evImagePreview")) document.getElementById("evImagePreview").style.display = "none";
       loadAdminEvents();
-      setTimeout(() => { msg.textContent = ""; }, 3000);
+      setTimeout(() => { msg.textContent = ""; }, 4000);
     } else {
       const err = await res.json().catch(() => ({}));
       msg.textContent = "❌ " + (err.error || res.status);
@@ -5687,13 +5707,43 @@ async function removeEntry(eventId, entryId) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  // 住民側イベントタブ
-  document.querySelectorAll('.tab-btn[data-tab="events"]').forEach(btn => {
-    btn.addEventListener("click", () => setTimeout(loadEvents, 0));
-  });
   // 管理者イベント管理タブ
   document.querySelectorAll('.board-tab[data-btab="events-admin"]').forEach(btn => {
     btn.addEventListener("click", () => setTimeout(loadAdminEvents, 0));
+  });
+
+  // イベント画像プレビュー
+  const evImageFile = document.getElementById("evImageFile");
+  if (evImageFile) {
+    evImageFile.addEventListener("change", () => {
+      const f = evImageFile.files[0];
+      const preview = document.getElementById("evImagePreview");
+      if (f && preview) {
+        const reader = new FileReader();
+        reader.onload = e => { preview.src = e.target.result; preview.style.display = "block"; };
+        reader.readAsDataURL(f);
+      }
+    });
+  }
+  const evImageUrl = document.getElementById("evImageUrl");
+  if (evImageUrl) {
+    evImageUrl.addEventListener("input", () => {
+      const preview = document.getElementById("evImagePreview");
+      if (preview) { preview.src = evImageUrl.value; preview.style.display = evImageUrl.value ? "block" : "none"; }
+    });
+  }
+
+  // お知らせ・イベント統合タブのフィルターボタン
+  document.querySelectorAll(".news-filter-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".news-filter-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      const filter = btn.dataset.filter;
+      const newsSection = document.getElementById("newsList");
+      const eventsSection = document.getElementById("eventsList");
+      if (newsSection) newsSection.style.display = (filter === "events") ? "none" : "";
+      if (eventsSection) eventsSection.style.display = (filter === "news") ? "none" : "";
+    });
   });
 });
 
