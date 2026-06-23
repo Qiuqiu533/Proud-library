@@ -5595,8 +5595,10 @@ async function loadAdminEvents() {
 
 async function createEvent() {
   const msg = document.getElementById("evCreateMsg");
+  if (!msg) { alert("フォームが見つかりません。ページを再読み込みしてください。"); return; }
   const title = document.getElementById("evTitle")?.value?.trim();
   if (!title) { msg.textContent = "❌ タイトルを入力してください"; return; }
+  msg.style.color = "#555";
   msg.textContent = "作成中…";
 
   // 画像データ取得（ファイル優先、なければURL）
@@ -5632,6 +5634,7 @@ async function createEvent() {
     });
     if (res.ok) {
       const postNews = body.post_news;
+      msg.style.color = "#2e7d32";
       msg.textContent = "✅ 作成しました" + (postNews ? "（お知らせにも投稿済み）" : "");
       document.getElementById("evTitle").value = "";
       document.getElementById("evDesc").value = "";
@@ -5644,7 +5647,7 @@ async function createEvent() {
       const err = await res.json().catch(() => ({}));
       msg.textContent = "❌ " + (err.error || res.status);
     }
-  } catch(e) { msg.textContent = "❌ 通信エラー"; }
+  } catch(e) { msg.style.color = "#c00"; msg.textContent = "❌ 通信エラー: " + e.message; }
 }
 
 async function updateEventStatus(eventId, status) {

@@ -7,6 +7,25 @@ from services.utils import rate_limit
 events_bp = Blueprint("events", __name__)
 
 
+def _ensure_image_column():
+    """events テーブルに image_data カラムがなければ追加する。"""
+    con = get_con()
+    try:
+        if USE_PG:
+            cur = con.cursor()
+            cur.execute("ALTER TABLE events ADD COLUMN IF NOT EXISTS image_data TEXT DEFAULT ''")
+        else:
+            try:
+                con.execute("ALTER TABLE events ADD COLUMN image_data TEXT DEFAULT ''")
+            except Exception:
+                pass
+        con.commit()
+    except Exception:
+        pass
+    finally:
+        con.close()
+
+
 def _board_auth():
     return request.headers.get("X-Password") == get_board_password()
 
@@ -245,6 +264,7 @@ def api_admin_create_event():
     image_data  = (body.get("image_data")  or "").strip()
     post_news   = body.get("post_news", True)  # お知らせ自動投稿フラグ
 
+    _ensure_image_column()
     ph = "%s" if USE_PG else "?"
     con = get_con()
     try:
