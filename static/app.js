@@ -270,12 +270,9 @@ document.getElementById("forgotBtn").addEventListener("click", async () => {
     body: JSON.stringify({room, email})
   });
   const data = await res.json();
-  if (res.ok && data.token) {
-    _forgotResetToken = data.token;
-    document.getElementById("forgotStep1").style.display = "none";
-    document.getElementById("forgotStep2").style.display = "";
+  if (res.ok && data.ok) {
     msg.style.color = "#2a7a2a";
-    msg.textContent = "本人確認できました。新しいパスワードを入力してください。";
+    msg.textContent = "メールを送信しました。届いたリンクからパスワードを再設定してください（30分以内）。";
   } else {
     msg.style.color = "#e05";
     msg.textContent = data.error || "エラーが発生しました";
