@@ -817,6 +817,7 @@
       <button class="board-tab" data-btab="settings">⚙️ 設定</button>
       <button class="board-tab" data-btab="collections">🎯 特集管理</button>
       <button class="board-tab" data-btab="awarddb">🏆 受賞作DB</button>
+      <button class="board-tab" data-btab="newsletter">📨 図書館だより</button>
       <button class="board-tab" data-btab="guide">📖 操作ガイド</button>
       <button class="board-tab" data-btab="analytics">📊 分析・レポート</button>
       <button class="board-tab" data-btab="auditlog">🔍 操作ログ</button>
@@ -1769,6 +1770,31 @@
 
         <!-- 一覧 -->
         <div id="adminAwardList" style="font-size:0.85rem"></div>
+      </div>
+
+      <div id="btab-newsletter" class="board-tab-panel">
+        <h3>📨 図書館だより 一斉配信</h3>
+        <p style="color:#555;font-size:0.9rem;margin-bottom:12px">メールアドレスを登録している住民全員に送信されます。送信前に内容をよく確認してください。</p>
+        <div style="max-width:640px">
+          <div style="margin-bottom:10px">
+            <label style="font-weight:bold;display:block;margin-bottom:4px">件名（タイトル）</label>
+            <input id="nlTitle" type="text" maxlength="100" placeholder="例：6月の図書館だより" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:8px;font-size:0.95rem">
+          </div>
+          <div style="margin-bottom:10px">
+            <label style="font-weight:bold;display:block;margin-bottom:4px">本文</label>
+            <textarea id="nlBody" maxlength="5000" rows="12" placeholder="本文を入力してください（最大5000文字）&#10;&#10;例：&#10;いつも図書館をご利用いただきありがとうございます。&#10;6月の新着図書をご紹介します。&#10;..." style="width:100%;padding:8px;border:1px solid #ddd;border-radius:8px;font-size:0.95rem"></textarea>
+            <div style="text-align:right;font-size:0.8rem;color:#888"><span id="nlBodyCount">0</span> / 5000文字</div>
+          </div>
+          <div style="margin-bottom:10px">
+            <label style="font-weight:bold;display:block;margin-bottom:4px">差出人名（任意）</label>
+            <input id="nlSender" type="text" maxlength="30" placeholder="図書館運営チーム" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:8px;font-size:0.95rem">
+          </div>
+          <button id="nlSendBtn" class="btn-primary" style="width:100%;padding:12px;font-size:1rem">📨 一斉送信する</button>
+          <div id="nlMsg" style="margin-top:10px;text-align:center;font-size:0.9rem"></div>
+        </div>
+        <hr style="margin:24px 0">
+        <h4>送信履歴</h4>
+        <div id="nlHistory" style="font-size:0.9rem;color:#444"></div>
       </div>
 
       <div id="btab-guide" class="board-tab-panel">

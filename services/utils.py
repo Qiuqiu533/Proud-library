@@ -162,6 +162,28 @@ def _send_reset_email(to_email, room, token):
     return False
 
 
+def send_email(to_email: str, subject: str, body: str) -> bool:
+    """汎用メール送信（Brevo優先→Resendフォールバック）。"""
+    if _BREVO_SMTP_PASSWORD and _BREVO_SMTP_USER:
+        if _send_email_brevo(to_email, subject, body):
+            return True
+        logger.warning("Brevo失敗。Resendにフォールバック")
+    if _RESEND_API_KEY:
+        try:
+            res = _requests.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {_RESEND_API_KEY}", "Content-Type": "application/json"},
+                json={"from": "図書館 <onboarding@resend.dev>", "to": [to_email], "subject": subject, "text": body},
+                timeout=10
+            )
+            return res.status_code == 200
+        except Exception as e:
+            logger.error("Resend error: %s", e)
+            return False
+    logger.warning("メール設定なし（BREVO_SMTP_PASSWORD/RESEND_API_KEY 未設定）")
+    return False
+
+
 def auto_cleanup_images():
     """DB使用量が95%超の場合、古い画像データを自動削除する"""
     if not USE_PG:
