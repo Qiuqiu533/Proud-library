@@ -262,6 +262,7 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .book-desc { font-size: 0.88rem; color: #444; line-height: 1.75; }
 .manual-review-date { display: block; margin-top: 6px; font-size: 0.75rem; color: #888; text-align: right; }
 .desc-rating { display: block; margin-top: 3px; font-size: 0.75rem; color: #f57c00; text-align: right; }
+.ai-disclaimer { font-size: 0.75rem; color: #999; margin: 4px 0 2px; font-style: italic; }
 .helpful-row { margin-top: 10px; }
 .helpful-btn { background: none; border: 1px solid #ccc; border-radius: 20px; padding: 4px 14px; font-size: 0.82rem; color: #555; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s; }
 .helpful-btn:hover:not(:disabled) { border-color: #4caf50; color: #4caf50; background: #f1f8e9; }
@@ -316,9 +317,9 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .board-header-left { display: flex; align-items: center; gap: 10px; }
 .board-title { font-size: 1.1rem; font-weight: 700; }
 .board-close { padding: 7px 16px; background: rgba(255,255,255,0.15); color: white; border: 1.5px solid rgba(255,255,255,0.4); border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 0.85rem; }
-.board-tabs { background: white; border-bottom: 2px solid #e0dbd0; display: flex; padding: 0 16px; overflow-x: auto; white-space: nowrap; scrollbar-width: none; }
+.board-tabs { background: white; border-bottom: 2px solid #e0dbd0; display: flex; flex-wrap: wrap; padding: 4px 8px 0; gap: 1px; overflow-x: unset; white-space: nowrap; scrollbar-width: none; }
 .board-tabs::-webkit-scrollbar { display: none; }
-.board-tab { padding: 11px 18px; border: none; background: none; font-family: inherit; font-size: 0.9rem; color: #666; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all .2s; white-space: nowrap; }
+.board-tab { padding: 7px 12px; border: none; background: none; font-family: inherit; font-size: 0.82rem; color: #666; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all .2s; white-space: nowrap; }
 .board-tab.active { color: #2a3a6a; border-bottom-color: #2a3a6a; font-weight: 600; }
 .board-body { flex: 1; overflow-y: auto; padding: 24px; max-width: 900px; margin: 0 auto; width: 100%; }
 .board-tab-panel { display: none; }
