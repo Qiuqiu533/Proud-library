@@ -5411,3 +5411,281 @@ document.addEventListener("DOMContentLoaded", () => {
     btn.addEventListener("click", () => setTimeout(loadAdminAwardBooks, 0));
   });
 });
+
+
+// ── イベント申込機能 ──────────────────────────────────────────────────────────
+
+// 住民側: イベント一覧表示
+async function loadEvents() {
+  const el = document.getElementById("eventsList");
+  if (!el) return;
+  try {
+    const res = await fetch("/api/events");
+    const events = await res.json();
+    if (!events.length) {
+      el.innerHTML = '<p style="color:#888;text-align:center;padding:32px">現在申込受付中のイベントはありません。</p>';
+      return;
+    }
+    const user = residentSession || getCloudUser() || {};
+    el.innerHTML = events.map(ev => _renderEventCard(ev, user)).join("");
+  } catch(e) {
+    el.innerHTML = `<div style="color:#c44;padding:16px">読み込みエラー</div>`;
+  }
+}
+
+function _renderEventCard(ev, user) {
+  const statusLabel = {"open":"受付中","closed":"締切","cancelled":"中止","hidden":"非公開"}[ev.status] || ev.status;
+  const cap = ev.capacity || 0;
+  const pct = cap > 0 ? Math.min(100, Math.round(ev.confirmed / cap * 100)) : 0;
+  const barColor = pct >= 100 ? "#e44" : pct >= 80 ? "#f90" : "#4a9";
+  const deadline = ev.entry_deadline ? `申込締切: ${ev.entry_deadline}` : "";
+  const isLoggedIn = !!user.room;
+
+  let actionHtml = "";
+  if (isLoggedIn && ev.status === "open") {
+    actionHtml = `
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px">
+        <input id="evNote-${ev.id}" type="text" placeholder="メモ（任意）" style="flex:1;min-width:140px;padding:6px 10px;border:1px solid #ccc;border-radius:6px;font-size:0.85rem">
+        <button onclick="enterEvent(${ev.id})" class="btn btn-sm" style="white-space:nowrap">参加申込</button>
+        <button onclick="cancelEvent(${ev.id})" class="btn btn-sm btn-outline" style="white-space:nowrap">キャンセル</button>
+      </div>
+      <p id="evMsg-${ev.id}" style="font-size:0.82rem;color:#c00;min-height:1em;margin-top:4px"></p>`;
+  } else if (!isLoggedIn && ev.status === "open") {
+    actionHtml = `<p style="font-size:0.84rem;color:#888;margin-top:8px">ログインして申込できます。</p>`;
+  }
+
+  return `
+    <div class="news-card" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:4px">
+        <strong style="font-size:1rem">${esc(ev.title)}</strong>
+        <span class="news-tag" style="font-size:0.78rem">${statusLabel}</span>
+      </div>
+      ${ev.description ? `<p style="font-size:0.88rem;color:#444;margin:6px 0">${esc(ev.description)}</p>` : ""}
+      <div style="font-size:0.83rem;color:#555;display:flex;gap:12px;flex-wrap:wrap;margin:6px 0">
+        ${ev.event_date ? `<span>📅 ${ev.event_date}${ev.event_time ? " " + ev.event_time : ""}</span>` : ""}
+        ${ev.location ? `<span>📍 ${esc(ev.location)}</span>` : ""}
+        ${deadline ? `<span>⏰ ${deadline}</span>` : ""}
+      </div>
+      ${cap > 0 ? `
+        <div style="margin:8px 0">
+          <div style="display:flex;justify-content:space-between;font-size:0.8rem;color:#666;margin-bottom:3px">
+            <span>申込者数 ${ev.confirmed}/${cap}名${ev.waitlist > 0 ? ` （キャンセル待ち ${ev.waitlist}名）` : ""}</span>
+            <span>${pct}%</span>
+          </div>
+          <div style="background:#eee;border-radius:4px;height:6px">
+            <div style="background:${barColor};border-radius:4px;height:6px;width:${pct}%;transition:width 0.3s"></div>
+          </div>
+        </div>` : `<p style="font-size:0.82rem;color:#666;margin:4px 0">参加者 ${ev.confirmed}名（定員なし）${ev.waitlist > 0 ? ` ／ キャンセル待ち ${ev.waitlist}名` : ""}</p>`}
+      ${actionHtml}
+    </div>`;
+}
+
+async function enterEvent(eventId) {
+  const user = residentSession || getCloudUser() || {};
+  if (!user.room) { alert("ログインしてください"); return; }
+  const note = document.getElementById(`evNote-${eventId}`)?.value?.trim() || "";
+  const msg = document.getElementById(`evMsg-${eventId}`);
+  if (msg) msg.textContent = "送信中…";
+  try {
+    const res = await fetch(`/api/events/${eventId}/entry`, {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ room: user.room, password: user.password || residentPassword, name: user.name || user.room, note })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      if (msg) msg.textContent = data.status === "waitlist" ? "✅ キャンセル待ちで登録しました" : "✅ 申込完了しました！";
+      setTimeout(loadEvents, 1000);
+    } else {
+      if (msg) msg.textContent = "❌ " + (data.error || res.status);
+    }
+  } catch(e) { if (msg) msg.textContent = "❌ 通信エラー"; }
+}
+
+async function cancelEvent(eventId) {
+  const user = residentSession || getCloudUser() || {};
+  if (!user.room) { alert("ログインしてください"); return; }
+  if (!confirm("申込をキャンセルしますか？")) return;
+  const msg = document.getElementById(`evMsg-${eventId}`);
+  try {
+    const res = await fetch(`/api/events/${eventId}/entry`, {
+      method: "DELETE",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ room: user.room, password: user.password || residentPassword })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      if (msg) msg.textContent = "✅ キャンセルしました";
+      setTimeout(loadEvents, 1000);
+    } else {
+      if (msg) msg.textContent = "❌ " + (data.error || res.status);
+    }
+  } catch(e) { if (msg) msg.textContent = "❌ 通信エラー"; }
+}
+
+// ── 管理者: イベント管理 ──────────────────────────────────────────────────────
+
+async function loadAdminEvents() {
+  const el = document.getElementById("adminEventsList");
+  if (!el) return;
+  el.innerHTML = '<div class="loading">読み込み中…</div>';
+  try {
+    const res = await fetch("/api/admin/events", { headers: {"X-Password": boardPassword} });
+    const events = await res.json();
+    if (!Array.isArray(events) || !events.length) {
+      el.innerHTML = '<p style="color:#888;padding:16px">イベントがありません。上のフォームから作成してください。</p>';
+      return;
+    }
+    el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.85rem">
+      <thead><tr style="background:#f5f5f5">
+        <th style="padding:8px;text-align:left;border-bottom:1px solid #ddd">タイトル</th>
+        <th style="padding:8px;text-align:center;border-bottom:1px solid #ddd">開催日</th>
+        <th style="padding:8px;text-align:center;border-bottom:1px solid #ddd">確定</th>
+        <th style="padding:8px;text-align:center;border-bottom:1px solid #ddd">待ち</th>
+        <th style="padding:8px;text-align:center;border-bottom:1px solid #ddd">状態</th>
+        <th style="padding:8px;text-align:center;border-bottom:1px solid #ddd">操作</th>
+      </tr></thead>
+      <tbody>
+        ${events.map(ev => `
+          <tr id="evrow-${ev.id}">
+            <td style="padding:8px;border-bottom:1px solid #eee">${esc(ev.title)}</td>
+            <td style="padding:8px;text-align:center;border-bottom:1px solid #eee">${ev.event_date || "—"}</td>
+            <td style="padding:8px;text-align:center;border-bottom:1px solid #eee">${ev.confirmed}</td>
+            <td style="padding:8px;text-align:center;border-bottom:1px solid #eee">${ev.waitlist}</td>
+            <td style="padding:8px;text-align:center;border-bottom:1px solid #eee">
+              <select onchange="updateEventStatus(${ev.id}, this.value)" style="font-size:0.8rem;padding:2px 6px;border-radius:4px;border:1px solid #ccc">
+                <option value="open" ${ev.status==="open"?"selected":""}>受付中</option>
+                <option value="closed" ${ev.status==="closed"?"selected":""}>締切</option>
+                <option value="hidden" ${ev.status==="hidden"?"selected":""}>非公開</option>
+              </select>
+            </td>
+            <td style="padding:8px;text-align:center;border-bottom:1px solid #eee;white-space:nowrap">
+              <button onclick="showAdminEntries(${ev.id}, '${esc(ev.title)}')" class="btn btn-sm">参加者</button>
+              <button onclick="deleteAdminEvent(${ev.id})" class="btn btn-sm btn-outline" style="color:#c00">削除</button>
+            </td>
+          </tr>`).join("")}
+      </tbody>
+    </table>`;
+  } catch(e) {
+    el.innerHTML = `<div style="color:#c44;padding:16px">エラー: ${e.message}</div>`;
+  }
+}
+
+async function createEvent() {
+  const msg = document.getElementById("evCreateMsg");
+  const title = document.getElementById("evTitle")?.value?.trim();
+  if (!title) { msg.textContent = "❌ タイトルを入力してください"; return; }
+  msg.textContent = "作成中…";
+  const body = {
+    title,
+    description: document.getElementById("evDesc")?.value?.trim() || "",
+    event_date:  document.getElementById("evDate")?.value || "",
+    event_time:  document.getElementById("evTime")?.value || "",
+    location:    document.getElementById("evLocation")?.value?.trim() || "",
+    capacity:    parseInt(document.getElementById("evCapacity")?.value) || 0,
+    entry_deadline: document.getElementById("evDeadline")?.value || null,
+    status:      document.getElementById("evStatus")?.value || "open",
+  };
+  try {
+    const res = await fetch("/api/admin/events", {
+      method: "POST",
+      headers: {"Content-Type":"application/json","X-Password": boardPassword},
+      body: JSON.stringify(body)
+    });
+    if (res.ok) {
+      msg.textContent = "✅ 作成しました";
+      document.getElementById("evTitle").value = "";
+      document.getElementById("evDesc").value = "";
+      loadAdminEvents();
+      setTimeout(() => { msg.textContent = ""; }, 3000);
+    } else {
+      const err = await res.json().catch(() => ({}));
+      msg.textContent = "❌ " + (err.error || res.status);
+    }
+  } catch(e) { msg.textContent = "❌ 通信エラー"; }
+}
+
+async function updateEventStatus(eventId, status) {
+  await fetch(`/api/admin/events/${eventId}`, {
+    method: "PATCH",
+    headers: {"Content-Type":"application/json","X-Password": boardPassword},
+    body: JSON.stringify({ status })
+  });
+}
+
+async function deleteAdminEvent(eventId) {
+  if (!confirm("このイベントを削除しますか？参加者データも全て削除されます。")) return;
+  const res = await fetch(`/api/admin/events/${eventId}`, {
+    method: "DELETE",
+    headers: {"Content-Type":"application/json","X-Password": boardPassword}
+  });
+  if (res.ok) {
+    document.getElementById(`evrow-${eventId}`)?.remove();
+    document.getElementById("adminEntriesArea").style.display = "none";
+  }
+}
+
+async function showAdminEntries(eventId, title) {
+  const area = document.getElementById("adminEntriesArea");
+  const titleEl = document.getElementById("adminEntriesTitle");
+  const tableEl = document.getElementById("adminEntriesTable");
+  area.style.display = "block";
+  titleEl.textContent = `「${title}」参加者一覧`;
+  tableEl.innerHTML = '<div class="loading">読み込み中…</div>';
+  try {
+    const res = await fetch(`/api/admin/events/${eventId}/entries`, { headers: {"X-Password": boardPassword} });
+    const entries = await res.json();
+    if (!entries.length) { tableEl.innerHTML = '<p style="color:#888">参加者はいません。</p>'; return; }
+    tableEl.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.85rem">
+      <thead><tr style="background:#f5f5f5">
+        <th style="padding:8px;text-align:left;border-bottom:1px solid #ddd">部屋番号</th>
+        <th style="padding:8px;text-align:left;border-bottom:1px solid #ddd">お名前</th>
+        <th style="padding:8px;text-align:left;border-bottom:1px solid #ddd">メモ</th>
+        <th style="padding:8px;text-align:center;border-bottom:1px solid #ddd">状態</th>
+        <th style="padding:8px;text-align:center;border-bottom:1px solid #ddd">申込日時</th>
+        <th style="padding:8px;text-align:center;border-bottom:1px solid #ddd">操作</th>
+      </tr></thead>
+      <tbody>
+        ${entries.map(e => `
+          <tr id="entry-${e.id}">
+            <td style="padding:8px;border-bottom:1px solid #eee">${esc(e.room)}</td>
+            <td style="padding:8px;border-bottom:1px solid #eee">${esc(e.name) || "—"}</td>
+            <td style="padding:8px;border-bottom:1px solid #eee">${esc(e.note) || "—"}</td>
+            <td style="padding:8px;text-align:center;border-bottom:1px solid #eee">
+              ${e.is_waitlist ? '<span style="color:#f80;font-weight:bold">待ち</span>' : '<span style="color:#4a9;font-weight:bold">確定</span>'}
+            </td>
+            <td style="padding:8px;text-align:center;border-bottom:1px solid #eee">${e.created_at}</td>
+            <td style="padding:8px;text-align:center;border-bottom:1px solid #eee">
+              <button onclick="removeEntry(${eventId}, ${e.id})" class="btn btn-sm btn-outline" style="color:#c00">削除</button>
+            </td>
+          </tr>`).join("")}
+      </tbody>
+    </table>`;
+  } catch(e) {
+    tableEl.innerHTML = `<div style="color:#c44">エラー: ${e.message}</div>`;
+  }
+}
+
+async function removeEntry(eventId, entryId) {
+  if (!confirm("この参加者を削除しますか？キャンセル待ちがいれば繰り上がります。")) return;
+  const res = await fetch(`/api/admin/events/${eventId}/entries/${entryId}`, {
+    method: "DELETE",
+    headers: {"Content-Type":"application/json","X-Password": boardPassword}
+  });
+  if (res.ok) {
+    document.getElementById(`entry-${entryId}`)?.remove();
+    // 参加者一覧を再読み込み（繰り上げ後の状態を反映）
+    setTimeout(() => showAdminEntries(eventId, document.getElementById("adminEntriesTitle")?.textContent?.replace(/「|」参加者一覧/g,"")), 500);
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  // 住民側イベントタブ
+  document.querySelectorAll('.tab-btn[data-tab="events"]').forEach(btn => {
+    btn.addEventListener("click", () => setTimeout(loadEvents, 0));
+  });
+  // 管理者イベント管理タブ
+  document.querySelectorAll('.board-tab[data-btab="events-admin"]').forEach(btn => {
+    btn.addEventListener("click", () => setTimeout(loadAdminEvents, 0));
+  });
+});
