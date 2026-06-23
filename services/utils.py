@@ -110,7 +110,7 @@ def _send_email_brevo(to_email: str, subject: str, body: str) -> bool:
     msg["To"]      = to_email
     msg.attach(MIMEText(body, "plain", "utf-8"))
     try:
-        with smtplib.SMTP("smtp-relay.brevo.com", 587) as server:
+        with smtplib.SMTP("smtp-relay.brevo.com", 587, timeout=15) as server:
             server.starttls()
             server.login(_BREVO_SMTP_USER, _BREVO_SMTP_PASSWORD)
             server.sendmail(msg["From"], [to_email], msg.as_string())
@@ -138,9 +138,11 @@ def _send_reset_email(to_email, room, token):
 """
     subject = "【プラウド船橋図書館】パスワードリセット"
 
-    # Brevo SMTP を優先
+    # Brevo SMTP を優先（失敗したらResendにフォールバック）
     if _BREVO_SMTP_PASSWORD and _BREVO_SMTP_USER:
-        return _send_email_brevo(to_email, subject, body)
+        if _send_email_brevo(to_email, subject, body):
+            return True
+        logger.warning("Brevo失敗。Resendにフォールバック")
 
     # フォールバック: Resend API
     if _RESEND_API_KEY:
