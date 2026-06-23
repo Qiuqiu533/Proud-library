@@ -1310,6 +1310,76 @@ def _migrate_audit_log():
         con.close()
 
 
+def _migrate_events():
+    """events / event_entries テーブルを追加（イベント申込機能）。"""
+    if _migration_done("events_v1"):
+        return
+    con = get_con()
+    try:
+        if USE_PG:
+            cur = con.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS events (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    description TEXT DEFAULT '',
+                    event_date TEXT NOT NULL,
+                    event_time TEXT DEFAULT '',
+                    location TEXT DEFAULT '',
+                    capacity INTEGER DEFAULT 0,
+                    entry_deadline TEXT DEFAULT '',
+                    status TEXT DEFAULT 'open',
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS event_entries (
+                    id SERIAL PRIMARY KEY,
+                    event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+                    room TEXT NOT NULL,
+                    name TEXT DEFAULT '',
+                    note TEXT DEFAULT '',
+                    is_waitlist BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    UNIQUE(event_id, room)
+                )
+            """)
+        else:
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    description TEXT DEFAULT '',
+                    event_date TEXT NOT NULL,
+                    event_time TEXT DEFAULT '',
+                    location TEXT DEFAULT '',
+                    capacity INTEGER DEFAULT 0,
+                    entry_deadline TEXT DEFAULT '',
+                    status TEXT DEFAULT 'open',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS event_entries (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_id INTEGER NOT NULL,
+                    room TEXT NOT NULL,
+                    name TEXT DEFAULT '',
+                    note TEXT DEFAULT '',
+                    is_waitlist INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(event_id, room)
+                )
+            """)
+        con.commit()
+        _mark_migration_done("events_v1")
+        logger.info("[migration] events テーブル追加完了")
+    except Exception as e:
+        logger.error("[migration] events error: %s", e)
+    finally:
+        con.close()
+
+
 def _run_all_migrations():
     """全マイグレーションをシングルスレッドで順次実行する（race condition防止）。"""
     steps = [
@@ -1335,6 +1405,7 @@ def _run_all_migrations():
         _migrate_wish_list_notify,     # 通知用カラム追加
         _migrate_invite_codes,         # 招待コードテーブル追加
         _migrate_audit_log,            # 管理者操作ログ
+        _migrate_events,               # イベント申込テーブル
         _verify_tables,
     ]
     for step in steps:

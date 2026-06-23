@@ -42,6 +42,9 @@ def rate_limit(limit=5, window=60):
         from functools import wraps
         @wraps(f)
         def wrapped(*args, **kwargs):
+            from flask import current_app
+            if current_app.config.get("TESTING"):
+                return f(*args, **kwargs)
             ip = request.headers.get("X-Forwarded-For", request.remote_addr or "unknown").split(",")[0].strip()
             key = f"{ip}:{f.__name__}"
             if not _check_rate_limit(key, limit, window):
