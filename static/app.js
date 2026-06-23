@@ -5102,20 +5102,28 @@ function _renderAwardBooks(books, query) {
   list.innerHTML = groups.map(g => `
     <div style="border:1px solid #e8e8e8;border-radius:10px;padding:12px 14px;background:#fff">
       <div style="font-size:0.78rem;color:#888;margin-bottom:6px">
-        ${esc(g.award)} 第${g.no}回（${g.year}年）
+        ${esc(g.award)}${g.no != null ? ` 第${g.no}回` : ""}（${g.year}年）
       </div>
-      ${g.books.map(b => `
+      ${g.books.map(b => {
+        const isbn = b.library_isbn || b.isbn13 || "";
+        const coverUrl = isbn ? `https://cover.openbd.jp/${isbn}.jpg` : "";
+        const coverHtml = coverUrl
+          ? `<img src="${coverUrl}" alt="" style="width:44px;height:60px;object-fit:cover;border-radius:4px;flex-shrink:0;background:#f0f0f0" onerror="this.style.display='none'">`
+          : `<div style="width:44px;height:60px;background:#f0f0f0;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.2rem">📖</div>`;
+        return `
         <div style="display:flex;align-items:center;gap:10px;margin-top:${g.books.length > 1 ? "8px" : "0"}">
-          <div style="flex:1">
-            <div style="font-size:0.95rem;font-weight:600;color:#222">${esc(b.title)}</div>
+          ${coverHtml}
+          <div style="flex:1;min-width:0">
+            <div style="font-size:0.95rem;font-weight:600;color:#222;line-height:1.3">${esc(b.title)}</div>
             <div style="font-size:0.82rem;color:#666;margin-top:2px">${esc(b.author)}</div>
           </div>
           ${b.in_library
-            ? `<span style="font-size:0.72rem;background:#e8f5e9;color:#2e7d32;padding:3px 8px;border-radius:12px;white-space:nowrap;cursor:pointer"
+            ? `<span style="font-size:0.72rem;background:#e8f5e9;color:#2e7d32;padding:3px 8px;border-radius:12px;white-space:nowrap;cursor:pointer;flex-shrink:0"
                  onclick="switchToBooksAndSearch('${esc(b.title).replace(/'/g,"\\'")}')">📖 蔵書あり</span>`
-            : `<span style="font-size:0.72rem;background:#f5f5f5;color:#aaa;padding:3px 8px;border-radius:12px;white-space:nowrap">未所蔵</span>`
+            : `<span style="font-size:0.72rem;background:#f5f5f5;color:#aaa;padding:3px 8px;border-radius:12px;white-space:nowrap;flex-shrink:0">未所蔵</span>`
           }
-        </div>`).join("")}
+        </div>`;
+      }).join("")}
     </div>`).join("");
 }
 

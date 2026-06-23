@@ -18,22 +18,35 @@ def api_award_books():
     else:
         rows = fetchall(con, "SELECT * FROM award_books WHERE status='確認済' ORDER BY award, award_year DESC, award_no DESC")
     con.close()
+    def _norm(s):
+        """タイトル・著者の正規化（スペース除去・全角半角統一）"""
+        import unicodedata
+        s = unicodedata.normalize("NFKC", s or "").strip()
+        return "".join(s.split())
+
     try:
         con2 = get_con()
         lib_rows = fetchall(con2, "SELECT isbn, title, author FROM genre_books")
         con2.close()
-        lib_map = {}
+        lib_map = {}       # (正規化タイトル, 正規化著者) → isbn
+        lib_title_map = {} # 正規化タイトルのみ → isbn（著者が異なる場合のフォールバック）
         for r in lib_rows:
-            key = (r["title"].strip(), r["author"].strip())
-            lib_map[key] = r["isbn"]
+            nt = _norm(r["title"])
+            na = _norm(r["author"])
+            lib_map[(nt, na)] = r["isbn"]
+            if nt not in lib_title_map:
+                lib_title_map[nt] = r["isbn"]
     except Exception:
         lib_map = {}
+        lib_title_map = {}
     result = []
     for r in rows:
         d = dict(r)
-        key = (d.get("title", "").strip(), d.get("author", "").strip())
-        d["in_library"] = key in lib_map
-        d["library_isbn"] = lib_map.get(key, "")
+        nt = _norm(d.get("title", ""))
+        na = _norm(d.get("author", ""))
+        isbn = lib_map.get((nt, na)) or lib_title_map.get(nt, "")
+        d["in_library"] = bool(isbn)
+        d["library_isbn"] = isbn
         result.append(d)
     return jsonify(result)
 
