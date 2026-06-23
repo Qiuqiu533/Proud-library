@@ -5815,18 +5815,26 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch(e) {}
 
     msg.style.color = "#888"; msg.textContent = "投稿中…";
-    const res = await fetch("/api/timeline", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({room: u.room, password: u.password || u.pin || "", isbn, title, author, cover, status, comment, nickname})
-    });
-    const data = await res.json();
-    if (res.ok) {
-      msg.style.color = "#2a7a2a"; msg.textContent = "✅ シェアしました！";
-      document.getElementById("timelineComment").value = "";
-      loadTimeline();
-    } else {
-      msg.style.color = "#e05"; msg.textContent = data.error || "エラーが発生しました";
+    shareBtn.disabled = true;
+    try {
+      const res = await fetch("/api/timeline", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({room: u.room, password: u.password || u.pin || "", isbn, title, author, cover, status, comment, nickname})
+      });
+      let data = {};
+      try { data = await res.json(); } catch(e) { data = {}; }
+      if (res.ok) {
+        msg.style.color = "#2a7a2a"; msg.textContent = "✅ シェアしました！";
+        document.getElementById("timelineComment").value = "";
+        loadTimeline();
+      } else {
+        msg.style.color = "#e05"; msg.textContent = data.error || `エラー (${res.status})`;
+      }
+    } catch(e) {
+      msg.style.color = "#e05"; msg.textContent = "通信エラーが発生しました";
+    } finally {
+      shareBtn.disabled = false;
     }
   });
 });
