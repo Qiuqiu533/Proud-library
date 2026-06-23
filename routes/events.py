@@ -140,7 +140,7 @@ def api_event_entry(event_id):
         confirmed, _ = _entry_count(con, event_id)
         capacity = ev["capacity"] or 0
         is_waitlist = capacity > 0 and confirmed >= capacity
-        wl_val = True if USE_PG else (1 if is_waitlist else 0)
+        wl_val = is_waitlist if USE_PG else (1 if is_waitlist else 0)
         if USE_PG:
             execute(con,
                 "INSERT INTO event_entries (event_id, room, name, note, is_waitlist) VALUES (%s,%s,%s,%s,%s)",
