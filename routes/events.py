@@ -228,39 +228,41 @@ def api_admin_events():
 
 @events_bp.route("/api/admin/events", methods=["POST"])
 def api_admin_create_event():
-    """イベント作成（管理者）"""
+    """イベント作成（管理者）。image_dataがあればannouncementsにも自動投稿。"""
     if not _board_auth():
         return jsonify({"error": "unauthorized"}), 401
     body = request.get_json() or {}
-    title    = (body.get("title")    or "").strip()
+    title       = (body.get("title")       or "").strip()
     if not title:
         return jsonify({"error": "タイトルは必須です"}), 400
+    description = (body.get("description") or "").strip()
+    event_date  = (body.get("event_date")  or "").strip()
+    event_time  = (body.get("event_time")  or "").strip()
+    location    = (body.get("location")    or "").strip()
+    capacity    = int(body.get("capacity") or 0)
+    deadline    = (body.get("entry_deadline") or "").strip() or None
+    status      = (body.get("status") or "open")
+    image_data  = (body.get("image_data")  or "").strip()
+    post_news   = body.get("post_news", True)  # お知らせ自動投稿フラグ
+
     con = get_con()
     try:
-        if USE_PG:
+        execute(con, """
+            INSERT INTO events (title, description, event_date, event_time, location, capacity, entry_deadline, status, image_data)
+            VALUES (?,?,?,?,?,?,?,?,?)
+        """, (title, description, event_date, event_time, location, capacity, deadline, status, image_data))
+
+        # お知らせに自動投稿
+        if post_news:
+            news_body = description or ""
+            if event_date:
+                time_str = f" {event_time}" if event_time else ""
+                news_body = f"📅 {event_date}{time_str}" + (f"\n📍 {location}" if location else "") + (f"\n\n{description}" if description else "")
             execute(con, """
-                INSERT INTO events (title, description, event_date, event_time, location, capacity, entry_deadline, status)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
-            """, (title,
-                  (body.get("description") or "").strip(),
-                  (body.get("event_date")  or "").strip(),
-                  (body.get("event_time")  or "").strip(),
-                  (body.get("location")    or "").strip(),
-                  int(body.get("capacity") or 0),
-                  (body.get("entry_deadline") or "").strip() or None,
-                  (body.get("status") or "open")))
-        else:
-            execute(con, """
-                INSERT INTO events (title, description, event_date, event_time, location, capacity, entry_deadline, status)
-                VALUES (?,?,?,?,?,?,?,?)
-            """, (title,
-                  (body.get("description") or "").strip(),
-                  (body.get("event_date")  or "").strip(),
-                  (body.get("event_time")  or "").strip(),
-                  (body.get("location")    or "").strip(),
-                  int(body.get("capacity") or 0),
-                  (body.get("entry_deadline") or "").strip() or None,
-                  (body.get("status") or "open")))
+                INSERT INTO announcements (title, body, category, image_url, event_date)
+                VALUES (?,?,?,?,?)
+            """, (title, news_body, "イベント", image_data, event_date or None))
+
         con.commit()
         con.close()
         log_action("イベント作成", title)

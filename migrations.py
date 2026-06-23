@@ -1465,6 +1465,29 @@ def _migrate_newsletters():
         con.close()
 
 
+def _migrate_events_image():
+    """events テーブルに image_data カラムを追加する。"""
+    if _migration_done("events_image_v1"):
+        return
+    con = get_con()
+    try:
+        if USE_PG:
+            cur = con.cursor()
+            cur.execute("ALTER TABLE events ADD COLUMN IF NOT EXISTS image_data TEXT DEFAULT ''")
+        else:
+            try:
+                con.execute("ALTER TABLE events ADD COLUMN image_data TEXT DEFAULT ''")
+            except Exception:
+                pass
+        con.commit()
+        _mark_migration_done("events_image_v1")
+        logger.info("[migration] events.image_data カラム追加完了")
+    except Exception as e:
+        logger.error("[migration] events_image error: %s", e)
+    finally:
+        con.close()
+
+
 def _migrate_collections_sort_order():
     """collections テーブルに sort_order カラムがなければ追加する。"""
     if _migration_done("collections_sort_order_v1"):
@@ -1517,6 +1540,7 @@ def _run_all_migrations():
         _migrate_reading_timeline,     # 読書タイムライン
         _migrate_newsletters,          # 図書館だより
         _migrate_collections_sort_order,  # collections.sort_order カラム追加
+        _migrate_events_image,             # events.image_data カラム追加
         _verify_tables,
     ]
     for step in steps:

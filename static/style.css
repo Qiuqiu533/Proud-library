@@ -917,3 +917,23 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .timeline-card-comment { font-size:0.85rem; color:#444; line-height:1.5; margin-top:4px; }
 .timeline-delete-btn { background:none; border:none; cursor:pointer; color:#c00; font-size:0.78rem; padding:2px 4px; margin-left:auto; }
 .timeline-empty { text-align:center; padding:40px; color:#aaa; font-size:0.9rem; }
+
+/* お知らせ・イベント統合タブ フィルターボタン */
+.news-filter-btn {
+  padding: 5px 14px;
+  border: 1px solid #ccc;
+  border-radius: 20px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: #555;
+  transition: background 0.15s, color 0.15s;
+}
+.news-filter-btn.active {
+  background: #3a5a3a;
+  color: #fff;
+  border-color: #3a5a3a;
+}
+.news-filter-btn:hover:not(.active) {
+  background: #f0f0f0;
+}
