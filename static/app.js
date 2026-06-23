@@ -5092,6 +5092,13 @@ function _renderAwardBooks(books, query) {
     list.innerHTML = `<div style="color:#aaa;font-size:0.9rem;padding:20px 0;text-align:center">${query ? "該当する作品がありません" : "受賞作データがありません"}</div>`;
     return;
   }
+  // タイトル+賞+年で重複除去
+  const seen = new Set();
+  books = books.filter(b => {
+    const dk = `${b.award}_${b.award_year}_${b.title}`;
+    if (seen.has(dk)) return false;
+    seen.add(dk); return true;
+  });
   const byYear = {};
   for (const b of books) {
     const k = `${b.award_year}_${b.award}`;
@@ -5151,6 +5158,14 @@ async function initAwardsTab() {
   try {
     const res = await fetch("/api/award-books/awards");
     const awards = await res.json();
+    const AWARD_ORDER = ["本屋大賞","本屋大賞ノミネート","直木賞","芥川賞","谷崎潤一郎賞","三島由紀夫賞","山本周五郎賞"];
+    awards.sort((a, b) => {
+      const ia = AWARD_ORDER.indexOf(a.award), ib = AWARD_ORDER.indexOf(b.award);
+      if (ia === -1 && ib === -1) return 0;
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    });
     const all = [{ award: "すべて", count: awards.reduce((s, a) => s + a.count, 0) }, ...awards];
     filterRow.innerHTML = all.map(a => `
       <button class="award-filter-btn${a.award === "すべて" ? " active" : ""}"

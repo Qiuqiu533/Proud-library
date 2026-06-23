@@ -48,8 +48,9 @@ def _auth(body):
     pw = (u.get("password") or "").strip()
     if not room or not pw:
         return None
+    ph = "%s" if USE_PG else "?"
     con = get_con()
-    row = fetchone(con, "SELECT room, pin, password_hash, password_salt FROM user_accounts WHERE room=?", (room,))
+    row = fetchone(con, f"SELECT room, pin, password_hash, password_salt FROM user_accounts WHERE room={ph}", (room,))
     con.close()
     if not row:
         return None
