@@ -1465,6 +1465,29 @@ def _migrate_newsletters():
         con.close()
 
 
+def _migrate_collections_sort_order():
+    """collections テーブルに sort_order カラムがなければ追加する。"""
+    if _migration_done("collections_sort_order_v1"):
+        return
+    con = get_con()
+    try:
+        if USE_PG:
+            cur = con.cursor()
+            cur.execute("ALTER TABLE collections ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0")
+        else:
+            try:
+                con.execute("ALTER TABLE collections ADD COLUMN sort_order INTEGER DEFAULT 0")
+            except Exception:
+                pass
+        con.commit()
+        _mark_migration_done("collections_sort_order_v1")
+        logger.info("[migration] collections.sort_order カラム追加完了")
+    except Exception as e:
+        logger.error("[migration] collections_sort_order error: %s", e)
+    finally:
+        con.close()
+
+
 def _run_all_migrations():
     """全マイグレーションをシングルスレッドで順次実行する（race condition防止）。"""
     steps = [
@@ -1493,6 +1516,7 @@ def _run_all_migrations():
         _migrate_events,               # イベント申込テーブル
         _migrate_reading_timeline,     # 読書タイムライン
         _migrate_newsletters,          # 図書館だより
+        _migrate_collections_sort_order,  # collections.sort_order カラム追加
         _verify_tables,
     ]
     for step in steps:
