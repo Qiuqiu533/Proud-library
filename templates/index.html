@@ -821,27 +821,47 @@
         <button id="boardClose" class="board-close">✕ 閉じる</button>
       </div>
     </div>
-    <div class="board-tabs">
-      <button class="board-tab active" data-btab="dashboard">🏠 ダッシュボード</button>
-      <button class="board-tab" data-btab="adminnews">📢 お知らせ</button>
-      <button class="board-tab" data-btab="bookdesc">📝 書評入力</button>
-      <button class="board-tab" data-btab="newarrival">📥 新着登録</button>
-      <button class="board-tab" data-btab="issues">📋 課題管理</button>
-      <button class="board-tab" data-btab="brequest">📬 リクエスト</button>
-      <button class="board-tab" data-btab="events-admin">🎫 イベント管理</button>
-      <button class="board-tab" data-btab="libschedule">🗓️ 休館日・イベント</button>
-      <button class="board-tab" data-btab="calendar">📅 活動記録</button>
-      <button class="board-tab" data-btab="staffchat">💬 チャット</button>
-      <button class="board-tab" data-btab="adminusers">👥 管理者設定</button>
-      <button class="board-tab" data-btab="invitecodes">🎟️ 招待コード</button>
-      <button class="board-tab" data-btab="settings">⚙️ 設定</button>
-      <button class="board-tab" data-btab="collections">🎯 特集管理</button>
-      <button class="board-tab" data-btab="awarddb">🏆 受賞作DB</button>
-      <button class="board-tab" data-btab="newsletter">📨 図書館だより</button>
-      <button class="board-tab" data-btab="guide">📖 操作ガイド</button>
-      <button class="board-tab" data-btab="analytics">📊 分析・レポート</button>
-      <button class="board-tab" data-btab="auditlog">🔍 操作ログ</button>
-      <button class="board-tab" data-btab="roadmap">🗺️ 公開ロードマップ</button>
+    <!-- グループタブ（上段） -->
+    <div class="board-group-tabs">
+      <button class="board-group-tab active" data-bgroup="content">📝 コンテンツ</button>
+      <button class="board-group-tab" data-bgroup="users">👥 利用者対応</button>
+      <button class="board-group-tab" data-bgroup="ops">⚙️ 運営管理</button>
+      <button class="board-group-tab" data-bgroup="analytics">📊 記録・分析</button>
+      <button class="board-group-tab" data-bgroup="guide">📋 ガイド</button>
+    </div>
+    <!-- サブタブ（下段） -->
+    <div class="board-tabs" id="board-subtabs">
+      <div class="board-subtab-group active" data-bgroup="content">
+        <button class="board-tab active" data-btab="adminnews">📢 お知らせ</button>
+        <button class="board-tab" data-btab="newarrival">📥 新着登録</button>
+        <button class="board-tab" data-btab="bookdesc">📝 書評入力</button>
+        <button class="board-tab" data-btab="collections">🎯 特集管理</button>
+        <button class="board-tab" data-btab="awarddb">🏆 受賞作DB</button>
+        <button class="board-tab" data-btab="newsletter">📨 図書館だより</button>
+      </div>
+      <div class="board-subtab-group" data-bgroup="users">
+        <button class="board-tab" data-btab="brequest">📬 リクエスト</button>
+        <button class="board-tab" data-btab="issues">📋 課題管理</button>
+        <button class="board-tab" data-btab="events-admin">🎫 イベント管理</button>
+      </div>
+      <div class="board-subtab-group" data-bgroup="ops">
+        <button class="board-tab" data-btab="dashboard">🏠 ダッシュボード</button>
+        <button class="board-tab" data-btab="adminusers">👥 管理者設定</button>
+        <button class="board-tab" data-btab="invitecodes">🎟️ 招待コード</button>
+        <button class="board-tab" data-btab="settings">⚙️ 設定</button>
+        <button class="board-tab" data-btab="libschedule">🗓️ 休館日</button>
+        <button class="board-tab" data-btab="calendar">📅 活動記録</button>
+      </div>
+      <div class="board-subtab-group" data-bgroup="analytics">
+        <button class="board-tab" data-btab="auditlog">🔍 操作ログ</button>
+        <button class="board-tab" data-btab="analytics">📊 分析・レポート</button>
+        <button class="board-tab" data-btab="staffchat">💬 チャット</button>
+      </div>
+      <div class="board-subtab-group" data-bgroup="guide">
+        <button class="board-tab" data-btab="guide">📖 操作ガイド</button>
+        <button class="board-tab" data-btab="manual">📋 運用マニュアル</button>
+        <button class="board-tab" data-btab="roadmap">🗺️ ロードマップ</button>
+      </div>
     </div>
     <div class="board-body">
 
