@@ -1907,9 +1907,16 @@ document.querySelectorAll(".kana-pill").forEach(btn => {
     currentKeyword = "";
     const si = document.getElementById("searchInput");
     if (si) si.value = "";
+    const kanaReset = document.getElementById("kanaResetBtn");
+    if (kanaReset) kanaReset.style.display = currentKana ? "inline-block" : "none";
     loadBooks("", 1);
   });
 });
+
+function resetKanaFilter() {
+  const allBtn = document.querySelector('.kana-pill[data-kana=""]');
+  if (allBtn) allBtn.click();
+}
 
 // perPageSelectの初期値をlocalStorageから復元
 (function() {
