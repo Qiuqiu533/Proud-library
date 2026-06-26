@@ -288,6 +288,51 @@ def api_user_reset_password():
     return jsonify({"ok": True})
 
 
+@user_bp.route("/api/user/account", methods=["GET"])
+def api_user_account():
+    room     = request.args.get("room", "").strip()
+    password = request.headers.get("X-Password", "").strip()
+    if not room or not password:
+        return jsonify({"error": "unauthorized"}), 401
+    con = get_con()
+    user = fetchone(con, "SELECT room, email, password_hash, password_salt, pin, updated_at FROM user_accounts WHERE room=?", (room,))
+    con.close()
+    if not user or not _user_auth_ok(user, password):
+        return jsonify({"error": "unauthorized"}), 401
+    return jsonify({
+        "room": user["room"],
+        "email": user.get("email") or "",
+        "updated_at": str(user.get("updated_at") or "")[:10],
+    })
+
+
+@user_bp.route("/api/user/account", methods=["DELETE"])
+def api_user_delete_account():
+    body     = request.get_json() or {}
+    room     = (body.get("room")     or "").strip()
+    password = (body.get("password") or "").strip()
+    if not room or not password:
+        return jsonify({"error": "unauthorized"}), 401
+    con = get_con()
+    user = fetchone(con, "SELECT password_hash, password_salt, pin FROM user_accounts WHERE room=?", (room,))
+    if not user or not _user_auth_ok(user, password):
+        con.close()
+        return jsonify({"error": "パスワードが違います"}), 401
+    loans = fetchall(con, "SELECT id FROM issues WHERE room=? AND returned_at IS NULL", (room,))
+    if loans:
+        con.close()
+        return jsonify({"error": f"貸出中の本が{len(loans)}冊あります。返却後に削除してください"}), 400
+    try:
+        execute(con, "DELETE FROM wish_list WHERE room=?", (room,))
+        execute(con, "DELETE FROM user_accounts WHERE room=?", (room,))
+        con.commit()
+        con.close()
+        return jsonify({"ok": True})
+    except Exception:
+        con.close()
+        return jsonify({"error": "削除処理中にエラーが発生しました"}), 500
+
+
 # --- Wish List ---
 def _wish_auth(body):
     """room + password で住民認証。成功時 room を返す、失敗時 None。"""

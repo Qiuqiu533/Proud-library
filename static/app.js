@@ -1965,6 +1965,7 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
     if (btn.dataset.tab === "news") { loadNews(); loadEvents(); }
     if (btn.dataset.tab === "info") loadInfo();
     if (btn.dataset.tab === "card") { loadCard(); loadWishlistCard(); }
+    if (btn.dataset.tab === "myaccount") loadMyAccount();
   });
 });
 
@@ -6123,3 +6124,177 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+
+// ===== マイアカウント =====
+async function loadMyAccount() {
+  const s = residentSession || getCloudUser();
+  if (!s) return;
+  const el = document.getElementById("myAccountContent");
+  if (!el) return;
+  try {
+    const res = await fetch(`/api/user/account?room=${encodeURIComponent(s.room)}`, {
+      headers: { "X-Password": s.password || s.pin || "" }
+    });
+    const data = await res.json();
+    if (!res.ok) { el.innerHTML = `<p style="color:#e05">${esc(data.error)}</p>`; return; }
+    el.innerHTML = `
+      <div style="background:#f9f9f9;border-radius:10px;padding:16px;margin-bottom:20px">
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee">
+          <span style="color:#888;font-size:0.9rem">部屋番号</span>
+          <span style="font-weight:600">${esc(data.room)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0">
+          <span style="color:#888;font-size:0.9rem">メールアドレス</span>
+          <span>${esc(data.email || '未登録')}</span>
+        </div>
+      </div>
+
+      <div style="margin-bottom:20px">
+        <h3 style="font-size:1rem;margin-bottom:10px">📧 メールアドレスを変更</h3>
+        <input id="newEmail" type="email" placeholder="新しいメールアドレス" value="${esc(data.email || '')}"
+          style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:0.95rem;box-sizing:border-box;margin-bottom:8px">
+        <input id="emailConfirmPw" type="password" placeholder="現在のパスワード（確認）"
+          style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:0.95rem;box-sizing:border-box;margin-bottom:8px">
+        <button onclick="updateMyEmail()" style="background:#3d6b4f;color:#fff;border:none;border-radius:8px;padding:10px 20px;cursor:pointer;font-size:0.9rem">変更する</button>
+        <span id="emailMsg" style="margin-left:10px;font-size:0.85rem"></span>
+      </div>
+
+      <div style="margin-bottom:20px">
+        <h3 style="font-size:1rem;margin-bottom:10px">🔑 パスワードを変更</h3>
+        <input id="oldPw" type="password" placeholder="現在のパスワード"
+          style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:0.95rem;box-sizing:border-box;margin-bottom:8px">
+        <input id="newPw" type="password" placeholder="新しいパスワード（8文字以上）"
+          style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:0.95rem;box-sizing:border-box;margin-bottom:8px">
+        <button onclick="changeMyPassword()" style="background:#3d6b4f;color:#fff;border:none;border-radius:8px;padding:10px 20px;cursor:pointer;font-size:0.9rem">変更する</button>
+        <span id="pwMsg" style="margin-left:10px;font-size:0.85rem"></span>
+      </div>
+
+      <div style="border-top:1px solid #eee;padding-top:20px;margin-top:10px">
+        <h3 style="font-size:1rem;color:#c00;margin-bottom:8px">⚠️ アカウントを削除</h3>
+        <p style="font-size:0.85rem;color:#888;margin-bottom:10px">削除すると登録情報・読書記録・ウィッシュリストがすべて消去されます。貸出中の本がある場合は削除できません。</p>
+        <input id="deletePw" type="password" placeholder="パスワードを入力して確認"
+          style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:0.95rem;box-sizing:border-box;margin-bottom:8px">
+        <button onclick="deleteMyAccount()" style="background:#c00;color:#fff;border:none;border-radius:8px;padding:10px 20px;cursor:pointer;font-size:0.9rem">アカウントを削除する</button>
+        <span id="deleteMsg" style="margin-left:10px;font-size:0.85rem"></span>
+      </div>
+    `;
+  } catch(e) {
+    el.innerHTML = '<p style="color:#e05">読み込みに失敗しました</p>';
+  }
+}
+
+async function updateMyEmail() {
+  const s = residentSession || getCloudUser();
+  if (!s) return;
+  const email = document.getElementById("newEmail").value.trim();
+  const pw = document.getElementById("emailConfirmPw").value.trim();
+  const msg = document.getElementById("emailMsg");
+  if (!email || !pw) { msg.style.color="#e05"; msg.textContent="入力してください"; return; }
+  const res = await fetch("/api/user/update-email", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ room: s.room, password: pw || s.pin, email })
+  });
+  const data = await res.json();
+  if (res.ok) { msg.style.color="#2a7a2a"; msg.textContent="✅ 変更しました"; }
+  else { msg.style.color="#e05"; msg.textContent=data.error||"エラー"; }
+}
+
+async function changeMyPassword() {
+  const s = residentSession || getCloudUser();
+  if (!s) return;
+  const oldPw = document.getElementById("oldPw").value.trim();
+  const newPw = document.getElementById("newPw").value.trim();
+  const msg = document.getElementById("pwMsg");
+  if (!oldPw || !newPw) { msg.style.color="#e05"; msg.textContent="入力してください"; return; }
+  const res = await fetch("/api/user/change-password", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ room: s.room, old_password: oldPw, new_password: newPw })
+  });
+  const data = await res.json();
+  if (res.ok) { msg.style.color="#2a7a2a"; msg.textContent="✅ 変更しました。再ログインしてください"; }
+  else { msg.style.color="#e05"; msg.textContent=data.error||"エラー"; }
+}
+
+async function deleteMyAccount() {
+  const s = residentSession || getCloudUser();
+  if (!s) return;
+  const pw = document.getElementById("deletePw").value.trim();
+  const msg = document.getElementById("deleteMsg");
+  if (!pw) { msg.style.color="#e05"; msg.textContent="パスワードを入力してください"; return; }
+  if (!confirm("本当にアカウントを削除しますか？この操作は取り消せません。")) return;
+  const res = await fetch("/api/user/account", {
+    method:"DELETE", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ room: s.room, password: pw })
+  });
+  const data = await res.json();
+  if (res.ok) {
+    alert("アカウントを削除しました。");
+    document.getElementById("logoutBtn").click();
+  } else { msg.style.color="#e05"; msg.textContent=data.error||"エラー"; }
+}
+
+// ===== フッター 利用規約・プライバシーポリシー =====
+function showLegalModal(type) {
+  const termsHTML = `
+    <h2 style="font-size:1.2rem;margin-bottom:4px">📋 利用規約</h2>
+    <p style="font-size:0.8rem;color:#888;margin-bottom:20px">制定：2026年6月26日</p>
+    <h3 style="font-size:0.95rem;margin:16px 0 6px">1. 利用資格</h3>
+    <p style="font-size:0.9rem;line-height:1.7">本アプリはプラウド船橋にお住まいの居住者（同居のご家族を含む）を対象としています。</p>
+    <h3 style="font-size:0.95rem;margin:16px 0 6px">2. アカウント登録</h3>
+    <ul style="font-size:0.9rem;line-height:1.9;padding-left:20px">
+      <li>登録には招待コードが必要です（管理組合にお問い合わせください）</li>
+      <li>部屋番号は正確にご入力ください</li>
+      <li>アカウントは登録者本人のみご利用いただけます</li>
+      <li>転居の際はアカウントの削除をお申し出ください</li>
+    </ul>
+    <h3 style="font-size:0.95rem;margin:16px 0 6px">3. 禁止事項</h3>
+    <ul style="font-size:0.9rem;line-height:1.9;padding-left:20px">
+      <li>他の利用者への誹謗中傷・迷惑行為</li>
+      <li>虚偽の評価・コメントの投稿</li>
+      <li>アカウントの第三者への譲渡・共有</li>
+      <li>本アプリの運営を妨害する行為</li>
+    </ul>
+    <h3 style="font-size:0.95rem;margin:16px 0 6px">4. 利用停止</h3>
+    <p style="font-size:0.9rem;line-height:1.7">以下の場合、アカウントを停止することがあります。</p>
+    <ul style="font-size:0.9rem;line-height:1.9;padding-left:20px">
+      <li>本規約に違反した場合</li>
+      <li>登録情報に虚偽があった場合</li>
+      <li>転居等により居住者でなくなった場合</li>
+    </ul>
+    <h3 style="font-size:0.95rem;margin:16px 0 6px">5. 免責</h3>
+    <p style="font-size:0.9rem;line-height:1.7">本アプリはボランティアにより運営されています。システム障害・メンテナンス等によるサービス停止について、運営側は責任を負いません。</p>
+    <p style="font-size:0.8rem;color:#888;margin-top:16px">なお、本を借りる際のルール（貸出期間・紛失対応等）は図書館内掲示のルールに従ってください。</p>
+  `;
+  const privacyHTML = `
+    <h2 style="font-size:1.2rem;margin-bottom:4px">🔒 プライバシーポリシー</h2>
+    <p style="font-size:0.8rem;color:#888;margin-bottom:20px">制定：2026年6月26日</p>
+    <h3 style="font-size:0.95rem;margin:16px 0 6px">1. 収集する情報</h3>
+    <ul style="font-size:0.9rem;line-height:1.9;padding-left:20px">
+      <li>部屋番号</li>
+      <li>メールアドレス（任意）</li>
+      <li>アプリ内での貸出・返却の記録</li>
+      <li>読書ステータス・評価・コメント（任意入力）</li>
+    </ul>
+    <h3 style="font-size:0.95rem;margin:16px 0 6px">2. 利用目的</h3>
+    <ul style="font-size:0.9rem;line-height:1.9;padding-left:20px">
+      <li>アプリのログイン認証</li>
+      <li>貸出状況の管理・確認</li>
+      <li>お知らせ・イベントのご案内（メール登録者のみ）</li>
+      <li>蔵書選定の参考（統計情報として利用）</li>
+    </ul>
+    <h3 style="font-size:0.95rem;margin:16px 0 6px">3. 第三者への提供</h3>
+    <p style="font-size:0.9rem;line-height:1.7">収集した情報を外部の第三者に提供することはありません。</p>
+    <h3 style="font-size:0.95rem;margin:16px 0 6px">4. 情報の管理</h3>
+    <ul style="font-size:0.9rem;line-height:1.9;padding-left:20px">
+      <li>情報はクラウドサービス上で管理されます</li>
+      <li>アクセスはアプリ管理者に限定されています</li>
+      <li>転居・退会の際はアカウントを削除します</li>
+    </ul>
+    <h3 style="font-size:0.95rem;margin:16px 0 6px">5. 登録情報の確認・修正・削除</h3>
+    <p style="font-size:0.9rem;line-height:1.7">登録情報の確認・修正・削除は「👤 マイアカウント」メニューからいつでもご自身で行えます。</p>
+    <h3 style="font-size:0.95rem;margin:16px 0 6px">6. 本ポリシーの変更</h3>
+    <p style="font-size:0.9rem;line-height:1.7">内容を変更する場合は、アプリ上でお知らせします。</p>
+  `;
+  document.getElementById("legalModalContent").innerHTML = type === "terms" ? termsHTML : privacyHTML;
+  document.getElementById("legalModal").style.display = "block";
+}
