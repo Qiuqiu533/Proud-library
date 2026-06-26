@@ -331,7 +331,9 @@ let currentPage = 1;
 let currentKeyword = "";
 let currentTotal = 0;
 let currentAward = "";   // 受賞フィルター
-let currentKana  = "";   // 50音フィルター
+let currentKana  = "";   // 50音フィルター（後方互換）
+let selectedKanas = new Set();  // 複数選択かな行
+let selectedAwards = new Set(); // 複数選択受賞賞
 
 // 受賞バッジスタイルマップ
 const AWARD_STYLE_MAP = {
@@ -1902,16 +1904,35 @@ document.querySelectorAll(".award-pill").forEach(btn => {
 
 document.querySelectorAll(".kana-pill").forEach(btn => {
   btn.addEventListener("click", () => {
-    document.querySelectorAll(".kana-pill").forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-    currentKana = btn.dataset.kana || "";
+    const kana = btn.dataset.kana || "";
+    if (kana === "") {
+      // 「全て」→選択をリセット
+      selectedKanas.clear();
+      document.querySelectorAll(".kana-pill").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+    } else {
+      // 行をトグル選択
+      const allBtn = document.querySelector('.kana-pill[data-kana=""]');
+      if (allBtn) allBtn.classList.remove("active");
+      if (selectedKanas.has(kana)) {
+        selectedKanas.delete(kana);
+        btn.classList.remove("active");
+      } else {
+        selectedKanas.add(kana);
+        btn.classList.add("active");
+      }
+      // 全解除なら「全て」をアクティブに
+      if (selectedKanas.size === 0) {
+        if (allBtn) allBtn.classList.add("active");
+      }
+    }
+    currentKana = [...selectedKanas].join(",");
     currentPage = 1;
-    // 50音フィルター選択時はキーワード検索をクリア（AND検索で0件になるため）
     currentKeyword = "";
     const si = document.getElementById("searchInput");
     if (si) si.value = "";
     const kanaReset = document.getElementById("kanaResetBtn");
-    if (kanaReset) kanaReset.style.display = currentKana ? "inline-block" : "none";
+    if (kanaReset) kanaReset.style.display = selectedKanas.size > 0 ? "inline-block" : "none";
     loadBooks("", 1);
   });
 });
@@ -5216,10 +5237,16 @@ async function loadAwardBooks(award) {
   if (!list) return;
   list.innerHTML = '<div style="color:#aaa;font-size:0.9rem;padding:20px 0;text-align:center">読み込み中…</div>';
   try {
-    const url = award ? `/api/award-books?award=${encodeURIComponent(award)}` : "/api/award-books";
-    const res = await fetch(url);
-    const books = await res.json();
-    _allAwardBooks = books;
+    // 全件キャッシュがなければ取得
+    if (!_allAwardBooks || _allAwardBooks.length === 0) {
+      const res = await fetch("/api/award-books");
+      _allAwardBooks = await res.json();
+    }
+    let books = _allAwardBooks;
+    // 複数賞フィルター
+    if (selectedAwards.size > 0) {
+      books = books.filter(b => (b.awards || []).some(a => selectedAwards.has(a.award)));
+    }
     const q = (document.getElementById("awardSearch")?.value || "").trim().toLowerCase();
     _renderAwardBooks(q ? books.filter(b => (b.title||"").toLowerCase().includes(q)||(b.author||"").toLowerCase().includes(q)) : books, q);
   } catch(e) {
@@ -5231,6 +5258,8 @@ async function initAwardsTab() {
   const filterRow = document.getElementById("awardTabFilter");
   if (!filterRow || filterRow.dataset.loaded) return;
   filterRow.dataset.loaded = "1";
+  _allAwardBooks = [];  // キャッシュリセット
+  selectedAwards.clear();
   try {
     const res = await fetch("/api/award-books/awards");
     const awards = await res.json();
@@ -5255,15 +5284,38 @@ async function initAwardsTab() {
 }
 
 function selectAwardFilter(btn) {
-  document.querySelectorAll(".award-filter-btn").forEach(b => {
-    b.style.background = "#fff"; b.style.color = "#444";
-    b.classList.remove("active");
-  });
-  btn.style.background = "#3d6b4f"; btn.style.color = "#fff";
-  btn.classList.add("active");
+  const award = btn.dataset.award || "";
+  if (award === "") {
+    // 「すべて」→全解除
+    selectedAwards.clear();
+    document.querySelectorAll(".award-filter-btn").forEach(b => {
+      b.style.background = "#fff"; b.style.color = "#444";
+      b.classList.remove("active");
+    });
+    btn.style.background = "#3d6b4f"; btn.style.color = "#fff";
+    btn.classList.add("active");
+  } else {
+    // 「すべて」ボタンを非アクティブに
+    const allBtn = document.querySelector('.award-filter-btn[data-award=""]');
+    if (allBtn) { allBtn.style.background = "#fff"; allBtn.style.color = "#444"; allBtn.classList.remove("active"); }
+    // トグル選択
+    if (selectedAwards.has(award)) {
+      selectedAwards.delete(award);
+      btn.style.background = "#fff"; btn.style.color = "#444";
+      btn.classList.remove("active");
+    } else {
+      selectedAwards.add(award);
+      btn.style.background = "#3d6b4f"; btn.style.color = "#fff";
+      btn.classList.add("active");
+    }
+    // 全解除なら「すべて」をアクティブに
+    if (selectedAwards.size === 0) {
+      if (allBtn) { allBtn.style.background = "#3d6b4f"; allBtn.style.color = "#fff"; allBtn.classList.add("active"); }
+    }
+  }
   const resetBtn = document.getElementById("awardResetBtn");
-  if (resetBtn) resetBtn.style.display = btn.dataset.award ? "inline-block" : "none";
-  loadAwardBooks(btn.dataset.award);
+  if (resetBtn) resetBtn.style.display = selectedAwards.size > 0 ? "inline-block" : "none";
+  loadAwardBooks("");
 }
 
 function resetAwardFilter() {
