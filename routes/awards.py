@@ -74,14 +74,15 @@ def api_post_award_book():
     author  = (data.get("author") or "").strip()
     year    = data.get("award_year")
     no      = data.get("award_no")
+    isbn13  = (data.get("isbn13") or "").strip()
     status  = (data.get("status") or "確認済").strip()
     if not award or not title:
         return jsonify({"error": "賞名とタイトルは必須です"}), 400
     if not USE_PG:
         return jsonify({"error": "PG only"}), 400
     con = get_con()
-    execute(con, "INSERT INTO award_books (award, award_no, award_year, title, author, status) VALUES (?,?,?,?,?,?)",
-            (award, no, year, title, author, status))
+    execute(con, "INSERT INTO award_books (award, award_no, award_year, title, author, isbn13, status) VALUES (?,?,?,?,?,?,?)",
+            (award, no, year, title, author, isbn13, status))
     con.commit()
     con.close()
     log_action("受賞作登録", f"{award}／{title}", f"著者={author} 年={year}")
