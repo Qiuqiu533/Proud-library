@@ -2924,7 +2924,8 @@ async function loadOpsStats() {
     <div class="stats-summary" style="flex-wrap:wrap;gap:12px;margin-bottom:20px">
       <div class="stat-card" style="cursor:pointer" title="クリックで会員一覧" onclick="showMemberList()"><div class="stat-num">${d.members}</div><div class="stat-label">👥 会員数</div></div>
       <div class="stat-card" style="cursor:pointer" title="クリックで貸出中一覧" onclick="showLoanedList()"><div class="stat-num">${d.loaned}</div><div class="stat-label">📤 現在貸出中</div></div>
-      <div class="stat-card"><div class="stat-num">${d.total_cached}</div><div class="stat-label">🔍 貸出状況確認済</div></div>
+      <div class="stat-card"><div class="stat-num">${d.total_books || 0}</div><div class="stat-label">📖 総蔵書数</div></div>
+      <div class="stat-card"><div class="stat-num">${d.total_wishes || 0}</div><div class="stat-label">💛 読みたいリスト</div></div>
       <div class="stat-card"><div class="stat-num">${d.total_votes || 0}</div><div class="stat-label">⭐ 評価投票数</div></div>
       <div class="stat-card"><div class="stat-num">${d.rated_books}</div><div class="stat-label">📚 評価された本</div></div>
     </div>

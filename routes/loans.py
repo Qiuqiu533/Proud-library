@@ -303,10 +303,13 @@ def api_ops_stats():
     try:
         loaned_row = fetchone(con, "SELECT COUNT(*) AS cnt FROM availability_cache WHERE status='loaned'")
         loaned = loaned_row["cnt"] if loaned_row else 0
-        total_cached_row = fetchone(con, "SELECT COUNT(*) AS cnt FROM availability_cache")
-        total_cached = total_cached_row["cnt"] if total_cached_row else 0
 
         genre_rows = fetchall(con, "SELECT genre, COUNT(*) AS cnt FROM genre_books GROUP BY genre ORDER BY cnt DESC LIMIT 10")
+        total_books_row = fetchone(con, "SELECT COUNT(*) AS cnt FROM genre_books")
+        total_books = total_books_row["cnt"] if total_books_row else 0
+
+        wish_row = fetchone(con, "SELECT COUNT(*) AS cnt FROM wish_list")
+        total_wishes = wish_row["cnt"] if wish_row else 0
 
         rating_row = fetchone(con, "SELECT COUNT(*) AS rated, SUM(votes) AS total_votes FROM ratings WHERE votes > 0")
         top_rated = fetchall(con, """
@@ -325,7 +328,8 @@ def api_ops_stats():
         con.close()
         return jsonify({
             "loaned": loaned,
-            "total_cached": total_cached,
+            "total_books": total_books,
+            "total_wishes": total_wishes,
             "genres": [{"genre": r["genre"] or "未分類", "cnt": r["cnt"]} for r in genre_rows],
             "rated_books": rating_row["rated"] if rating_row else 0,
             "total_votes": rating_row["total_votes"] if rating_row else 0,
