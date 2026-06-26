@@ -560,7 +560,7 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 /* .recent-thumb は mini-card に統合済み */
 
 /* ===== ジャンルフィルター ===== */
-.genre-select { display: none; padding: 7px 10px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; font-size: 0.85rem; outline: none; background: white; cursor: pointer; }
+.genre-select { display: inline-block; padding: 7px 10px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; font-size: 0.85rem; outline: none; background: white; cursor: pointer; max-width: 200px; }
 .genre-filter-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 14px; padding: 0 2px; }
 .genre-filter-label { font-size: 0.78rem; color: #888; font-weight: 600; flex-shrink: 0; }
 .genre-btn { display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; border: 1.5px solid #ccd9d2; border-radius: 20px; background: white; color: #556b5a; font-size: 0.8rem; font-weight: 500; cursor: pointer; transition: all .18s; font-family: inherit; white-space: nowrap; }
