@@ -5185,8 +5185,8 @@ function selectAwardFilter(btn) {
   });
   btn.style.background = "#3d6b4f"; btn.style.color = "#fff";
   btn.classList.add("active");
-  const resetBar = document.getElementById("awardResetBar");
-  if (resetBar) resetBar.style.display = btn.dataset.award ? "block" : "none";
+  const resetBtn = document.getElementById("awardResetBtn");
+  if (resetBtn) resetBtn.style.display = btn.dataset.award ? "inline-block" : "none";
   loadAwardBooks(btn.dataset.award);
 }
 

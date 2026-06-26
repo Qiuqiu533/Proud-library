@@ -504,9 +504,9 @@
             style="width:100%;padding:9px 36px 9px 12px;border:1px solid #ccc;border-radius:8px;font-size:0.9rem;box-sizing:border-box">
           <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#aaa;pointer-events:none">🔍</span>
         </div>
-        <div id="awardTabFilter" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px"></div>
-        <div id="awardResetBar" style="display:none;margin-bottom:8px">
-          <button onclick="resetAwardFilter()" style="font-size:0.8rem;background:none;border:none;color:#3d6b4f;cursor:pointer;text-decoration:underline;padding:0">✕ 絞り込みを解除</button>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px">
+          <div id="awardTabFilter" style="display:contents"></div>
+          <button id="awardResetBtn" onclick="resetAwardFilter()" style="display:none;padding:5px 14px;border-radius:16px;border:1.5px solid #c0392b;background:#fff;color:#c0392b;font-size:0.8rem;font-weight:600;cursor:pointer">× クリア</button>
         </div>
         <div id="awardBooksList" style="display:flex;flex-direction:column;gap:10px">
           <div style="color:#aaa;font-size:0.9rem;padding:20px 0;text-align:center">読み込み中…</div>
