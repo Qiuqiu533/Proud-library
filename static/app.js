@@ -5210,7 +5210,7 @@ function _renderAwardBooks(books, query) {
       </div>
       ${g.books.map(b => {
         const isbn = b.library_isbn || b.isbn13 || "";
-        const coverUrl = isbn ? `https://cover.openbd.jp/${isbn}.jpg` : "";
+        const coverUrl = get_cover_url_js(isbn);
         const coverHtml = coverUrl
           ? `<img src="${coverUrl}" alt="" style="width:44px;height:60px;object-fit:cover;border-radius:4px;flex-shrink:0;background:#f0f0f0" onerror="this.style.display='none'">`
           : `<div style="width:44px;height:60px;background:#f0f0f0;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.2rem">📖</div>`;
