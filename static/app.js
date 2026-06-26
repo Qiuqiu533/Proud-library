@@ -2818,6 +2818,71 @@ function _initAnalyticsSubTabs() {
   });
 }
 
+// ===== 統計ドリルダウンモーダル =====
+function _showStatsModal(title, html) {
+  let overlay = document.getElementById("statsModalOverlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "statsModalOverlay";
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px";
+    overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+  }
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:12px;max-width:560px;width:100%;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,0.18)">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #eee">
+        <h3 style="margin:0;font-size:1rem;color:#222">${title}</h3>
+        <button onclick="document.getElementById('statsModalOverlay').remove()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#888;line-height:1">×</button>
+      </div>
+      <div style="overflow-y:auto;padding:14px 18px;flex:1">${html}</div>
+    </div>`;
+  overlay.style.display = "flex";
+}
+
+async function showMemberList() {
+  _showStatsModal("👥 会員一覧", '<div style="color:#aaa;font-size:0.85rem">読み込み中…</div>');
+  const res = await fetch("/api/admin/members", { headers: { "X-Password": boardPassword } }).catch(() => null);
+  if (!res || !res.ok) { _showStatsModal("👥 会員一覧", '<div style="color:#c44">取得に失敗しました</div>'); return; }
+  const members = await res.json();
+  const html = `
+    <div style="font-size:0.82rem;color:#888;margin-bottom:10px">合計 ${members.length} 名</div>
+    <table style="width:100%;border-collapse:collapse;font-size:0.88rem">
+      <thead><tr style="border-bottom:2px solid #eee;text-align:left">
+        <th style="padding:6px 8px">部屋番号</th>
+        <th style="padding:6px 8px">メール</th>
+        <th style="padding:6px 8px">登録日</th>
+      </tr></thead>
+      <tbody>
+        ${members.map(m => `
+          <tr style="border-bottom:1px solid #f5f5f5">
+            <td style="padding:6px 8px;font-weight:600">${esc(m.room)}</td>
+            <td style="padding:6px 8px;color:#555;font-size:0.82rem">${m.email ? esc(m.email) : '<span style="color:#ccc">未登録</span>'}</td>
+            <td style="padding:6px 8px;color:#888">${m.created_at}</td>
+          </tr>`).join("")}
+      </tbody>
+    </table>`;
+  _showStatsModal("👥 会員一覧", html);
+}
+
+async function showLoanedList() {
+  _showStatsModal("📤 貸出中一覧", '<div style="color:#aaa;font-size:0.85rem">読み込み中…</div>');
+  const res = await fetch("/api/availability/loaned").catch(() => null);
+  if (!res || !res.ok) { _showStatsModal("📤 貸出中一覧", '<div style="color:#c44">取得に失敗しました</div>'); return; }
+  const books = await res.json();
+  if (!books.length) { _showStatsModal("📤 貸出中一覧", '<div style="color:#aaa;font-size:0.88rem">貸出中の本はありません</div>'); return; }
+  const html = `
+    <div style="font-size:0.82rem;color:#888;margin-bottom:10px">${books.length} 冊貸出中</div>
+    ${books.map(b => `
+      <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #f5f5f5">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:0.9rem;font-weight:600;color:#222">${esc(b.title || b.isbn)}</div>
+          ${b.author ? `<div style="font-size:0.78rem;color:#888">${esc(b.author)}</div>` : ""}
+        </div>
+        <div style="font-size:0.75rem;color:#aaa;white-space:nowrap">${String(b.updated_at||"").slice(0,10)}</div>
+      </div>`).join("")}`;
+  _showStatsModal("📤 貸出中一覧", html);
+}
+
 // ===== 運営統計 =====
 const _GENRE_LABEL = {
   "文芸小説": "文芸小説", "その他（要分類）": "その他", "児童学習漫画": "学習漫画",
@@ -2857,8 +2922,8 @@ async function loadOpsStats() {
 
   el.innerHTML = `
     <div class="stats-summary" style="flex-wrap:wrap;gap:12px;margin-bottom:20px">
-      <div class="stat-card"><div class="stat-num">${d.members}</div><div class="stat-label">👥 会員数</div></div>
-      <div class="stat-card"><div class="stat-num">${d.loaned}</div><div class="stat-label">📤 現在貸出中</div></div>
+      <div class="stat-card" style="cursor:pointer" title="クリックで会員一覧" onclick="showMemberList()"><div class="stat-num">${d.members}</div><div class="stat-label">👥 会員数</div></div>
+      <div class="stat-card" style="cursor:pointer" title="クリックで貸出中一覧" onclick="showLoanedList()"><div class="stat-num">${d.loaned}</div><div class="stat-label">📤 現在貸出中</div></div>
       <div class="stat-card"><div class="stat-num">${d.total_cached}</div><div class="stat-label">🔍 貸出状況確認済</div></div>
       <div class="stat-card"><div class="stat-num">${d.total_votes || 0}</div><div class="stat-label">⭐ 評価投票数</div></div>
       <div class="stat-card"><div class="stat-num">${d.rated_books}</div><div class="stat-label">📚 評価された本</div></div>

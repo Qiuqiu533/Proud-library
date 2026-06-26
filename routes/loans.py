@@ -274,6 +274,26 @@ def api_db_size():
         return jsonify({"error": str(e)}), 500
 
 
+@loans_bp.route("/api/admin/members")
+def api_admin_members():
+    """会員一覧（管理者）"""
+    if request.headers.get("X-Password") != get_board_password():
+        return jsonify({"error": "unauthorized"}), 401
+    ph = "%s" if USE_PG else "?"
+    con = get_con()
+    try:
+        rows = fetchall(con, "SELECT room, email, created_at FROM user_accounts ORDER BY created_at DESC")
+        con.close()
+        return jsonify([{
+            "room": r["room"],
+            "email": r["email"] or "",
+            "created_at": str(r["created_at"])[:10],
+        } for r in rows])
+    except Exception as e:
+        con.close()
+        return jsonify({"error": str(e)}), 500
+
+
 @loans_bp.route("/api/admin/ops-stats")
 def api_ops_stats():
     """運営統計: 貸出状況・評価・リクエスト対応サマリ"""
