@@ -5209,7 +5209,7 @@ function _renderAwardBooks(books, query) {
         ${esc(g.award)}${g.no != null ? ` 第${g.no}回` : ""}（${g.year}年）
       </div>
       ${g.books.map(b => {
-        const isbn = b.library_isbn || b.isbn13 || "";
+        const isbn = b.library_isbn || (b.isbn13 && b.isbn13.length >= 10 ? b.isbn13 : "") || "";
         const coverUrl = get_cover_url_js(isbn);
         const coverHtml = coverUrl
           ? `<img src="${coverUrl}" alt="" style="width:44px;height:60px;object-fit:cover;border-radius:4px;flex-shrink:0;background:#f0f0f0" onerror="this.style.display='none'">`
@@ -5606,20 +5606,18 @@ function _renderEventCard(ev, user) {
 
   return `
     <div class="news-card" style="margin-bottom:12px">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:4px">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <span style="font-size:0.72rem;background:#e8f0ff;color:#3a5cbf;padding:2px 8px;border-radius:10px;font-weight:600">📅 イベント</span>
-          <strong style="font-size:1rem">${esc(ev.title)}</strong>
-        </div>
-        <span class="news-tag" style="font-size:0.78rem">${statusLabel}</span>
+      <div class="news-meta">
+        <span class="news-cat cat-イベント">📅 イベント</span>
+        ${ev.event_date ? `<span class="news-date">📅 ${ev.event_date}${ev.event_time ? " " + ev.event_time : ""}</span>` : ""}
+        <span class="news-tag" style="font-size:0.78rem;margin-left:auto">${statusLabel}</span>
       </div>
-      ${ev.image_data ? `<img src="${esc(ev.image_data)}" alt="" style="width:100%;max-height:200px;object-fit:cover;border-radius:8px;margin:8px 0">` : ""}
-      ${ev.description ? `<p style="font-size:0.88rem;color:#444;margin:6px 0">${esc(ev.description)}</p>` : ""}
-      <div style="font-size:0.83rem;color:#555;display:flex;gap:12px;flex-wrap:wrap;margin:6px 0">
-        ${ev.event_date ? `<span>📅 ${ev.event_date}${ev.event_time ? " " + ev.event_time : ""}</span>` : ""}
+      <div class="news-title">${esc(ev.title)}</div>
+      ${ev.image_data ? `<img src="${esc(ev.image_data)}" alt="" style="width:100%;max-height:220px;object-fit:cover;border-radius:8px;margin:8px 0">` : ""}
+      ${ev.description ? `<div class="news-body">${esc(ev.description).replace(/\n/g,"<br>")}</div>` : ""}
+      ${ev.location || deadline ? `<div style="font-size:0.83rem;color:#555;display:flex;gap:12px;flex-wrap:wrap;margin:4px 0">
         ${ev.location ? `<span>📍 ${esc(ev.location)}</span>` : ""}
         ${deadline ? `<span>⏰ ${deadline}</span>` : ""}
-      </div>
+      </div>` : ""}
       ${cap > 0 ? `
         <div style="margin:8px 0">
           <div style="display:flex;justify-content:space-between;font-size:0.8rem;color:#666;margin-bottom:3px">
