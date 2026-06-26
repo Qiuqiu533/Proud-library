@@ -1385,7 +1385,7 @@ async function loadInfo() {
 
   document.getElementById("infoCard").innerHTML = `
     <h2>📍 ${info.name}</h2>
-    <div class="info-row"><span class="info-label">所在地</span><span class="info-value">${info.location}</span></div>
+    <div class="info-row"><span class="info-label">所在地</span><span class="info-value">${info.zip ? info.zip + "　" : ""}${info.location}</span></div>
     <div class="info-row"><span class="info-label">開館時間</span><span class="info-value">${hoursHtml}</span></div>
     <div class="info-row info-row-cal">
       <span class="info-label">休館日・イベント</span>
