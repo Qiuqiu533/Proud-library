@@ -145,11 +145,13 @@ def api_books_by_genre():
     if genre:
         conditions.append(f"genre={ph}")
         params_base.append(genre)
-    if kana_row and kana_row in _KANA_ROWS:
-        chars = _KANA_ROWS[kana_row]
-        kana_conds = " OR ".join([f"title_yomi LIKE {ph}" for _ in chars])
-        conditions.append(f"({kana_conds})")
-        params_base.extend([c + "%" for c in chars])
+    if kana_row:
+        selected_rows = [r for r in kana_row.split(",") if r in _KANA_ROWS]
+        if selected_rows:
+            all_chars = [c for r in selected_rows for c in _KANA_ROWS[r]]
+            kana_conds = " OR ".join([f"title_yomi LIKE {ph}" for _ in all_chars])
+            conditions.append(f"({kana_conds})")
+            params_base.extend([c + "%" for c in all_chars])
     if keyword:
         like = f"%{keyword}%"
         like_kata = f"%{_hira_to_kata(keyword)}%"
