@@ -2266,6 +2266,23 @@ function openBoardPanel() {
   loadDashboard();
 }
 
+// Board group tabs
+document.querySelectorAll(".board-group-tab").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const group = btn.dataset.bgroup;
+    document.querySelectorAll(".board-group-tab").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".board-subtab-group").forEach(g => g.classList.remove("active"));
+    btn.classList.add("active");
+    const subgroup = document.querySelector(`.board-subtab-group[data-bgroup="${group}"]`);
+    if (subgroup) {
+      subgroup.classList.add("active");
+      // グループ切替時は最初のサブタブを自動選択
+      const firstSubTab = subgroup.querySelector(".board-tab");
+      if (firstSubTab) firstSubTab.click();
+    }
+  });
+});
+
 // Board tabs
 document.querySelectorAll(".board-tab").forEach(btn => {
   btn.addEventListener("click", () => {
