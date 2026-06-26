@@ -2878,6 +2878,17 @@ async function showMemberList() {
   const members = await res.json();
   const html = `
     <div style="font-size:0.82rem;color:#888;margin-bottom:10px">合計 ${members.length} 名</div>
+    <div style="background:#fff8e1;border:1px solid #f0a500;border-radius:8px;padding:12px;margin-bottom:16px">
+      <div style="font-weight:600;margin-bottom:8px">🔑 パスワードリセット</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input id="resetRoom" type="text" placeholder="部屋番号（例：5-533）"
+          style="padding:8px;border:1px solid #ddd;border-radius:6px;font-size:0.88rem;flex:1;min-width:120px">
+        <input id="resetNewPw" type="text" placeholder="新しいパスワード（8文字以上）"
+          style="padding:8px;border:1px solid #ddd;border-radius:6px;font-size:0.88rem;flex:1;min-width:160px">
+        <button onclick="adminResetPassword()" style="background:#3d6b4f;color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:0.88rem;white-space:nowrap">リセット</button>
+      </div>
+      <div id="resetMsg" style="margin-top:6px;font-size:0.83rem"></div>
+    </div>
     <table style="width:100%;border-collapse:collapse;font-size:0.88rem">
       <thead><tr style="border-bottom:2px solid #eee;text-align:left">
         <th style="padding:6px 8px">部屋番号</th>
@@ -2886,13 +2897,14 @@ async function showMemberList() {
       </tr></thead>
       <tbody>
         ${members.map(m => `
-          <tr style="border-bottom:1px solid #f5f5f5">
+          <tr style="border-bottom:1px solid #f5f5f5;cursor:pointer" onclick="document.getElementById('resetRoom')&&(document.getElementById('resetRoom').value='${esc(m.room)}')">
             <td style="padding:6px 8px;font-weight:600">${esc(m.room)}</td>
             <td style="padding:6px 8px;color:#555;font-size:0.82rem">${m.email ? esc(m.email) : '<span style="color:#ccc">未登録</span>'}</td>
             <td style="padding:6px 8px;color:#888">${m.created_at}</td>
           </tr>`).join("")}
       </tbody>
-    </table>`;
+    </table>
+    <p style="font-size:0.78rem;color:#aaa;margin-top:8px">※ 行をタップすると部屋番号が自動入力されます</p>`;
   _showStatsModal("👥 会員一覧", html);
 }
 
@@ -6297,4 +6309,32 @@ function showLegalModal(type) {
   `;
   document.getElementById("legalModalContent").innerHTML = type === "terms" ? termsHTML : privacyHTML;
   document.getElementById("legalModal").style.display = "block";
+}
+
+// ===== 管理者パスワードリセット =====
+async function adminResetPassword() {
+  const room = (document.getElementById("resetRoom")?.value || "").trim();
+  const pw   = (document.getElementById("resetNewPw")?.value || "").trim();
+  const msg  = document.getElementById("resetMsg");
+  if (!room || !pw) { msg.style.color="#e05"; msg.textContent="部屋番号と新しいパスワードを入力してください"; return; }
+  if (pw.length < 8) { msg.style.color="#e05"; msg.textContent="パスワードは8文字以上にしてください"; return; }
+  if (!confirm(`部屋番号 ${room} のパスワードを「${pw}」にリセットしますか？`)) return;
+  msg.textContent="処理中…"; msg.style.color="#888";
+  try {
+    const res = await fetch("/api/admin/reset-user-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Password": boardPassword },
+      body: JSON.stringify({ room, new_password: pw })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      msg.style.color="#2a7a2a";
+      msg.textContent=`✅ ${data.room} のパスワードをリセットしました`;
+      document.getElementById("resetNewPw").value="";
+    } else {
+      msg.style.color="#e05"; msg.textContent=data.error||"エラーが発生しました";
+    }
+  } catch(e) {
+    msg.style.color="#e05"; msg.textContent="通信エラーが発生しました";
+  }
 }

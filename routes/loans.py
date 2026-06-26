@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 from flask import Blueprint, request, jsonify
 from config import get_board_password, LIBRARYLIFE_BASE, LIBRARY_INFO
 from database import get_con, execute, fetchone, fetchall, USE_PG
+from services.utils import _hash_password
 
 loans_bp = Blueprint("loans", __name__)
 
@@ -367,6 +368,37 @@ def api_wishlist_summary():
             "author": r["author"] or "",
             "wish_count": r["wish_count"],
         } for r in rows])
+    except Exception as e:
+        con.close()
+        return jsonify({"error": str(e)}), 500
+
+
+@loans_bp.route("/api/admin/reset-user-password", methods=["POST"])
+def api_admin_reset_user_password():
+    """管理者による住民パスワードリセット"""
+    if request.headers.get("X-Password") != get_board_password():
+        return jsonify({"error": "unauthorized"}), 401
+    body = request.get_json() or {}
+    room = (body.get("room") or "").strip()
+    new_password = (body.get("new_password") or "").strip()
+    if not room or not new_password or len(new_password) < 8:
+        return jsonify({"error": "部屋番号と8文字以上の新しいパスワードを入力してください"}), 400
+    con = get_con()
+    try:
+        user = fetchone(con, "SELECT room FROM user_accounts WHERE room=?", (room,))
+        if not user:
+            con.close()
+            return jsonify({"error": f"部屋番号 {room} は登録されていません"}), 404
+        h, s = _hash_password(new_password)
+        if USE_PG:
+            execute(con, "UPDATE user_accounts SET password_hash=%s, password_salt=%s, pin=%s, updated_at=NOW() WHERE room=%s",
+                    (h, s, new_password, room))
+        else:
+            execute(con, "UPDATE user_accounts SET password_hash=?, password_salt=?, pin=?, updated_at=datetime('now','localtime') WHERE room=?",
+                    (h, s, new_password, room))
+        con.commit()
+        con.close()
+        return jsonify({"ok": True, "room": room})
     except Exception as e:
         con.close()
         return jsonify({"error": str(e)}), 500
