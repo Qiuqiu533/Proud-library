@@ -366,11 +366,14 @@ function renderAwardBadges(awards) {
     seen.add(key);
     return true;
   });
+  // 順位を表示する賞（ランキング系のみ）
+  const RANKED_AWARDS = ["本屋大賞", "本屋大賞ノミネート", "このミステリーがすごい!", "本格ミステリ・ベスト10"];
   return `<div class="award-badges">${unique.map(a => {
-    const isRank1 = a.rank === 1;
+    const showRank = a.rank && RANKED_AWARDS.includes(a.award);
+    const isRank1 = showRank && a.rank === 1;
     const cls = isRank1 ? "rank1" : awardStyleClass(a.award);
     const year = a.year ? `'${String(a.year).slice(-2)}` : "";
-    const rankLabel = a.rank ? ` ${a.rank}位` : "";
+    const rankLabel = showRank ? ` ${a.rank}位` : "";
     const crown = isRank1 ? "👑 " : "";
     const label = `${crown}${a.award}${year}${rankLabel}`;
     const tooltip = `${a.award} ${a.year || ""}${rankLabel}`;
