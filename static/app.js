@@ -436,7 +436,7 @@ function _renderDescSection(isbn, book) {
       👍 参考になった${helpfulCount > 0 ? `<span class="helpful-count">${helpfulCount}</span>` : ''}
     </button></div>`;
   const aiDisclaimer = (!book.manual_review && book.ai_review_date)
-    ? `<p class="ai-disclaimer">※ AI生成の書評です。内容は正確でない場合があります。</p>` : "";
+    ? `<p class="ai-disclaimer">⚠️ この内容紹介はAIが自動生成したものです。実際の内容・登場人物・結末等と異なる場合があります。特定の思想・宗教・政治的立場を推奨するものではありません。</p>` : "";
   placeholder.outerHTML = `<div class="modal-section"><h3>📄 内容・収録作品</h3><p class="book-desc">${esc(book.description)}</p>${aiDisclaimer}${dateTag}${aiScoreTag}${helpfulBtn}</div>`;
 }
 
