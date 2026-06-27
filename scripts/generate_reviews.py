@@ -74,27 +74,39 @@ def _get_con():
 
 
 def _fetch_wikipedia_author(author: str) -> str:
-    """Wikipedia日本語版から著者情報を取得する"""
+    """Wikipedia日本語版から著者情報を取得する（フルネーム優先）"""
     if not author:
         return ""
-    # 著者名の最初の部分（姓のみ）で検索
-    name = author.split()[0].strip()
-    try:
-        res = requests.get(
-            f"https://ja.wikipedia.org/api/rest_v1/page/summary/{requests.utils.quote(name)}",
-            timeout=8,
-            headers={"User-Agent": "ProudLibrary/1.0"}
-        )
-        if res.status_code == 200:
-            data = res.json()
-            extract = data.get("extract", "")
-            # 最初の2文（200字以内）だけ使う
-            sentences = extract.replace("。", "。\n").split("\n")
-            summary = "。".join([s for s in sentences[:2] if s.strip()])
-            if summary and len(summary) > 10:
-                return summary[:200]
-    except Exception:
-        pass
+    # フルネーム → 姓のみ の順で試みる
+    candidates = []
+    full = author.strip().replace("　", " ")
+    candidates.append(full)
+    parts = full.split()
+    if len(parts) > 1:
+        candidates.append(parts[0])  # 姓のみ
+
+    for name in candidates:
+        try:
+            res = requests.get(
+                f"https://ja.wikipedia.org/api/rest_v1/page/summary/{requests.utils.quote(name)}",
+                timeout=8,
+                headers={"User-Agent": "ProudLibrary/1.0"}
+            )
+            if res.status_code == 200:
+                data = res.json()
+                # 人物記事かどうか確認（descriptionに「作家」「小説家」「詩人」等が含まれるか）
+                description = data.get("description", "")
+                extract = data.get("extract", "")
+                person_keywords = ["作家", "小説家", "詩人", "著者", "ライター", "絵本", "漫画", "画家",
+                                   "教授", "研究者", "評論家", "脚本家", "翻訳家", "医師", "写真家"]
+                is_person = any(kw in description or kw in extract[:100] for kw in person_keywords)
+                if is_person:
+                    sentences = extract.replace("。", "。\n").split("\n")
+                    summary = "。".join([s for s in sentences[:2] if s.strip()])
+                    if summary and len(summary) > 10:
+                        return summary[:200]
+        except Exception:
+            pass
     return ""
 
 
@@ -136,7 +148,7 @@ def _generate_review(title: str, author: str, publisher: str, genre: str,
 ジャンル: {genre or "その他"}
 
 【必須ルール】
-1. この書籍について信頼できる情報が全くない場合は {{"status": "情報不足"}} のみ返す
+1. タイトルと著者名から何も推測できない場合のみ {{"status": "情報不足"}} を返す（タイトルから内容が推測できる場合は書評を書くこと）
 2. 書評は400字以上600字以内
 3. 以下の3要素を必ず含める:
    ① 書籍の概要・テーマ（何の本か）

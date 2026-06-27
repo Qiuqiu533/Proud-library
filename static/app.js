@@ -428,7 +428,7 @@ function _renderDescSection(isbn, book) {
     dateTag = `<span class="manual-review-date">AI登録：${ad.getFullYear()}年${ad.getMonth()+1}月${ad.getDate()}日（${modelName}）</span>`;
   }
   const aiScoreTag = book.ai_review_score
-    ? `<span class="desc-rating">書評品質スコア：${(book.ai_review_score / 10).toFixed(1)} / 5.0</span>` : "";
+    ? `<span class="desc-rating">書評品質スコア：${book.ai_review_score} / 100</span>` : "";
   const helpfulCount = book.helpful_count || 0;
   const helpfulVoted = (JSON.parse(localStorage.getItem("helpful_voted")||"[]")).includes(isbn);
   const helpfulBtn = `<div class="helpful-row">
