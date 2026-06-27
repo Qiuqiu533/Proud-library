@@ -1527,6 +1527,34 @@ def _migrate_update_award_isbn():
         con.close()
 
 
+def _migrate_ai_review_columns():
+    """genre_books に ai_summary / ai_tags カラムを追加する。"""
+    if _migration_done("ai_review_columns_v1"):
+        return
+    con = get_con()
+    try:
+        if USE_PG:
+            cur = con.cursor()
+            cur.execute("ALTER TABLE genre_books ADD COLUMN IF NOT EXISTS ai_summary TEXT")
+            cur.execute("ALTER TABLE genre_books ADD COLUMN IF NOT EXISTS ai_tags TEXT DEFAULT '[]'")
+        else:
+            try:
+                con.execute("ALTER TABLE genre_books ADD COLUMN ai_summary TEXT")
+            except Exception:
+                pass
+            try:
+                con.execute("ALTER TABLE genre_books ADD COLUMN ai_tags TEXT DEFAULT '[]'")
+            except Exception:
+                pass
+        con.commit()
+        _mark_migration_done("ai_review_columns_v1")
+        logger.info("[migration] genre_books.ai_summary/ai_tags カラム追加完了")
+    except Exception as e:
+        logger.error("[migration] ai_review_columns error: %s", e)
+    finally:
+        con.close()
+
+
 def _migrate_collections_sort_order():
     """collections テーブルに sort_order カラムがなければ追加する。"""
     if _migration_done("collections_sort_order_v1"):
@@ -1581,6 +1609,7 @@ def _run_all_migrations():
         _migrate_collections_sort_order,  # collections.sort_order カラム追加
         _migrate_events_image,             # events.image_data カラム追加
         _migrate_update_award_isbn,        # 受賞作ISBN一括更新
+        _migrate_ai_review_columns,        # ai_summary/ai_tags カラム追加
         _verify_tables,
     ]
     for step in steps:
