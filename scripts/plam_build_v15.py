@@ -601,6 +601,18 @@ def _generate_statistics(works: WorkRegistry, authors: AuthorRegistry) -> None:
     _generate_author_award_summary(history)
     _generate_overlap_trend(import_log, history)
 
+    # V1.9: award_graph.csv / award_author_graph.csv / statistics_history.csv を更新
+    _generate_award_graph(history, [s["id"] for s in award_stats])
+    _generate_award_author_graph(history)
+    from collections import Counter as _Counter
+    work_award_cnt = _Counter(r["work_id"] for r in history if r.get("work_id"))
+    multi_cnt = sum(1 for c in work_award_cnt.values() if c > 1)
+    _append_statistics_history(
+        works_count=total_works, award_count=len(seen_award_ids),
+        history_count=len(history), multi_count=multi_cnt,
+        author_count=len(authors.rows)
+    )
+
 
 # ── V1.7: cross_award_summary.csv ───────────────────────────────────────────
 
@@ -810,6 +822,109 @@ def _generate_overlap_trend(import_log: list[dict], history: list[dict]) -> None
         lines.append(f"| {r['author']} | {r['award_count']} | {r['awards']} |")
 
     OVERLAP_TREND_MD.write_text("\n".join(lines), encoding="utf-8")
+
+
+# ── V1.9: award_graph / award_author_graph / statistics_history ───────────────
+
+AWARD_GRAPH_PATH        = PLAM_DIR / "award_graph.csv"
+AWARD_GRAPH_FIELDS      = ["award_from", "award_to", "overlap_count", "work_ids"]
+AUTHOR_GRAPH_PATH       = PLAM_DIR / "award_author_graph.csv"
+AUTHOR_GRAPH_FIELDS     = ["author_id", "author", "award_sequence", "award_years"]
+STATS_HISTORY_PATH      = REPORTS_DIR / "statistics_history.csv"
+STATS_HISTORY_FIELDS    = ["snapshot_date", "version_tag", "works", "awards",
+                            "histories", "multi_award_works", "authors"]
+
+
+def _generate_award_graph(history: list[dict], award_ids: list[str]) -> None:
+    """有向賞ペアグラフを award_graph.csv に書き出す（相互記録）"""
+    from collections import defaultdict
+    work_awards: dict[str, set[str]] = defaultdict(set)
+    for r in history:
+        wid = r.get("work_id", "").strip()
+        aid = r.get("award_id", "").strip()
+        if wid and aid:
+            work_awards[wid].add(aid)
+
+    ids = sorted(set(award_ids))
+    rows = []
+    for i, a in enumerate(ids):
+        for b in ids[i+1:]:
+            shared = [wid for wid, awards in work_awards.items()
+                      if a in awards and b in awards]
+            if shared:
+                work_ids_str = "|".join(shared)
+                rows.append({"award_from": a, "award_to": b,
+                             "overlap_count": len(shared), "work_ids": work_ids_str})
+                rows.append({"award_from": b, "award_to": a,
+                             "overlap_count": len(shared), "work_ids": work_ids_str})
+    write_csv(AWARD_GRAPH_PATH, AWARD_GRAPH_FIELDS, rows)
+
+
+def _generate_award_author_graph(history: list[dict]) -> None:
+    """著者ごとの受賞賞系列を award_author_graph.csv に書き出す（時系列順）"""
+    from collections import defaultdict
+    works_map = {r["work_id"]: r for r in read_csv(WORKS_PATH) if r.get("work_id")}
+    wid_to_author: dict[str, tuple[str, str]] = {
+        wid: (w.get("author_id", ""), w.get("author", ""))
+        for wid, w in works_map.items()
+    }
+
+    # 著者ごとに (award_year, award_id) を収集
+    author_timeline: dict[str, list[tuple[int, str]]] = defaultdict(list)
+    author_name_map: dict[str, str] = {}
+    for r in history:
+        wid = r.get("work_id", "").strip()
+        aid = r.get("award_id", "").strip()
+        yr_str = r.get("award_year", "")
+        if not wid or not aid or not yr_str.isdigit():
+            continue
+        author_id, author_name = wid_to_author.get(wid, ("", ""))
+        if not author_id:
+            continue
+        author_timeline[author_id].append((int(yr_str), aid))
+        author_name_map[author_id] = author_name
+
+    rows = []
+    for author_id, timeline in sorted(author_timeline.items()):
+        # 重複除去・時系列ソート
+        seen: set[str] = set()
+        ordered: list[tuple[int, str]] = []
+        for yr, aid in sorted(timeline):
+            if aid not in seen:
+                seen.add(aid)
+                ordered.append((yr, aid))
+        if len(ordered) < 2:
+            continue  # 複数賞受賞著者のみ記録
+        sequence = "→".join(a for _, a in ordered)
+        years    = "|".join(str(y) for y, _ in ordered)
+        rows.append({
+            "author_id":      author_id,
+            "author":         author_name_map.get(author_id, ""),
+            "award_sequence": sequence,
+            "award_years":    years,
+        })
+    write_csv(AUTHOR_GRAPH_PATH, AUTHOR_GRAPH_FIELDS, rows)
+
+
+def _append_statistics_history(works_count: int, award_count: int,
+                                history_count: int, multi_count: int,
+                                author_count: int) -> None:
+    """statistics_history.csv にスナップショットを追記する"""
+    REPORTS_DIR.mkdir(exist_ok=True)
+    existing = read_csv(STATS_HISTORY_PATH) if STATS_HISTORY_PATH.exists() else []
+    today = datetime.now().strftime("%Y-%m-%d")
+    # 同日のスナップショットは上書き
+    existing = [r for r in existing if r.get("snapshot_date") != today]
+    existing.append({
+        "snapshot_date":    today,
+        "version_tag":      f"v1.9+{award_count}awards",
+        "works":            works_count,
+        "awards":           award_count,
+        "histories":        history_count,
+        "multi_award_works": multi_count,
+        "authors":          author_count,
+    })
+    write_csv(STATS_HISTORY_PATH, STATS_HISTORY_FIELDS, existing)
 
 
 # ── エントリーポイント ──────────────────────────────────────────────────────

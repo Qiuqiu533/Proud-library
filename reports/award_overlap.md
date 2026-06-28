@@ -1,6 +1,6 @@
 # PLAM 賞別重複分析（award_overlap.md）
 
-生成日時: 2026-06-29 07:23
+生成日時: 2026-06-29 07:29
 
 ## 賞ペア別 重複作品数
 
@@ -9,21 +9,28 @@
 | AKU | HKM | 0 |  |
 | AKU | HON | 0 |  |
 | AKU | JRA | 0 |  |
+| AKU | KIK | 0 |  |
 | AKU | NAO | 0 |  |
 | AKU | RAN | 0 |  |
 | AKU | YAM | 0 |  |
 | HKM | HON | 0 |  |
 | HKM | JRA | 6 | ミステリ・オペラ 宿命城殺人事件, 葉桜の季節に君を想うということ, 隻眼の少女 他3件 |
+| HKM | KIK | 0 |  |
 | HKM | NAO | 1 | 黒牢城 |
 | HKM | RAN | 0 |  |
 | HKM | YAM | 1 | 地雷グリコ |
 | HON | JRA | 0 |  |
+| HON | KIK | 0 |  |
 | HON | NAO | 1 | 蜜蜂と遠雷 |
 | HON | RAN | 0 |  |
 | HON | YAM | 1 | ゴールデンスランバー |
+| JRA | KIK | 0 |  |
 | JRA | NAO | 1 | カディスの赤い星 |
 | JRA | RAN | 0 |  |
 | JRA | YAM | 4 | 地雷グリコ, エトロフ発緊急電, 奪取 他1件 |
+| KIK | NAO | 0 |  |
+| KIK | RAN | 0 |  |
+| KIK | YAM | 0 |  |
 | NAO | RAN | 1 | テロリストのパラソル |
 | NAO | YAM | 3 | 邂逅の森, テスカトリポカ, 木挽町のあだ討ち |
 | RAN | YAM | 0 |  |
