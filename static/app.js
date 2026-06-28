@@ -1114,7 +1114,7 @@ async function loadTopNew() {
       return `<div class="mini-card" data-isbn="${b.isbn}">
         <div class="mini-card-cover">
           <img src="${cover}" alt="${esc(b.title)}" loading="lazy"
-            onerror="_coverFallback(this,'${ndlFallback}')"">
+            onerror="_coverFallback(this,'${ndlFallback}')">
         </div>
         <div class="mini-card-title">${esc(b.title)}</div>
         <div class="mini-card-author">${esc(b.author || "")}</div>
@@ -1978,7 +1978,7 @@ async function _loadRelatedBooks(isbn) {
       const items = books.map(b => {
         const ndlFallback = `https://ndlsearch.ndl.go.jp/thumbnail/${b.isbn}.jpg`;
         const imgOrPlaceholder = `<img src="${b.cover || ndlFallback}" alt="${esc(b.title)}" loading="lazy"
-          onerror="_coverFallback(this,'${ndlFallback}')"">`;
+          onerror="_coverFallback(this,'${ndlFallback}')">`;
         return `<div class="related-card" onclick="openModal('${b.isbn}')" onkeydown="if(event.key==='Enter'||event.key===' ')openModal('${b.isbn}')" role="button" tabindex="0">
           <div class="related-thumb">${imgOrPlaceholder}</div>
           <div class="related-title">${esc(b.title)}</div>
@@ -5067,11 +5067,12 @@ async function loadPopularBooks() {
     sec.style.display = "block";
     applySectionState("popular");
     row.innerHTML = books.map(b => {
-      const ndlFallback = `https://ndlsearch.ndl.go.jp/thumbnail/${b.isbn}.jpg`;
+      const ndlUrl = `https://ndlsearch.ndl.go.jp/thumbnail/${b.isbn}.jpg`;
+      const amzFallback = b.isbn10 ? `https://images-na.ssl-images-amazon.com/images/P/${b.isbn10}.09.LZZZZZZZ.jpg` : "";
       const stars = b.score ? "★".repeat(Math.round(b.score)) + "☆".repeat(5 - Math.round(b.score)) : "";
       return `<div class="mini-card" data-isbn="${b.isbn}">
-        <div class="mini-card-cover"><img src="${b.cover || ndlFallback}" alt="${esc(b.title)}" loading="lazy"
-          onerror="_coverFallback(this,'${ndlFallback}')""></div>
+        <div class="mini-card-cover"><img src="${b.cover || ndlUrl}" alt="${esc(b.title)}" loading="lazy"
+          onerror="_coverFallback(this,'${amzFallback}')"></div>
         <div class="mini-card-title">${esc(b.title)}</div>
         <div style="color:#f0a500;font-size:0.72rem;margin-top:2px">${stars} ${b.score.toFixed(1)}</div>
       </div>`;
@@ -5110,7 +5111,7 @@ async function loadCollections() {
         const items = books.filter(Boolean).map(b => {
           const ndlFallback = `https://ndlsearch.ndl.go.jp/thumbnail/${b.isbn}.jpg`;
           return `<div class="related-card" onclick="openModal('${b.isbn}')" role="button" tabindex="0">
-            <div class="related-thumb"><img src="${b.cover || ndlFallback}" alt="${esc(b.title)}" loading="lazy" onerror="_coverFallback(this,'${ndlFallback}')""></div>
+            <div class="related-thumb"><img src="${b.cover || ndlFallback}" alt="${esc(b.title)}" loading="lazy" onerror="_coverFallback(this,'${ndlFallback}')"></div>
             <div class="related-title">${esc(b.title)}</div>
             <div class="related-author">${esc(b.author || "")}</div>
           </div>`;
