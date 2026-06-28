@@ -1055,3 +1055,4 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .plam-rel-title { font-weight: 600; color: #333; line-height: 1.3; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .plam-rel-award { color: #888; font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 480px) { .plam-related-grid { grid-template-columns: repeat(2, 1fr); } }
+.plam-rel-reason { color: #9b7cc8; font-size: 0.72rem; margin-top: 2px; white-space: normal; line-height: 1.3; }

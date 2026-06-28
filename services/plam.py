@@ -136,6 +136,19 @@ def _bridge_set() -> set[str]:
     return {r["work_id"] for r in _read("bridge_works.csv") if r.get("bridge_type") == "cross_cluster"}
 
 
+@lru_cache(maxsize=1)
+def _jaccard_map() -> dict[tuple[str, str], float]:
+    """(award_a, award_b) → jaccard係数（順不同）"""
+    result: dict[tuple[str, str], float] = {}
+    for r in _read("award_similarity.csv"):
+        a, b = r.get("award_a", ""), r.get("award_b", "")
+        j = float(r.get("jaccard", 0) or 0)
+        if a and b:
+            result[(a, b)] = j
+            result[(b, a)] = j
+    return result
+
+
 def get_book_plam_info(title: str, author: str = "") -> dict | None:
     """書籍タイトルからPLAM情報を返す。見つからなければNone。"""
     if not title:
@@ -201,14 +214,59 @@ def get_book_plam_info(title: str, author: str = "") -> dict | None:
     }
 
 
-def get_related_works(work_id: str, limit: int = 6) -> list[dict]:
-    """PLAMネットワークを使って関連作品を返す。
+def _plam_score(
+    my_awards: set[str],
+    my_clusters: set[str],
+    w_awards: set[str],
+    is_bridge: bool,
+    jaccard_m: dict[tuple[str, str], float],
+) -> tuple[float, set[str], float]:
+    """推薦スコアと内訳を返す。(score, shared_awards, max_jaccard)"""
+    shared = my_awards & w_awards
+    w_clusters = {_cluster_map().get(a, "unknown") for a in w_awards}
+    cluster_bonus = len(my_clusters & w_clusters)
 
-    優先順位:
-    1. 同じ賞を受賞した作品（共有賞数が多い順）
-    2. 同じクラスタの作品
-    Proud Library DB（genre_books）に存在する作品のみISBNを付与する。
-    """
+    # Jaccardボーナス: 共有賞ペア間の最大Jaccard
+    max_j = 0.0
+    for ma in my_awards:
+        for wa in w_awards:
+            j = jaccard_m.get((ma, wa), 0.0)
+            if j > max_j:
+                max_j = j
+
+    score = (
+        len(shared) * 5
+        + (3 if is_bridge else 0)
+        + cluster_bonus * 2
+        + max_j * 100
+    )
+    return score, shared, max_j
+
+
+def _build_reason(
+    shared_awards: set[str],
+    is_bridge: bool,
+    my_clusters: set[str],
+    w_clusters: set[str],
+) -> str:
+    """推薦理由テキストを生成する。"""
+    master = _awards_master()
+    parts: list[str] = []
+
+    if shared_awards:
+        names = [master.get(a, {}).get("award_name", a) for a in sorted(shared_awards)]
+        parts.append(f"{'・'.join(names)}の評価軸が共通")
+    if is_bridge:
+        parts.append("クラスタ横断のBridge Work")
+    cross = my_clusters & w_clusters - {"unknown"}
+    if cross and not shared_awards:
+        parts.append(f"同じ{list(cross)[0]}クラスタ")
+
+    return "・".join(parts) if parts else ""
+
+
+def get_related_works(work_id: str, limit: int = 6) -> list[dict]:
+    """PLAMネットワークを使って関連作品を返す（Jaccard補正スコアリング付き）。"""
     from database import get_con
     import sqlite3
 
@@ -216,6 +274,7 @@ def get_related_works(work_id: str, limit: int = 6) -> list[dict]:
     cluster_m = _cluster_map()
     master = _awards_master()
     bridges = _bridge_set()
+    jaccard_m = _jaccard_map()
 
     # 対象作品の賞セット・クラスタセット取得
     my_rows = history.get(work_id, [])
@@ -229,30 +288,27 @@ def get_related_works(work_id: str, limit: int = 6) -> list[dict]:
         return []
 
     # 全work_idのスコアを計算（自作品除く）
-    scores: dict[str, dict] = {}
+    scored: list[tuple[float, str, dict]] = []
     for wid, rows in history.items():
         if wid == work_id:
             continue
         w_awards = {r["award_id"] for r in rows if r.get("status") in ("awarded", "co_winner")}
-        shared = my_awards & w_awards
-        if not shared:
+        if not (my_awards & w_awards):
             continue
+        is_bridge = wid in bridges
+        score, shared, max_j = _plam_score(my_awards, my_clusters, w_awards, is_bridge, jaccard_m)
         w_clusters = {cluster_m.get(a, "unknown") for a in w_awards}
-        shared_clusters = my_clusters & w_clusters
-        scores[wid] = {
+        reason = _build_reason(shared, is_bridge, my_clusters, w_clusters)
+        scored.append((score, wid, {
             "shared_count": len(shared),
-            "cluster_match": len(shared_clusters),
-            "is_bridge": wid in bridges,
-        }
+            "is_bridge":    is_bridge,
+            "max_jaccard":  round(max_j, 4),
+            "reason":       reason,
+        }))
 
-    # スコア降順でソート
-    ranked = sorted(
-        scores.items(),
-        key=lambda x: (-x[1]["shared_count"], -x[1]["cluster_match"], -x[1]["is_bridge"]),
-    )
+    scored.sort(key=lambda x: -x[0])
 
     # works.csv から作品情報を取得
-    works_idx = _works_index()
     wid_to_work: dict[str, dict] = {r["work_id"]: r for r in _read("works.csv")}
 
     # genre_books との照合（タイトル正規化）
@@ -267,7 +323,7 @@ def get_related_works(work_id: str, limit: int = 6) -> list[dict]:
         db_books = {}
 
     result = []
-    for wid, sc in ranked:
+    for score, wid, meta in scored:
         if len(result) >= limit:
             break
         work = wid_to_work.get(wid)
@@ -276,16 +332,14 @@ def get_related_works(work_id: str, limit: int = 6) -> list[dict]:
 
         title = work.get("canonical_title", "")
         author = work.get("author", "")
-        nkey = _normalize(title)
-        db_match = db_books.get(nkey)
+        db_match = db_books.get(_normalize(title))
 
-        # award情報（最大weight賞のみ）
+        # top_award: 最大weightの賞
         w_rows = [r for r in history.get(wid, []) if r.get("status") in ("awarded", "co_winner")]
         if not w_rows:
             continue
-        top_award_id = max(w_rows, key=lambda r: int(master.get(r["award_id"], {}).get("weight", 0) or 0))["award_id"]
-        top_info = master.get(top_award_id, {})
-        cluster = cluster_m.get(top_award_id, "unknown")
+        top_aid = max(w_rows, key=lambda r: int(master.get(r["award_id"], {}).get("weight", 0) or 0))["award_id"]
+        cluster = cluster_m.get(top_aid, "unknown")
 
         result.append({
             "work_id":     wid,
@@ -293,11 +347,13 @@ def get_related_works(work_id: str, limit: int = 6) -> list[dict]:
             "author":      author,
             "isbn":        db_match["isbn"] if db_match else None,
             "in_library":  db_match is not None,
-            "top_award":   top_info.get("award_name", top_award_id),
+            "top_award":   master.get(top_aid, {}).get("award_name", top_aid),
             "cluster":     cluster,
             "color":       CLUSTER_COLORS.get(cluster, "#ccc"),
-            "shared_count": sc["shared_count"],
-            "is_bridge":   sc["is_bridge"],
+            "score":       round(score, 2),
+            "shared_count": meta["shared_count"],
+            "is_bridge":   meta["is_bridge"],
+            "reason":      meta["reason"],
         })
 
     return result
@@ -309,3 +365,4 @@ def invalidate_cache() -> None:
     _works_index.cache_clear()
     _history_by_work.cache_clear()
     _bridge_set.cache_clear()
+    _jaccard_map.cache_clear()
