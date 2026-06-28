@@ -1991,27 +1991,29 @@ async function _loadPlamInfo(isbn, title, author) {
     // 既存のPLAMセクションがあれば置き換えない（再描画防止）
     if (document.getElementById("modal-plam-section")) return;
 
+    const CLUSTER_LABEL = { literary:"Literary", mystery:"Mystery", sf:"SF", horror:"Horror", career:"Career", debut:"Debut" };
+
     const clusterDots = data.clusters.map(c =>
-      `<span class="plam-cluster-dot" style="background:${c.color}" title="${c.id}">${c.id}</span>`
+      `<span class="plam-cluster-dot" style="background:${c.color}">${CLUSTER_LABEL[c.id] || c.id}</span>`
     ).join("");
 
     const awardItems = data.awards.map(a =>
       `<div class="plam-award-item">
+        <span class="plam-award-year-col">${a.award_year || "—"}</span>
         <span class="plam-award-dot" style="background:${a.color}"></span>
         <span class="plam-award-name">${esc(a.award_name)}</span>
-        <span class="plam-award-year">${a.award_year ? "（" + a.award_year + "年）" : ""}</span>
       </div>`
     ).join("");
 
     const bridgeBadge = data.is_bridge
-      ? `<span class="plam-bridge-badge">🌉 Bridge Work</span>` : "";
+      ? `<span class="plam-bridge-badge">🌉 Bridge Work — ${data.clusters.map(c => CLUSTER_LABEL[c.id] || c.id).join(" × ")}</span>` : "";
 
+    const plamUrl = `/plam?work_id=${encodeURIComponent(data.work_id)}`;
     const plamHtml = `<div class="modal-section" id="modal-plam-section">
-      <h3>🏆 文学賞</h3>
+      <h3>🏆 文学賞 <a class="plam-network-link" href="${plamUrl}" target="_blank" rel="noopener">📊 PLAMネットワーク</a></h3>
       ${bridgeBadge}
       <div class="plam-awards-list">${awardItems}</div>
       <div class="plam-cluster-row">${clusterDots}</div>
-      <a class="plam-network-link" href="/plam" target="_blank" rel="noopener">📊 賞ネットワークを見る</a>
     </div>`;
 
     // 関連本セクションの直前に挿入
