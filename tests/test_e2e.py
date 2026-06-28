@@ -196,6 +196,31 @@ def test_s6_admin_new_arrival(client):
     assert "9784000099001" in isbns
 
 
+def test_s6_admin_reset_user_password(client, registered_user):
+    """管理者が住民パスワードをリセットできる。"""
+    room = registered_user
+    res = client.post("/api/admin/reset-user-password",
+        headers={"X-Password": BOARD_PW},
+        json={"room": room, "new_password": "NewPass123"})
+    assert res.status_code == 200
+    assert res.get_json()["ok"] is True
+
+    # 新パスワードでログインできる
+    res2 = client.post("/api/user/login", json={"room": room, "password": "NewPass123"})
+    assert res2.status_code == 200
+
+    # 存在しない部屋番号は404
+    res3 = client.post("/api/admin/reset-user-password",
+        headers={"X-Password": BOARD_PW},
+        json={"room": "9-999", "new_password": "NewPass123"})
+    assert res3.status_code == 404
+
+    # 認証なしは401
+    res4 = client.post("/api/admin/reset-user-password",
+        json={"room": room, "new_password": "NewPass123"})
+    assert res4.status_code == 401
+
+
 def test_s6_ops_stats(client):
     """運営統計が正常なデータ構造を返す。"""
     res = client.get("/api/admin/ops-stats", headers={"X-Password": BOARD_PW})
