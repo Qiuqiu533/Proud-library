@@ -206,3 +206,19 @@ def get_resident_password():
 
 def get_board_password():
     return get_setting("board_password", _BOARD_PASSWORD_ENV)
+
+
+def check_password(provided: str, role: str) -> bool:
+    """タイミング攻撃に耐性のある定数時間パスワード比較。
+    role: "admin" | "board" | "resident"
+    """
+    import hmac
+    getters = {
+        "admin":    get_admin_password,
+        "board":    get_board_password,
+        "resident": get_resident_password,
+    }
+    expected = getters.get(role, lambda: "")()
+    if not expected or not provided:
+        return False
+    return hmac.compare_digest(provided.encode(), expected.encode())

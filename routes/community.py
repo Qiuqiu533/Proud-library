@@ -1,6 +1,6 @@
 import json
 from flask import Blueprint, request, jsonify
-from config import get_admin_password, get_board_password
+from config import get_admin_password, get_board_password, check_password
 from database import get_con, execute, fetchone, fetchall
 from services.utils import rate_limit
 from services.audit import log_action
@@ -31,7 +31,7 @@ def api_issues():
 @community_bp.route("/api/issues", methods=["POST"])
 def api_post_issue():
     body = request.get_json()
-    if _get_pw() != get_board_password():
+    if not check_password(_get_pw(), "board"):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     row = fetchone(con, "SELECT MIN(sort_order) as m FROM issues")
@@ -46,7 +46,7 @@ def api_post_issue():
 @community_bp.route("/api/issues/reorder", methods=["POST"])
 def api_reorder_issues():
     body = request.get_json()
-    if _get_pw() != get_board_password():
+    if not check_password(_get_pw(), "board"):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     for item in body.get("order", []):
@@ -58,7 +58,7 @@ def api_reorder_issues():
 @community_bp.route("/api/issues/<int:issue_id>", methods=["PATCH"])
 def api_update_issue(issue_id):
     body = request.get_json()
-    if _get_pw() != get_board_password():
+    if not check_password(_get_pw(), "board"):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     if "title" in body:
@@ -73,7 +73,7 @@ def api_update_issue(issue_id):
 @community_bp.route("/api/issues/<int:issue_id>", methods=["DELETE"])
 def api_delete_issue(issue_id):
     body = request.get_json()
-    if _get_pw() != get_board_password():
+    if not check_password(_get_pw(), "board"):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     execute(con, "DELETE FROM issues WHERE id=?", (issue_id,))
@@ -93,7 +93,7 @@ def api_calendar():
 @community_bp.route("/api/calendar", methods=["POST"])
 def api_post_calendar():
     body = request.get_json()
-    if _get_pw() != get_board_password():
+    if not check_password(_get_pw(), "board"):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     row = fetchone(con, "SELECT MIN(sort_order) as m FROM calendar_events")
@@ -108,7 +108,7 @@ def api_post_calendar():
 @community_bp.route("/api/calendar/reorder", methods=["POST"])
 def api_reorder_calendar():
     body = request.get_json()
-    if _get_pw() != get_board_password():
+    if not check_password(_get_pw(), "board"):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     for item in body.get("order", []):
@@ -120,7 +120,7 @@ def api_reorder_calendar():
 @community_bp.route("/api/calendar/<int:ev_id>", methods=["PATCH"])
 def api_update_calendar(ev_id):
     body = request.get_json()
-    if _get_pw() != get_board_password():
+    if not check_password(_get_pw(), "board"):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     execute(con, "UPDATE calendar_events SET title=?,event_date=?,body=?,minutes=? WHERE id=?",
@@ -133,7 +133,7 @@ def api_update_calendar(ev_id):
 @community_bp.route("/api/calendar/<int:ev_id>", methods=["DELETE"])
 def api_delete_calendar(ev_id):
     body = request.get_json()
-    if _get_pw() != get_board_password():
+    if not check_password(_get_pw(), "board"):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     execute(con, "DELETE FROM calendar_events WHERE id=?", (ev_id,))
@@ -153,7 +153,7 @@ def api_lib_schedule():
 @community_bp.route("/api/lib-schedule", methods=["POST"])
 def api_post_lib_schedule():
     body = request.get_json()
-    if _get_pw() != get_board_password():
+    if not check_password(_get_pw(), "board"):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     execute(con, "INSERT INTO lib_schedule (title,event_date,type) VALUES (?,?,?)",
@@ -165,7 +165,7 @@ def api_post_lib_schedule():
 @community_bp.route("/api/lib-schedule/<int:sch_id>", methods=["PATCH"])
 def api_update_lib_schedule(sch_id):
     body = request.get_json()
-    if _get_pw() != get_board_password():
+    if not check_password(_get_pw(), "board"):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     execute(con, "UPDATE lib_schedule SET title=?,event_date=?,type=? WHERE id=?",
@@ -177,7 +177,7 @@ def api_update_lib_schedule(sch_id):
 @community_bp.route("/api/lib-schedule/<int:sch_id>", methods=["DELETE"])
 def api_delete_lib_schedule(sch_id):
     body = request.get_json()
-    if _get_pw() != get_board_password():
+    if not check_password(_get_pw(), "board"):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     execute(con, "DELETE FROM lib_schedule WHERE id=?", (sch_id,))
@@ -210,7 +210,7 @@ def api_announcements():
 def api_post_announcement():
     body = request.get_json()
     pw = _get_pw()
-    if pw != get_admin_password() and pw != get_board_password():
+    if not (check_password(pw, "admin") or check_password(pw, "board")):
         return jsonify({"error": "unauthorized"}), 401
     title = body.get("title", "").strip()
     text = body.get("body", "").strip()
@@ -232,7 +232,7 @@ def api_post_announcement():
 def api_update_announcement(ann_id):
     body = request.get_json()
     pw = _get_pw()
-    if pw != get_admin_password() and pw != get_board_password():
+    if not (check_password(pw, "admin") or check_password(pw, "board")):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     images = body.get("images", [])
@@ -250,7 +250,7 @@ def api_update_announcement(ann_id):
 def api_delete_announcement(ann_id):
     body = request.get_json()
     pw = _get_pw()
-    if pw != get_admin_password() and pw != get_board_password():
+    if not (check_password(pw, "admin") or check_password(pw, "board")):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     execute(con, "DELETE FROM announcements WHERE id=?", (ann_id,))
@@ -275,7 +275,7 @@ def api_requests():
 @community_bp.route("/api/requests/admin")
 def api_requests_admin():
     pw = request.headers.get("X-Password", "")
-    if pw != get_admin_password() and pw != get_board_password():
+    if not (check_password(pw, "admin") or check_password(pw, "board")):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     rows = fetchall(con, "SELECT id,title,author,reason,room,status,note,votes,created_at,type,reply FROM book_requests ORDER BY id ASC")
@@ -329,7 +329,7 @@ def api_vote_request(req_id):
 def api_update_request(req_id):
     body = request.get_json()
     pw = _get_pw()
-    if pw != get_admin_password() and pw != get_board_password():
+    if not (check_password(pw, "admin") or check_password(pw, "board")):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     detail_parts = []
@@ -350,7 +350,7 @@ def api_update_request(req_id):
 def api_delete_request(req_id):
     body = request.get_json()
     pw = _get_pw()
-    if pw != get_admin_password() and pw != get_board_password():
+    if not (check_password(pw, "admin") or check_password(pw, "board")):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     execute(con, "DELETE FROM book_requests WHERE id=?", (req_id,))

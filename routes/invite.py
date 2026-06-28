@@ -1,6 +1,6 @@
 import secrets
 from flask import Blueprint, request, jsonify
-from config import get_board_password
+from config import get_board_password, check_password
 from database import get_con, execute, fetchone, fetchall, USE_PG
 
 invite_bp = Blueprint("invite", __name__)
@@ -15,7 +15,7 @@ def _gen_code() -> str:
 
 
 def _auth(req) -> bool:
-    return req.headers.get("X-Password") == get_board_password()
+    return check_password(req.headers.get("X-Password"), "board")
 
 
 # ===== 管理者向け =====

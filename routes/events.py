@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from config import get_board_password
+from config import get_board_password, check_password
 from database import get_con, execute, fetchone, fetchall, USE_PG
 from services.audit import log_action
 from services.utils import rate_limit
@@ -27,7 +27,7 @@ def _ensure_image_column():
 
 
 def _board_auth():
-    return request.headers.get("X-Password") == get_board_password()
+    return check_password(request.headers.get("X-Password"), "board")
 
 
 def _resident_auth(body: dict):

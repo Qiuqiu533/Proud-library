@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from config import get_board_password
+from config import get_board_password, check_password
 from database import get_con, execute, fetchone, fetchall, USE_PG
 
 admin_bp = Blueprint("admin", __name__)
@@ -8,7 +8,7 @@ admin_bp = Blueprint("admin", __name__)
 @admin_bp.route("/api/staff_chat", methods=["GET"])
 def api_staff_chat_get():
     pw = request.headers.get("X-Password", "")
-    if pw != get_board_password():
+    if not check_password(pw, "board"):
         return jsonify({"error": "unauthorized"}), 401
     thread_id = request.args.get("thread_id")
     con = get_con()
@@ -23,7 +23,7 @@ def api_staff_chat_get():
 @admin_bp.route("/api/staff_chat", methods=["POST"])
 def api_staff_chat_post():
     body = request.get_json()
-    if body.get("password") != get_board_password():
+    if not check_password(body.get("password"), "board"):
         return jsonify({"error": "unauthorized"}), 401
     sender = (body.get("sender") or "匿名").strip()
     message = (body.get("message") or "").strip()
@@ -43,7 +43,7 @@ def api_staff_chat_post():
 @admin_bp.route("/api/staff_chat/<int:msg_id>", methods=["DELETE"])
 def api_staff_chat_delete(msg_id):
     body = request.get_json()
-    if body.get("password") != get_board_password():
+    if not check_password(body.get("password"), "board"):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     execute(con, "DELETE FROM staff_chat WHERE id=?", (msg_id,))
@@ -54,7 +54,7 @@ def api_staff_chat_delete(msg_id):
 @admin_bp.route("/api/chat_threads", methods=["GET"])
 def api_chat_threads_get():
     pw = request.headers.get("X-Password", "")
-    if pw != get_board_password():
+    if not check_password(pw, "board"):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     if USE_PG:
@@ -84,7 +84,7 @@ def api_chat_threads_get():
 @admin_bp.route("/api/chat_threads", methods=["POST"])
 def api_chat_threads_post():
     body = request.get_json()
-    if body.get("password") != get_board_password():
+    if not check_password(body.get("password"), "board"):
         return jsonify({"error": "unauthorized"}), 401
     title = (body.get("title") or "").strip()
     created_by = (body.get("created_by") or "匿名").strip()
@@ -107,7 +107,7 @@ def api_chat_threads_post():
 @admin_bp.route("/api/chat_threads/<int:thread_id>", methods=["DELETE"])
 def api_chat_threads_delete(thread_id):
     body = request.get_json()
-    if body.get("password") != get_board_password():
+    if not check_password(body.get("password"), "board"):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     execute(con, "DELETE FROM staff_chat WHERE thread_id=?", (thread_id,))
