@@ -177,7 +177,7 @@ def fetch_book_detail(isbn, hint_title=""):
             c1, c2 = _title_core(t1), _title_core(t2)
             return c1 == c2 or c1 in t2 or c2 in t1 or c1 in c2 or c2 in c1
 
-        cached = fetchone(dc, f"SELECT title, author, description, manual_review, manual_review_date, ai_review_date, ai_review_score, ai_model, helpful_count FROM genre_books WHERE isbn={ph}", (isbn,))
+        cached = fetchone(dc, f"SELECT title, author, description, manual_review, manual_review_date, ai_review_date, ai_review_score, ai_model, helpful_count, ai_summary, ai_tags FROM genre_books WHERE isbn={ph}", (isbn,))
 
         if cached and cached.get("description") and lib_title:
             if not _title_match(lib_title, cached.get("title", "")):
@@ -216,6 +216,17 @@ def fetch_book_detail(isbn, hint_title=""):
             hc = cached.get("helpful_count")
             if hc:
                 result["helpful_count"] = int(hc)
+        if cached:
+            ai_sum = cached.get("ai_summary")
+            if ai_sum:
+                result["ai_summary"] = ai_sum
+            ai_tags_raw = cached.get("ai_tags")
+            if ai_tags_raw:
+                try:
+                    import json as _json
+                    result["ai_tags"] = _json.loads(ai_tags_raw) if isinstance(ai_tags_raw, str) else ai_tags_raw
+                except Exception:
+                    pass
     except Exception:
         pass
     if isbn13 and isbn13.startswith("978"):

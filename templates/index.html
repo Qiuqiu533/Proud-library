@@ -2306,6 +2306,142 @@
         </div>
       </div>
 
+      <!-- 運用マニュアル -->
+      <div id="btab-manual" class="board-tab-panel">
+        <div class="guide-container">
+          <h3 class="guide-main-title">📋 運用マニュアル</h3>
+          <p class="guide-subtitle">プラウド船橋コミュニティ図書館 日常運用チェックリスト・Q&amp;A</p>
+
+          <!-- 目次 -->
+          <div class="guide-toc">
+            <div class="guide-toc-title">📋 目次</div>
+            <a class="guide-toc-item" href="#manual-daily">1. 日常業務チェックリスト</a>
+            <a class="guide-toc-item" href="#manual-monthly">2. 月次業務</a>
+            <a class="guide-toc-item" href="#manual-books">3. 蔵書管理</a>
+            <a class="guide-toc-item" href="#manual-users">4. 住民・ユーザー管理</a>
+            <a class="guide-toc-item" href="#manual-trouble">5. トラブル対応</a>
+            <a class="guide-toc-item" href="#manual-rules">6. 貸出ルール・図書館規則</a>
+            <a class="guide-toc-item" href="#manual-contacts">7. 緊急連絡先</a>
+          </div>
+
+          <!-- 1. 日常業務 -->
+          <div class="guide-section" id="manual-daily">
+            <h4 class="guide-section-title">1. 日常業務チェックリスト（週1〜2回推奨）</h4>
+            <div class="guide-info-box">
+              <strong>📌 開館日の確認作業</strong>
+            </div>
+            <table class="guide-table">
+              <tr><th>項目</th><th>操作場所</th><th>目安時間</th></tr>
+              <tr><td>✅ 住民からのリクエストを確認</td><td>管理者メニュー → 購入リクエスト</td><td>3分</td></tr>
+              <tr><td>✅ チャット・お問い合わせへの返信</td><td>管理者メニュー → チャット</td><td>5分</td></tr>
+              <tr><td>✅ 延滞本の確認（librarylife）</td><td>librarylife.net → 貸出管理</td><td>5分</td></tr>
+              <tr><td>✅ 新着本をアプリに登録</td><td>管理者メニュー → 新着登録</td><td>2〜5分/冊</td></tr>
+              <tr><td>✅ イベントの申込状況確認</td><td>管理者メニュー → イベント管理</td><td>2分</td></tr>
+            </table>
+          </div>
+
+          <!-- 2. 月次業務 -->
+          <div class="guide-section" id="manual-monthly">
+            <h4 class="guide-section-title">2. 月次業務</h4>
+            <table class="guide-table">
+              <tr><th>項目</th><th>操作場所</th><th>タイミング</th></tr>
+              <tr><td>📰 図書館だよりの発行</td><td>管理者メニュー → 図書館だより</td><td>月初</td></tr>
+              <tr><td>📊 利用統計の確認</td><td>管理者メニュー → 分析</td><td>月末</td></tr>
+              <tr><td>📦 新規購入本の検討・発注</td><td>ウィッシュリスト上位を参考に</td><td>月末</td></tr>
+              <tr><td>🏆 受賞作データの更新</td><td>管理者メニュー → 受賞DBを確認</td><td>受賞発表時</td></tr>
+              <tr><td>📢 お知らせの定期投稿</td><td>管理者メニュー → お知らせ投稿</td><td>随時</td></tr>
+            </table>
+          </div>
+
+          <!-- 3. 蔵書管理 -->
+          <div class="guide-section" id="manual-books">
+            <h4 class="guide-section-title">3. 蔵書管理</h4>
+            <div class="guide-step-box">
+              <div class="guide-step-title">📚 新しい本を登録する手順</div>
+              <ol>
+                <li>librarylife.net で本を登録（ISBN・タイトル・著者・場所を入力）</li>
+                <li>管理者メニュー → 新着登録 → ISBNを入力して「登録」</li>
+                <li>アプリのトップに「新着」バッジとともに表示される（自動）</li>
+                <li>書評はAIが数分〜数時間以内に自動生成（手動登録も可能）</li>
+              </ol>
+            </div>
+            <div class="guide-step-box" style="margin-top:12px">
+              <div class="guide-step-title">🗑️ 本を廃棄・除籍する手順</div>
+              <ol>
+                <li>librarylife.net で除籍処理を行う</li>
+                <li>アプリ側は自動的に在庫反映される（librarylifeと同期）</li>
+                <li>書評データはDB上に残るため削除不要（検索対象外になる）</li>
+              </ol>
+            </div>
+            <div class="guide-info-box" style="margin-top:12px;background:#fff3cd;border-color:#ffc107">
+              <strong>⚠️ 注意</strong><br>
+              蔵書の追加・削除はlibrarylife.netで行ってください。アプリのDBから直接削除すると書評データが失われます。
+            </div>
+          </div>
+
+          <!-- 4. ユーザー管理 -->
+          <div class="guide-section" id="manual-users">
+            <h4 class="guide-section-title">4. 住民・ユーザー管理</h4>
+            <table class="guide-table">
+              <tr><th>状況</th><th>対応方法</th></tr>
+              <tr><td>新しい住民が登録したい</td><td>招待コードを発行（管理者メニュー → 招待コード）して住民に伝える</td></tr>
+              <tr><td>住民がパスワードを忘れた</td><td>住民自身がログイン画面の「パスワードリセット」から対応可能（メール必要）</td></tr>
+              <tr><td>不審なユーザーを確認したい</td><td>管理者メニュー → ユーザー管理 → 一覧で確認</td></tr>
+              <tr><td>住民からの購入依頼</td><td>管理者メニュー → 購入リクエスト → 対応状況を更新</td></tr>
+              <tr><td>ゲストとして使っている人に登録を勧めたい</td><td>招待コードを発行してお知らせで告知</td></tr>
+            </table>
+          </div>
+
+          <!-- 5. トラブル対応 -->
+          <div class="guide-section" id="manual-trouble">
+            <h4 class="guide-section-title">5. トラブル対応</h4>
+            <table class="guide-table">
+              <tr><th>症状</th><th>原因</th><th>対処法</th></tr>
+              <tr><td>アプリが遅い・つながらない</td><td>Renderサーバーのスリープ（無料枠）</td><td>30〜50秒待つ。毎日の自動Ping設定済み</td></tr>
+              <tr><td>蔵書が検索できない</td><td>librarylifeサーバーの問題</td><td>librarylife.netを直接確認。復旧まで待つ</td></tr>
+              <tr><td>書評が表示されない</td><td>OpenAI API制限またはDB未生成</td><td>管理者メニュー → 書評未登録一覧を確認</td></tr>
+              <tr><td>住民がログインできない</td><td>パスワード誤り・招待コード未使用</td><td>住民にパスワードリセットを案内</td></tr>
+              <tr><td>メールが届かない</td><td>迷惑メールフォルダに振り分け</td><td>迷惑メールを確認するよう案内</td></tr>
+              <tr><td>その他のシステムトラブル</td><td>コードまたはインフラの問題</td><td>秋山（アプリ管理者）に連絡</td></tr>
+            </table>
+            <div class="guide-info-box" style="margin-top:14px">
+              <strong>💡 アプリのログを確認するには</strong><br>
+              Render.com にログインし「proud-library」サービス → 「Logs」タブでサーバーのエラーログを確認できます。
+            </div>
+          </div>
+
+          <!-- 6. 貸出ルール -->
+          <div class="guide-section" id="manual-rules">
+            <h4 class="guide-section-title">6. 貸出ルール・図書館規則</h4>
+            <table class="guide-table">
+              <tr><th>項目</th><th>ルール</th></tr>
+              <tr><td>貸出期間</td><td>2週間（librarylife上で管理）</td></tr>
+              <tr><td>貸出冊数</td><td>一度に3冊まで</td></tr>
+              <tr><td>延滞時の対応</td><td>librarylifeで確認 → 必要に応じて住民へ連絡</td></tr>
+              <tr><td>紛失・破損</td><td>住民に同等品の弁償を依頼</td></tr>
+              <tr><td>予約・リクエスト</td><td>アプリのウィッシュリスト機能を利用</td></tr>
+              <tr><td>蔵書の選定基準</td><td>理事会で承認されたリストに基づく</td></tr>
+            </table>
+          </div>
+
+          <!-- 7. 緊急連絡先 -->
+          <div class="guide-section" id="manual-contacts">
+            <h4 class="guide-section-title">7. 緊急連絡先</h4>
+            <table class="guide-table">
+              <tr><th>役割</th><th>連絡先</th><th>対応内容</th></tr>
+              <tr><td>アプリ管理者</td><td>秋山（理事会メンバー）</td><td>システムトラブル・機能追加</td></tr>
+              <tr><td>図書館担当者</td><td>ライブラリーグループ</td><td>蔵書・貸出・日常運用</td></tr>
+              <tr><td>情報ステーション</td><td>librarylife.net サポート</td><td>蔵書管理システムの問題</td></tr>
+            </table>
+            <div class="guide-info-box" style="margin-top:14px">
+              <strong>🔐 アカウント管理について</strong><br>
+              Render.com・GitHub・Neon・Brevoのアカウント情報は引き継ぎ資料を参照してください。パスワードの変更が必要な場合はアプリ管理者（秋山）にご連絡ください。
+            </div>
+          </div>
+
+        </div>
+      </div><!-- end btab-manual -->
+
     </div>
   </div>
 

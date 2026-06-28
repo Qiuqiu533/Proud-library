@@ -298,6 +298,10 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .manual-review-date { display: block; margin-top: 6px; font-size: 0.75rem; color: #888; text-align: right; }
 .desc-rating { display: block; margin-top: 3px; font-size: 0.75rem; color: #f57c00; text-align: right; }
 .ai-disclaimer { font-size: 0.75rem; color: #999; margin: 4px 0 2px; font-style: italic; }
+.ai-summary-line { font-size: 0.88rem; color: #5a4200; background: #fffbf0; border-left: 3px solid #f5c842; padding: 6px 10px; border-radius: 0 6px 6px 0; margin: 0 0 10px; line-height: 1.6; }
+.modal-tag-row { display: flex; flex-wrap: wrap; gap: 5px; margin: 10px 0 4px; }
+.modal-tag-chip { background: none; border: 1.5px solid #c8b89a; color: #6b4f2a; border-radius: 14px; padding: 2px 10px; font-size: 0.73rem; cursor: pointer; font-family: inherit; transition: all .18s; }
+.modal-tag-chip:hover { border-color: #8b5e2e; background: #fff3e0; color: #6b3a12; font-weight: 600; }
 .helpful-row { margin-top: 10px; }
 .helpful-btn { background: none; border: 1px solid #ccc; border-radius: 20px; padding: 4px 14px; font-size: 0.82rem; color: #555; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s; }
 .helpful-btn:hover:not(:disabled) { border-color: #4caf50; color: #4caf50; background: #f1f8e9; }
