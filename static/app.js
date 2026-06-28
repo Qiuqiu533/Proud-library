@@ -1917,6 +1917,7 @@ async function openModal(isbn, preloadedBook) {
       if (availEl) availEl.innerHTML = `<div class="avail-row"><span>取得できませんでした</span></div>`;
     } finally {
       _loadRelatedBooks(isbn);
+      _loadPlamInfo(isbn, preloadedBook.title || "", preloadedBook.author || "");
     }
   } else {
     // preloadedBookなし（評価後の再表示など）：全データ取得してから表示
@@ -1940,6 +1941,7 @@ async function openModal(isbn, preloadedBook) {
       _bindModalEvents(isbn);
       _renderDescSection(isbn, book);
       _loadRelatedBooks(isbn);
+      _loadPlamInfo(isbn, book.title || "", book.author || "");
     } catch(e) {
       document.getElementById("modalContent").innerHTML =
         `<div class="loading-error" style="text-align:center;padding:40px 20px;color:#c00;line-height:2">📡 書籍情報の取得に失敗しました。<br>通信エラーまたはサーバーの起動中の可能性があります。<br><button class="btn-retry" onclick="openModal('${isbn.replace(/'/g,"\\'")}')">再試行する</button></div>`;
@@ -1974,6 +1976,49 @@ async function _loadRelatedBooks(isbn) {
     };
     const html = renderCarousel(data.same_author, "👤 同じ著者の本") + renderCarousel(data.same_genre, "📚 同じジャンルの本");
     if (html) current.outerHTML = html;
+  } catch(e) {}
+}
+
+async function _loadPlamInfo(isbn, title, author) {
+  if (!title) return;
+  try {
+    const params = new URLSearchParams({ title, author: author || "" });
+    const res = await fetch(`/api/plam/book?${params}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data || !data.awards || data.awards.length === 0) return;
+
+    // 既存のPLAMセクションがあれば置き換えない（再描画防止）
+    if (document.getElementById("modal-plam-section")) return;
+
+    const clusterDots = data.clusters.map(c =>
+      `<span class="plam-cluster-dot" style="background:${c.color}" title="${c.id}">${c.id}</span>`
+    ).join("");
+
+    const awardItems = data.awards.map(a =>
+      `<div class="plam-award-item">
+        <span class="plam-award-dot" style="background:${a.color}"></span>
+        <span class="plam-award-name">${esc(a.award_name)}</span>
+        <span class="plam-award-year">${a.award_year ? "（" + a.award_year + "年）" : ""}</span>
+      </div>`
+    ).join("");
+
+    const bridgeBadge = data.is_bridge
+      ? `<span class="plam-bridge-badge">🌉 Bridge Work</span>` : "";
+
+    const plamHtml = `<div class="modal-section" id="modal-plam-section">
+      <h3>🏆 文学賞</h3>
+      ${bridgeBadge}
+      <div class="plam-awards-list">${awardItems}</div>
+      <div class="plam-cluster-row">${clusterDots}</div>
+      <a class="plam-network-link" href="/plam" target="_blank" rel="noopener">📊 賞ネットワークを見る</a>
+    </div>`;
+
+    // 関連本セクションの直前に挿入
+    const relatedPlaceholder = document.getElementById("modal-related-placeholder");
+    if (relatedPlaceholder) {
+      relatedPlaceholder.insertAdjacentHTML("beforebegin", plamHtml);
+    }
   } catch(e) {}
 }
 
