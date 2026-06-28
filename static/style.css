@@ -1028,3 +1028,16 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .suggest-item:hover, .suggest-item.suggest-active {
   background: #f0f7f2;
 }
+
+/* PLAM 文学賞セクション */
+#modal-plam-section { border-left: 3px solid #6a4c93; }
+.plam-awards-list { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.plam-award-item { display: flex; align-items: center; gap: 8px; font-size: 0.88rem; }
+.plam-award-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.plam-award-name { font-weight: 600; color: #333; }
+.plam-award-year { color: #888; font-size: 0.82rem; }
+.plam-cluster-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 8px; }
+.plam-cluster-dot { font-size: 0.78rem; font-weight: 600; color: #fff; padding: 2px 10px; border-radius: 20px; text-transform: capitalize; }
+.plam-bridge-badge { display: inline-block; font-size: 0.82rem; background: #fff3e0; color: #b45309; border: 1px solid #f59e0b; border-radius: 20px; padding: 2px 10px; margin-bottom: 8px; }
+.plam-network-link { font-size: 0.82rem; color: #6a4c93; text-decoration: none; display: inline-block; margin-top: 4px; }
+.plam-network-link:hover { text-decoration: underline; }
