@@ -984,3 +984,18 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .news-filter-btn:hover:not(.active) {
   background: #f0f0f0;
 }
+
+/* ===== ページトップボタン ===== */
+#scrollTopBtn {
+  position: fixed; bottom: 80px; right: 18px; width: 44px; height: 44px;
+  background: #3d6b4f; color: white; border: none; border-radius: 50%;
+  font-size: 1rem; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  opacity: 0; visibility: hidden; transition: opacity .3s, visibility .3s;
+  z-index: 150;
+}
+#scrollTopBtn.visible { opacity: 1; visibility: visible; }
+#scrollTopBtn:hover { background: #2a4a37; }
+
+/* ===== 書評文字数カウント ===== */
+.review-char-count { font-size: 0.78rem; color: #aaa; text-align: right; margin-top: 3px; }
+.review-char-over { color: #e05; font-weight: 600; }
