@@ -15,7 +15,7 @@ from collections import OrderedDict
 
 PLAM_DIR = Path("data/plam")
 AWARD_CSVS = sorted(PLAM_DIR.glob("*.csv"))
-EXCLUDE = {"awards_master.csv", "works.csv"}
+EXCLUDE = {"awards_master.csv", "works.csv", "authors.csv", "aliases.csv"}
 
 
 def read_csv(path: Path) -> list[dict]:
