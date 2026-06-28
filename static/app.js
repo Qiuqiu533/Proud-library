@@ -2745,14 +2745,19 @@ async function loadDashboard() {
 
   const pw = boardPassword;
   try {
-    const [dashRes, awardsRes] = await Promise.all([
+    const [dashRes, awardsRes, backupRes] = await Promise.all([
       fetch(`/api/admin/dashboard-data`, { headers: { "X-Password": pw } }),
       fetch(`/api/award-books/awards`),
+      fetch(`/api/admin/backup-status`, { headers: { "X-Password": pw } }),
     ]);
     if (!dashRes.ok) throw new Error("dashboard-data fetch failed");
     const d = await dashRes.json();
     const awardsData = awardsRes.ok ? await awardsRes.json() : [];
     const awardCount = awardsData.reduce((s, a) => s + (a.count || 0), 0);
+    const backupData = backupRes && backupRes.ok ? await backupRes.json() : {};
+    const backupHtml = backupData.last_backup
+      ? `✅ 最終バックアップ: ${backupData.last_backup}`
+      : `⚠️ バックアップ未確認（<a href="https://github.com/Qiuqiu533/Proud-library/actions/workflows/backup.yml" target="_blank">GitHub Actions</a>で確認）`;
 
     const reqs   = d.requests  || [];
     const issues = d.issues    || [];
@@ -2794,7 +2799,7 @@ async function loadDashboard() {
     const alertIcon  = (n) => n > 0 ? "🔴" : "✅";
 
     el.innerHTML = `
-      <div class="dash-updated">最終更新: ${new Date().toLocaleString("ja-JP", {month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"})}</div>
+      <div class="dash-updated">最終更新: ${new Date().toLocaleString("ja-JP", {month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"})} ｜ 🗄️ ${backupHtml}</div>
 
       <!-- 要対応バナー -->
       ${(pendingReqs.length + pendingFeedback.length + openIssues.length) > 0 ? `
@@ -6485,3 +6490,28 @@ async function adminResetPassword() {
     msg.style.color="#e05"; msg.textContent="通信エラーが発生しました";
   }
 }
+
+// ===== ページトップボタン =====
+(function() {
+  const btn = document.getElementById("scrollTopBtn");
+  if (!btn) return;
+  window.addEventListener("scroll", () => {
+    btn.classList.toggle("visible", window.scrollY > 300);
+  }, { passive: true });
+})();
+
+// ===== 書評文字数カウント =====
+(function() {
+  const ta = document.getElementById("reviewText");
+  if (!ta) return;
+  const MAX = 200;
+  const counter = document.createElement("div");
+  counter.className = "review-char-count";
+  counter.textContent = `0 / ${MAX}文字`;
+  ta.insertAdjacentElement("afterend", counter);
+  ta.addEventListener("input", () => {
+    const len = ta.value.length;
+    counter.textContent = `${len} / ${MAX}文字`;
+    counter.classList.toggle("review-char-over", len > MAX);
+  });
+})();

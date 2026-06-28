@@ -114,3 +114,24 @@ def api_chat_threads_delete(thread_id):
     execute(con, "DELETE FROM chat_threads WHERE id=?", (thread_id,))
     con.commit(); con.close()
     return jsonify({"ok": True})
+
+
+@admin_bp.route("/api/admin/backup-status")
+def api_backup_status():
+    pw = request.headers.get("X-Password", "")
+    if not check_password(pw, "board"):
+        return jsonify({"error": "unauthorized"}), 401
+    import urllib.request, json as _json
+    try:
+        repo = "Qiuqiu533/Proud-library"
+        url = f"https://api.github.com/repos/{repo}/actions/workflows/backup.yml/runs?per_page=1&status=success"
+        req = urllib.request.Request(url, headers={"User-Agent": "proud-library"})
+        with urllib.request.urlopen(req, timeout=5) as r:
+            data = _json.loads(r.read())
+        runs = data.get("workflow_runs", [])
+        if runs:
+            ts = runs[0].get("updated_at", "")[:10]
+            return jsonify({"last_backup": ts})
+    except Exception:
+        pass
+    return jsonify({"last_backup": None})
