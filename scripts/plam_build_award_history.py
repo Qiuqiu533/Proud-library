@@ -28,10 +28,22 @@ import argparse, csv
 from pathlib import Path
 
 PLAM_DIR = Path("data/plam")
-EXCLUDE   = {"awards_master.csv", "works.csv", "authors.csv", "aliases.csv", "award_history.csv"}
+EXCLUDE   = {"awards_master.csv", "works.csv", "authors.csv", "aliases.csv",
+             "award_history.csv", "duplicate_candidates.csv",
+             "duplicate_review_history.csv", "award_import_log.csv",
+             "cross_award_summary.csv"}
 HISTORY_PATH = PLAM_DIR / "award_history.csv"
 FIELDNAMES = ["history_id", "work_id", "award_id", "award_year",
-              "award_no", "award_term", "status", "remarks"]
+              "award_no", "award_term", "status", "confidence", "remarks"]
+
+# 情報源の信頼性ランク
+SOURCE_CONFIDENCE = {
+    "AKU": "OFFICIAL",   # 公益財団法人日本文学振興会
+    "NAO": "OFFICIAL",   # 公益財団法人日本文学振興会
+    "HON": "OFFICIAL",   # 特定非営利活動法人本屋大賞実行委員会
+    "RAN": "VERIFIED",   # Wikipedia（公式サイト接続不可のため）
+    "JRA": "VERIFIED",   # Wikipedia（公式サイト確認中）
+}
 
 
 def read_csv(path: Path) -> list[dict]:
@@ -77,6 +89,7 @@ def main():
                 "award_no":   r.get("award_no", ""),
                 "award_term": r.get("award_term", ""),
                 "status":     r.get("status", ""),
+                "confidence": SOURCE_CONFIDENCE.get(award_id, "REVIEWED"),
                 "remarks":    r.get("remarks", ""),
             })
             added += 1
