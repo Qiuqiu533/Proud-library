@@ -1,7 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 from flask import Blueprint, request, jsonify
-from config import get_board_password, LIBRARYLIFE_BASE, LIBRARY_INFO
+from config import get_board_password, LIBRARYLIFE_BASE, LIBRARY_INFO, check_password
 from database import get_con, execute, fetchone, fetchall, USE_PG
 from services.utils import _hash_password
 
@@ -181,7 +181,7 @@ def api_availability_loaned():
 @loans_bp.route("/api/admin/availability-stale")
 def api_availability_stale():
     """24時間以上更新されていない書籍ISBNを最大N件返す（フロント側で順次チェックに使用）"""
-    if request.headers.get("X-Password") != get_board_password():
+    if not check_password(request.headers.get("X-Password"), "board"):
         return jsonify({"error": "unauthorized"}), 401
     limit = min(int(request.args.get("limit", 30)), 100)
     con = get_con()
@@ -212,7 +212,7 @@ def api_availability_stale():
 @loans_bp.route("/api/admin/dashboard-data")
 def api_admin_dashboard_data():
     """ダッシュボード用データを1リクエストで返す"""
-    if request.headers.get("X-Password") != get_board_password():
+    if not check_password(request.headers.get("X-Password"), "board"):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     try:
@@ -244,7 +244,7 @@ def api_admin_dashboard_data():
 
 @loans_bp.route("/api/admin/db-size")
 def api_db_size():
-    if request.headers.get("X-Password") != get_board_password():
+    if not check_password(request.headers.get("X-Password"), "board"):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     try:
@@ -278,7 +278,7 @@ def api_db_size():
 @loans_bp.route("/api/admin/members")
 def api_admin_members():
     """会員一覧（管理者）"""
-    if request.headers.get("X-Password") != get_board_password():
+    if not check_password(request.headers.get("X-Password"), "board"):
         return jsonify({"error": "unauthorized"}), 401
     ph = "%s" if USE_PG else "?"
     con = get_con()
@@ -298,7 +298,7 @@ def api_admin_members():
 @loans_bp.route("/api/admin/ops-stats")
 def api_ops_stats():
     """運営統計: 貸出状況・評価・リクエスト対応サマリ"""
-    if request.headers.get("X-Password") != get_board_password():
+    if not check_password(request.headers.get("X-Password"), "board"):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     try:
@@ -349,7 +349,7 @@ def api_ops_stats():
 @loans_bp.route("/api/admin/wishlist-summary")
 def api_wishlist_summary():
     """読みたいリスト集計（購入判断用）: 複数人が登録している本を降順で返す"""
-    if request.headers.get("X-Password") != get_board_password():
+    if not check_password(request.headers.get("X-Password"), "board"):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     try:
@@ -376,7 +376,7 @@ def api_wishlist_summary():
 @loans_bp.route("/api/admin/reset-user-password", methods=["POST"])
 def api_admin_reset_user_password():
     """管理者による住民パスワードリセット"""
-    if request.headers.get("X-Password") != get_board_password():
+    if not check_password(request.headers.get("X-Password"), "board"):
         return jsonify({"error": "unauthorized"}), 401
     body = request.get_json() or {}
     room = (body.get("room") or "").strip()
@@ -407,7 +407,7 @@ def api_admin_reset_user_password():
 @loans_bp.route("/api/admin/audit-log")
 def api_audit_log():
     """管理者操作ログ（最新200件）"""
-    if request.headers.get("X-Password") != get_board_password():
+    if not check_password(request.headers.get("X-Password"), "board"):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     try:

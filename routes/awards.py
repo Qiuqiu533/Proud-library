@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from config import get_board_password
+from config import get_board_password, check_password
 from database import get_con, execute, fetchone, fetchall, USE_PG
 from services.audit import log_action
 
@@ -67,7 +67,7 @@ def api_post_award_book():
     """受賞作を1件追加（管理者）"""
     data = request.get_json() or {}
     password = data.get("password", "")
-    if password != get_board_password():
+    if not check_password(password, "board"):
         return jsonify({"error": "認証エラー"}), 403
     award   = (data.get("award") or "").strip()
     title   = (data.get("title") or "").strip()
@@ -93,7 +93,7 @@ def api_post_award_book():
 def api_patch_award_book(book_id):
     """受賞作のステータスを更新（管理者）"""
     data = request.get_json() or {}
-    if data.get("password", "") != get_board_password():
+    if not check_password(data.get("password", ""), "board"):
         return jsonify({"error": "認証エラー"}), 403
     status = (data.get("status") or "").strip()
     if status not in ("確認済", "要確認"):
@@ -111,7 +111,7 @@ def api_patch_award_book(book_id):
 def api_delete_award_book(book_id):
     """受賞作を削除（管理者）"""
     data = request.get_json() or {}
-    if data.get("password", "") != get_board_password():
+    if not check_password(data.get("password", ""), "board"):
         return jsonify({"error": "認証エラー"}), 403
     if not USE_PG:
         return jsonify({"error": "PG only"}), 400
@@ -129,7 +129,7 @@ def api_award_books_admin():
         return jsonify([])
     award = request.args.get("award", "").strip()
     password = request.headers.get("X-Password", "")
-    if password != get_board_password():
+    if not check_password(password, "board"):
         return jsonify({"error": "認証エラー"}), 403
     con = get_con()
     if award:

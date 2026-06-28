@@ -48,7 +48,7 @@ def _ensure_collections_table():
         con.close()
 from config import (
     get_admin_password, get_board_password, OPENBD_API,
-    _KANA_ROWS, FULL_STATS,
+    _KANA_ROWS, FULL_STATS, check_password,
 )
 from database import get_con, execute, fetchone, fetchall, USE_PG
 from services.utils import rate_limit, _hira_to_kata, _kata_to_hira
@@ -248,7 +248,7 @@ def api_get_new_arrivals():
 @books_bp.route("/api/new-arrivals", methods=["POST"])
 def api_post_new_arrival():
     body = request.get_json()
-    if body.get("password") != get_board_password():
+    if not check_password(body.get("password"), "board"):
         return jsonify({"error": "unauthorized"}), 401
     isbn = (body.get("isbn") or "").strip().replace("-", "")
     arrived_at = (body.get("arrived_at") or "").strip()
@@ -268,7 +268,7 @@ def api_post_new_arrival():
 @books_bp.route("/api/new-arrivals/<int:arrival_id>", methods=["DELETE"])
 def api_delete_new_arrival(arrival_id):
     body = request.get_json()
-    if body.get("password") != get_board_password():
+    if not check_password(body.get("password"), "board"):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     execute(con, "DELETE FROM new_arrivals WHERE id=?", (arrival_id,))
@@ -573,7 +573,7 @@ def api_delete_review():
 def api_book_description():
     body = request.get_json()
     password = body.get("password", "")
-    if password != get_admin_password() and password != get_board_password():
+    if not (check_password(password, "admin") or check_password(password, "board")):
         return jsonify({"error": "unauthorized"}), 401
     isbn = body.get("isbn", "").strip()
     description = body.get("description", "").strip()[:600]
@@ -591,7 +591,7 @@ def api_book_award():
     """受賞情報の設定（管理者のみ）"""
     body = request.get_json()
     password = body.get("password", "")
-    if password != get_admin_password() and password != get_board_password():
+    if not (check_password(password, "admin") or check_password(password, "board")):
         return jsonify({"error": "unauthorized"}), 401
     isbn = body.get("isbn", "").strip()
     awards = body.get("awards", [])
@@ -666,7 +666,7 @@ def api_collections_get():
 @books_bp.route("/api/collections", methods=["POST"])
 def api_collections_post():
     body = request.get_json()
-    if body.get("password") != get_board_password():
+    if not check_password(body.get("password"), "board"):
         return jsonify({"error": "unauthorized"}), 401
     title = (body.get("title") or "").strip()
     if not title:
@@ -691,7 +691,7 @@ def api_collections_post():
 @books_bp.route("/api/collections/<int:cid>", methods=["PATCH"])
 def api_collections_patch(cid):
     body = request.get_json()
-    if body.get("password") != get_board_password():
+    if not check_password(body.get("password"), "board"):
         return jsonify({"error": "unauthorized"}), 401
     updates = []
     params = []
@@ -717,7 +717,7 @@ def api_collections_patch(cid):
 @books_bp.route("/api/collections/<int:cid>", methods=["DELETE"])
 def api_collections_delete(cid):
     body = request.get_json()
-    if body.get("password") != get_board_password():
+    if not check_password(body.get("password"), "board"):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     execute(con, "DELETE FROM collections WHERE id=?", (cid,))

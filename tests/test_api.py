@@ -7,6 +7,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 # テスト用にインメモリDBを強制使用
 os.environ.setdefault("DATABASE_URL", "")
+# テスト用パスワード（check_passwordはhmac.compare_digestを使うため空文字不可）
+os.environ.setdefault("ADMIN_PASSWORD",    "test-admin-pw")
+os.environ.setdefault("BOARD_PASSWORD",    "test-board-pw")
+os.environ.setdefault("RESIDENT_PASSWORD", "test-resident-pw")
 
 import app as flask_app
 
@@ -253,7 +257,7 @@ def test_ops_stats_no_auth(client):
 
 def test_ops_stats_with_auth(client):
     """正しい認証で運営統計が取得できる（テスト環境のboard_passwordは空文字）"""
-    res = client.get("/api/admin/ops-stats", headers={"X-Password": ""})
+    res = client.get("/api/admin/ops-stats", headers={"X-Password": "test-board-pw"})
     assert res.status_code == 200
     data = res.get_json()
     assert "loaned" in data
@@ -269,7 +273,7 @@ def test_wishlist_summary_no_auth(client):
 
 def test_wishlist_summary_with_auth(client):
     """正しい認証でウィッシュリスト集計が取得できる（テスト環境のboard_passwordは空文字）"""
-    res = client.get("/api/admin/wishlist-summary", headers={"X-Password": ""})
+    res = client.get("/api/admin/wishlist-summary", headers={"X-Password": "test-board-pw"})
     assert res.status_code == 200
     assert isinstance(res.get_json(), list)
 
@@ -352,7 +356,7 @@ def test_patch_request_status_ok(client):
         return  # データなしはスキップ
     req_id = reqs[0]["id"]
     res = client.patch(f"/api/requests/{req_id}", json={"status": "approved"},
-                       headers={"X-Password": ""})
+                       headers={"X-Password": "test-board-pw"})
     assert res.status_code == 200
     assert res.get_json().get("ok")
 
@@ -423,13 +427,13 @@ def test_invite_codes_issue_and_list(client):
     """招待コード発行→一覧に表示される"""
     res = client.post("/api/admin/invite-codes",
                       json={"count": 3, "note": "テスト"},
-                      headers={"X-Password": ""})
+                      headers={"X-Password": "test-board-pw"})
     assert res.status_code == 200
     data = res.get_json()
     assert data.get("ok")
     assert len(data.get("codes", [])) == 3
 
-    res2 = client.get("/api/admin/invite-codes", headers={"X-Password": ""})
+    res2 = client.get("/api/admin/invite-codes", headers={"X-Password": "test-board-pw"})
     assert res2.status_code == 200
     codes_in_db = [r["code"] for r in res2.get_json()]
     for c in data["codes"]:
@@ -440,7 +444,7 @@ def test_invite_validate_valid(client):
     """有効な招待コードの検証は valid=True"""
     issue = client.post("/api/admin/invite-codes",
                         json={"count": 1},
-                        headers={"X-Password": ""})
+                        headers={"X-Password": "test-board-pw"})
     code = issue.get_json()["codes"][0]
     res = client.post("/api/invite/validate", json={"code": code})
     assert res.status_code == 200
@@ -458,13 +462,13 @@ def test_invite_delete_unused(client):
     """未使用コードの削除"""
     issue = client.post("/api/admin/invite-codes",
                         json={"count": 1},
-                        headers={"X-Password": ""})
-    code_id_list = client.get("/api/admin/invite-codes", headers={"X-Password": ""}).get_json()
+                        headers={"X-Password": "test-board-pw"})
+    code_id_list = client.get("/api/admin/invite-codes", headers={"X-Password": "test-board-pw"}).get_json()
     issued_code = issue.get_json()["codes"][0]
     target = next((r for r in code_id_list if r["code"] == issued_code), None)
     assert target is not None
     res = client.delete(f"/api/admin/invite-codes/{target['id']}",
-                        headers={"X-Password": ""})
+                        headers={"X-Password": "test-board-pw"})
     assert res.status_code == 200
     assert res.get_json().get("ok")
 
@@ -494,7 +498,7 @@ def test_admin_create_and_list_event(client):
     res = client.post("/api/admin/events",
                       json={"title": "読書会テスト", "event_date": "2026-08-01",
                             "capacity": 10, "status": "open"},
-                      headers={"X-Password": ""})
+                      headers={"X-Password": "test-board-pw"})
     assert res.status_code == 200
     assert res.get_json()["ok"]
 
@@ -508,7 +512,7 @@ def test_event_entry_and_cancel(client):
     client.post("/api/admin/events",
                 json={"title": "映画上映会テスト", "event_date": "2026-09-01",
                       "capacity": 5, "status": "open"},
-                headers={"X-Password": ""})
+                headers={"X-Password": "test-board-pw"})
     event_id = _get_event_id(client, "映画上映会テスト")
 
     res = client.post(f"/api/events/{event_id}/entry",
@@ -532,7 +536,7 @@ def test_event_waitlist(client):
     client.post("/api/admin/events",
                 json={"title": "定員テスト", "event_date": "2026-10-01",
                       "capacity": 1, "status": "open"},
-                headers={"X-Password": ""})
+                headers={"X-Password": "test-board-pw"})
     event_id = _get_event_id(client, "定員テスト")
 
     r1 = client.post(f"/api/events/{event_id}/entry",
@@ -555,7 +559,7 @@ def test_event_waitlist_promotion(client):
     client.post("/api/admin/events",
                 json={"title": "繰り上げテスト", "event_date": "2026-11-01",
                       "capacity": 1, "status": "open"},
-                headers={"X-Password": ""})
+                headers={"X-Password": "test-board-pw"})
     event_id = _get_event_id(client, "繰り上げテスト")
 
     client.post(f"/api/events/{event_id}/entry", json={"room": "1-401", "password": "test5678"})
@@ -564,7 +568,7 @@ def test_event_waitlist_promotion(client):
     client.delete(f"/api/events/{event_id}/entry", json={"room": "1-401", "password": "test5678"})
 
     entries = client.get(f"/api/admin/events/{event_id}/entries",
-                         headers={"X-Password": ""}).get_json()
+                         headers={"X-Password": "test-board-pw"}).get_json()
     room402 = next(e for e in entries if e["room"] == "1-402")
     assert not room402["is_waitlist"]
 
@@ -575,7 +579,7 @@ def test_event_duplicate_entry(client):
     client.post("/api/admin/events",
                 json={"title": "重複テスト", "event_date": "2026-12-01",
                       "capacity": 10, "status": "open"},
-                headers={"X-Password": ""})
+                headers={"X-Password": "test-board-pw"})
     event_id = _get_event_id(client, "重複テスト")
 
     client.post(f"/api/events/{event_id}/entry", json={"room": "1-501", "password": "test5678"})
@@ -588,7 +592,7 @@ def test_event_unauth_entry(client):
     client.post("/api/admin/events",
                 json={"title": "認証テスト", "event_date": "2026-12-15",
                       "capacity": 5, "status": "open"},
-                headers={"X-Password": ""})
+                headers={"X-Password": "test-board-pw"})
     event_id = _get_event_id(client, "認証テスト")
     res = client.post(f"/api/events/{event_id}/entry",
                       json={"room": "9999", "password": "wrong"})
@@ -600,9 +604,9 @@ def test_admin_delete_event(client):
     client.post("/api/admin/events",
                 json={"title": "削除テスト固有", "event_date": "2026-12-31",
                       "capacity": 0, "status": "open"},
-                headers={"X-Password": ""})
+                headers={"X-Password": "test-board-pw"})
     event_id = _get_event_id(client, "削除テスト固有")
-    res = client.delete(f"/api/admin/events/{event_id}", headers={"X-Password": ""})
+    res = client.delete(f"/api/admin/events/{event_id}", headers={"X-Password": "test-board-pw"})
     assert res.status_code == 200
     assert res.get_json()["ok"]
     events = client.get("/api/events").get_json()

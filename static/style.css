@@ -176,6 +176,8 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .tag-chip:hover, .tag-chip.active { border-color: #8b5e2e; background: #fff3e0; color: #6b3a12; font-weight: 600; }
 .tag-count { font-size: 0.68rem; color: #aaa; margin-left: 2px; }
 .tag-chip.active .tag-count { color: #a0611a; }
+.tag-chip--clear { border-color: #aaa; color: #555; background: #f5f5f5; }
+.tag-chip--clear:hover { border-color: #666; background: #e0e0e0; color: #333; font-weight: 600; }
 
 /* ===== Pagination ===== */
 .pagination { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; margin: 8px 0; }

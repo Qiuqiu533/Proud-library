@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from config import get_admin_password, get_resident_password, get_board_password
+from config import get_admin_password, get_resident_password, get_board_password, check_password
 from database import get_con, execute, fetchone
 from services.utils import rate_limit, _hash_password, _verify_password
 
@@ -10,7 +10,7 @@ auth_bp = Blueprint("auth", __name__)
 @rate_limit(limit=5, window=60)
 def api_auth():
     body = request.get_json()
-    if body.get("password") == get_resident_password():
+    if check_password(body.get("password"), "resident"):
         return jsonify({"ok": True})
     return jsonify({"error": "unauthorized"}), 401
 
@@ -25,7 +25,7 @@ def api_login_qr_url():
 @rate_limit(limit=5, window=60)
 def api_board_auth():
     body = request.get_json()
-    if body.get("password") == get_board_password():
+    if check_password(body.get("password"), "board"):
         return jsonify({"ok": True})
     return jsonify({"error": "unauthorized"}), 401
 
@@ -49,7 +49,7 @@ def api_admin_login():
 @auth_bp.route("/api/admin/users", methods=["GET"])
 def api_admin_users_list():
     pw = request.headers.get("X-Password", "")
-    if pw != get_board_password():
+    if not check_password(pw, "board"):
         return jsonify({"error": "unauthorized"}), 401
     from database import fetchall
     con = get_con()
@@ -138,7 +138,7 @@ def api_admin_users_change_password(target_code):
 @auth_bp.route("/api/admin/change-password", methods=["POST"])
 def api_change_password():
     body = request.get_json()
-    if body.get("current_password") != get_board_password():
+    if not check_password(body.get("current_password"), "board"):
         return jsonify({"error": "現在のパスワードが違います"}), 401
     target = body.get("target")
     new_pw = body.get("new_password", "").strip()

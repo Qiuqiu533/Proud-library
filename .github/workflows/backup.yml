@@ -1,31 +1,38 @@
-name: Weekly DB Backup
+name: DB週次バックアップ（Neon → GitHub Artifacts）
 
 on:
   schedule:
-    - cron: "0 20 * * 0"  # 毎週日曜 05:00 JST (UTC 20:00土曜)
+    - cron: "0 20 * * 0"  # 毎週日曜 JST 05:00（UTC 20:00）
   workflow_dispatch:       # 手動実行も可能
 
 jobs:
   backup:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: Install postgresql-client
+      - name: PostgreSQLクライアントをインストール
         run: sudo apt-get install -y postgresql-client
 
-      - name: Run pg_dump
+      - name: pg_dumpでバックアップ取得
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          FILENAME="proud_library_backup_${TIMESTAMP}.sql"
           pg_dump "$DATABASE_URL" \
             --no-password \
-            --format=custom \
-            --file="backup_${TIMESTAMP}.dump"
-          echo "BACKUP_FILE=backup_${TIMESTAMP}.dump" >> $GITHUB_ENV
+            --clean \
+            --if-exists \
+            --no-owner \
+            --no-acl \
+            --format=plain \
+            > "$FILENAME"
+          echo "FILENAME=$FILENAME" >> $GITHUB_ENV
+          echo "バックアップ完了: $FILENAME ($(wc -l < $FILENAME) 行)"
 
-      - name: Upload backup as artifact
+      - name: Artifactsにアップロード（30日間保持）
         uses: actions/upload-artifact@v4
         with:
-          name: db-backup-${{ github.run_id }}
-          path: ${{ env.BACKUP_FILE }}
-          retention-days: 90
+          name: db-backup-${{ github.run_number }}
+          path: ${{ env.FILENAME }}
+          retention-days: 30

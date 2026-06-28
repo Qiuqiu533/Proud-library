@@ -1012,6 +1012,7 @@ async function loadPopularTags() {
     const data = await res.json();
     if (!data.tags || data.tags.length === 0) { panel.style.display = "none"; return; }
     panel.innerHTML = '<span class="tag-panel-label">🏷️ タグ:</span>' +
+      '<button class="tag-chip tag-chip--clear" id="tagClearBtn" style="display:none" onclick="clearTagFilter()">× すべての本</button>' +
       data.tags.map(t =>
         `<button class="tag-chip" data-tag="${esc(t.tag)}" onclick="searchByTag('${esc(t.tag)}')">${esc(t.tag)}<span class="tag-count">${t.count}</span></button>`
       ).join("");
@@ -1027,7 +1028,17 @@ async function searchByTag(tag) {
   document.getElementById("searchInput").value = "";
   document.querySelectorAll(".genre-btn").forEach(b => b.classList.remove("active"));
   document.querySelectorAll(".tag-chip").forEach(b => b.classList.toggle("active", b.dataset.tag === tag));
+  const clearBtn = document.getElementById("tagClearBtn");
+  if (clearBtn) clearBtn.style.display = "";
   await loadBooksByTag(tag, 1);
+}
+
+function clearTagFilter() {
+  currentTag = "";
+  document.querySelectorAll(".tag-chip").forEach(b => b.classList.remove("active"));
+  const clearBtn = document.getElementById("tagClearBtn");
+  if (clearBtn) clearBtn.style.display = "none";
+  loadBooks("");
 }
 
 async function loadBooksByTag(tag, page = 1) {
