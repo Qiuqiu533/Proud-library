@@ -385,6 +385,7 @@ let currentKeyword = "";
 let currentTotal = 0;
 let currentAward = "";   // 受賞フィルター
 let currentKana  = "";   // 50音フィルター（後方互換）
+let currentTag   = "";   // タグ検索フィルター
 let selectedKanas = new Set();  // 複数選択かな行
 let selectedAwards = new Set(); // 複数選択受賞賞
 
@@ -483,9 +484,8 @@ function _renderDescSection(isbn, book) {
   const aiScoreTag = book.ai_review_score
     ? `<span class="desc-rating">書評品質スコア：${book.ai_review_score} / 100</span>` : "";
   const helpfulCount = book.helpful_count || 0;
-  const helpfulVoted = (JSON.parse(localStorage.getItem("helpful_voted")||"[]")).includes(isbn);
   const helpfulBtn = `<div class="helpful-row">
-    <button class="helpful-btn${helpfulVoted?' voted':''}" onclick="voteHelpful('${isbn}',this)" ${helpfulVoted?'disabled':''}>
+    <button class="helpful-btn" onclick="voteHelpful('${isbn}',this)">
       👍 参考になった${helpfulCount > 0 ? `<span class="helpful-count">${helpfulCount}</span>` : ''}
     </button></div>`;
   const aiDisclaimer = (!book.manual_review && book.ai_review_date)
@@ -494,6 +494,7 @@ function _renderDescSection(isbn, book) {
 }
 
 async function voteHelpful(isbn, btn) {
+  btn.disabled = true;
   try {
     const res = await fetch("/api/helpful", {
       method: "POST",
@@ -501,14 +502,15 @@ async function voteHelpful(isbn, btn) {
       body: JSON.stringify({ isbn })
     });
     const data = await res.json();
-    const voted = JSON.parse(localStorage.getItem("helpful_voted") || "[]");
-    if (!voted.includes(isbn)) voted.push(isbn);
-    localStorage.setItem("helpful_voted", JSON.stringify(voted));
-    btn.disabled = true;
     btn.classList.add("voted");
     const count = data.helpful_count || 1;
-    btn.innerHTML = `👍 参考になった<span class="helpful-count">${count}</span>`;
-  } catch(e) {}
+    if (data.already_voted) {
+      btn.innerHTML = `👍 参考になった<span class="helpful-count">${count}</span>`;
+      btn.title = "すでに投票済みです";
+    } else {
+      btn.innerHTML = `👍 参考になった<span class="helpful-count">${count}</span>`;
+    }
+  } catch(e) { btn.disabled = false; }
 }
 
 function isFav(isbn) { return localStorage.getItem("fav_" + isbn) === "1"; }
@@ -993,6 +995,53 @@ async function loadBooksByGenre(genre, page = 1) {
   renderPagination("paginationTop",    data.total, page, p => loadBooksByGenre(genre, p));
   renderPagination("paginationBottom", data.total, page, p => loadBooksByGenre(genre, p));
   applyAvailCache(data.books.map(b => b.isbn).filter(Boolean));
+}
+
+// ===== タグ検索 =====
+async function loadPopularTags() {
+  const panel = document.getElementById("tagPanel");
+  if (!panel) return;
+  try {
+    const res = await fetch("/api/tags/popular");
+    const data = await res.json();
+    if (!data.tags || data.tags.length === 0) { panel.style.display = "none"; return; }
+    panel.innerHTML = '<span class="tag-panel-label">🏷️ タグ:</span>' +
+      data.tags.map(t =>
+        `<button class="tag-chip" data-tag="${esc(t.tag)}" onclick="searchByTag('${esc(t.tag)}')">${esc(t.tag)}<span class="tag-count">${t.count}</span></button>`
+      ).join("");
+    panel.style.display = "flex";
+  } catch(e) { panel.style.display = "none"; }
+}
+
+async function searchByTag(tag) {
+  currentTag = tag;
+  currentGenre = "";
+  currentKeyword = "";
+  currentPage = 1;
+  document.getElementById("searchInput").value = "";
+  document.querySelectorAll(".genre-btn").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll(".tag-chip").forEach(b => b.classList.toggle("active", b.dataset.tag === tag));
+  await loadBooksByTag(tag, 1);
+}
+
+async function loadBooksByTag(tag, page = 1) {
+  currentPage = page;
+  currentTag = tag;
+  document.getElementById("bookGrid").innerHTML = '<div class="loading">読み込み中…</div>';
+  document.getElementById("totalCount").textContent = "";
+  try {
+    const res = await fetch(`/api/books/by-tag?tag=${encodeURIComponent(tag)}&page=${page}`);
+    const data = await res.json();
+    currentTotal = data.total;
+    const books = data.books.map(b => ({ ...b, rating: b.rating || getRating(b.isbn) }));
+    document.getElementById("totalCount").textContent = `全 ${data.total.toLocaleString()} 件（#${tag}）`;
+    renderGrid("bookGrid", books);
+    renderPagination("paginationTop",    data.total, page, p => loadBooksByTag(tag, p));
+    renderPagination("paginationBottom", data.total, page, p => loadBooksByTag(tag, p));
+    applyAvailCache(data.books.map(b => b.isbn).filter(Boolean));
+  } catch(e) {
+    document.getElementById("bookGrid").innerHTML = '<div class="loading-error">タグ検索に失敗しました。</div>';
+  }
 }
 
 // ===== トップ新着（蔵書タブ最上部） =====
@@ -3487,6 +3536,7 @@ loadReqList();
 renderRecentBooks();
 applyTopSectionsState();
 applyFilterRowsState();
+loadPopularTags();
 // loadGenreCounts(); // ジャンルフィルター非表示中
 
 // 起動時: お知らせバッジ（未読カウント）を初期化

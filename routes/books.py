@@ -404,6 +404,64 @@ def api_books_no_review():
     return jsonify({"books": rows, "total": total_row["cnt"] if total_row else 0})
 
 
+@books_bp.route("/api/tags/popular")
+def api_tags_popular():
+    """ai_tags から人気タグTOP30を返す"""
+    con = get_con()
+    rows = fetchall(con, "SELECT ai_tags FROM genre_books WHERE ai_tags IS NOT NULL AND ai_tags != '[]' AND ai_tags != ''")
+    con.close()
+    from collections import Counter
+    counter = Counter()
+    for row in rows:
+        try:
+            tags = json.loads(row["ai_tags"]) if isinstance(row["ai_tags"], str) else row["ai_tags"]
+            if isinstance(tags, list):
+                counter.update(tags)
+        except Exception:
+            pass
+    top = [{"tag": t, "count": c} for t, c in counter.most_common(30)]
+    return jsonify({"tags": top})
+
+
+@books_bp.route("/api/books/by-tag")
+def api_books_by_tag():
+    """指定タグを含む書籍をDBから返す"""
+    tag = request.args.get("tag", "").strip()
+    page = int(request.args.get("page", 1))
+    limit = 20
+    offset = (page - 1) * limit
+    if not tag:
+        return jsonify({"books": [], "total": 0, "page": page})
+    con = get_con()
+    ph = "%s" if USE_PG else "?"
+    if USE_PG:
+        rows = fetchall(con,
+            "SELECT isbn, title, author, ai_tags FROM genre_books WHERE ai_tags::jsonb @> %s::jsonb ORDER BY title LIMIT %s OFFSET %s",
+            (json.dumps([tag]), limit, offset))
+        total_row = fetchone(con,
+            "SELECT COUNT(*) as cnt FROM genre_books WHERE ai_tags::jsonb @> %s::jsonb",
+            (json.dumps([tag]),))
+    else:
+        rows = fetchall(con,
+            "SELECT isbn, title, author, ai_tags FROM genre_books WHERE ai_tags LIKE ? ORDER BY title LIMIT ? OFFSET ?",
+            (f'%"{tag}"%', limit, offset))
+        total_row = fetchone(con,
+            "SELECT COUNT(*) as cnt FROM genre_books WHERE ai_tags LIKE ?",
+            (f'%"{tag}"%',))
+    con.close()
+    isbns = [r["isbn"] for r in rows if r.get("isbn")]
+    ratings = get_ratings_bulk(isbns)
+    books = []
+    for r in rows:
+        books.append({
+            "isbn": r["isbn"],
+            "title": r["title"],
+            "author": r["author"],
+            "rating": ratings.get(r["isbn"], {"score": 0, "votes": 0, "reviews": []}),
+        })
+    return jsonify({"books": books, "total": total_row["cnt"] if total_row else 0, "page": page, "tag": tag})
+
+
 @books_bp.route("/api/books/related/<isbn>")
 def api_books_related(isbn):
     """同じ著者・同じジャンルの本を返す（モーダル用）"""
@@ -434,14 +492,28 @@ def api_books_related(isbn):
 @books_bp.route("/api/helpful", methods=["POST"])
 @rate_limit(limit=5, window=60)
 def api_helpful():
+    import hashlib
     body = request.get_json()
     isbn = body.get("isbn", "").strip()
     if not isbn:
         return jsonify({"error": "isbn required"}), 400
+    # 投票者の識別: IPアドレス + User-Agent をハッシュ化（個人情報を保存しない）
+    voter_raw = (request.remote_addr or "") + (request.headers.get("User-Agent", ""))
+    voter_hash = hashlib.sha256(voter_raw.encode()).hexdigest()
     con = get_con()
-    execute(con, "UPDATE genre_books SET helpful_count = COALESCE(helpful_count,0) + 1 WHERE isbn=%s" if USE_PG else "UPDATE genre_books SET helpful_count = COALESCE(helpful_count,0) + 1 WHERE isbn=?", (isbn,))
+    ph = "%s" if USE_PG else "?"
+    existing = fetchone(con, f"SELECT 1 FROM helpful_votes WHERE isbn={ph} AND voter_hash={ph}", (isbn, voter_hash))
+    if existing:
+        row = fetchone(con, f"SELECT helpful_count FROM genre_books WHERE isbn={ph}", (isbn,))
+        con.close()
+        return jsonify({"helpful_count": row["helpful_count"] if row else 0, "already_voted": True})
+    if USE_PG:
+        execute(con, "INSERT INTO helpful_votes (isbn, voter_hash) VALUES (%s, %s) ON CONFLICT DO NOTHING", (isbn, voter_hash))
+    else:
+        execute(con, "INSERT OR IGNORE INTO helpful_votes (isbn, voter_hash) VALUES (?, ?)", (isbn, voter_hash))
+    execute(con, f"UPDATE genre_books SET helpful_count = COALESCE(helpful_count,0) + 1 WHERE isbn={ph}", (isbn,))
     con.commit()
-    row = fetchone(con, "SELECT helpful_count FROM genre_books WHERE isbn=%s" if USE_PG else "SELECT helpful_count FROM genre_books WHERE isbn=?", (isbn,))
+    row = fetchone(con, f"SELECT helpful_count FROM genre_books WHERE isbn={ph}", (isbn,))
     con.close()
     return jsonify({"helpful_count": row["helpful_count"] if row else 1})
 
