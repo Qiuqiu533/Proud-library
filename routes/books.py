@@ -158,9 +158,10 @@ def api_books_by_genre():
         like_hira = f"%{_kata_to_hira(keyword)}%"
         conditions.append(
             f"(title LIKE {ph} OR author LIKE {ph} OR title LIKE {ph} OR title LIKE {ph}"
-            f" OR title_yomi LIKE {ph} OR title_yomi LIKE {ph} OR title_yomi LIKE {ph})"
+            f" OR title_yomi LIKE {ph} OR title_yomi LIKE {ph} OR title_yomi LIKE {ph}"
+            f" OR ai_summary LIKE {ph} OR ai_tags LIKE {ph})"
         )
-        params_base.extend([like, like, like_kata, like_hira, like, like_hira, like_kata])
+        params_base.extend([like, like, like_kata, like_hira, like, like_hira, like_kata, like, like])
     if award:
         if USE_PG:
             if award == "本屋大賞":

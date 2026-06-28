@@ -813,7 +813,8 @@ async function loadBooks(keyword = "", page = 1) {
   if (currentSort === "author") books.sort((a, b) => authorSortKey(a.author).localeCompare(authorSortKey(b.author), "ja"));
   if (currentSort === "fav") books.sort((a, b) => (isFav(b.isbn) ? 1 : 0) - (isFav(a.isbn) ? 1 : 0));
   if (currentSort === "isbn_desc") books.sort((a, b) => (b.isbn || "").localeCompare(a.isbn || ""));
-  document.getElementById("totalCount").textContent = `全 ${data.total.toLocaleString()} 件`;
+  const aiLabel = keyword ? ' <span class="ai-search-badge">🤖 AI検索</span>' : "";
+  document.getElementById("totalCount").innerHTML = `全 ${data.total.toLocaleString()} 件${aiLabel}`;
   renderGrid("bookGrid", books);
   renderPagination("paginationTop", data.total, page, p => loadBooks(keyword, p));
   renderPagination("paginationBottom", data.total, page, p => loadBooks(keyword, p));
@@ -2086,7 +2087,7 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
     if (btn.dataset.tab === "news") { loadNews(); loadEvents(); }
     if (btn.dataset.tab === "info") loadInfo();
     if (btn.dataset.tab === "card") { loadCard(); loadWishlistCard(); }
-    if (btn.dataset.tab === "myaccount") loadMyAccount();
+    if (btn.dataset.tab === "myaccount") { loadMyAccount(); renderReadingGoal(); }
   });
 });
 
@@ -6515,3 +6516,95 @@ async function adminResetPassword() {
     counter.classList.toggle("review-char-over", len > MAX);
   });
 })();
+
+// ===== 読書目標・実績 =====
+function _goalKey() { const r = _curRoom(); return r ? `reading_goal_${r}` : "reading_goal"; }
+
+function getReadingGoal() {
+  try { return JSON.parse(localStorage.getItem(_goalKey()) || "{}"); } catch { return {}; }
+}
+
+function setReadingGoal(year, target) {
+  localStorage.setItem(_goalKey(), JSON.stringify({ year, target: parseInt(target) || 0 }));
+}
+
+function countReadThisYear(year) {
+  const prefix = (() => { const r = _curRoom(); return r ? `readmeta_${r}_` : "readmeta_"; })();
+  let count = 0;
+  const yearStr = String(year);
+  Object.keys(localStorage).forEach(k => {
+    if (!k.startsWith(prefix)) return;
+    try {
+      const meta = JSON.parse(localStorage.getItem(k) || "{}");
+      if (meta.date && meta.date.startsWith(yearStr)) count++;
+    } catch {}
+  });
+  return count;
+}
+
+function countReadAllTime() {
+  const entries = getLogEntries();
+  return entries.filter(e => e.status === "読んだ").length;
+}
+
+function renderReadingGoal() {
+  const el = document.getElementById("readingGoalBody");
+  if (!el) return;
+  const year = new Date().getFullYear();
+  const goal = getReadingGoal();
+  const target = goal.target || 0;
+  const readThisYear = countReadThisYear(year);
+  const readAllTime = countReadAllTime();
+  const pct = target > 0 ? Math.min(100, Math.round(readThisYear / target * 100)) : 0;
+
+  const ACHIEVEMENTS = [
+    { req: 1,   icon: "🌱", label: "はじめの一冊" },
+    { req: 5,   icon: "📖", label: "読書家の卵" },
+    { req: 10,  icon: "🌿", label: "本の虫" },
+    { req: 20,  icon: "📚", label: "多読家" },
+    { req: 50,  icon: "🏆", label: "読書マスター" },
+    { req: 100, icon: "👑", label: "図書館の星" },
+  ];
+  const earned = ACHIEVEMENTS.filter(a => readAllTime >= a.req);
+  const latest = earned[earned.length - 1];
+  const next = ACHIEVEMENTS.find(a => readAllTime < a.req);
+
+  el.innerHTML = `
+    ${target > 0 ? `
+    <div style="font-size:0.85rem;color:#555;margin-bottom:4px">
+      ${year}年の目標：<strong>${readThisYear} / ${target}冊</strong>
+      ${pct >= 100 ? ' 🎉 達成！' : `（${pct}%）`}
+    </div>
+    <div class="goal-progress-bar-wrap">
+      <div class="goal-progress-bar ${pct >= 100 ? 'complete' : ''}" style="width:${pct}%"></div>
+    </div>` : `
+    <div style="font-size:0.85rem;color:#aaa;margin-bottom:8px">今年の目標を設定しましょう ✏️</div>`}
+    <div class="goal-stats">
+      <div class="goal-stat">
+        <div class="goal-stat-num">${readThisYear}</div>
+        <div class="goal-stat-label">${year}年 読了冊数</div>
+      </div>
+      <div class="goal-stat">
+        <div class="goal-stat-num">${readAllTime}</div>
+        <div class="goal-stat-label">累計 読了冊数</div>
+      </div>
+      <div class="goal-stat">
+        <div class="goal-stat-num">${latest ? `<span class="goal-achievement">${latest.icon}</span>` : "—"}</div>
+        <div class="goal-stat-label">${latest ? latest.label : "実績なし"}</div>
+      </div>
+    </div>
+    ${next ? `<div style="font-size:0.75rem;color:#aaa;margin-top:8px">次の実績：${next.icon} ${next.label}（あと${next.req - readAllTime}冊）</div>` : ""}
+  `;
+}
+
+function openGoalEdit() {
+  const year = new Date().getFullYear();
+  const goal = getReadingGoal();
+  const current = goal.target || "";
+  const val = prompt(`${year}年の読書目標（冊数）を入力してください`, current);
+  if (val === null) return;
+  const n = parseInt(val);
+  if (isNaN(n) || n < 0) { alert("正しい冊数を入力してください"); return; }
+  setReadingGoal(year, n);
+  renderReadingGoal();
+}
