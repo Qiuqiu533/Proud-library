@@ -97,10 +97,27 @@ def get_bridge_works(limit: int = 50) -> list[dict]:
     return result[:limit]
 
 
+import unicodedata
+import re as _re
+
+
+def _normalize(s: str) -> str:
+    """タイトル照合用正規化: NFKC変換 + 小文字 + 空白除去"""
+    s = unicodedata.normalize("NFKC", s)
+    s = s.lower()
+    s = _re.sub(r"[\s　]+", "", s)  # 全角・半角スペース除去
+    return s
+
+
 @lru_cache(maxsize=1)
 def _works_index() -> dict[str, dict]:
-    """正規化タイトル（小文字）→ works行 のインデックス"""
-    return {r["canonical_title"].lower(): r for r in _read("works.csv") if r.get("canonical_title")}
+    """正規化タイトル → works行 のインデックス（NFKC正規化済み）"""
+    result: dict[str, dict] = {}
+    for r in _read("works.csv"):
+        t = r.get("canonical_title", "")
+        if t:
+            result[_normalize(t)] = r
+    return result
 
 
 @lru_cache(maxsize=1)
@@ -130,11 +147,11 @@ def get_book_plam_info(title: str, author: str = "") -> dict | None:
     history = _history_by_work()
     bridges = _bridge_set()
 
-    key = title.strip().lower()
+    key = _normalize(title)
     work = works.get(key)
 
-    # 完全一致なし → 部分一致（前方一致）で再試行
-    if not work:
+    # 完全一致なし → 前方一致（短いキーが長いキーの先頭と一致）で再試行
+    if not work and len(key) >= 2:
         for k, v in works.items():
             if k.startswith(key) or key.startswith(k):
                 work = v
@@ -168,7 +185,8 @@ def get_book_plam_info(title: str, author: str = "") -> dict | None:
     if not awards_info:
         return None
 
-    awards_info.sort(key=lambda x: -x["weight"])
+    # 年代順（award_year昇順）。同年はweight降順
+    awards_info.sort(key=lambda x: (x["award_year"] or "9999", -x["weight"]))
 
     return {
         "work_id":    wid,
