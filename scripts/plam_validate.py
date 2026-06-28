@@ -88,14 +88,18 @@ def validate(path: str, no_start: int | None = None, no_end: int | None = None) 
             if r["isbn_status"] not in VALID_ISBN_STATUSES:
                 errors.append(f"[isbn_status] 不正値: 回{r['award_no']} '{r['isbn_status']}'")
 
-    # ── 8. work_id 重複 ──────────────────────────
-    if "work_id" in (rows[0] if rows else {}):
-        seen_ids: set[str] = set()
+    # ── 8. work_id / entry_id 重複 ───────────────
+    # entry_id は全行で一意（空でなければ）
+    if rows and "entry_id" in rows[0]:
+        seen_eids: set[str] = set()
         for r in rows:
-            wid = r.get("work_id", "")
-            if wid in seen_ids:
-                errors.append(f"[work_id重複] {wid}")
-            seen_ids.add(wid)
+            eid = r.get("entry_id", "").strip()
+            if eid:
+                if eid in seen_eids:
+                    errors.append(f"[entry_id重複] {eid}")
+                seen_eids.add(eid)
+    # work_id は受賞行（awarded/co_winner）では空不可だが重複は許可（複数受賞のため）
+    # no_award 行は空が正常
 
     # ── サマリー出力 ────────────────────────────
     n_co_rounds = len({(r["award_no"], r["award_term"]) for r in rows if r["status"] == "co_winner"})
