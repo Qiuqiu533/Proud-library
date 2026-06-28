@@ -31,7 +31,8 @@ PLAM_DIR = Path("data/plam")
 EXCLUDE   = {"awards_master.csv", "works.csv", "authors.csv", "aliases.csv",
              "award_history.csv", "duplicate_candidates.csv",
              "duplicate_review_history.csv", "award_import_log.csv",
-             "cross_award_summary.csv"}
+             "cross_award_summary.csv", "award_network.csv",
+             "author_award_summary.csv"}
 HISTORY_PATH = PLAM_DIR / "award_history.csv"
 FIELDNAMES = ["history_id", "work_id", "award_id", "award_year",
               "award_no", "award_term", "status", "confidence", "remarks"]
