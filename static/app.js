@@ -2045,7 +2045,8 @@ async function _loadPlamRelated(workId) {
       const inner = `
         <div class="plam-rel-dot" style="background:${w.color}"></div>
         <div class="plam-rel-title">${esc(w.title)}</div>
-        <div class="plam-rel-award">${esc(w.top_award)}${w.is_bridge ? " 🌉" : ""}</div>`;
+        <div class="plam-rel-award">${esc(w.top_award)}${w.is_bridge ? " 🌉" : ""}</div>
+        ${w.reason ? `<div class="plam-rel-reason">${esc(w.reason)}</div>` : ""}`;
       return clickable
         ? `<div class="plam-rel-card plam-rel-card--link" onclick="openModal('${w.isbn}')" role="button" tabindex="0" aria-label="${esc(w.title)}">${inner}</div>`
         : `<div class="plam-rel-card">${inner}</div>`;
