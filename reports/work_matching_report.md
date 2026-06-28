@@ -1,19 +1,19 @@
 # PLAM work_matching_report.md
 
-生成日時: 2026-06-29 07:28
-インポート対象: `yoshikawa_prize.csv`
+生成日時: 2026-06-29 07:40
+インポート対象: `konomi_prize.csv`
 
 ## サマリー
 
 | 項目 | 件数 |
 |---|---|
-| 処理対象（受賞行） | 63 |
+| 処理対象（受賞行） | 38 |
 | Tier 1 ISBN一致（自動確定） | 0 |
-| Tier 2 canonical_title+author_id一致（自動採用） | 0 |
+| Tier 2 canonical_title+author_id一致（自動採用） | 18 |
 | Tier 3 canonical_titleのみ一致（要レビュー） | 0 |
-| Tier 4 新規 work_id 採番 | 63 |
-| no_award / データ不完全 | 3 |
-| 自動解決率 | 0.0% |
+| Tier 4 新規 work_id 採番 | 20 |
+| no_award / データ不完全 | 0 |
+| 自動解決率 | 47.4% |
 
 ## ✅ 要レビューなし
 
