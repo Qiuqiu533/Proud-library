@@ -1,19 +1,19 @@
 # PLAM work_matching_report.md
 
-生成日時: 2026-06-28 23:56
-インポート対象: `honnya_prize.csv`
+生成日時: 2026-06-29 00:05
+インポート対象: `ranpo_prize.csv`
 
 ## サマリー
 
 | 項目 | 件数 |
 |---|---|
-| 処理対象（受賞行） | 23 |
+| 処理対象（受賞行） | 81 |
 | Tier 1 ISBN一致（自動確定） | 0 |
 | Tier 2 canonical_title+author_id一致（自動採用） | 1 |
 | Tier 3 canonical_titleのみ一致（要レビュー） | 0 |
-| Tier 4 新規 work_id 採番 | 22 |
-| no_award / データ不完全 | 0 |
-| 自動解決率 | 4.3% |
+| Tier 4 新規 work_id 採番 | 80 |
+| no_award / データ不完全 | 4 |
+| 自動解決率 | 1.2% |
 
 ## ✅ 要レビューなし
 

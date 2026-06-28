@@ -1,5 +1,5 @@
 """
-PLAM Version 1.5 — 重複判定パイプライン
+PLAM Version 1.6 — 重複判定パイプライン + 運用ログ・統計
 
 【work_id 永久不変ルール】
   既存 work_id は絶対に再採番しない。
@@ -37,8 +37,11 @@ PLAM_DIR       = Path("data/plam")
 WORKS_PATH     = PLAM_DIR / "works.csv"
 AUTHORS_PATH   = PLAM_DIR / "authors.csv"
 DUP_PATH       = PLAM_DIR / "duplicate_candidates.csv"
+DUP_REVIEW_PATH = PLAM_DIR / "duplicate_review_history.csv"
+IMPORT_LOG_PATH = PLAM_DIR / "award_import_log.csv"
 REPORTS_DIR    = Path("reports")
 MATCH_REPORT   = REPORTS_DIR / "work_matching_report.md"
+STATISTICS_MD  = REPORTS_DIR / "statistics.md"
 
 WORKS_FIELDS   = ["work_id", "canonical_title", "title", "author",
                   "author_id", "isbn13", "isbn_status", "notes"]
@@ -47,10 +50,16 @@ AUTHORS_FIELDS = ["author_id", "author_name", "author_name_kana",
 DUP_FIELDS     = ["candidate_work_id", "incoming_title", "matched_title",
                   "incoming_author", "matched_author",
                   "match_reason", "confidence", "source_csv"]
+DUP_REVIEW_FIELDS = ["candidate_id", "candidate_work_id", "incoming_title",
+                     "incoming_author", "decision", "review_date", "reviewer", "notes"]
+IMPORT_LOG_FIELDS = ["import_id", "award_id", "import_date", "records_added",
+                     "tier1_matches", "tier2_matches", "tier3_reviews", "tier4_new",
+                     "reviewer", "commit_hash"]
 
 EXCLUDE = {"awards_master.csv", "works.csv", "authors.csv",
            "aliases.csv", "award_history.csv",
-           "duplicate_candidates.csv"}
+           "duplicate_candidates.csv", "duplicate_review_history.csv",
+           "award_import_log.csv"}
 
 
 # ── ユーティリティ ──────────────────────────────────────────────────────────
@@ -349,10 +358,13 @@ def cmd_import(csv_path: Path, dry_run: bool) -> None:
         new_award_rows.append(nr)
 
     # ── 出力 ─────────────────────────────────────────────────────────────────
-    awarded_total = cnt["total"] - cnt["no_award"] - cnt["skip"]
+    # skip には「title/author 空欄」が含まれる。no_award 行は status=="no_award" のもの
+    # だが title/author が空なので skip にも計上される場合があるため両方合計で表示
+    no_skip_total = cnt["no_award"] + cnt["skip"]
+    awarded_total = cnt["total"] - no_skip_total
     auto_matched  = cnt["isbn"] + cnt["key"]
 
-    print(f"\n  処理対象: {awarded_total} 件（うちno_award {cnt['no_award']} 件）")
+    print(f"\n  総行数: {cnt['total']} 件（受賞対象: {awarded_total}件 / no_award+skip: {no_skip_total}件）")
     print(f"  Tier 1 ISBN一致:               {cnt['isbn']:3d} 件")
     print(f"  Tier 2 canonical+author_id一致: {cnt['key']:3d} 件")
     print(f"  Tier 3 titleのみ一致（要確認）:  {cnt['title']:3d} 件")
@@ -381,6 +393,18 @@ def cmd_import(csv_path: Path, dry_run: bool) -> None:
         # work_matching_report.md
         _write_report(csv_path, cnt, awarded_total, auto_matched, dup_rows)
         print(f"  ✅ {MATCH_REPORT}")
+
+        # award_import_log.csv
+        _log_import(csv_path, cnt, awarded_total)  # awarded_total = total - no_award - skip
+        print(f"  ✅ {IMPORT_LOG_PATH} に記録")
+
+        # statistics.md
+        _generate_statistics(works, authors)
+        print(f"  ✅ {STATISTICS_MD}")
+
+        # duplicate_review_history.csv（初回のみヘッダ作成）
+        if not DUP_REVIEW_PATH.exists():
+            write_csv(DUP_REVIEW_PATH, DUP_REVIEW_FIELDS, [])
     else:
         print("[dry-run] 書き込みなし")
         if dup_rows:
@@ -450,6 +474,120 @@ def _write_report(csv_path: Path, cnt: dict, awarded_total: int,
     MATCH_REPORT.write_text("\n".join(lines), encoding="utf-8")
 
 
+# ── V1.6: award_import_log ──────────────────────────────────────────────────
+
+def _log_import(csv_path: Path, cnt: dict, awarded_total: int) -> None:
+    """取り込み結果を award_import_log.csv に追記する"""
+    existing = read_csv(IMPORT_LOG_PATH) if IMPORT_LOG_PATH.exists() else []
+    import_id = len(existing) + 1
+
+    # award_id を CSV から推定（先頭の受賞行から取得）
+    rows = read_csv(csv_path)
+    award_id = next((r.get("award_id", "") for r in rows if r.get("award_id")), "UNKNOWN")
+
+    existing.append({
+        "import_id":    import_id,
+        "award_id":     award_id,
+        "import_date":  datetime.now().strftime("%Y-%m-%d"),
+        "records_added": awarded_total,
+        "tier1_matches": cnt["isbn"],
+        "tier2_matches": cnt["key"],
+        "tier3_reviews": cnt["title"],
+        "tier4_new":    cnt["new"],
+        "reviewer":     "",
+        "commit_hash":  "",
+    })
+    write_csv(IMPORT_LOG_PATH, IMPORT_LOG_FIELDS, existing)
+
+
+# ── V1.6: statistics.md ─────────────────────────────────────────────────────
+
+def _generate_statistics(works: WorkRegistry, authors: AuthorRegistry) -> None:
+    """reports/statistics.md を再生成する"""
+    REPORTS_DIR.mkdir(exist_ok=True)
+
+    history = read_csv(PLAM_DIR / "award_history.csv") if (PLAM_DIR / "award_history.csv").exists() else []
+
+    # 複数受賞
+    from collections import Counter
+    work_award_cnt = Counter(r["work_id"] for r in history if r.get("work_id"))
+    multi_award = sum(1 for c in work_award_cnt.values() if c > 1)
+
+    # ISBN付与率
+    total_works = len(works.rows)
+    isbn_count  = sum(1 for r in works.rows if (r.get("isbn13") or "").strip())
+    isbn_rate   = isbn_count / total_works * 100 if total_works else 0
+
+    # レビュー待ち
+    dup_pending = len(read_csv(DUP_PATH)) if DUP_PATH.exists() else 0
+
+    # 賞別集計
+    award_files = sorted(p for p in PLAM_DIR.glob("*.csv") if p.name not in EXCLUDE)
+    award_stats: list[dict] = []
+    seen_award_ids: set[str] = set()
+    for p in award_files:
+        rows = read_csv(p)
+        if not rows or "award_id" not in rows[0]:
+            continue
+        aid   = rows[0].get("award_id", "")
+        aname = rows[0].get("award_name", aid)
+        if aid in seen_award_ids:
+            continue
+        seen_award_ids.add(aid)
+        rounds   = len({r.get("award_no") for r in rows if r.get("award_no")})
+        awarded  = sum(1 for r in rows if r.get("status") != "no_award"
+                       and r.get("work_id", "").startswith("PLAM-"))
+        award_stats.append({"id": aid, "name": aname, "rounds": rounds, "awarded": awarded})
+
+    import_log = read_csv(IMPORT_LOG_PATH) if IMPORT_LOG_PATH.exists() else []
+
+    lines = [
+        f"# PLAM Statistics",
+        f"",
+        f"更新日時: {datetime.now():%Y-%m-%d %H:%M}",
+        f"",
+        f"## データ規模",
+        f"",
+        f"| 項目 | 件数 |",
+        f"|---|---|",
+        f"| 作品数 | {total_works} |",
+        f"| 著者数 | {len(authors.rows)} |",
+        f"| 賞数 | {len(seen_award_ids)} |",
+        f"| 受賞履歴数 | {len(history)} |",
+        f"",
+        f"## 品質指標",
+        f"",
+        f"| 指標 | 値 |",
+        f"|---|---|",
+        f"| 複数受賞作品数 | {multi_award} |",
+        f"| ISBN付与率 | {isbn_rate:.1f}% |",
+        f"| Tier3レビュー待ち件数 | {dup_pending} |",
+        f"",
+        f"## 賞別データ",
+        f"",
+        f"| 賞ID | 賞名 | 回次数 | 受賞作品数 |",
+        f"|---|---|---|---|",
+    ]
+    for s in award_stats:
+        lines.append(f"| {s['id']} | {s['name']} | {s['rounds']} | {s['awarded']} |")
+
+    lines += [
+        f"",
+        f"## 取り込み履歴",
+        f"",
+        f"| ID | 賞 | 日付 | 追加数 | Tier1 | Tier2 | Tier3 | Tier4(新規) |",
+        f"|---|---|---|---|---|---|---|---|",
+    ]
+    for lg in import_log:
+        lines.append(
+            f"| {lg['import_id']} | {lg['award_id']} | {lg['import_date']} "
+            f"| {lg['records_added']} | {lg['tier1_matches']} "
+            f"| {lg['tier2_matches']} | {lg['tier3_reviews']} | {lg['tier4_new']} |"
+        )
+
+    STATISTICS_MD.write_text("\n".join(lines), encoding="utf-8")
+
+
 # ── エントリーポイント ──────────────────────────────────────────────────────
 
 def main():
@@ -460,6 +598,8 @@ def main():
                         help="works.csv を V1.5 形式に移行（canonical_title/author_id追加）")
     parser.add_argument("--import", dest="import_csv", metavar="CSV",
                         help="新しい賞 CSV を 4段階マッチングで取り込む")
+    parser.add_argument("--stats", action="store_true",
+                        help="statistics.md を現在の状態で再生成する")
     parser.add_argument("--dry-run", action="store_true",
                         help="書き込みを行わずに結果を表示する")
     args = parser.parse_args()
@@ -468,6 +608,11 @@ def main():
         cmd_upgrade(args.dry_run)
     elif args.import_csv:
         cmd_import(Path(args.import_csv), args.dry_run)
+    elif args.stats:
+        works   = WorkRegistry(); works.load()
+        authors = AuthorRegistry(); authors.load()
+        _generate_statistics(works, authors)
+        print(f"✅ {STATISTICS_MD} 更新完了")
     else:
         parser.print_help()
         sys.exit(1)
