@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU" crossorigin="anonymous"></script>
 </head>
 <body>
 
@@ -2322,6 +2322,9 @@
             <a class="guide-toc-item" href="#manual-trouble">5. トラブル対応</a>
             <a class="guide-toc-item" href="#manual-rules">6. 貸出ルール・図書館規則</a>
             <a class="guide-toc-item" href="#manual-contacts">7. 緊急連絡先</a>
+            <a class="guide-toc-item" href="#manual-incident">8. 障害対応フロー</a>
+            <a class="guide-toc-item" href="#manual-auditlog">9. 監査ログ確認手順</a>
+            <a class="guide-toc-item" href="#manual-restore">10. バックアップ復元手順</a>
           </div>
 
           <!-- 1. 日常業務 -->
@@ -2436,6 +2439,98 @@
             <div class="guide-info-box" style="margin-top:14px">
               <strong>🔐 アカウント管理について</strong><br>
               Render.com・GitHub・Neon・Brevoのアカウント情報は引き継ぎ資料を参照してください。パスワードの変更が必要な場合はアプリ管理者（秋山）にご連絡ください。
+            </div>
+          </div>
+
+          <div class="guide-section" id="manual-incident">
+            <h4 class="guide-section-title">8. 障害対応フロー</h4>
+            <div class="guide-info-box" style="margin-bottom:12px">
+              障害発生時はSentryから自動メール通知が届きます（qiuqiuhaozi777@gmail.com）。以下の手順で対応してください。
+            </div>
+            <table class="guide-table">
+              <tr><th>ステップ</th><th>確認内容</th><th>対応方法</th></tr>
+              <tr>
+                <td>① 状況確認</td>
+                <td>アプリにアクセスできるか確認</td>
+                <td><a href="https://proud-library.onrender.com" target="_blank">proud-library.onrender.com</a> を開く</td>
+              </tr>
+              <tr>
+                <td>② ログ確認</td>
+                <td>Renderのログでエラー内容を確認</td>
+                <td><a href="https://dashboard.render.com" target="_blank">dashboard.render.com</a> → Logs</td>
+              </tr>
+              <tr>
+                <td>③ Sentry確認</td>
+                <td>エラーの詳細・発生回数・影響範囲</td>
+                <td><a href="https://sentry.io" target="_blank">sentry.io</a> → Proud-library プロジェクト</td>
+              </tr>
+              <tr>
+                <td>④ 再起動</td>
+                <td>一時的な障害の場合は再起動で解消することが多い</td>
+                <td>Render → Manual Deploy または Restart</td>
+              </tr>
+              <tr>
+                <td>⑤ ロールバック</td>
+                <td>デプロイ直後の障害は直前のバージョンに戻す</td>
+                <td>Render → Deploys → 正常だったデプロイの「Redeploy」</td>
+              </tr>
+              <tr>
+                <td>⑥ DB確認</td>
+                <td>DBへの接続・データ破損がないか確認</td>
+                <td><a href="https://neon.tech" target="_blank">neon.tech</a> → SQL Editor で <code>SELECT COUNT(*) FROM genre_books;</code></td>
+              </tr>
+            </table>
+            <div class="guide-info-box" style="margin-top:12px;background:#fff3e0;border-left-color:#f57c00">
+              <strong>⚠️ 住民への告知が必要な場合</strong><br>
+              長時間（1時間以上）停止する場合は、マンション掲示板またはLINEグループで「システムメンテナンス中」の旨をご案内ください。
+            </div>
+          </div>
+
+          <div class="guide-section" id="manual-auditlog">
+            <h4 class="guide-section-title">9. 監査ログ確認手順（月1回推奨）</h4>
+            <p class="guide-text">管理者・理事会が行った操作（お知らせ投稿・リクエスト対応・蔵書登録など）は自動記録されています。月1回程度、異常な操作がないか確認してください。</p>
+            <table class="guide-table">
+              <tr><th>確認方法</th><th>手順</th></tr>
+              <tr>
+                <td>管理画面から確認</td>
+                <td>管理者ログイン → 「📋 操作ログ」タブ → 直近の操作一覧を確認</td>
+              </tr>
+              <tr>
+                <td>DBから直接確認</td>
+                <td>neon.tech → SQL Editor → <code>SELECT * FROM audit_log ORDER BY created_at DESC LIMIT 50;</code></td>
+              </tr>
+            </table>
+            <div class="guide-info-box" style="margin-top:12px">
+              <strong>🔍 異常と判断するケース</strong><br>
+              心当たりのない深夜帯の操作、大量の削除操作、知らない部屋番号からの操作などが記録されていた場合はアプリ管理者（秋山）に連絡してください。
+            </div>
+          </div>
+
+          <div class="guide-section" id="manual-restore">
+            <h4 class="guide-section-title">10. バックアップ復元手順</h4>
+            <p class="guide-text">毎週日曜早朝にDBバックアップが自動取得されます（GitHub Actionsで実行、30日間保存）。データが失われた場合は以下の手順で復元できます。</p>
+            <table class="guide-table">
+              <tr><th>ステップ</th><th>手順</th></tr>
+              <tr>
+                <td>① バックアップ取得</td>
+                <td><a href="https://github.com/Qiuqiu533/Proud-library/actions/workflows/backup.yml" target="_blank">GitHub Actions → backup.yml</a> → 最新の実行 → Artifacts から <code>.sql</code> ファイルをダウンロード</td>
+              </tr>
+              <tr>
+                <td>② Neonに接続</td>
+                <td><a href="https://neon.tech" target="_blank">neon.tech</a> → プロジェクト → Connection Details から DATABASE_URL を取得</td>
+              </tr>
+              <tr>
+                <td>③ 復元実行</td>
+                <td>ターミナルで <code>psql "$DATABASE_URL" &lt; proud_library_backup_YYYYMMDD.sql</code> を実行</td>
+              </tr>
+              <tr>
+                <td>④ 復元確認</td>
+                <td>neon.tech → SQL Editor → <code>SELECT COUNT(*) FROM genre_books;</code> でレコード数を確認</td>
+              </tr>
+            </table>
+            <div class="guide-info-box" style="margin-top:12px;background:#e8f5e9;border-left-color:#388e3c">
+              <strong>✅ 定期的な復元テストについて</strong><br>
+              年1〜2回、実際にバックアップからテスト環境へ復元できるか確認することを推奨します。バックアップが取得されていても復元できなければ意味がありません。
             </div>
           </div>
 
