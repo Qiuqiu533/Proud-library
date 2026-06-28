@@ -592,9 +592,14 @@ def _generate_statistics(works: WorkRegistry, authors: AuthorRegistry) -> None:
 
     STATISTICS_MD.write_text("\n".join(lines), encoding="utf-8")
 
-    # cross_award_summary.csv と award_overlap.md も更新
+    # V1.7: cross_award_summary.csv と award_overlap.md を更新
     _generate_cross_award_summary(history)
     _generate_award_overlap(history, [s["id"] for s in award_stats])
+
+    # V1.8: award_network.csv / author_award_summary.csv / overlap_trend.md を更新
+    _generate_award_network(history, [s["id"] for s in award_stats])
+    _generate_author_award_summary(history)
+    _generate_overlap_trend(import_log, history)
 
 
 # ── V1.7: cross_award_summary.csv ───────────────────────────────────────────
@@ -686,6 +691,125 @@ def _generate_award_overlap(history: list[dict], award_ids: list[str]) -> None:
         )
 
     AWARD_OVERLAP_MD.write_text("\n".join(lines), encoding="utf-8")
+
+
+# ── V1.8: award_network / author_award_summary / overlap_trend ───────────────
+
+AWARD_NETWORK_PATH   = PLAM_DIR / "award_network.csv"
+AWARD_NETWORK_FIELDS = ["award_a", "award_b", "overlap_count", "titles"]
+AUTHOR_SUMMARY_PATH  = PLAM_DIR / "author_award_summary.csv"
+AUTHOR_SUMMARY_FIELDS= ["author_id", "author", "work_count", "award_count", "awards"]
+OVERLAP_TREND_MD     = REPORTS_DIR / "overlap_trend.md"
+
+
+def _generate_award_network(history: list[dict], award_ids: list[str]) -> None:
+    """賞ペア別重複数を award_network.csv に書き出す"""
+    from collections import defaultdict
+    work_awards: dict[str, set[str]] = defaultdict(set)
+    for r in history:
+        wid = r.get("work_id", "").strip()
+        aid = r.get("award_id", "").strip()
+        if wid and aid:
+            work_awards[wid].add(aid)
+
+    works_map = {r["work_id"]: r.get("title", "") for r in read_csv(WORKS_PATH)}
+    ids = sorted(set(award_ids))
+    rows = []
+    for i, a in enumerate(ids):
+        for b in ids[i+1:]:
+            overlaps = [wid for wid, awards in work_awards.items()
+                        if a in awards and b in awards]
+            titles = "|".join(works_map.get(w, w) for w in overlaps[:5])
+            rows.append({"award_a": a, "award_b": b,
+                         "overlap_count": len(overlaps), "titles": titles})
+    write_csv(AWARD_NETWORK_PATH, AWARD_NETWORK_FIELDS, rows)
+
+
+def _generate_author_award_summary(history: list[dict]) -> None:
+    """著者単位の受賞集計を author_award_summary.csv に書き出す"""
+    from collections import defaultdict
+    works_map = {r["work_id"]: r for r in read_csv(WORKS_PATH) if r.get("work_id")}
+
+    # work_id → (author_id, author_name) のマップ
+    wid_to_author: dict[str, tuple[str, str]] = {}
+    for wid, w in works_map.items():
+        wid_to_author[wid] = (w.get("author_id", ""), w.get("author", ""))
+
+    # 著者ごとに work_id と award_id を集計
+    author_works: dict[str, set[str]] = defaultdict(set)
+    author_awards: dict[str, set[str]] = defaultdict(set)
+    author_name_map: dict[str, str] = {}
+
+    for r in history:
+        wid = r.get("work_id", "").strip()
+        aid = r.get("award_id", "").strip()
+        if not wid or not aid:
+            continue
+        author_id, author_name = wid_to_author.get(wid, ("", ""))
+        if not author_id:
+            continue
+        author_works[author_id].add(wid)
+        author_awards[author_id].add(aid)
+        author_name_map[author_id] = author_name
+
+    rows = []
+    for author_id in sorted(author_awards, key=lambda x: -len(author_awards[x])):
+        rows.append({
+            "author_id":   author_id,
+            "author":      author_name_map.get(author_id, ""),
+            "work_count":  len(author_works[author_id]),
+            "award_count": len(author_awards[author_id]),
+            "awards":      ",".join(sorted(author_awards[author_id])),
+        })
+    write_csv(AUTHOR_SUMMARY_PATH, AUTHOR_SUMMARY_FIELDS, rows)
+
+
+def _generate_overlap_trend(import_log: list[dict], history: list[dict]) -> None:
+    """取り込みごとの重複率を reports/overlap_trend.md に書き出す"""
+    from collections import defaultdict
+
+    # 全 work_id の出現賞を集計
+    work_awards: dict[str, set[str]] = defaultdict(set)
+    for r in history:
+        wid = r.get("work_id", "").strip()
+        aid = r.get("award_id", "").strip()
+        if wid and aid:
+            work_awards[wid].add(aid)
+
+    lines = [
+        "# PLAM 重複トレンドレポート（overlap_trend.md）",
+        "",
+        f"生成日時: {datetime.now():%Y-%m-%d %H:%M}",
+        "",
+        "## 取り込み別 重複率",
+        "",
+        "| 賞ID | 取り込み日 | 追加数 | Tier2(重複) | 重複率 |",
+        "|---|---|---|---|---|",
+    ]
+    for lg in import_log:
+        added   = int(lg.get("records_added", 0) or 0)
+        tier2   = int(lg.get("tier2_matches", 0) or 0)
+        rate    = tier2 / added * 100 if added > 0 else 0.0
+        lines.append(
+            f"| {lg['award_id']} | {lg['import_date']} "
+            f"| {added} | {tier2} | {rate:.1f}% |"
+        )
+
+    # 複数受賞が多い著者トップ5（author_award_summary.csvから）
+    author_summary = read_csv(AUTHOR_SUMMARY_PATH) if AUTHOR_SUMMARY_PATH.exists() else []
+    multi_authors = [r for r in author_summary if int(r.get("award_count", 0) or 0) > 1]
+
+    lines += [
+        "",
+        "## 複数賞受賞著者（上位10名）",
+        "",
+        "| 著者 | 受賞賞数 | 受賞賞 |",
+        "|---|---|---|",
+    ]
+    for r in multi_authors[:10]:
+        lines.append(f"| {r['author']} | {r['award_count']} | {r['awards']} |")
+
+    OVERLAP_TREND_MD.write_text("\n".join(lines), encoding="utf-8")
 
 
 # ── エントリーポイント ──────────────────────────────────────────────────────
