@@ -509,9 +509,13 @@ def _generate_statistics(works: WorkRegistry, authors: AuthorRegistry) -> None:
     history = read_csv(PLAM_DIR / "award_history.csv") if (PLAM_DIR / "award_history.csv").exists() else []
 
     # 複数受賞
-    from collections import Counter
+    from collections import Counter, defaultdict
     work_award_cnt = Counter(r["work_id"] for r in history if r.get("work_id"))
     multi_award = sum(1 for c in work_award_cnt.values() if c > 1)
+
+    # 信頼性別件数
+    conf_cnt: dict[str, int] = Counter(r.get("confidence", "REVIEWED") for r in history)
+    official_rate = conf_cnt.get("OFFICIAL", 0) / max(len(history), 1) * 100
 
     # ISBN付与率
     total_works = len(works.rows)
@@ -561,6 +565,7 @@ def _generate_statistics(works: WorkRegistry, authors: AuthorRegistry) -> None:
         f"|---|---|",
         f"| 複数受賞作品数 | {multi_award} |",
         f"| ISBN付与率 | {isbn_rate:.1f}% |",
+        f"| 公式ソース率 (OFFICIAL) | {official_rate:.1f}% |",
         f"| Tier3レビュー待ち件数 | {dup_pending} |",
         f"",
         f"## 賞別データ",
@@ -586,6 +591,101 @@ def _generate_statistics(works: WorkRegistry, authors: AuthorRegistry) -> None:
         )
 
     STATISTICS_MD.write_text("\n".join(lines), encoding="utf-8")
+
+    # cross_award_summary.csv と award_overlap.md も更新
+    _generate_cross_award_summary(history)
+    _generate_award_overlap(history, [s["id"] for s in award_stats])
+
+
+# ── V1.7: cross_award_summary.csv ───────────────────────────────────────────
+
+CROSS_SUMMARY_PATH = PLAM_DIR / "cross_award_summary.csv"
+CROSS_SUMMARY_FIELDS = ["work_id", "title", "author", "award_count",
+                         "awards", "first_award_year", "latest_award_year"]
+AWARD_OVERLAP_MD = REPORTS_DIR / "award_overlap.md"
+
+
+def _generate_cross_award_summary(history: list[dict]) -> None:
+    """複数受賞作品の一覧 cross_award_summary.csv を生成する"""
+    works = read_csv(WORKS_PATH)
+    works_map = {r["work_id"]: r for r in works if r.get("work_id")}
+
+    from collections import defaultdict
+    work_hist: dict[str, list[dict]] = defaultdict(list)
+    for r in history:
+        wid = r.get("work_id", "").strip()
+        if wid:
+            work_hist[wid].append(r)
+
+    summary_rows = []
+    for wid, rows in sorted(work_hist.items()):
+        awards = sorted({r["award_id"] for r in rows})
+        years  = [int(r["award_year"]) for r in rows if r.get("award_year", "").isdigit()]
+        w = works_map.get(wid, {})
+        summary_rows.append({
+            "work_id":          wid,
+            "title":            w.get("title", ""),
+            "author":           w.get("author", ""),
+            "award_count":      len(awards),
+            "awards":           ",".join(awards),
+            "first_award_year": min(years) if years else "",
+            "latest_award_year": max(years) if years else "",
+        })
+
+    # award_count > 1 のみ cross_award_summary に書く（単受賞は除外）
+    multi = [r for r in summary_rows if r["award_count"] > 1]
+    write_csv(CROSS_SUMMARY_PATH, CROSS_SUMMARY_FIELDS, multi)
+
+
+def _generate_award_overlap(history: list[dict], award_ids: list[str]) -> None:
+    """各賞ペアの重複作品数を award_overlap.md に書き出す"""
+    from collections import defaultdict
+    work_awards: dict[str, set[str]] = defaultdict(set)
+    for r in history:
+        wid = r.get("work_id", "").strip()
+        aid = r.get("award_id", "").strip()
+        if wid and aid:
+            work_awards[wid].add(aid)
+
+    lines = [
+        f"# PLAM 賞別重複分析（award_overlap.md）",
+        f"",
+        f"生成日時: {datetime.now():%Y-%m-%d %H:%M}",
+        f"",
+        f"## 賞ペア別 重複作品数",
+        f"",
+        f"| 賞A | 賞B | 重複作品数 | 作品 |",
+        f"|---|---|---|---|",
+    ]
+
+    ids = sorted(set(award_ids))
+    for i, a in enumerate(ids):
+        for b in ids[i+1:]:
+            overlaps = [wid for wid, awards in work_awards.items()
+                        if a in awards and b in awards]
+            # 作品タイトル（先頭3件まで）
+            works = read_csv(WORKS_PATH)
+            works_map = {r["work_id"]: r.get("title", "") for r in works}
+            titles = ", ".join(works_map.get(w, w) for w in overlaps[:3])
+            if len(overlaps) > 3:
+                titles += f" 他{len(overlaps)-3}件"
+            lines.append(f"| {a} | {b} | {len(overlaps)} | {titles} |")
+
+    lines += [
+        f"",
+        f"## 複数受賞作品一覧",
+        f"",
+        f"| work_id | タイトル | 著者 | 受賞賞 | 初受賞年 | 最終受賞年 |",
+        f"|---|---|---|---|---|---|",
+    ]
+    cross = read_csv(CROSS_SUMMARY_PATH) if CROSS_SUMMARY_PATH.exists() else []
+    for r in cross:
+        lines.append(
+            f"| {r['work_id']} | {r['title']} | {r['author']} "
+            f"| {r['awards']} | {r['first_award_year']} | {r['latest_award_year']} |"
+        )
+
+    AWARD_OVERLAP_MD.write_text("\n".join(lines), encoding="utf-8")
 
 
 # ── エントリーポイント ──────────────────────────────────────────────────────
