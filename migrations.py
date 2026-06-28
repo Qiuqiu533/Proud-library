@@ -1527,6 +1527,29 @@ def _migrate_update_award_isbn():
         con.close()
 
 
+def _migrate_helpful_count():
+    """genre_books に helpful_count カラムを追加する。"""
+    if _migration_done("helpful_count_v1"):
+        return
+    con = get_con()
+    try:
+        if USE_PG:
+            cur = con.cursor()
+            cur.execute("ALTER TABLE genre_books ADD COLUMN IF NOT EXISTS helpful_count INTEGER DEFAULT 0")
+        else:
+            try:
+                con.execute("ALTER TABLE genre_books ADD COLUMN helpful_count INTEGER DEFAULT 0")
+            except Exception:
+                pass
+        con.commit()
+        _mark_migration_done("helpful_count_v1")
+        logger.info("[migration] genre_books.helpful_count カラム追加完了")
+    except Exception as e:
+        logger.error("[migration] helpful_count error: %s", e)
+    finally:
+        con.close()
+
+
 def _migrate_helpful_votes():
     """helpful_votes テーブルを追加する（重複投票防止）。"""
     if _migration_done("helpful_votes_v1"):
@@ -1643,6 +1666,7 @@ def _run_all_migrations():
         _migrate_collections_sort_order,  # collections.sort_order カラム追加
         _migrate_events_image,             # events.image_data カラム追加
         _migrate_update_award_isbn,        # 受賞作ISBN一括更新
+        _migrate_helpful_count,            # helpful_count カラム追加
         _migrate_helpful_votes,            # helpful_votes テーブル追加
         _migrate_ai_review_columns,        # ai_summary/ai_tags カラム追加
         _verify_tables,

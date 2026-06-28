@@ -490,7 +490,13 @@ function _renderDescSection(isbn, book) {
     </button></div>`;
   const aiDisclaimer = (!book.manual_review && book.ai_review_date)
     ? `<p class="ai-disclaimer">⚠️ この内容紹介はAIが自動生成したものです。実際の内容・登場人物・結末等と異なる場合があります。特定の思想・宗教・政治的立場を推奨するものではありません。</p>` : "";
-  placeholder.outerHTML = `<div class="modal-section"><h3>📄 内容・収録作品</h3><p class="book-desc">${esc(book.description)}</p>${aiDisclaimer}${dateTag}${aiScoreTag}${helpfulBtn}</div>`;
+  // ai_summary（一行要約）
+  const summaryHtml = book.ai_summary
+    ? `<p class="ai-summary-line">💡 <em>${esc(book.ai_summary)}</em></p>` : "";
+  // ai_tags（クリッカブルチップ）
+  const tagsHtml = (book.ai_tags && book.ai_tags.length)
+    ? `<div class="modal-tag-row">${book.ai_tags.map(t => `<button class="modal-tag-chip" onclick="searchByTag('${esc(t)}')">#${esc(t)}</button>`).join("")}</div>` : "";
+  placeholder.outerHTML = `<div class="modal-section"><h3>📄 内容・収録作品</h3>${summaryHtml}<p class="book-desc">${esc(book.description)}</p>${aiDisclaimer}${tagsHtml}${dateTag}${aiScoreTag}${helpfulBtn}</div>`;
 }
 
 async function voteHelpful(isbn, btn) {

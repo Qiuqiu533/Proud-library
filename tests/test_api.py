@@ -607,3 +607,62 @@ def test_admin_delete_event(client):
     assert res.get_json()["ok"]
     events = client.get("/api/events").get_json()
     assert not any(e["title"] == "削除テスト固有" for e in events)
+
+
+# ── helpful投票重複防止テスト ──────────────────────────────────────────────
+def test_helpful_vote_dedup(client):
+    """同一IPから同じ本への2回目投票はalready_voted=Trueを返す"""
+    isbn = "9784062019439"
+    # DBにダミーレコードを作成
+    from database import get_con, USE_PG
+    con = get_con()
+    ph = "%s" if USE_PG else "?"
+    con.execute(
+        f"INSERT OR IGNORE INTO genre_books (isbn, title) VALUES ({ph},{ph})" if not USE_PG
+        else f"INSERT INTO genre_books (isbn, title) VALUES ({ph},{ph}) ON CONFLICT DO NOTHING",
+        (isbn, "テスト本"),
+    )
+    con.commit(); con.close()
+
+    r1 = client.post("/api/helpful", json={"isbn": isbn})
+    assert r1.status_code == 200
+    d1 = r1.get_json()
+    assert "already_voted" not in d1 or not d1.get("already_voted")
+
+    r2 = client.post("/api/helpful", json={"isbn": isbn})
+    assert r2.status_code == 200
+    d2 = r2.get_json()
+    assert d2.get("already_voted") is True
+
+
+def test_helpful_no_isbn(client):
+    """isbn未指定は400"""
+    res = client.post("/api/helpful", json={})
+    assert res.status_code == 400
+
+
+# ── タグ検索APIテスト ────────────────────────────────────────────────────
+def test_tags_popular_endpoint(client):
+    """/api/tags/popular が200を返す"""
+    res = client.get("/api/tags/popular")
+    assert res.status_code == 200
+    data = res.get_json()
+    assert "tags" in data
+    assert isinstance(data["tags"], list)
+
+
+def test_books_by_tag_endpoint(client):
+    """/api/books/by-tag?tag=xxx が200を返す"""
+    res = client.get("/api/books/by-tag?tag=青春")
+    assert res.status_code == 200
+    data = res.get_json()
+    assert "books" in data
+    assert "total" in data
+
+
+def test_books_by_tag_no_tag(client):
+    """tagなしは空リストを返す"""
+    res = client.get("/api/books/by-tag")
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data["books"] == []
