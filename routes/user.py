@@ -432,3 +432,31 @@ def api_delete_wishlist():
     execute(con, "DELETE FROM wish_list WHERE room=? AND isbn=?", (room, isbn))
     con.commit(); con.close()
     return jsonify({"ok": True})
+
+
+@user_bp.route("/api/admin/reset-user-password", methods=["POST"])
+@rate_limit(limit=20, window=60)
+def api_admin_reset_user_password():
+    """管理者による住民パスワードリセット"""
+    from config import check_password
+    pw = request.headers.get("X-Password", "")
+    if not check_password(pw, "board"):
+        return jsonify({"error": "unauthorized"}), 401
+    body = request.get_json() or {}
+    room = (body.get("room") or "").strip()
+    new_password = (body.get("new_password") or "").strip()
+    if not room:
+        return jsonify({"error": "部屋番号を入力してください"}), 400
+    if not new_password or len(new_password) < 8:
+        return jsonify({"error": "パスワードは8文字以上にしてください"}), 400
+    con = get_con()
+    user = fetchone(con, "SELECT room FROM user_accounts WHERE room=?", (room,))
+    if not user:
+        con.close()
+        return jsonify({"error": f"部屋番号 {room} は登録されていません"}), 404
+    h, s = _hash_password(new_password)
+    execute(con, "UPDATE user_accounts SET password_hash=?, password_salt=? WHERE room=?", (h, s, room))
+    execute(con, "INSERT INTO audit_log (action, target, detail) VALUES (?,?,?)",
+            ("admin_reset_password", room, "管理者がパスワードをリセット"))
+    con.commit(); con.close()
+    return jsonify({"ok": True, "room": room})
