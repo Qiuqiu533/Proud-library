@@ -674,6 +674,8 @@ function readStatusBadge(status) {
 function renderCard(book, opts = {}) {
   const div = document.createElement("div");
   div.className = "book-card";
+  div.setAttribute("role", "article");
+  div.setAttribute("aria-label", `${book.title}${book.author ? " / " + book.author : ""}`);
   const rating = book.rating || getRating(book.isbn);
   const fav = isFav(book.isbn);
   const readStatus = getReadStatus(book.isbn);
@@ -681,13 +683,13 @@ function renderCard(book, opts = {}) {
   const amzFallback = book.isbn10 ? `https://images-na.ssl-images-amazon.com/images/P/${book.isbn10}.09.LZZZZZZZ.jpg` : "";
   const img = book.cover
     ? `<img class="book-cover" src="${book.cover}" alt="${esc(book.title)}" loading="lazy" onerror="_coverFallback(this,'${amzFallback}')">`
-    : `<div class="book-cover-placeholder">📖</div>`;
+    : `<div class="book-cover-placeholder" aria-hidden="true">📖</div>`;
 
   div.innerHTML = `
     <div class="card-cover-wrap">
       ${img}
-      <button class="fav-btn ${fav ? 'active' : ''}" data-isbn="${book.isbn}" title="お気に入り">♥</button>
-      ${readStatus ? `<div class="read-badge">${readStatus}</div>` : ""}
+      <button class="fav-btn ${fav ? 'active' : ''}" data-isbn="${book.isbn}" aria-label="${fav ? 'お気に入りから削除' : 'お気に入りに追加'}" aria-pressed="${fav}">♥</button>
+      ${readStatus ? `<div class="read-badge" aria-label="読書状態: ${readStatus}">${readStatus}</div>` : ""}
     </div>
     <div class="book-info">
       <div class="book-title">${esc(book.title)}</div>
@@ -1976,10 +1978,11 @@ async function _loadRelatedBooks(isbn) {
     const renderCarousel = (books, label) => {
       if (!books || books.length === 0) return "";
       const items = books.map(b => {
-        const ndlFallback = `https://ndlsearch.ndl.go.jp/thumbnail/${b.isbn}.jpg`;
-        const imgOrPlaceholder = `<img src="${b.cover || ndlFallback}" alt="${esc(b.title)}" loading="lazy"
-          onerror="_coverFallback(this,'${ndlFallback}')">`;
-        return `<div class="related-card" onclick="openModal('${b.isbn}')" onkeydown="if(event.key==='Enter'||event.key===' ')openModal('${b.isbn}')" role="button" tabindex="0">
+        const ndlUrl = `https://ndlsearch.ndl.go.jp/thumbnail/${b.isbn}.jpg`;
+        const amzFb = b.isbn10 ? `https://images-na.ssl-images-amazon.com/images/P/${b.isbn10}.09.LZZZZZZZ.jpg` : "";
+        const imgOrPlaceholder = `<img src="${b.cover || ndlUrl}" alt="${esc(b.title)}" loading="lazy"
+          onerror="_coverFallback(this,'${amzFb}')">`;
+        return `<div class="related-card" onclick="openModal('${b.isbn}')" onkeydown="if(event.key==='Enter'||event.key===' ')openModal('${b.isbn}')" role="button" tabindex="0" aria-label="${esc(b.title)}">
           <div class="related-thumb">${imgOrPlaceholder}</div>
           <div class="related-title">${esc(b.title)}</div>
           <div class="related-author">${esc(b.author || "")}</div>
@@ -3169,6 +3172,22 @@ const _GENRE_LABEL = {
   "科学・学術": "科学・学術", "英語絵本": "英語絵本", "児童文学・YA": "児童文学・YA",
 };
 
+function _renderMiniBar(trend, color) {
+  if (!trend.length) return '<div style="color:#aaa;font-size:0.82rem">データなし（今後蓄積されます）</div>';
+  const max = Math.max(...trend.map(t => t.cnt), 1);
+  return `<div style="display:flex;align-items:flex-end;gap:4px;height:48px">
+    ${trend.map(t => {
+      const h = Math.max(Math.round(t.cnt / max * 44), 2);
+      const day = t.day.slice(5);
+      return `<div style="display:flex;flex-direction:column;align-items:center;flex:1;gap:2px" title="${t.day}: ${t.cnt}件">
+        <div style="font-size:0.65rem;color:#aaa">${t.cnt}</div>
+        <div style="background:${color};border-radius:2px 2px 0 0;height:${h}px;width:100%"></div>
+        <div style="font-size:0.6rem;color:#aaa;white-space:nowrap">${day}</div>
+      </div>`;
+    }).join("")}
+  </div>`;
+}
+
 async function loadOpsStats() {
   const el = document.getElementById("opsStatsContent");
   if (!el) return;
@@ -3269,6 +3288,20 @@ async function loadOpsStats() {
         : '<div style="color:#aaa;font-size:0.85rem">該当なし</div>'}
       </div>
     </div>
+    <div style="margin-bottom:20px">
+      <h4 style="color:#3d6b4f;margin-bottom:10px">📈 稼働統計（過去7日間）</h4>
+      <div style="display:flex;gap:20px;flex-wrap:wrap">
+        <div style="flex:1;min-width:180px">
+          <div style="font-size:0.8rem;color:#888;margin-bottom:6px">新規登録者数</div>
+          ${_renderMiniBar(d.reg_trend || [], "#5b8dd9")}
+        </div>
+        <div style="flex:1;min-width:180px">
+          <div style="font-size:0.8rem;color:#888;margin-bottom:6px">貸出活動数（確認回数）</div>
+          ${_renderMiniBar(d.loan_trend || [], "#3d6b4f")}
+        </div>
+      </div>
+    </div>
+
     <div style="margin-top:20px;padding:14px;background:#f5f9f6;border:1px solid #d0e8d8;border-radius:10px">
       <h4 style="color:#3d6b4f;margin:0 0 6px">🔄 在庫状況 一括チェック</h4>
       <p style="font-size:0.78rem;color:#888;margin:0 0 10px">24時間以上未チェックの書籍をまとめて確認します（最大30冊）。完了まで数分かかる場合があります。</p>
@@ -5070,11 +5103,11 @@ async function loadPopularBooks() {
       const ndlUrl = `https://ndlsearch.ndl.go.jp/thumbnail/${b.isbn}.jpg`;
       const amzFallback = b.isbn10 ? `https://images-na.ssl-images-amazon.com/images/P/${b.isbn10}.09.LZZZZZZZ.jpg` : "";
       const stars = b.score ? "★".repeat(Math.round(b.score)) + "☆".repeat(5 - Math.round(b.score)) : "";
-      return `<div class="mini-card" data-isbn="${b.isbn}">
+      return `<div class="mini-card" data-isbn="${b.isbn}" role="button" tabindex="0" aria-label="${esc(b.title)} ${b.score.toFixed(1)}点">
         <div class="mini-card-cover"><img src="${b.cover || ndlUrl}" alt="${esc(b.title)}" loading="lazy"
           onerror="_coverFallback(this,'${amzFallback}')"></div>
         <div class="mini-card-title">${esc(b.title)}</div>
-        <div style="color:#f0a500;font-size:0.72rem;margin-top:2px">${stars} ${b.score.toFixed(1)}</div>
+        <div style="color:#f0a500;font-size:0.72rem;margin-top:2px" aria-hidden="true">${stars} ${b.score.toFixed(1)}</div>
       </div>`;
     }).join("");
     row.querySelectorAll(".mini-card").forEach(el => {

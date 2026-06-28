@@ -397,6 +397,37 @@ def api_ops_stats():
         except Exception:
             dead_stock = []
 
+        # 稼働統計：過去7日間の新規登録・貸出活動推移
+        try:
+            reg_trend = fetchall(con, """
+                SELECT DATE(created_at) AS day, COUNT(*) AS cnt
+                FROM user_accounts
+                WHERE created_at >= NOW() - INTERVAL '7 days'
+                GROUP BY DATE(created_at) ORDER BY day
+            """ if USE_PG else """
+                SELECT DATE(created_at) AS day, COUNT(*) AS cnt
+                FROM user_accounts
+                WHERE created_at >= datetime('now', '-7 days')
+                GROUP BY DATE(created_at) ORDER BY day
+            """)
+        except Exception:
+            reg_trend = []
+
+        try:
+            loan_trend = fetchall(con, """
+                SELECT DATE(recorded_at) AS day, COUNT(*) AS cnt
+                FROM loan_history
+                WHERE recorded_at >= NOW() - INTERVAL '7 days' AND status = 'loaned'
+                GROUP BY DATE(recorded_at) ORDER BY day
+            """ if USE_PG else """
+                SELECT DATE(recorded_at) AS day, COUNT(*) AS cnt
+                FROM loan_history
+                WHERE recorded_at >= datetime('now', '-7 days') AND status = 'loaned'
+                GROUP BY DATE(recorded_at) ORDER BY day
+            """)
+        except Exception:
+            loan_trend = []
+
         con.close()
         return jsonify({
             "loaned": loaned,
@@ -413,6 +444,8 @@ def api_ops_stats():
             "members":   member_row["cnt"]    if member_row    else 0,
             "top_authors": [{"author": r["author"], "book_cnt": r["book_cnt"], "total_votes": r["total_votes"], "avg_score": r["avg_score"]} for r in top_authors],
             "dead_stock": [{"isbn": r["isbn"], "title": r["title"] or r["isbn"], "author": r["author"] or "", "last_loaned": str(r["last_loaned"] or "")[:10] if r["last_loaned"] else "貸出記録なし"} for r in dead_stock],
+            "reg_trend":  [{"day": str(r["day"])[:10], "cnt": r["cnt"]} for r in reg_trend],
+            "loan_trend": [{"day": str(r["day"])[:10], "cnt": r["cnt"]} for r in loan_trend],
         })
     except Exception as e:
         con.close()
