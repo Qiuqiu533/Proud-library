@@ -24,5 +24,11 @@ def pytest_configure(config):
     if r_cols and "user_votes" not in r_cols:
         con.execute("ALTER TABLE ratings ADD COLUMN user_votes TEXT DEFAULT '{{}}'")
 
+    # helpful_votes テーブルのテストデータをリセット（テスト間の状態汚染防止）
+    try:
+        con.execute("DELETE FROM helpful_votes")
+    except Exception:
+        pass
+
     con.commit()
     con.close()

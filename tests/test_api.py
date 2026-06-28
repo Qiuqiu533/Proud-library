@@ -612,7 +612,7 @@ def test_admin_delete_event(client):
 # ── helpful投票重複防止テスト ──────────────────────────────────────────────
 def test_helpful_vote_dedup(client):
     """同一IPから同じ本への2回目投票はalready_voted=Trueを返す"""
-    isbn = "9784062019439"
+    isbn = "9784062099999"  # このテスト専用の一意なISBN
     # DBにダミーレコードを作成
     from database import get_con, USE_PG
     con = get_con()
