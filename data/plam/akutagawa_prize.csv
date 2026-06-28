@@ -1,0 +1,47 @@
+award_id,award_name,award_year,award_no,award_term,title,author,isbn13,status,remarks
+# PLAM - 芥川龍之介賞 (AKU)
+# データソース: 公益財団法人日本文学振興会 https://bungakushinko.or.jp/award/akutagawa/list.html
+# 最終確認: 2026-06-28
+# award_term: H1=上半期 H2=下半期
+# status: awarded=受賞 no_award=該当作なし co_winner=共同受賞
+# Phase 1: 1935-1954 (第1回～第32回)
+AKU,芥川賞,1935,1,H1,蒼氓,石川達三,,awarded,
+AKU,芥川賞,1935,2,H2,,,,no_award,
+AKU,芥川賞,1936,3,H1,コシャマイン記,鶴田知也,,co_winner,
+AKU,芥川賞,1936,3,H1,城外,小田嶽夫,,co_winner,
+AKU,芥川賞,1936,4,H2,地中海,冨澤有爲男,,co_winner,
+AKU,芥川賞,1936,4,H2,普賢,石川淳,,co_winner,
+AKU,芥川賞,1937,5,H1,暢氣眼鏡 他,尾崎一雄,,awarded,
+AKU,芥川賞,1937,6,H2,糞尿譚,火野葦平,,awarded,
+AKU,芥川賞,1938,7,H1,厚物咲,中山義秀,,awarded,
+AKU,芥川賞,1938,8,H2,乗合馬車 他,中里恒子,,awarded,
+AKU,芥川賞,1939,9,H1,あさくさの子供,長谷健,,co_winner,
+AKU,芥川賞,1939,9,H1,鶏騒動,半田義之,,co_winner,
+AKU,芥川賞,1939,10,H2,密獵者,寒川光太郎,,awarded,
+AKU,芥川賞,1940,11,H1,,,,no_award,
+AKU,芥川賞,1940,12,H2,平賀源内,櫻田常久,,awarded,
+AKU,芥川賞,1941,13,H1,長江デルタ,多田裕計,,awarded,
+AKU,芥川賞,1941,14,H2,青果の市,芝木好子,,awarded,
+AKU,芥川賞,1942,15,H1,,,,no_award,
+AKU,芥川賞,1942,16,H2,連絡員,倉光俊夫,,awarded,
+AKU,芥川賞,1943,17,H1,纏足の頃,石塚喜久三,,awarded,
+AKU,芥川賞,1943,18,H2,和紙,東野邊薫,,awarded,
+AKU,芥川賞,1944,19,H1,攀,小尾十三登,,co_winner,
+AKU,芥川賞,1944,19,H1,劉廣福,八木義徳,,co_winner,
+AKU,芥川賞,1944,20,H2,雁立,清水基吉,,awarded,第20回H2終了後戦争のため休止
+AKU,芥川賞,1949,21,H1,本の話,由起しげ子,,co_winner,1944年第20回H2〜1948年は戦争のため休止
+AKU,芥川賞,1949,21,H1,確証,小谷剛,,co_winner,
+AKU,芥川賞,1949,22,H2,闘牛,井上靖,,awarded,
+AKU,芥川賞,1950,23,H1,異邦人,辻亮一,,awarded,
+AKU,芥川賞,1950,24,H2,,,,no_award,
+AKU,芥川賞,1951,25,H1,春の草 他,石川利光,,co_winner,
+AKU,芥川賞,1951,25,H1,壁,安部公房,,co_winner,
+AKU,芥川賞,1951,26,H2,広場の孤独・漢奸その他,堀田善衛,,awarded,
+AKU,芥川賞,1952,27,H1,,,,no_award,
+AKU,芥川賞,1952,28,H2,或る「小倉日記」伝,松本清張,,co_winner,
+AKU,芥川賞,1952,28,H2,喪神,五味康祐,,co_winner,
+AKU,芥川賞,1953,29,H1,悪い仲間・陰気な愉しみ,安岡章太郎,,awarded,
+AKU,芥川賞,1953,30,H2,,,,no_award,
+AKU,芥川賞,1954,31,H1,驟雨・その他,吉行淳之介,,awarded,
+AKU,芥川賞,1954,32,H2,プールサイド小景,庄野潤三,,co_winner,
+AKU,芥川賞,1954,32,H2,アメリカン・スクール,小島信夫,,co_winner,

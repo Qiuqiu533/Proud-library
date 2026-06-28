@@ -1,0 +1,44 @@
+award_id,award_name,award_year,award_no,award_term,title,author,isbn13,status,remarks
+# PLAM - 直木三十五賞 (NAO)
+# データソース: 公益財団法人日本文学振興会 https://bungakushinko.or.jp/award/naoki/list.html
+# 最終確認: 2026-06-28
+# award_term: H1=上半期 H2=下半期
+# status: awarded=受賞 no_award=該当作なし co_winner=共同受賞
+# Phase 1: 1935-1954 (第1回～第32回)
+NAO,直木賞,1935,1,H1,鶴八鶴次郎・風流深川唄 その他,川口松太郎,,awarded,
+NAO,直木賞,1935,2,H2,吉野朝太平記,鷲尾雨工,,awarded,
+NAO,直木賞,1936,3,H1,天正女合戦・武道傳來記,海音寺潮五郎,,awarded,
+NAO,直木賞,1936,4,H2,人生の阿呆,木々高太郎,,awarded,
+NAO,直木賞,1937,5,H1,,,,no_award,
+NAO,直木賞,1937,6,H2,ジョン萬次郎漂流記・その他,井伏鱒二,,awarded,
+NAO,直木賞,1938,7,H1,ナリン殿下への回想,橘外男,,awarded,
+NAO,直木賞,1938,8,H2,兜首・秋田口の兄弟,大池唯雄,,awarded,
+NAO,直木賞,1939,9,H1,,,,no_award,
+NAO,直木賞,1939,10,H2,,,,no_award,
+NAO,直木賞,1940,11,H1,軍事郵便,河内仙介,,co_winner,
+NAO,直木賞,1940,11,H1,小指・その他,堤千代,,co_winner,
+NAO,直木賞,1940,12,H2,上総風土記・その他,村上元三,,awarded,
+NAO,直木賞,1941,13,H1,,,,no_award,
+NAO,直木賞,1941,14,H2,,,,no_award,
+NAO,直木賞,1942,15,H1,,,,no_award,
+NAO,直木賞,1942,16,H2,寛容・その他,神崎武雄,,co_winner,
+NAO,直木賞,1942,16,H2,強情いちご・その他,田岡典夫,,co_winner,
+NAO,直木賞,1943,17,H1,,,,no_award,
+NAO,直木賞,1943,18,H2,山畠・蛾と笹舟,森荘已池,,awarded,
+NAO,直木賞,1944,19,H1,ニューギニヤ山岳戦,岡田誠三,,awarded,
+NAO,直木賞,1944,20,H2,,,,no_award,第20回H2終了後戦争のため休止
+NAO,直木賞,1949,21,H1,面・刺青,富田常雄,,awarded,1944年第20回H2〜1948年は戦争のため休止
+NAO,直木賞,1949,22,H2,海の廃園,山田克郎,,awarded,
+NAO,直木賞,1950,23,H1,執行猶予,小山いと子,,co_winner,
+NAO,直木賞,1950,23,H1,天皇の帽子,今日出海,,co_winner,
+NAO,直木賞,1950,24,H2,真説石川五右衛門・長恨歌,檀一雄,,awarded,
+NAO,直木賞,1951,25,H1,英語屋さん・その他,源氏鶏太,,awarded,
+NAO,直木賞,1951,26,H2,鈴木主水,久生十蘭,,co_winner,
+NAO,直木賞,1951,26,H2,イエスの裔,柴田錬三郎,,co_winner,
+NAO,直木賞,1952,27,H1,罪な女・その他,藤原審爾,,awarded,
+NAO,直木賞,1952,28,H2,叛乱,立野信之,,awarded,
+NAO,直木賞,1953,29,H1,,,,no_award,
+NAO,直木賞,1953,30,H2,,,,no_award,
+NAO,直木賞,1954,31,H1,終身未決囚,有馬頼義,,awarded,
+NAO,直木賞,1954,32,H2,高安犬物語,戸川幸夫,,co_winner,
+NAO,直木賞,1954,32,H2,ボロ家の春秋,梅崎春生,,co_winner,
