@@ -1992,8 +1992,60 @@ function switchToBooksAndSearch(keyword) {
 }
 
 // ===== Events =====
-document.getElementById("searchBtn").addEventListener("click", () => switchToBooksAndSearch(document.getElementById("searchInput").value));
-document.getElementById("searchInput").addEventListener("keydown", e => { if (e.key === "Enter") switchToBooksAndSearch(document.getElementById("searchInput").value); });
+document.getElementById("searchBtn").addEventListener("click", () => { _hideSuggest(); switchToBooksAndSearch(document.getElementById("searchInput").value); });
+document.getElementById("searchInput").addEventListener("keydown", e => {
+  if (e.key === "Enter") { _hideSuggest(); switchToBooksAndSearch(document.getElementById("searchInput").value); }
+  else if (e.key === "ArrowDown") { _suggestMove(1); e.preventDefault(); }
+  else if (e.key === "ArrowUp") { _suggestMove(-1); e.preventDefault(); }
+  else if (e.key === "Escape") _hideSuggest();
+});
+(function _initAutocomplete() {
+  const inp = document.getElementById("searchInput");
+  let _timer = null, _active = -1;
+  const _box = document.createElement("div");
+  _box.id = "suggestBox";
+  _box.style.cssText = "position:absolute;background:#fff;border:1px solid #c8dcc0;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.12);z-index:9999;max-width:480px;width:100%;display:none;overflow:hidden";
+  inp.parentNode.style.position = "relative";
+  inp.parentNode.appendChild(_box);
+  window._hideSuggest = () => { _box.style.display = "none"; _active = -1; };
+  window._suggestMove = (dir) => {
+    const items = _box.querySelectorAll(".suggest-item");
+    if (!items.length) return;
+    _active = Math.max(-1, Math.min(items.length - 1, _active + dir));
+    items.forEach((el, i) => el.classList.toggle("suggest-active", i === _active));
+    if (_active >= 0) inp.value = items[_active].dataset.title;
+  };
+  inp.addEventListener("input", () => {
+    clearTimeout(_timer);
+    const q = inp.value.trim();
+    if (q.length < 1) { _hideSuggest(); return; }
+    _timer = setTimeout(async () => {
+      const res = await fetch(`/api/books/suggest?q=${encodeURIComponent(q)}`).catch(() => null);
+      if (!res || !res.ok) return;
+      const list = await res.json();
+      if (!list.length) { _hideSuggest(); return; }
+      _active = -1;
+      _box.innerHTML = list.map((b, i) =>
+        `<div class="suggest-item" data-title="${esc(b.title)}" style="padding:9px 14px;cursor:pointer;border-bottom:1px solid #f0ede8;font-size:0.87rem">
+          <span style="font-weight:600">${esc(b.title)}</span>
+          ${b.author ? `<span style="color:#888;margin-left:8px;font-size:0.8rem">${esc(b.author)}</span>` : ""}
+        </div>`).join("");
+      _box.querySelectorAll(".suggest-item").forEach(el => {
+        el.addEventListener("mousedown", () => {
+          inp.value = el.dataset.title;
+          _hideSuggest();
+          switchToBooksAndSearch(inp.value);
+        });
+        el.addEventListener("mouseover", () => {
+          _box.querySelectorAll(".suggest-item").forEach(x => x.classList.remove("suggest-active"));
+          el.classList.add("suggest-active");
+        });
+      });
+      _box.style.display = "block";
+    }, 220);
+  });
+  document.addEventListener("click", e => { if (!_box.contains(e.target) && e.target !== inp) _hideSuggest(); });
+})();
 document.getElementById("modalClose").addEventListener("click", closeModal);
 document.getElementById("modalCloseBottom").addEventListener("click", closeModal);
 document.getElementById("modal").addEventListener("click", e => { if (e.target === document.getElementById("modal")) closeModal(); });
@@ -3155,6 +3207,30 @@ async function loadOpsStats() {
             </div>`;
           }).join("")}
         </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:20px">
+      <div style="flex:1;min-width:200px">
+        <h4 style="color:#3d6b4f;margin-bottom:10px">✍️ 人気作家 TOP10</h4>
+        ${(d.top_authors || []).length ? d.top_authors.map((a, i) =>
+          `<div style="display:flex;align-items:center;gap:8px;font-size:0.83rem;margin-bottom:5px">
+            <span style="font-weight:700;color:#5b8dd9;width:22px;text-align:right">${i+1}</span>
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.author)}</span>
+            <span style="color:#888;white-space:nowrap">${a.book_cnt}冊</span>
+            ${a.total_votes > 0 ? `<span style="color:#e8a020;white-space:nowrap">⭐${a.avg_score || "-"}（${a.total_votes}件）</span>` : ""}
+          </div>`).join("")
+        : '<div style="color:#aaa;font-size:0.85rem">データなし</div>'}
+      </div>
+      <div style="flex:1;min-width:200px">
+        <h4 style="color:#3d6b4f;margin-bottom:6px">😴 死蔵本候補（上位20冊）</h4>
+        <p style="font-size:0.75rem;color:#888;margin-bottom:8px">評価なし・貸出履歴なし・180日以上経過。廃棄・寄付の検討候補です。</p>
+        ${(d.dead_stock || []).length ? d.dead_stock.map(b =>
+          `<div style="font-size:0.82rem;margin-bottom:5px;display:flex;gap:6px">
+            <span style="color:#aaa;white-space:nowrap">${b.created_at || ""}</span>
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(b.title)}">${esc(b.title)}</span>
+            ${b.author ? `<span style="color:#888;white-space:nowrap">${esc(b.author)}</span>` : ""}
+          </div>`).join("")
+        : '<div style="color:#aaa;font-size:0.85rem">該当なし</div>'}
       </div>
     </div>
     <div style="margin-top:20px;padding:14px;background:#f5f9f6;border:1px solid #d0e8d8;border-radius:10px">
@@ -5787,6 +5863,10 @@ function _renderEventCard(ev, user) {
           </div>
         </div>` : `<p style="font-size:0.82rem;color:#666;margin:4px 0">参加者 ${ev.confirmed}名（定員なし）${ev.waitlist > 0 ? ` ／ キャンセル待ち ${ev.waitlist}名` : ""}</p>`}
       ${actionHtml}
+      <div style="margin-top:8px">
+        <a href="/api/events/${ev.id}/ics" download="event_${ev.id}.ics"
+           style="font-size:0.8rem;color:#5b8dd9;text-decoration:none">📅 カレンダーに追加（.ics）</a>
+      </div>
     </div>`;
 }
 

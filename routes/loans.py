@@ -326,6 +326,51 @@ def api_ops_stats():
         fb_done_row   = fetchone(con, "SELECT COUNT(*) AS cnt FROM book_requests WHERE type='feedback' AND status IN ('fb_done','fb_noted','fb_none','fb_rejected')")
 
         member_row = fetchone(con, "SELECT COUNT(*) AS cnt FROM user_accounts")
+
+        # 人気作家TOP10（評価数合計）
+        top_authors = fetchall(con, """
+            SELECT g.author, COUNT(DISTINCT g.isbn) AS book_cnt,
+                   COALESCE(SUM(r.votes), 0) AS total_votes,
+                   ROUND(AVG(CASE WHEN r.votes > 0 THEN r.score END)::numeric, 1) AS avg_score
+            FROM genre_books g
+            LEFT JOIN ratings r ON r.isbn = g.isbn
+            WHERE g.author IS NOT NULL AND g.author != ''
+            GROUP BY g.author
+            ORDER BY total_votes DESC, book_cnt DESC
+            LIMIT 10
+        """ if USE_PG else """
+            SELECT g.author, COUNT(DISTINCT g.isbn) AS book_cnt,
+                   COALESCE(SUM(r.votes), 0) AS total_votes,
+                   ROUND(AVG(CASE WHEN r.votes > 0 THEN r.score END), 1) AS avg_score
+            FROM genre_books g
+            LEFT JOIN ratings r ON r.isbn = g.isbn
+            WHERE g.author IS NOT NULL AND g.author != ''
+            GROUP BY g.author
+            ORDER BY total_votes DESC, book_cnt DESC
+            LIMIT 10
+        """)
+
+        # 死蔵本（評価なし・登録から180日以上）
+        try:
+            dead_stock = fetchall(con, """
+                SELECT g.isbn, g.title, g.author, g.created_at
+                FROM genre_books g
+                LEFT JOIN ratings r ON r.isbn = g.isbn
+                WHERE (r.votes IS NULL OR r.votes = 0)
+                  AND g.created_at IS NOT NULL
+                  AND g.created_at < NOW() - INTERVAL '180 days'
+                ORDER BY g.created_at ASC
+                LIMIT 20
+            """ if USE_PG else """
+                SELECT g.isbn, g.title, g.author
+                FROM genre_books g
+                LEFT JOIN ratings r ON r.isbn = g.isbn
+                WHERE (r.votes IS NULL OR r.votes = 0)
+                LIMIT 20
+            """)
+        except Exception:
+            dead_stock = []
+
         con.close()
         return jsonify({
             "loaned": loaned,
@@ -340,6 +385,8 @@ def api_ops_stats():
             "fb_total":  fb_total_row["cnt"]  if fb_total_row  else 0,
             "fb_done":   fb_done_row["cnt"]   if fb_done_row   else 0,
             "members":   member_row["cnt"]    if member_row    else 0,
+            "top_authors": [{"author": r["author"], "book_cnt": r["book_cnt"], "total_votes": r["total_votes"], "avg_score": r["avg_score"]} for r in top_authors],
+            "dead_stock": [{"isbn": r["isbn"], "title": r["title"] or r["isbn"], "author": r["author"] or "", "created_at": str(r.get("created_at") or "")[:10] if hasattr(r, "get") else ""} for r in dead_stock],
         })
     except Exception as e:
         con.close()
