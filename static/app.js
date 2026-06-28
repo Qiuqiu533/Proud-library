@@ -35,6 +35,39 @@ window.onerror = function(msg, src, line, col, err) {
 let residentSession = null;
 try { residentSession = JSON.parse(sessionStorage.getItem("resident_session") || "null"); } catch {}
 
+// ゲストモード
+let isGuest = sessionStorage.getItem("guest_mode") === "1";
+
+function enterGuestMode() {
+  isGuest = true;
+  sessionStorage.setItem("guest_mode", "1");
+}
+function exitGuestMode() {
+  isGuest = false;
+  sessionStorage.removeItem("guest_mode");
+}
+// ゲスト状態で書き込み操作をしようとした場合に呼ぶ
+function requireLogin(msg) {
+  if (isGuest || (!residentSession && !getCloudUser())) {
+    showGuestLoginToast(msg || "この機能はログインが必要です");
+    return true;
+  }
+  return false;
+}
+function showGuestLoginToast(msg) {
+  let toast = document.getElementById("guestToast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "guestToast";
+    toast.className = "guest-toast";
+    document.body.appendChild(toast);
+  }
+  toast.innerHTML = `<span>${msg}</span><button onclick="document.getElementById('loginScreen').style.display='flex';exitGuestMode();sessionStorage.removeItem('guest_mode');document.getElementById('guestToast').style.display='none'">ログイン</button>`;
+  toast.style.display = "flex";
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => { toast.style.display = "none"; }, 5000);
+}
+
 function validateRoom(room) {
   // 街区形式: 1-5 の街区番号 + ハイフン + 3〜4桁部屋番号
   if (/^[1-5]-\d{3,4}$/.test(room)) return true;
@@ -136,6 +169,11 @@ async function checkAuth() {
     loginScreen.style.display = "none";
     return;
   }
+  // ゲストモード復元
+  if (isGuest) {
+    loginScreen.style.display = "none";
+    return;
+  }
   loginScreen.style.display = "flex";
   _initLoginQr();
 }
@@ -185,6 +223,19 @@ _bindEl("tabLogin",    "click", () => showLoginTab("login"));
 _bindEl("tabRegister", "click", () => showLoginTab("register"));
 _bindEl("toForgotBtn", "click", () => showLoginTab("forgot"));
 _bindEl("toLoginBtn",  "click", () => showLoginTab("login"));
+
+document.getElementById("guestLoginBtn").addEventListener("click", () => {
+  enterGuestMode();
+  document.getElementById("loginScreen").style.display = "none";
+  // ゲストバナーを表示
+  const banner = document.createElement("div");
+  banner.id = "guestBanner";
+  banner.className = "guest-banner";
+  banner.innerHTML = `👀 ゲスト閲覧中（閲覧のみ）&nbsp;
+    <button onclick="document.getElementById('loginScreen').style.display='flex';exitGuestMode();document.getElementById('guestBanner').remove()">ログイン／登録</button>
+    <button onclick="exitGuestMode();document.getElementById('guestBanner').remove()" style="background:#888">✕</button>`;
+  document.querySelector(".sticky-header").prepend(banner);
+});
 
 document.getElementById("loginBtn").addEventListener("click", async () => {
   const room = (document.getElementById("loginRoom").value || "").trim();
@@ -309,8 +360,9 @@ document.getElementById("forgotResetBtn").addEventListener("click", async () => 
 });
 
 document.getElementById("logoutBtn").addEventListener("click", () => {
-  if (!confirm("ログアウトしますか？")) return;
+  if (!confirm(isGuest ? "ゲスト閲覧を終了しますか？" : "ログアウトしますか？")) return;
   residentSession = null;
+  exitGuestMode();
   localStorage.removeItem("resident_auth");
   sessionStorage.removeItem("resident_session");
   sessionStorage.removeItem("resident_pass");
@@ -319,6 +371,7 @@ document.getElementById("logoutBtn").addEventListener("click", () => {
   sessionStorage.removeItem("board_name");
   sessionStorage.removeItem("admin_session");
   adminSession = null;
+  document.getElementById("guestBanner")?.remove();
   document.getElementById("loginScreen").style.display = "flex";
   document.getElementById("loginRoom").value = "";
   document.getElementById("residentPass").value = "";
@@ -460,6 +513,7 @@ async function voteHelpful(isbn, btn) {
 
 function isFav(isbn) { return localStorage.getItem("fav_" + isbn) === "1"; }
 function toggleFav(isbn) {
+  if (requireLogin("お気に入りにはログインが必要です")) return;
   if (isFav(isbn)) localStorage.removeItem("fav_" + isbn);
   else localStorage.setItem("fav_" + isbn, "1");
   setTimeout(cloudSync, 500);
@@ -1846,6 +1900,7 @@ function closeModal() {
   if (isbns.length) applyAvailCache(isbns);
 }
 function openRateModal() {
+  if (requireLogin("評価の投稿にはログインが必要です")) return;
   ratingScore = 0;
   document.getElementById("reviewText").value = "";
   document.getElementById("rateMsg").textContent = "";
