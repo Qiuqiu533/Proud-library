@@ -26,6 +26,10 @@ SIMILARITY_FIELDS = ["award_a", "award_b", "jaccard", "shared_works",
                      "works_a", "works_b", "shared_titles"]
 GRAPH_PATH   = PLAM_DIR / "graph_data.csv"
 GRAPH_FIELDS = ["source", "target", "weight", "shared_works", "shared_titles"]
+CLUSTER_PATH  = PLAM_DIR / "cluster_summary.csv"
+BRIDGE_PATH   = PLAM_DIR / "bridge_works.csv"
+BRIDGE_FIELDS = ["work_id", "title", "author", "awards", "clusters",
+                 "award_count", "cluster_count", "bridge_type"]
 
 
 def _read_csv(path: Path) -> list[dict]:
@@ -85,6 +89,76 @@ def _build_similarity():
     for r in rows[:10]:
         print(f"  {r['award_a']} ↔ {r['award_b']}: {r['jaccard']} "
               f"（{r['shared_works']}件 / {r['works_a']}+{r['works_b']}）")
+
+
+def _build_bridge_works():
+    """複数賞受賞作品（bridge works）を抽出してCSV出力。
+    cluster_summary.csv からクラスタ定義を読み込み、
+    クラスタ横断作品を bridge_type=cross_cluster として区別する。
+    """
+    history = _read_csv(HISTORY_PATH)
+
+    # award_id → cluster_id
+    award_cluster: dict[str, str] = {}
+    if CLUSTER_PATH.exists():
+        for r in _read_csv(CLUSTER_PATH):
+            award_cluster[r["award_id"]] = r["cluster_id"]
+
+    # work_id → awards set
+    work_awards: dict[str, set[str]] = defaultdict(set)
+    for r in history:
+        wid = (r.get("work_id") or "").strip()
+        aid = (r.get("award_id") or "").strip()
+        if wid and aid:
+            work_awards[wid].add(aid)
+
+    # work_id → title/author
+    wid_title: dict[str, str] = {}
+    wid_author: dict[str, str] = {}
+    works_path = PLAM_DIR / "works.csv"
+    if works_path.exists():
+        for r in _read_csv(works_path):
+            wid_title[r["work_id"]] = r.get("canonical_title", "")
+            wid_author[r["work_id"]] = r.get("author", "")
+
+    rows: list[dict] = []
+    for wid, awards in work_awards.items():
+        if len(awards) < 2:
+            continue
+
+        clusters = {award_cluster.get(a, "unknown") for a in awards}
+        bridge_type = "cross_cluster" if len(clusters) > 1 else "intra_cluster"
+
+        rows.append({
+            "work_id":       wid,
+            "title":         wid_title.get(wid, ""),
+            "author":        wid_author.get(wid, ""),
+            "awards":        " ".join(sorted(awards)),
+            "clusters":      " ".join(sorted(clusters)),
+            "award_count":   len(awards),
+            "cluster_count": len(clusters),
+            "bridge_type":   bridge_type,
+        })
+
+    # award_count降順、bridge_type（cross_clusterを先に）でソート
+    rows.sort(key=lambda r: (-int(r["cluster_count"]), -int(r["award_count"])))
+
+    with open(BRIDGE_PATH, "w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=BRIDGE_FIELDS)
+        w.writeheader()
+        w.writerows(rows)
+
+    cross = [r for r in rows if r["bridge_type"] == "cross_cluster"]
+    intra = [r for r in rows if r["bridge_type"] == "intra_cluster"]
+    print(f"✅ {BRIDGE_PATH} 生成完了（{len(rows)} 作品）")
+    print(f"  cross_cluster（クラスタ横断）: {len(cross)} 件")
+    print(f"  intra_cluster（クラスタ内複数受賞）: {len(intra)} 件")
+    print("\ncross_cluster 作品:")
+    for r in cross:
+        print(f"  {r['title']}（{r['author']}）: {r['awards']} → clusters: {r['clusters']}")
+    print("\nintra_cluster 上位5件:")
+    for r in intra[:5]:
+        print(f"  {r['title']}（{r['author']}）: {r['awards']}")
 
 
 def _build_graph():
@@ -152,6 +226,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--similarity",      action="store_true")
     parser.add_argument("--graph",           action="store_true")
+    parser.add_argument("--bridge",          action="store_true")
     parser.add_argument("--validate-master", action="store_true")
     args = parser.parse_args()
 
@@ -159,9 +234,11 @@ def main():
         _build_similarity()
     if args.graph:
         _build_graph()
+    if args.bridge:
+        _build_bridge_works()
     if args.validate_master:
         _validate_master()
-    if not (args.similarity or args.graph or args.validate_master):
+    if not (args.similarity or args.graph or args.bridge or args.validate_master):
         parser.print_help()
 
 
