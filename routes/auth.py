@@ -15,11 +15,6 @@ def api_auth():
     return jsonify({"error": "unauthorized"}), 401
 
 
-@auth_bp.route("/api/login-qr-url")
-def api_login_qr_url():
-    base = request.host_url.rstrip("/")
-    return jsonify({"url": base + "/"})
-
 
 @auth_bp.route("/api/board/auth", methods=["POST"])
 @rate_limit(limit=5, window=60)

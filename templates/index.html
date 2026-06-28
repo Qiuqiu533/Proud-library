@@ -18,7 +18,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU" crossorigin="anonymous"></script>
 </head>
 <body>
 
@@ -106,13 +105,6 @@
         </div>
         <p id="forgotMsg" class="login-error"></p>
         <button class="login-link-btn" id="toLoginBtn">ログインに戻る</button>
-      </div>
-
-      <div class="login-qr-section">
-        <div class="login-qr-divider"><span>または</span></div>
-        <p class="login-qr-label">📱 QRコードをスキャンして入室</p>
-        <div id="loginQrCode" class="login-qr-wrap"></div>
-        <p class="login-qr-note">掲示板のQRコードをカメラで読み取るとログインできます</p>
       </div>
 
       <div class="login-guest-section">
@@ -1695,15 +1687,6 @@
       <div id="btab-settings" class="board-tab-panel">
         <h3 style="margin-bottom:20px">⚙️ 設定</h3>
 
-        <div class="settings-section" style="margin-bottom:24px">
-          <h4>📱 住民向けQRコード</h4>
-          <p style="font-size:0.85rem;color:#555;margin-bottom:12px">掲示板に貼るQRコードを生成します。スキャンするだけでパスワード入力なしにログインできます。</p>
-          <div id="adminQrWrap" style="display:flex;flex-direction:column;align-items:center;gap:12px">
-            <div id="adminQrCode" style="background:white;padding:12px;border-radius:8px;border:1.5px solid #cde"></div>
-            <button class="btn-board-add" id="adminQrPrintBtn">🖨️ 印刷用ページを開く</button>
-          </div>
-        </div>
-
         <div class="settings-section" style="margin-bottom:24px;padding:14px;background:#fff8e1;border-radius:10px;border:1px solid #ffe082">
           <h4 style="margin-bottom:8px;color:#7a5700">🔑 パスワードを忘れた場合の復旧手順</h4>
           <ol style="font-size:0.83rem;color:#555;margin:0;padding-left:20px;line-height:1.8">
@@ -1913,7 +1896,7 @@
             <div class="guide-toc-title">📋 目次</div>
             <a class="guide-toc-item" href="#guide-overview">1. このサイトの全体像</a>
             <a class="guide-toc-item" href="#guide-login">2. 管理者メニューへのログイン</a>
-            <a class="guide-toc-item" href="#guide-resident-login">2b. 住民のログイン方法（QRコード）</a>
+            <a class="guide-toc-item" href="#guide-resident-login">2b. 住民のログイン方法</a>
             <a class="guide-toc-item" href="#guide-passwords">3. パスワード一覧</a>
             <a class="guide-toc-item" href="#guide-news">4. お知らせを投稿・編集する</a>
             <a class="guide-toc-item" href="#guide-newarrival">4b. 新着本を登録する</a>
@@ -1971,36 +1954,23 @@
             </div>
           </div>
 
-          <!-- 2b. 住民のログイン（QRコード） -->
+          <!-- 2b. 住民のログイン方法 -->
           <div class="guide-section" id="guide-resident-login">
-            <h4 class="guide-section-title">2b. 住民のログイン方法（QRコード）</h4>
-            <p class="guide-text">住民がサイトにアクセスすると、ログイン画面が表示されます。ログイン方法は2通りあります。</p>
+            <h4 class="guide-section-title">2b. 住民のログイン方法</h4>
+            <p class="guide-text">住民がサイトにアクセスすると、ログイン画面が表示されます。</p>
             <div class="guide-step-box">
-              <strong>方法①：QRコードをスキャン（推奨）</strong>
+              <strong>部屋番号でログイン（個人機能を使う場合）</strong>
               <ol class="guide-ol">
-                <li>掲示板に貼られたQRコードをスマホのカメラで読み取る</li>
-                <li>自動的にログイン完了（パスワード入力不要）</li>
-              </ol>
-            </div>
-            <div class="guide-step-box" style="margin-top:10px">
-              <strong>方法②：パスワードを手入力</strong>
-              <ol class="guide-ol">
-                <li>ログイン画面の「パスワード」欄に住民パスワードを入力</li>
+                <li>ログイン画面の「部屋番号」「パスワード」欄を入力</li>
                 <li>「入室する」をクリック</li>
               </ol>
-              <p style="margin-top:6px;font-size:0.82rem;color:#666">※ QRコードが手元にない場合や、スマホのカメラが使えない場合に利用してください。</p>
             </div>
             <div class="guide-step-box" style="margin-top:10px">
-              <strong>📱 QRコードの発行・印刷手順（管理者）：</strong>
+              <strong>ゲストとして閲覧（個人登録なしで蔵書検索のみ）</strong>
               <ol class="guide-ol">
-                <li>管理者メニュー →「⚙️ 設定」タブを開く</li>
-                <li>「📱 住民向けQRコード」セクションのQRコードを確認</li>
-                <li>「🖨️ 印刷用ページを開く」をクリック → 印刷して掲示板に貼る</li>
+                <li>「👀 ゲストとして閲覧する」をクリック</li>
+                <li>蔵書検索・書評閲覧のみ可能</li>
               </ol>
-            </div>
-            <div class="guide-warning-box" style="margin-top:10px">
-              ⚠️ <strong>パスワード変更時の注意</strong><br>
-              住民パスワードを変更した場合、QRコードも自動的に新しいパスワードのものに更新されます。掲示板の古いQRコードを取り外し、新しいQRコードを印刷して貼り直してください。
             </div>
           </div>
 
@@ -2010,7 +1980,7 @@
             <div class="guide-warning-box">⚠️ このページは管理者メニュー内にのみ表示されますが、パスワードは別途安全な場所に保管してください。</div>
             <table class="guide-table">
               <tr><th>種類</th><th>初期値</th><th>用途</th></tr>
-              <tr><td>🏠 住民パスワード</td><td>pfl2525@QQ3</td><td>住民がサイトにログインする際のパスワード（QRコードにも埋め込まれています）</td></tr>
+              <tr><td>🏠 住民パスワード</td><td>pfl2525@QQ3</td><td>住民がサイトにログインする際のパスワード</td></tr>
               <tr><td>🏛️ 管理者パスワード</td><td>kanri5533</td><td>管理者メニューへのログイン・各種操作に使用</td></tr>
             </table>
             <div class="guide-step-box">
