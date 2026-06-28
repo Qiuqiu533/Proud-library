@@ -196,27 +196,11 @@ async function checkAuth() {
         showToast("パスワードを再設定しました。新しいパスワードでログインしてください。", "success");
         document.getElementById("resetPasswordScreen").style.display = "none";
         document.getElementById("loginScreen").style.display = "flex";
-        _initLoginQr();
       } else {
         err.textContent = "❌ " + (data.error || "エラーが発生しました");
       }
     };
     return;
-  }
-
-  // QRパラメータによる自動ログイン（共通パスワード方式との後方互換）
-  const qrPw = urlParams.get("qr");
-  if (qrPw) {
-    const res = await fetch("/api/auth", {
-      method: "POST", headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({password: qrPw})
-    });
-    if (res.ok) {
-      localStorage.setItem("resident_auth", "1");
-      window.history.replaceState({}, "", window.location.pathname);
-      loginScreen.style.display = "none";
-      return;
-    }
   }
 
   // セッション復元
@@ -234,18 +218,6 @@ async function checkAuth() {
     return;
   }
   loginScreen.style.display = "flex";
-  _initLoginQr();
-}
-
-async function _initLoginQr() {
-  try {
-    const res = await fetch("/api/login-qr-url");
-    const data = await res.json();
-    const wrap = document.getElementById("loginQrCode");
-    if (!wrap || !data.url) return;
-    wrap.innerHTML = "";
-    new QRCode(wrap, {text: data.url, width: 160, height: 160, correctLevel: QRCode.CorrectLevel.M});
-  } catch(e) {}
 }
 
 function _bindEl(id, ev, fn) {
@@ -2520,7 +2492,6 @@ document.querySelectorAll(".board-tab").forEach(btn => {
     if (btn.dataset.btab === "brequest") loadReqManage();
     if (btn.dataset.btab === "loaned") loadLoanedBooks();
     if (btn.dataset.btab === "staffchat") initStaffChat();
-    if (btn.dataset.btab === "settings") loadAdminQr();
     if (btn.dataset.btab === "adminusers") loadAdminUsers();
     if (btn.dataset.btab === "collections") loadAdminCollections();
     if (btn.dataset.btab === "bookdesc") {
@@ -3060,7 +3031,6 @@ function switchBoardTab(tabKey) {
   if (tabKey === "issues") loadIssues();
   if (tabKey === "brequest") loadReqManage();
   if (tabKey === "staffchat") initStaffChat();
-  if (tabKey === "settings") loadAdminQr();
   if (tabKey === "adminusers") loadAdminUsers();
   if (tabKey === "collections") loadAdminCollections();
   if (tabKey === "bookdesc") {
@@ -4485,44 +4455,6 @@ async function loadAdminUsers() {
   });
 }
 
-async function loadAdminQr() {
-  const wrap = document.getElementById("adminQrCode");
-  if (!wrap) return;
-  try {
-    const res = await fetch("/api/login-qr-url");
-    const data = await res.json();
-    wrap.innerHTML = "";
-    new QRCode(wrap, {text: data.url, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M});
-  } catch(e) {
-    wrap.innerHTML = '<p style="font-size:0.8rem;color:#e05">QR生成に失敗しました</p>';
-  }
-}
-
-document.getElementById("adminQrPrintBtn").addEventListener("click", async () => {
-  const res = await fetch("/api/login-qr-url");
-  const data = await res.json();
-  const win = window.open("", "_blank");
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
-    <title>住民向けQRコード</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
-    <style>
-      body { font-family: sans-serif; text-align: center; padding: 40px; background: white; }
-      h2 { color: #2a4a37; margin-bottom: 8px; }
-      p { color: #555; font-size: 0.9rem; margin-bottom: 20px; }
-      #qr { display: inline-block; padding: 16px; border: 2px solid #cde; border-radius: 12px; }
-      .note { margin-top: 20px; font-size: 0.8rem; color: #888; }
-      @media print { button { display: none; } }
-    </style>
-  </head><body>
-    <h2>📚 プラウド船橋コミュニティ図書館</h2>
-    <p>QRコードをスキャンするとパスワード入力なしにログインできます</p>
-    <div id="qr"></div>
-    <p class="note">※ このQRコードはご入居者専用です。外部への共有はご遠慮ください。</p>
-    <br><button onclick="window.print()" style="padding:10px 24px;font-size:1rem;cursor:pointer">🖨️ 印刷する</button>
-    <script>new QRCode(document.getElementById("qr"), {text: "${data.url}", width: 240, height: 240, correctLevel: QRCode.CorrectLevel.M});<\/script>
-  </body></html>`);
-  win.document.close();
-});
 
 // ===== 貸出中一覧（入居者タブ） =====
 function isbn13ToCoverUrl(isbn13) {
