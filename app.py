@@ -63,7 +63,9 @@ def set_security_headers(response):
             "books.google.com "
             "books.googleusercontent.com "
             "lh3.googleusercontent.com "
-            "*.googleusercontent.com; "
+            "*.googleusercontent.com "
+            "www.librarylife.net "
+            "librarylife.net; "
         "connect-src 'self' *.ingest.us.sentry.io; "
         "frame-ancestors 'none';"
     )
