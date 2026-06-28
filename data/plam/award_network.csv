@@ -1,6 +1,7 @@
 award_a,award_b,overlap_count,titles
 AKU,HKM,0,
 AKU,HON,0,
+AKU,HOR,0,
 AKU,JRA,0,
 AKU,JSF,0,
 AKU,KIK,0,
@@ -9,6 +10,7 @@ AKU,NAO,0,
 AKU,RAN,0,
 AKU,YAM,0,
 HKM,HON,0,
+HKM,HOR,0,
 HKM,JRA,6,ミステリ・オペラ 宿命城殺人事件|葉桜の季節に君を想うということ|隻眼の少女|蟬かえる|大鞠家殺人事件
 HKM,JSF,0,
 HKM,KIK,0,
@@ -16,6 +18,7 @@ HKM,KMS,8,葉桜の季節に君を想うということ|生首に聞いてみろ
 HKM,NAO,1,黒牢城
 HKM,RAN,0,
 HKM,YAM,1,地雷グリコ
+HON,HOR,0,
 HON,JRA,0,
 HON,JSF,0,
 HON,KIK,0,
@@ -23,6 +26,13 @@ HON,KMS,1,ゴールデンスランバー
 HON,NAO,1,蜜蜂と遠雷
 HON,RAN,0,
 HON,YAM,1,ゴールデンスランバー
+HOR,JRA,0,
+HOR,JSF,0,
+HOR,KIK,0,
+HOR,KMS,0,
+HOR,NAO,0,
+HOR,RAN,0,
+HOR,YAM,1,ぼっけえ、きょうてえ
 JRA,JSF,1,アラビアの夜の種族
 JRA,KIK,0,
 JRA,KMS,7,葉桜の季節に君を想うということ|地雷グリコ|伝説なき地|新宿鮫|OUT
