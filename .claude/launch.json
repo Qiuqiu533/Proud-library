@@ -4,8 +4,10 @@
     {
       "name": "proud-library",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["app.py"],
-      "port": 5050
+      "runtimeArgs": ["/tmp/Proud-library-fresh/app.py"],
+      "port": 5050,
+      "cwd": "/tmp/Proud-library-fresh",
+      "autoPort": true
     },
     {
       "name": "proud-library-dev",
