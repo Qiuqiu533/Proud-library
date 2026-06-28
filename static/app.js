@@ -30,6 +30,19 @@ window.onerror = function(msg, src, line, col, err) {
   console.error('[JS ERROR]', msg, 'at', src, 'line', line);
 };
 
+// 書影フォールバック: 失敗したら次のURLを試し、全滅でプレースホルダーに置換
+function _coverFallback(img, nextUrl) {
+  if (nextUrl && img.src !== nextUrl) {
+    img.onerror = () => _coverFallback(img, null); // 次の失敗時はプレースホルダー
+    img.src = nextUrl;
+  } else {
+    const ph = document.createElement("div");
+    ph.className = img.className || "book-cover-placeholder";
+    ph.textContent = "📖";
+    img.replaceWith(ph);
+  }
+}
+
 // ===== Auth =====
 // residentSession: {room, password} をsessionStorageで保持
 let residentSession = null;
@@ -643,8 +656,9 @@ function renderCard(book, opts = {}) {
   const fav = isFav(book.isbn);
   const readStatus = getReadStatus(book.isbn);
   const ndlFallback = `https://ndlsearch.ndl.go.jp/thumbnail/${book.isbn}.jpg`;
+  const amzFallback = book.isbn10 ? `https://images-na.ssl-images-amazon.com/images/P/${book.isbn10}.09.LZZZZZZZ.jpg` : "";
   const img = book.cover
-    ? `<img class="book-cover" src="${book.cover}" alt="${esc(book.title)}" loading="lazy" onerror="if(this.src!=='${ndlFallback}'){this.src='${ndlFallback}';}else{this.replaceWith(Object.assign(document.createElement('div'),{className:'book-cover-placeholder',textContent:'📖'}));}">`
+    ? `<img class="book-cover" src="${book.cover}" alt="${esc(book.title)}" loading="lazy" onerror="_coverFallback(this,'${amzFallback}')">`
     : `<div class="book-cover-placeholder">📖</div>`;
 
   div.innerHTML = `
@@ -880,7 +894,7 @@ function renderRecentBooks() {
   row.innerHTML = recent.map(b => {
     const ndlFallback = `https://ndlsearch.ndl.go.jp/thumbnail/${b.isbn}.jpg`;
     const img = b.cover
-      ? `<img src="${b.cover}" alt="${esc(b.title)}" loading="lazy" onerror="if(this.src!=='${ndlFallback}'){this.src='${ndlFallback}';}else{this.replaceWith(Object.assign(document.createElement('div'),{className:'mini-card-placeholder',textContent:'📖'}));}">`
+      ? `<img src="${b.cover}" alt="${esc(b.title)}" loading="lazy" onerror="_coverFallback(this,'${ndlFallback}')">`
       : `<div class="mini-card-placeholder">📖</div>`;
     return `<div class="mini-card" data-isbn="${b.isbn}">
       <div class="mini-card-cover">${img}</div>
@@ -1078,7 +1092,7 @@ async function loadTopNew() {
       return `<div class="mini-card" data-isbn="${b.isbn}">
         <div class="mini-card-cover">
           <img src="${cover}" alt="${esc(b.title)}" loading="lazy"
-            onerror="if(this.src!=='${ndlFallback}'){this.src='${ndlFallback}';}else{this.replaceWith(Object.assign(document.createElement('div'),{className:'mini-card-placeholder',textContent:'📖'}));}">
+            onerror="_coverFallback(this,'${ndlFallback}')"">
         </div>
         <div class="mini-card-title">${esc(b.title)}</div>
         <div class="mini-card-author">${esc(b.author || "")}</div>
@@ -1730,7 +1744,7 @@ async function loadWishlistCard() {
     return `<div class="mini-card" data-isbn="${isbn}">
       <div onclick="openModal('${isbn}')" style="cursor:pointer">
         <img src="${b.cover || ndl}" alt="${esc(b.title)}" loading="lazy"
-          onerror="if(this.src!=='${ndl}')this.src='${ndl}';else this.style.display='none';">
+          onerror="_coverFallback(this,'${ndl}')";">
         <div class="mini-title">${esc(b.title)}</div>
       </div>
       <button onclick="toggleWishNotify('${isbn}', this)"
@@ -1942,7 +1956,7 @@ async function _loadRelatedBooks(isbn) {
       const items = books.map(b => {
         const ndlFallback = `https://ndlsearch.ndl.go.jp/thumbnail/${b.isbn}.jpg`;
         const imgOrPlaceholder = `<img src="${b.cover || ndlFallback}" alt="${esc(b.title)}" loading="lazy"
-          onerror="if(this.src!=='${ndlFallback}'){this.src='${ndlFallback}';}else{this.replaceWith(Object.assign(document.createElement('div'),{className:'related-thumb-placeholder',textContent:'📖'}));}">`;
+          onerror="_coverFallback(this,'${ndlFallback}')"">`;
         return `<div class="related-card" onclick="openModal('${b.isbn}')" onkeydown="if(event.key==='Enter'||event.key===' ')openModal('${b.isbn}')" role="button" tabindex="0">
           <div class="related-thumb">${imgOrPlaceholder}</div>
           <div class="related-title">${esc(b.title)}</div>
@@ -5035,7 +5049,7 @@ async function loadPopularBooks() {
       const stars = b.score ? "★".repeat(Math.round(b.score)) + "☆".repeat(5 - Math.round(b.score)) : "";
       return `<div class="mini-card" data-isbn="${b.isbn}">
         <div class="mini-card-cover"><img src="${b.cover || ndlFallback}" alt="${esc(b.title)}" loading="lazy"
-          onerror="if(this.src!=='${ndlFallback}'){this.src='${ndlFallback}';}else{this.replaceWith(Object.assign(document.createElement('div'),{className:'mini-card-placeholder',textContent:'📖'}));}"></div>
+          onerror="_coverFallback(this,'${ndlFallback}')""></div>
         <div class="mini-card-title">${esc(b.title)}</div>
         <div style="color:#f0a500;font-size:0.72rem;margin-top:2px">${stars} ${b.score.toFixed(1)}</div>
       </div>`;
@@ -5074,7 +5088,7 @@ async function loadCollections() {
         const items = books.filter(Boolean).map(b => {
           const ndlFallback = `https://ndlsearch.ndl.go.jp/thumbnail/${b.isbn}.jpg`;
           return `<div class="related-card" onclick="openModal('${b.isbn}')" role="button" tabindex="0">
-            <div class="related-thumb"><img src="${b.cover || ndlFallback}" alt="${esc(b.title)}" loading="lazy" onerror="if(this.src!=='${ndlFallback}'){this.src='${ndlFallback}';}else{this.style.display='none';}"></div>
+            <div class="related-thumb"><img src="${b.cover || ndlFallback}" alt="${esc(b.title)}" loading="lazy" onerror="_coverFallback(this,'${ndlFallback}')""></div>
             <div class="related-title">${esc(b.title)}</div>
             <div class="related-author">${esc(b.author || "")}</div>
           </div>`;
