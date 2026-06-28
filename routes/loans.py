@@ -138,11 +138,28 @@ def api_availability(isbn):
                     VALUES (%s, %s, %s, %s, NOW())
                     ON CONFLICT (isbn) DO UPDATE SET status=EXCLUDED.status, title=EXCLUDED.title, author=EXCLUDED.author, updated_at=NOW()
                 """, (isbn, result_status, title, author))
+                # 貸出状況が確定した場合は loan_history に記録
+                if result_status in ("loaned", "available"):
+                    try:
+                        execute(con, """
+                            INSERT INTO loan_history (isbn, status, title, author, recorded_at)
+                            VALUES (%s, %s, %s, %s, NOW())
+                        """, (isbn, result_status, title, author))
+                    except Exception:
+                        pass
             else:
                 execute(con, """
                     INSERT OR REPLACE INTO availability_cache (isbn, status, title, author, updated_at)
                     VALUES (?, ?, ?, ?, datetime('now','localtime'))
                 """, (isbn, result_status, title, author))
+                if result_status in ("loaned", "available"):
+                    try:
+                        execute(con, """
+                            INSERT INTO loan_history (isbn, status, title, author, recorded_at)
+                            VALUES (?, ?, ?, ?, datetime('now','localtime'))
+                        """, (isbn, result_status, title, author))
+                    except Exception:
+                        pass
             con.commit()
         except Exception:
             pass
@@ -350,22 +367,31 @@ def api_ops_stats():
             LIMIT 10
         """)
 
-        # 死蔵本（評価なし・登録から180日以上）
+        # 死蔵本（評価なし・180日以上貸出履歴なし）
         try:
             dead_stock = fetchall(con, """
-                SELECT g.isbn, g.title, g.author, g.created_at
+                SELECT g.isbn, g.title, g.author,
+                       MAX(lh.recorded_at) AS last_loaned
                 FROM genre_books g
                 LEFT JOIN ratings r ON r.isbn = g.isbn
+                LEFT JOIN loan_history lh ON lh.isbn = g.isbn AND lh.status = 'loaned'
                 WHERE (r.votes IS NULL OR r.votes = 0)
-                  AND g.created_at IS NOT NULL
-                  AND g.created_at < NOW() - INTERVAL '180 days'
-                ORDER BY g.created_at ASC
+                GROUP BY g.isbn, g.title, g.author
+                HAVING MAX(lh.recorded_at) IS NULL
+                    OR MAX(lh.recorded_at) < NOW() - INTERVAL '180 days'
+                ORDER BY MAX(lh.recorded_at) ASC NULLS FIRST
                 LIMIT 20
             """ if USE_PG else """
-                SELECT g.isbn, g.title, g.author
+                SELECT g.isbn, g.title, g.author,
+                       MAX(lh.recorded_at) AS last_loaned
                 FROM genre_books g
                 LEFT JOIN ratings r ON r.isbn = g.isbn
+                LEFT JOIN loan_history lh ON lh.isbn = g.isbn AND lh.status = 'loaned'
                 WHERE (r.votes IS NULL OR r.votes = 0)
+                GROUP BY g.isbn, g.title, g.author
+                HAVING MAX(lh.recorded_at) IS NULL
+                    OR datetime(MAX(lh.recorded_at)) < datetime('now', '-180 days')
+                ORDER BY MAX(lh.recorded_at) ASC
                 LIMIT 20
             """)
         except Exception:
@@ -386,7 +412,7 @@ def api_ops_stats():
             "fb_done":   fb_done_row["cnt"]   if fb_done_row   else 0,
             "members":   member_row["cnt"]    if member_row    else 0,
             "top_authors": [{"author": r["author"], "book_cnt": r["book_cnt"], "total_votes": r["total_votes"], "avg_score": r["avg_score"]} for r in top_authors],
-            "dead_stock": [{"isbn": r["isbn"], "title": r["title"] or r["isbn"], "author": r["author"] or "", "created_at": str(r.get("created_at") or "")[:10] if hasattr(r, "get") else ""} for r in dead_stock],
+            "dead_stock": [{"isbn": r["isbn"], "title": r["title"] or r["isbn"], "author": r["author"] or "", "last_loaned": str(r["last_loaned"] or "")[:10] if r["last_loaned"] else "貸出記録なし"} for r in dead_stock],
         })
     except Exception as e:
         con.close()

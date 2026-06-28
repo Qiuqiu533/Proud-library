@@ -68,7 +68,7 @@ def api_books_suggest():
     if len(q) < 1:
         return jsonify([])
     from database import get_con, USE_PG
-    from services.books import _hira_to_kata, _kata_to_hira
+    from services.utils import _hira_to_kata, _kata_to_hira
     con = get_con()
     try:
         ph = "%s" if USE_PG else "?"
