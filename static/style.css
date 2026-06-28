@@ -999,3 +999,28 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 /* ===== 書評文字数カウント ===== */
 .review-char-count { font-size: 0.78rem; color: #aaa; text-align: right; margin-top: 3px; }
 .review-char-over { color: #e05; font-weight: 600; }
+
+/* ===== AI検索バッジ ===== */
+.ai-search-badge {
+  display: inline-block; font-size: 0.72rem; background: #e8f5e9;
+  color: #2e7d32; border: 1px solid #a5d6a7; border-radius: 10px;
+  padding: 1px 8px; margin-left: 8px; vertical-align: middle; font-weight: 600;
+}
+
+/* ===== 読書目標カード ===== */
+.reading-goal-card {
+  background: white; border-radius: 12px; border: 1.5px solid #e0d9ce;
+  padding: 16px; margin-bottom: 20px;
+}
+.reading-goal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.reading-goal-title { font-weight: 700; font-size: 0.95rem; color: #3d6b4f; }
+.reading-goal-edit-btn { font-size: 0.78rem; padding: 4px 10px; border-radius: 8px; border: 1px solid #c8b89a; background: white; color: #6b4f2a; cursor: pointer; }
+.reading-goal-edit-btn:hover { background: #fff3e0; }
+.goal-progress-bar-wrap { background: #f0ede8; border-radius: 8px; height: 14px; overflow: hidden; margin: 8px 0 6px; }
+.goal-progress-bar { height: 100%; background: linear-gradient(90deg, #3d6b4f, #5a8a6a); border-radius: 8px; transition: width .6s ease; }
+.goal-progress-bar.complete { background: linear-gradient(90deg, #f57c00, #ffa726); }
+.goal-stats { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px; }
+.goal-stat { text-align: center; flex: 1; min-width: 70px; }
+.goal-stat-num { font-size: 1.4rem; font-weight: 700; color: #3d6b4f; }
+.goal-stat-label { font-size: 0.72rem; color: #888; }
+.goal-achievement { font-size: 1.4rem; margin-right: 4px; }
