@@ -58,7 +58,7 @@ function _coverFallback(img, nextUrl) {
     img.src = nextUrl;
   } else {
     const ph = document.createElement("div");
-    ph.className = img.className || "book-cover-placeholder";
+    ph.className = "book-cover-placeholder";
     ph.textContent = "📖";
     img.replaceWith(ph);
   }
@@ -561,7 +561,8 @@ function toggleFav(isbn) {
   setTimeout(cloudSync, 500);
 }
 function getFavIsbns() {
-  return Object.keys(localStorage).filter(k => k.startsWith("fav_") && localStorage[k] === "1").map(k => k.slice(4));
+  return Object.keys(localStorage).filter(k => k.startsWith("fav_") && localStorage[k] === "1")
+    .map(k => k.slice(4)).filter(isbn => /^\d{13}$/.test(isbn));
 }
 
 function _curRoom() {
@@ -580,7 +581,7 @@ function getLogEntries() {
   const prefix = (() => { const r = _curRoom(); return r ? `read_${r}_` : `read_`; })();
   return Object.keys(localStorage).filter(k => k.startsWith(prefix)).map(k => ({
     isbn: k.slice(prefix.length), status: localStorage[k]
-  }));
+  })).filter(e => /^\d{13}$/.test(e.isbn));
 }
 function getReadMeta(isbn) {
   try { return JSON.parse(localStorage.getItem(_metaKey(isbn)) || "{}"); } catch { return {}; }
