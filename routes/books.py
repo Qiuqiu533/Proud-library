@@ -520,7 +520,7 @@ def api_books_related(isbn):
         for b in rows:
             isbn13 = b["isbn"]
             isbn10 = isbn13_to_isbn10(isbn13) if isbn13.startswith("978") else ""
-            result.append({"isbn": isbn13, "title": b["title"], "author": b["author"], "cover": get_cover_url(isbn13, isbn10)})
+            result.append({"isbn": isbn13, "isbn10": isbn10, "title": b["title"], "author": b["author"], "cover": get_cover_url(isbn13, isbn10)})
         return result
     return jsonify({"same_author": enrich(same_author), "same_genre": enrich(same_genre)})
 
