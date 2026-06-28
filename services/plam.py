@@ -201,6 +201,108 @@ def get_book_plam_info(title: str, author: str = "") -> dict | None:
     }
 
 
+def get_related_works(work_id: str, limit: int = 6) -> list[dict]:
+    """PLAMネットワークを使って関連作品を返す。
+
+    優先順位:
+    1. 同じ賞を受賞した作品（共有賞数が多い順）
+    2. 同じクラスタの作品
+    Proud Library DB（genre_books）に存在する作品のみISBNを付与する。
+    """
+    from database import get_con
+    import sqlite3
+
+    history = _history_by_work()
+    cluster_m = _cluster_map()
+    master = _awards_master()
+    bridges = _bridge_set()
+
+    # 対象作品の賞セット・クラスタセット取得
+    my_rows = history.get(work_id, [])
+    my_awards: set[str] = {
+        r["award_id"] for r in my_rows
+        if r.get("status") in ("awarded", "co_winner")
+    }
+    my_clusters: set[str] = {cluster_m.get(a, "unknown") for a in my_awards}
+
+    if not my_awards:
+        return []
+
+    # 全work_idのスコアを計算（自作品除く）
+    scores: dict[str, dict] = {}
+    for wid, rows in history.items():
+        if wid == work_id:
+            continue
+        w_awards = {r["award_id"] for r in rows if r.get("status") in ("awarded", "co_winner")}
+        shared = my_awards & w_awards
+        if not shared:
+            continue
+        w_clusters = {cluster_m.get(a, "unknown") for a in w_awards}
+        shared_clusters = my_clusters & w_clusters
+        scores[wid] = {
+            "shared_count": len(shared),
+            "cluster_match": len(shared_clusters),
+            "is_bridge": wid in bridges,
+        }
+
+    # スコア降順でソート
+    ranked = sorted(
+        scores.items(),
+        key=lambda x: (-x[1]["shared_count"], -x[1]["cluster_match"], -x[1]["is_bridge"]),
+    )
+
+    # works.csv から作品情報を取得
+    works_idx = _works_index()
+    wid_to_work: dict[str, dict] = {r["work_id"]: r for r in _read("works.csv")}
+
+    # genre_books との照合（タイトル正規化）
+    try:
+        con = get_con()
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        cur.execute("SELECT isbn, title, author FROM genre_books")
+        db_books = {_normalize(r["title"]): dict(r) for r in cur.fetchall()}
+        con.close()
+    except Exception:
+        db_books = {}
+
+    result = []
+    for wid, sc in ranked:
+        if len(result) >= limit:
+            break
+        work = wid_to_work.get(wid)
+        if not work:
+            continue
+
+        title = work.get("canonical_title", "")
+        author = work.get("author", "")
+        nkey = _normalize(title)
+        db_match = db_books.get(nkey)
+
+        # award情報（最大weight賞のみ）
+        w_rows = [r for r in history.get(wid, []) if r.get("status") in ("awarded", "co_winner")]
+        if not w_rows:
+            continue
+        top_award_id = max(w_rows, key=lambda r: int(master.get(r["award_id"], {}).get("weight", 0) or 0))["award_id"]
+        top_info = master.get(top_award_id, {})
+        cluster = cluster_m.get(top_award_id, "unknown")
+
+        result.append({
+            "work_id":     wid,
+            "title":       title,
+            "author":      author,
+            "isbn":        db_match["isbn"] if db_match else None,
+            "in_library":  db_match is not None,
+            "top_award":   top_info.get("award_name", top_award_id),
+            "cluster":     cluster,
+            "color":       CLUSTER_COLORS.get(cluster, "#ccc"),
+            "shared_count": sc["shared_count"],
+            "is_bridge":   sc["is_bridge"],
+        })
+
+    return result
+
+
 def invalidate_cache() -> None:
     _awards_master.cache_clear()
     _cluster_map.cache_clear()

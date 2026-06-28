@@ -2014,6 +2014,7 @@ async function _loadPlamInfo(isbn, title, author) {
       ${bridgeBadge}
       <div class="plam-awards-list">${awardItems}</div>
       <div class="plam-cluster-row">${clusterDots}</div>
+      <div id="modal-plam-related-placeholder"></div>
     </div>`;
 
     // 関連本セクションの直前に挿入
@@ -2021,6 +2022,39 @@ async function _loadPlamInfo(isbn, title, author) {
     if (relatedPlaceholder) {
       relatedPlaceholder.insertAdjacentHTML("beforebegin", plamHtml);
     }
+
+    // PLAM関連作品を非同期で取得・描画
+    _loadPlamRelated(data.work_id);
+  } catch(e) {}
+}
+
+async function _loadPlamRelated(workId) {
+  const placeholder = document.getElementById("modal-plam-related-placeholder");
+  if (!placeholder) return;
+  try {
+    const res = await fetch(`/api/plam/related?work_id=${encodeURIComponent(workId)}`);
+    if (!res.ok) return;
+    const items = await res.json();
+    if (!items || items.length === 0) return;
+
+    const current = document.getElementById("modal-plam-related-placeholder");
+    if (!current) return;
+
+    const cards = items.map(w => {
+      const clickable = w.in_library && w.isbn;
+      const inner = `
+        <div class="plam-rel-dot" style="background:${w.color}"></div>
+        <div class="plam-rel-title">${esc(w.title)}</div>
+        <div class="plam-rel-award">${esc(w.top_award)}${w.is_bridge ? " 🌉" : ""}</div>`;
+      return clickable
+        ? `<div class="plam-rel-card plam-rel-card--link" onclick="openModal('${w.isbn}')" role="button" tabindex="0" aria-label="${esc(w.title)}">${inner}</div>`
+        : `<div class="plam-rel-card">${inner}</div>`;
+    }).join("");
+
+    current.outerHTML = `<div class="plam-related-section">
+      <div class="plam-related-label">📚 同じ評価軸の作品</div>
+      <div class="plam-related-grid">${cards}</div>
+    </div>`;
   } catch(e) {}
 }
 
