@@ -6499,8 +6499,8 @@ function showLegalModal(type) {
     <h3 style="font-size:0.95rem;margin:16px 0 6px">4. 著作権・書評について</h3>
     <ul style="font-size:0.9rem;line-height:1.9;padding-left:20px">
       <li>投稿できるコメント・書評は、ご自身が作成したオリジナルの文章に限ります</li>
-      <li>Amazonの商品説明・出版社の紹介文・他サイトのレビューのコピーは禁止します</li>
-      <li>書影（表紙画像）はOpen Library / Google Books APIを通じて取得・表示しています</li>
+      <li>出版社や他のサイトの書籍の紹介文・レビューなどをコピーしての投稿は禁止します</li>
+      <li>書影（表紙画像）はNDL（国立国会図書館）・Amazon・Google Books等を通じて取得・表示しています</li>
     </ul>
     <h3 style="font-size:0.95rem;margin:16px 0 6px">5. 利用停止</h3>
     <p style="font-size:0.9rem;line-height:1.7">以下の場合、アカウントを停止することがあります。</p>
@@ -6519,7 +6519,7 @@ function showLegalModal(type) {
     <h3 style="font-size:0.95rem;margin:16px 0 6px">1. 収集する情報</h3>
     <ul style="font-size:0.9rem;line-height:1.9;padding-left:20px">
       <li>部屋番号</li>
-      <li>メールアドレス（任意）</li>
+      <li>メールアドレス（必須）</li>
       <li>アプリ内での貸出・返却の記録</li>
       <li>読書ステータス・評価・コメント（任意入力）</li>
       <li>アクセス時のIPアドレス（不正利用防止・重複投票防止のため匿名化ハッシュで保存）</li>
