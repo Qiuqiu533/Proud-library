@@ -644,7 +644,7 @@ function renderCard(book, opts = {}) {
   const readStatus = getReadStatus(book.isbn);
   const ndlFallback = `https://ndlsearch.ndl.go.jp/thumbnail/${book.isbn}.jpg`;
   const img = book.cover
-    ? `<img class="book-cover" src="${book.cover}" alt="${book.title}" loading="lazy" onerror="if(this.src!=='${ndlFallback}'){this.src='${ndlFallback}';}else{this.replaceWith(Object.assign(document.createElement('div'),{className:'book-cover-placeholder',textContent:'📖'}));}">`
+    ? `<img class="book-cover" src="${book.cover}" alt="${esc(book.title)}" loading="lazy" onerror="if(this.src!=='${ndlFallback}'){this.src='${ndlFallback}';}else{this.replaceWith(Object.assign(document.createElement('div'),{className:'book-cover-placeholder',textContent:'📖'}));}">`
     : `<div class="book-cover-placeholder">📖</div>`;
 
   div.innerHTML = `
@@ -1195,7 +1195,7 @@ async function loadLog(filter = "all") {
     if (card.querySelector(".log-meta")) return;
     const metaDiv = document.createElement("div");
     metaDiv.className = "log-meta";
-    if (meta.date) metaDiv.innerHTML += `<div class="log-meta-date">📅 読んだ日：${meta.date}</div>`;
+    if (meta.date) metaDiv.innerHTML += `<div class="log-meta-date">📅 読んだ日：${esc(meta.date)}</div>`;
     if (meta.memo) metaDiv.innerHTML += `<div class="log-meta-memo">✏️ ${esc(meta.memo)}</div>`;
     card.appendChild(metaDiv);
   });
@@ -1215,12 +1215,12 @@ function newsItemHtml(item, showDelete) {
   return `
     <div class="news-card" data-id="${item.id}">
       <div class="news-meta">
-        <span class="news-cat cat-${item.category}">${item.category}</span>
+        <span class="news-cat cat-${esc(item.category)}">${esc(item.category)}</span>
         <span class="news-date">${item.created_at.slice(0, 10)}</span>
         ${showDelete ? `<button class="news-edit" data-id="${item.id}" title="編集">✏️</button><button class="news-del" data-id="${item.id}" title="削除">🗑</button>` : ""}
       </div>
       <div class="news-title">${esc(item.title)}</div>
-      ${item.event_date ? `<div class="news-event-date">📅 ${item.event_date}</div>` : ""}
+      ${item.event_date ? `<div class="news-event-date">📅 ${esc(item.event_date)}</div>` : ""}
       <div class="news-body">${esc(item.body).replace(/\n/g, "<br>")}</div>
       ${imagesHtml}
       <div class="news-edit-form" id="news-edit-form-${item.id}" style="display:none;margin-top:12px;border-top:1px solid #eee;padding-top:12px">
@@ -2539,7 +2539,7 @@ async function loadNewArrivalAdmin() {
       <div class="arrival-info">
         <div class="arrival-title">${esc(r.title || r.isbn)}</div>
         <div class="arrival-author">${esc(r.author || "")}</div>
-        <div class="arrival-date">📅 入荷日：${r.arrived_at}</div>
+        <div class="arrival-date">📅 入荷日：${esc(r.arrived_at)}</div>
       </div>
       <button class="arrival-del btn-danger-sm" data-id="${r.id}">削除</button>
     </div>`).join("");
@@ -3313,7 +3313,7 @@ function renderCalendar() {
           <button class="btn-move cal-up" data-id="${item.id}" ${idx===0?"disabled":""} title="上へ">▲</button>
           <button class="btn-move cal-down" data-id="${item.id}" ${idx===items.length-1?"disabled":""} title="下へ">▼</button>
         </div>
-        <span class="cal-date cal-view-date" data-id="${item.id}">📅 ${item.event_date}</span>
+        <span class="cal-date cal-view-date" data-id="${item.id}">📅 ${esc(item.event_date)}</span>
         <span class="cal-title-text cal-view-title" data-id="${item.id}">${esc(item.title)}</span>
         <button class="btn-edit cal-edit-btn" data-id="${item.id}" title="編集">✏️</button>
         <button class="news-del cal-del" data-id="${item.id}" title="削除">🗑</button>
@@ -3445,7 +3445,7 @@ function renderLibSchedule() {
     <div class="cal-card" id="ls-card-${item.id}">
       <div class="cal-header">
         ${badge}
-        <span class="ls-view-date">${item.event_date}</span>
+        <span class="ls-view-date">${esc(item.event_date)}</span>
         <span class="cal-title-text ls-view-title">${esc(item.title)}</span>
         <button class="btn-edit ls-edit-btn" data-id="${item.id}" title="編集">✏️</button>
         <button class="news-del ls-del" data-id="${item.id}" title="削除">🗑</button>
@@ -6405,14 +6405,20 @@ function showLegalModal(type) {
       <li>アカウントの第三者への譲渡・共有</li>
       <li>本アプリの運営を妨害する行為</li>
     </ul>
-    <h3 style="font-size:0.95rem;margin:16px 0 6px">4. 利用停止</h3>
+    <h3 style="font-size:0.95rem;margin:16px 0 6px">4. 著作権・書評について</h3>
+    <ul style="font-size:0.9rem;line-height:1.9;padding-left:20px">
+      <li>投稿できるコメント・書評は、ご自身が作成したオリジナルの文章に限ります</li>
+      <li>Amazonの商品説明・出版社の紹介文・他サイトのレビューのコピーは禁止します</li>
+      <li>書影（表紙画像）はOpen Library / Google Books APIを通じて取得・表示しています</li>
+    </ul>
+    <h3 style="font-size:0.95rem;margin:16px 0 6px">5. 利用停止</h3>
     <p style="font-size:0.9rem;line-height:1.7">以下の場合、アカウントを停止することがあります。</p>
     <ul style="font-size:0.9rem;line-height:1.9;padding-left:20px">
       <li>本規約に違反した場合</li>
       <li>登録情報に虚偽があった場合</li>
       <li>転居等により居住者でなくなった場合</li>
     </ul>
-    <h3 style="font-size:0.95rem;margin:16px 0 6px">5. 免責</h3>
+    <h3 style="font-size:0.95rem;margin:16px 0 6px">6. 免責</h3>
     <p style="font-size:0.9rem;line-height:1.7">本アプリはボランティアにより運営されています。システム障害・メンテナンス等によるサービス停止について、運営側は責任を負いません。</p>
     <p style="font-size:0.8rem;color:#888;margin-top:16px">なお、本を借りる際のルール（貸出期間・紛失対応等）は図書館内掲示のルールに従ってください。</p>
   `;
@@ -6425,6 +6431,8 @@ function showLegalModal(type) {
       <li>メールアドレス（任意）</li>
       <li>アプリ内での貸出・返却の記録</li>
       <li>読書ステータス・評価・コメント（任意入力）</li>
+      <li>アクセス時のIPアドレス（不正利用防止・重複投票防止のため匿名化ハッシュで保存）</li>
+      <li>ブラウザのlocalStorageにお気に入り・読書履歴等を端末内で保存します（サーバーには送信しません）</li>
     </ul>
     <h3 style="font-size:0.95rem;margin:16px 0 6px">2. 利用目的</h3>
     <ul style="font-size:0.9rem;line-height:1.9;padding-left:20px">
