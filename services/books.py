@@ -59,8 +59,7 @@ def _inertia_headers(partial_data=None, partial_component=None):
 
 
 def get_cover_url(isbn13, isbn10=""):
-    if isbn10:
-        return f"https://images-na.ssl-images-amazon.com/images/P/{isbn10}.09.LZZZZZZZ.jpg"
+    # NDLを第1候補（安定・ホットリンク制限なし）。Amazon URLはフロントのonerrorで補完。
     return NDL_THUMB.format(isbn=isbn13)
 
 

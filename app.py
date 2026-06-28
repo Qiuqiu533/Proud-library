@@ -58,8 +58,12 @@ def set_security_headers(response):
         "img-src 'self' data: "
             "ndlsearch.ndl.go.jp "
             "images-na.ssl-images-amazon.com "
+            "m.media-amazon.com "
             "covers.openlibrary.org "
-            "books.google.com; "
+            "books.google.com "
+            "books.googleusercontent.com "
+            "lh3.googleusercontent.com "
+            "*.googleusercontent.com; "
         "connect-src 'self' *.ingest.us.sentry.io; "
         "frame-ancestors 'none';"
     )
