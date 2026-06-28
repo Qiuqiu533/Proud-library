@@ -29,6 +29,27 @@
 window.onerror = function(msg, src, line, col, err) {
   console.error('[JS ERROR]', msg, 'at', src, 'line', line);
 };
+// トースト通知（alertの代替）
+function showToast(msg, type = "info") {
+  let container = document.getElementById("toastContainer");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "toastContainer";
+    container.style.cssText = "position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:99999;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none";
+    document.body.appendChild(container);
+  }
+  const toast = document.createElement("div");
+  const colors = { error: "#c0392b", success: "#2e7d32", info: "#1565c0", warn: "#e65100" };
+  toast.style.cssText = `background:${colors[type]||colors.info};color:#fff;padding:11px 22px;border-radius:24px;font-size:0.88rem;box-shadow:0 4px 16px rgba(0,0,0,0.25);opacity:0;transition:opacity 0.25s;pointer-events:none;max-width:320px;text-align:center`;
+  toast.textContent = msg;
+  container.appendChild(toast);
+  requestAnimationFrame(() => { toast.style.opacity = "1"; });
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    setTimeout(() => toast.remove(), 300);
+  }, type === "error" ? 4000 : 2500);
+}
+
 
 // 書影フォールバック: 失敗したら次のURLを試し、全滅でプレースホルダーに置換
 function _coverFallback(img, nextUrl) {
@@ -122,7 +143,7 @@ async function _offerMigrateReadingLog() {
     body: JSON.stringify({room: residentSession.room, password: residentSession.password, favorites: favs, reading_log})
   });
   localStorage.setItem("reading_log_migrated_" + residentSession.room, "1");
-  alert("読書記録をアカウントに保存しました。");
+  showToast("読書記録をアカウントに保存しました。", "success");
 }
 
 async function checkAuth() {
@@ -147,7 +168,7 @@ async function checkAuth() {
       });
       const data = await res.json();
       if (res.ok) {
-        alert("パスワードを再設定しました。新しいパスワードでログインしてください。");
+        showToast("パスワードを再設定しました。新しいパスワードでログインしてください。", "success");
         document.getElementById("resetPasswordScreen").style.display = "none";
         document.getElementById("loginScreen").style.display = "flex";
         _initLoginQr();
@@ -356,7 +377,7 @@ document.getElementById("forgotResetBtn").addEventListener("click", async () => 
   });
   const data = await res.json();
   if (res.ok) {
-    alert("パスワードを再設定しました。新しいパスワードでログインしてください。");
+    showToast("パスワードを再設定しました。新しいパスワードでログインしてください。", "success");
     _forgotResetToken = null;
     document.getElementById("forgotStep1").style.display = "";
     document.getElementById("forgotStep2").style.display = "none";
@@ -1338,7 +1359,7 @@ async function loadAdminNews() {
         method: "DELETE", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: pass })
       });
-      if (r.ok) loadAdminNews(); else alert("パスワードが違います");
+      if (r.ok) loadAdminNews(); else showToast("パスワードが違います", "error");
     });
   });
   list.querySelectorAll(".news-edit").forEach(btn => {
@@ -1381,7 +1402,7 @@ async function loadAdminNews() {
     btn.addEventListener("click", async () => {
       const id = btn.dataset.id;
       const pass = boardPassword;
-      if (!pass) { alert("管理者としてログインしてください"); return; }
+      if (!pass) { showToast("管理者としてログインしてください", "warn"); return; }
       const title = list.querySelector(`.news-edit-title[data-id="${id}"]`).value.trim();
       const body = list.querySelector(`.news-edit-body[data-id="${id}"]`).value.trim();
       const category = list.querySelector(`.news-edit-cat[data-id="${id}"]`).value;
@@ -1808,7 +1829,7 @@ function _bindModalEvents(isbn) {
       if (data) {
         _updateReviewsSection(isbn, data);
       } else {
-        alert("削除できませんでした");
+        showToast("削除できませんでした", "error");
         btn.disabled = false;
       }
     });
@@ -1840,7 +1861,7 @@ function _updateReviewsSection(isbn, rating) {
         btn.disabled = true;
         const data = await deleteReview(btn.dataset.isbn, btn.dataset.rid);
         if (data) _updateReviewsSection(isbn, data);
-        else { alert("削除できませんでした"); btn.disabled = false; }
+        else { showToast("削除できませんでした", "error"); btn.disabled = false; }
       });
     });
   }
@@ -3240,7 +3261,7 @@ async function loadOpsStats() {
         <p style="font-size:0.75rem;color:#888;margin-bottom:8px">評価なし・貸出履歴なし・180日以上経過。廃棄・寄付の検討候補です。</p>
         ${(d.dead_stock || []).length ? d.dead_stock.map(b =>
           `<div style="font-size:0.82rem;margin-bottom:5px;display:flex;gap:6px">
-            <span style="color:#aaa;white-space:nowrap">${b.created_at || ""}</span>
+            <span style="color:#aaa;white-space:nowrap;font-size:0.75rem">${b.last_loaned || "記録なし"}</span>
             <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(b.title)}">${esc(b.title)}</span>
             ${b.author ? `<span style="color:#888;white-space:nowrap">${esc(b.author)}</span>` : ""}
           </div>`).join("")
@@ -3485,19 +3506,19 @@ function renderCalendar() {
       const event_date = form.querySelector(".ce-date").value;
       const body = form.querySelector(".ce-body").value.trim();
       const minutes = form.querySelector(".ce-minutes").value.trim();
-      if (!title) { alert("タイトルを入力してください"); return; }
+      if (!title) { showToast("タイトルを入力してください", "warn"); return; }
       btn.textContent = "保存中…"; btn.disabled = true;
       try {
         const res = await fetch(`/api/calendar/${id}`, {
           method: "PATCH", headers: {"Content-Type":"application/json"},
           body: JSON.stringify({password: boardPassword, title, event_date, body, minutes})
         });
-        if (!res.ok) { alert("保存に失敗しました（認証エラー）"); btn.textContent = "保存"; btn.disabled = false; return; }
+        if (!res.ok) { showToast("保存に失敗しました（認証エラー）", "error"); btn.textContent = "保存"; btn.disabled = false; return; }
         const item = allCalItems.find(i => String(i.id) === String(id));
         if (item) { item.title = title; item.event_date = event_date; item.body = body; item.minutes = minutes; }
         renderCalendar();
       } catch(e) {
-        alert("通信エラーが発生しました");
+        showToast("通信エラーが発生しました", "error");
         btn.textContent = "保存"; btn.disabled = false;
       }
     });
@@ -3578,13 +3599,13 @@ function renderLibSchedule() {
       const title = form.querySelector(".lse-title").value.trim();
       const event_date = form.querySelector(".lse-date").value;
       const type = form.querySelector(".lse-type").value;
-      if (!title || !event_date) { alert("タイトルと日付を入力してください"); return; }
+      if (!title || !event_date) { showToast("タイトルと日付を入力してください", "warn"); return; }
       btn.textContent = "保存中…"; btn.disabled = true;
       const res = await fetch(`/api/lib-schedule/${id}`, {
         method: "PATCH", headers: {"Content-Type":"application/json"},
         body: JSON.stringify({password: boardPassword, title, event_date, type})
       });
-      if (!res.ok) { alert("保存に失敗しました"); btn.textContent = "保存"; btn.disabled = false; return; }
+      if (!res.ok) { showToast("保存に失敗しました", "error"); btn.textContent = "保存"; btn.disabled = false; return; }
       const item = allLsItems.find(i => String(i.id) === String(id));
       if (item) { item.title = title; item.event_date = event_date; item.type = type; }
       renderLibSchedule();
@@ -4354,7 +4375,7 @@ async function loadAdminUsers() {
       });
       const d = await r.json();
       if (r.ok) loadAdminUsers();
-      else alert("❌ " + (d.error || "削除に失敗しました"));
+      else showToast("❌ " + (d.error || "削除に失敗しました"), "error");
     });
   });
 
@@ -4376,7 +4397,7 @@ async function loadAdminUsers() {
         body: JSON.stringify({req_code: myCode, req_password: curPass, new_password: newPw})
       });
       const d = await r.json();
-      alert(r.ok ? "✅ パスワードを変更しました" : "❌ " + (d.error || "失敗しました"));
+      showToast(r.ok ? "✅ パスワードを変更しました" : "❌ " + (d.error || "失敗しました"), r.ok ? "success" : "error");
     });
   });
 
@@ -4830,7 +4851,7 @@ function initThreadUI() {
   if (submitBtn) submitBtn.onclick = async () => {
     const title = (document.getElementById("chatNewThreadTitle").value || "").trim();
     const msg = (document.getElementById("chatNewThreadMsg").value || "").trim();
-    if (!title) { alert("タイトルを入力してください"); return; }
+    if (!title) { showToast("タイトルを入力してください", "warn"); return; }
     const sender = boardSenderName || "匿名";
     const res = await fetch("/api/chat_threads", {
       method: "POST", headers: {"Content-Type":"application/json"},
@@ -4843,7 +4864,7 @@ function initThreadUI() {
       newForm.style.display = "none";
       openThread(data.thread_id, title);
     } else {
-      alert(data.error || "作成に失敗しました");
+      showToast(data.error || "作成に失敗しました", "error");
     }
   };
 
@@ -5886,7 +5907,7 @@ function _renderEventCard(ev, user) {
 
 async function enterEvent(eventId) {
   const user = residentSession || getCloudUser() || {};
-  if (!user.room) { alert("ログインしてください"); return; }
+  if (!user.room) { showToast("ログインしてください", "warn"); return; }
   const note = document.getElementById(`evNote-${eventId}`)?.value?.trim() || "";
   const msg = document.getElementById(`evMsg-${eventId}`);
   if (msg) msg.textContent = "送信中…";
@@ -5908,7 +5929,7 @@ async function enterEvent(eventId) {
 
 async function cancelEvent(eventId) {
   const user = residentSession || getCloudUser() || {};
-  if (!user.room) { alert("ログインしてください"); return; }
+  if (!user.room) { showToast("ログインしてください", "warn"); return; }
   if (!confirm("申込をキャンセルしますか？")) return;
   const msg = document.getElementById(`evMsg-${eventId}`);
   try {
@@ -5977,7 +5998,7 @@ async function loadAdminEvents() {
 
 async function createEvent() {
   const msg = document.getElementById("evCreateMsg");
-  if (!msg) { alert("フォームが見つかりません。ページを再読み込みしてください。"); return; }
+  if (!msg) { showToast("フォームが見つかりません。ページを再読み込みしてください。", "error"); return; }
   const title = document.getElementById("evTitle")?.value?.trim();
   if (!title) { msg.textContent = "❌ タイトルを入力してください"; return; }
   msg.style.color = "#555";
@@ -6257,7 +6278,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!u) return;
     const select = document.getElementById("timelineIsbnSelect");
     const isbn = select?.value;
-    if (!isbn) { alert("本を選んでください"); return; }
+    if (!isbn) { showToast("本を選んでください", "warn"); return; }
     const status = select.options[select.selectedIndex]?.dataset.status || "";
     const comment = document.getElementById("timelineComment")?.value || "";
     const nickname = document.getElementById("timelineNickname")?.value || "";
@@ -6479,7 +6500,7 @@ async function deleteMyAccount() {
   });
   const data = await res.json();
   if (res.ok) {
-    alert("アカウントを削除しました。");
+    showToast("アカウントを削除しました。", "info");
     document.getElementById("logoutBtn").click();
   } else { msg.style.color="#e05"; msg.textContent=data.error||"エラー"; }
 }
@@ -6698,7 +6719,7 @@ function openGoalEdit() {
   const val = prompt(`${year}年の読書目標（冊数）を入力してください`, current);
   if (val === null) return;
   const n = parseInt(val);
-  if (isNaN(n) || n < 0) { alert("正しい冊数を入力してください"); return; }
+  if (isNaN(n) || n < 0) { showToast("正しい冊数を入力してください", "warn"); return; }
   setReadingGoal(year, n);
   renderReadingGoal();
 }

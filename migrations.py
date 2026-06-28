@@ -1635,6 +1635,47 @@ def _migrate_collections_sort_order():
         con.close()
 
 
+def _migrate_loan_history():
+    """貸出履歴テーブル（loan_history）を追加する。"""
+    if _migration_done("loan_history_v1"):
+        return
+    con = get_con()
+    try:
+        if USE_PG:
+            cur = con.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS loan_history (
+                    id SERIAL PRIMARY KEY,
+                    isbn TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    title TEXT DEFAULT '',
+                    author TEXT DEFAULT '',
+                    recorded_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_loan_history_isbn ON loan_history(isbn)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_loan_history_recorded ON loan_history(recorded_at)")
+        else:
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS loan_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    isbn TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    title TEXT DEFAULT '',
+                    author TEXT DEFAULT '',
+                    recorded_at TEXT DEFAULT (datetime('now','localtime'))
+                )
+            """)
+            con.execute("CREATE INDEX IF NOT EXISTS idx_loan_history_isbn ON loan_history(isbn)")
+        con.commit()
+        _mark_migration_done("loan_history_v1")
+        logger.info("[migration] loan_history テーブル追加完了")
+    except Exception as e:
+        logger.error("[migration] loan_history error: %s", e)
+    finally:
+        con.close()
+
+
 def _run_all_migrations():
     """全マイグレーションをシングルスレッドで順次実行する（race condition防止）。"""
     steps = [
@@ -1669,6 +1710,7 @@ def _run_all_migrations():
         _migrate_helpful_count,            # helpful_count カラム追加
         _migrate_helpful_votes,            # helpful_votes テーブル追加
         _migrate_ai_review_columns,        # ai_summary/ai_tags カラム追加
+        _migrate_loan_history,             # 貸出履歴テーブル追加
         _verify_tables,
     ]
     for step in steps:
