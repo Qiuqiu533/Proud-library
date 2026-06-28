@@ -1024,3 +1024,7 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .goal-stat-num { font-size: 1.4rem; font-weight: 700; color: #3d6b4f; }
 .goal-stat-label { font-size: 0.72rem; color: #888; }
 .goal-achievement { font-size: 1.4rem; margin-right: 4px; }
+
+.suggest-item:hover, .suggest-item.suggest-active {
+  background: #f0f7f2;
+}

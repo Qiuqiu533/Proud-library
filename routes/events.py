@@ -394,3 +394,61 @@ def api_admin_remove_entry(event_id, entry_id):
     except Exception as e:
         con.close()
         return jsonify({"error": str(e)}), 500
+
+
+@events_bp.route("/api/events/<int:event_id>/ics")
+def api_event_ics(event_id):
+    """iCalendar形式でイベントをダウンロード"""
+    con = get_con()
+    try:
+        ph = "%s" if USE_PG else "?"
+        ev = fetchone(con, f"SELECT * FROM events WHERE id={ph}", (event_id,))
+        con.close()
+    except Exception as e:
+        con.close()
+        return jsonify({"error": str(e)}), 500
+    if not ev:
+        return jsonify({"error": "not found"}), 404
+
+    title = ev["title"] or "イベント"
+    description = (ev.get("description") or "").replace("\n", "\\n")
+    location = ev.get("location") or ""
+    event_date = ev.get("event_date") or ""
+    event_time = ev.get("event_time") or "00:00"
+
+    # DTSTART/DTEND を組み立て（終了は2時間後）
+    try:
+        from datetime import datetime, timedelta
+        dt_str = f"{event_date} {event_time}"
+        dt_start = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
+        dt_end = dt_start + timedelta(hours=2)
+        fmt = "%Y%m%dT%H%M%S"
+        dtstart = dt_start.strftime(fmt)
+        dtend = dt_end.strftime(fmt)
+    except Exception:
+        dtstart = dtend = ""
+
+    uid = f"event-{event_id}@proud-library"
+    ics_content = (
+        "BEGIN:VCALENDAR\r\n"
+        "VERSION:2.0\r\n"
+        "PRODID:-//Proud Library//JP\r\n"
+        "CALSCALE:GREGORIAN\r\n"
+        "METHOD:PUBLISH\r\n"
+        "BEGIN:VEVENT\r\n"
+        f"UID:{uid}\r\n"
+        f"SUMMARY:{title}\r\n"
+        f"DESCRIPTION:{description}\r\n"
+        f"LOCATION:{location}\r\n"
+        f"DTSTART:{dtstart}\r\n"
+        f"DTEND:{dtend}\r\n"
+        "END:VEVENT\r\n"
+        "END:VCALENDAR\r\n"
+    )
+
+    from flask import Response
+    return Response(
+        ics_content,
+        mimetype="text/calendar",
+        headers={"Content-Disposition": f'attachment; filename="event_{event_id}.ics"'}
+    )

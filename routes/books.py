@@ -61,6 +61,40 @@ from services.books import (
 books_bp = Blueprint("books", __name__)
 
 
+@books_bp.route("/api/books/suggest")
+def api_books_suggest():
+    """タイトル・著者のオートコンプリート候補（最大10件）"""
+    q = request.args.get("q", "").strip()
+    if len(q) < 1:
+        return jsonify([])
+    from database import get_con, USE_PG
+    from services.books import _hira_to_kata, _kata_to_hira
+    con = get_con()
+    try:
+        ph = "%s" if USE_PG else "?"
+        like = f"%{q}%"
+        like_kata = f"%{_hira_to_kata(q)}%"
+        like_hira = f"%{_kata_to_hira(q)}%"
+        rows = fetchall(con, f"""
+            SELECT isbn, title, author FROM genre_books
+            WHERE title LIKE {ph} OR title LIKE {ph} OR title LIKE {ph}
+               OR author LIKE {ph} OR author LIKE {ph} OR author LIKE {ph}
+            LIMIT 10
+        """, (like, like_kata, like_hira, like, like_kata, like_hira))
+        con.close()
+        seen = set()
+        result = []
+        for r in rows:
+            key = (r["title"], r["author"])
+            if key not in seen:
+                seen.add(key)
+                result.append({"isbn": r["isbn"], "title": r["title"] or "", "author": r["author"] or ""})
+        return jsonify(result)
+    except Exception as e:
+        con.close()
+        return jsonify([])
+
+
 @books_bp.route("/api/books")
 def api_books():
     keyword = request.args.get("keyword", "")
