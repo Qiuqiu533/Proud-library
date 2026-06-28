@@ -1,0 +1,35 @@
+work_id,title,author,awards,clusters,award_count,cluster_count,bridge_type
+PLAM-000382,黒牢城,米澤穂信,HKM KMS NAO,literary mystery,3,2,cross_cluster
+PLAM-000399,ゴールデンスランバー,伊坂幸太郎,HON KMS YAM,literary mystery,3,2,cross_cluster
+PLAM-000602,ぼっけえ、きょうてえ,岩井志麻子,HOR YAM,horror mystery,2,2,cross_cluster
+PLAM-000216,カディスの赤い星,逢坂剛,JRA NAO,literary mystery,2,2,cross_cluster
+PLAM-000533,アラビアの夜の種族,古川日出男,JRA JSF,mystery sf,2,2,cross_cluster
+PLAM-000623,ゲームの王国,小川哲,JSF YAM,mystery sf,2,2,cross_cluster
+PLAM-000227,私が殺した少女,原尞,KMS NAO,literary mystery,2,2,cross_cluster
+PLAM-000237,マークスの山,高村薫,KMS NAO,literary mystery,2,2,cross_cluster
+PLAM-000276,テロリストのパラソル,藤原伊織,NAO RAN,literary mystery,2,2,cross_cluster
+PLAM-000299,邂逅の森,熊谷達也,NAO YAM,literary mystery,2,2,cross_cluster
+PLAM-000379,テスカトリポカ,佐藤究,NAO YAM,literary mystery,2,2,cross_cluster
+PLAM-000387,木挽町のあだ討ち,永井紗耶子,NAO YAM,literary mystery,2,2,cross_cluster
+PLAM-000564,地雷グリコ,青崎有吾,HKM JRA KMS YAM,mystery,4,1,intra_cluster
+PLAM-000537,葉桜の季節に君を想うということ,歌野晶午,HKM JRA KMS,mystery,3,1,intra_cluster
+PLAM-000532,ミステリ・オペラ 宿命城殺人事件,山田正紀,HKM JRA,mystery,2,1,intra_cluster
+PLAM-000571,生首に聞いてみろ,法月綸太郎,HKM KMS,mystery,2,1,intra_cluster
+PLAM-000572,容疑者Xの献身,東野圭吾,HKM KMS,mystery,2,1,intra_cluster
+PLAM-000547,隻眼の少女,麻耶雄嵩,HKM JRA,mystery,2,1,intra_cluster
+PLAM-000584,涙香迷宮,竹本健治,HKM KMS,mystery,2,1,intra_cluster
+PLAM-000585,屍人荘の殺人,今村昌弘,HKM KMS,mystery,2,1,intra_cluster
+PLAM-000587,medium 霊媒探偵城塚翡翠,相沢沙呼,HKM KMS,mystery,2,1,intra_cluster
+PLAM-000560,蟬かえる,櫻田智也,HKM JRA,mystery,2,1,intra_cluster
+PLAM-000561,大鞠家殺人事件,芦辺拓,HKM JRA,mystery,2,1,intra_cluster
+PLAM-000370,蜜蜂と遠雷,恩田陸,HON NAO,literary,2,1,intra_cluster
+PLAM-000512,伝説なき地,船戸与一,JRA KMS,mystery,2,1,intra_cluster
+PLAM-000513,エトロフ発緊急電,佐々木譲,JRA YAM,mystery,2,1,intra_cluster
+PLAM-000514,新宿鮫,大沢在昌,JRA KMS,mystery,2,1,intra_cluster
+PLAM-000523,奪取,真保裕一,JRA YAM,mystery,2,1,intra_cluster
+PLAM-000524,OUT,桐野夏生,JRA KMS,mystery,2,1,intra_cluster
+PLAM-000528,永遠の仔,天童荒太,JRA KMS,mystery,2,1,intra_cluster
+PLAM-000542,果断 隠蔽捜査2,今野敏,JRA YAM,mystery,2,1,intra_cluster
+PLAM-000549,ジェノサイド,高野和明,JRA KMS,mystery,2,1,intra_cluster
+PLAM-000594,砂のクロニクル,船戸与一,KMS YAM,mystery,2,1,intra_cluster
+PLAM-000619,満願,米澤穂信,KMS YAM,mystery,2,1,intra_cluster
