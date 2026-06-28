@@ -52,16 +52,41 @@ function showToast(msg, type = "info") {
 
 
 // 書影フォールバック: 失敗したら次のURLを試し、全滅でプレースホルダーに置換
-function _coverFallback(img, nextUrl) {
-  if (nextUrl && img.src !== nextUrl) {
-    img.onerror = () => _coverFallback(img, null); // 次の失敗時はプレースホルダー
-    img.src = nextUrl;
+// 書影フォールバック — nextUrls は文字列 or 配列。配列の場合は順番に試みる
+function _coverFallback(img, nextUrls) {
+  const queue = Array.isArray(nextUrls) ? nextUrls : (nextUrls ? [nextUrls] : []);
+  const next = queue[0];
+  const rest = queue.slice(1);
+  if (next && img.src !== next) {
+    img.onerror = () => _coverFallback(img, rest);
+    img.onload = function() { if (this.naturalWidth <= 1) _coverFallback(img, rest); };
+    img.src = next;
   } else {
     const ph = document.createElement("div");
     ph.className = "book-cover-placeholder";
     ph.textContent = "📖";
     img.replaceWith(ph);
   }
+}
+
+// 書影URLの優先順リストを生成（primary → NDL → Amazon → Google Books）
+function _coverFallbackUrls(isbn13, isbn10, primaryUrl) {
+  const urls = [];
+  if (primaryUrl) urls.push(primaryUrl);
+  const ndl = `https://ndlsearch.ndl.go.jp/thumbnail/${isbn13}.jpg`;
+  if (!urls.includes(ndl)) urls.push(ndl);
+  if (isbn10) urls.push(`https://images-na.ssl-images-amazon.com/images/P/${isbn10}.09.LZZZZZZZ.jpg`);
+  urls.push(`https://books.google.com/books/content?vid=ISBN${isbn13}&printsec=frontcover&img=1&zoom=1`);
+  return urls;
+}
+
+// 書影HTMLを一元生成 — この関数を使うことで全箇所のフォールバック連鎖を統一
+function _bookCoverHtml(isbn13, isbn10, coverUrl, altText, cssClass) {
+  cssClass = cssClass || "book-cover";
+  const [first, ...rest] = _coverFallbackUrls(isbn13, isbn10, coverUrl);
+  if (!first) return `<div class="book-cover-placeholder" aria-hidden="true">📖</div>`;
+  const fb = rest.length ? JSON.stringify(rest).replace(/"/g, "&quot;") : "[]";
+  return `<img class="${cssClass}" src="${first}" alt="${altText}" loading="lazy" onerror="_coverFallback(this,${fb})">`;
 }
 
 // ===== Auth =====
@@ -679,11 +704,7 @@ function renderCard(book, opts = {}) {
   const rating = book.rating || getRating(book.isbn);
   const fav = isFav(book.isbn);
   const readStatus = getReadStatus(book.isbn);
-  const ndlFallback = `https://ndlsearch.ndl.go.jp/thumbnail/${book.isbn}.jpg`;
-  const amzFallback = book.isbn10 ? `https://images-na.ssl-images-amazon.com/images/P/${book.isbn10}.09.LZZZZZZZ.jpg` : "";
-  const img = book.cover
-    ? `<img class="book-cover" src="${book.cover}" alt="${esc(book.title)}" loading="lazy" onerror="_coverFallback(this,'${amzFallback}')">`
-    : `<div class="book-cover-placeholder" aria-hidden="true">📖</div>`;
+  const img = _bookCoverHtml(book.isbn, book.isbn10 || "", book.cover || "", esc(book.title), "book-cover");
 
   div.innerHTML = `
     <div class="card-cover-wrap">
@@ -916,10 +937,7 @@ function renderRecentBooks() {
     return;
   }
   row.innerHTML = recent.map(b => {
-    const ndlFallback = `https://ndlsearch.ndl.go.jp/thumbnail/${b.isbn}.jpg`;
-    const img = b.cover
-      ? `<img src="${b.cover}" alt="${esc(b.title)}" loading="lazy" onerror="_coverFallback(this,'${ndlFallback}')">`
-      : `<div class="mini-card-placeholder">📖</div>`;
+    const img = _bookCoverHtml(b.isbn, b.isbn10 || "", b.cover || "", esc(b.title));
     return `<div class="mini-card" data-isbn="${b.isbn}">
       <div class="mini-card-cover">${img}</div>
       <div class="mini-card-title">${esc(b.title)}</div>
@@ -1111,13 +1129,8 @@ async function loadTopNew() {
     const books = (data.books || data);
     if (!books.length) return;
     row.innerHTML = books.map(b => {
-      const cover = b.cover || get_cover_url_js(b.isbn);
-      const ndlFallback = `https://ndlsearch.ndl.go.jp/thumbnail/${b.isbn}.jpg`;
       return `<div class="mini-card" data-isbn="${b.isbn}">
-        <div class="mini-card-cover">
-          <img src="${cover}" alt="${esc(b.title)}" loading="lazy"
-            onerror="_coverFallback(this,'${ndlFallback}')">
-        </div>
+        <div class="mini-card-cover">${_bookCoverHtml(b.isbn, b.isbn10 || "", b.cover || "", esc(b.title))}</div>
         <div class="mini-card-title">${esc(b.title)}</div>
         <div class="mini-card-author">${esc(b.author || "")}</div>
       </div>`;
@@ -1609,7 +1622,7 @@ function _renderModalContent(isbn, book, rating) {
   return `
     <div class="modal-top">
       <div class="modal-cover-wrap">
-        <div class="modal-cover">${book.cover ? `<img src="${book.cover}" alt="${esc(book.title)}" onerror="this.parentElement.innerHTML='<div class=\\'modal-cover-placeholder\\'>📖</div>'">` : '<div class="modal-cover-placeholder">📖</div>'}</div>
+        <div class="modal-cover">${_bookCoverHtml(book.isbn, book.isbn10 || "", book.cover || "", esc(book.title), "modal-cover-img")}</div>
         <div class="modal-cover-awards">${awardsHtml}</div>
       </div>
       <div class="modal-header">
@@ -1763,12 +1776,10 @@ async function loadWishlistCard() {
   const notifyMap = Object.fromEntries(list.map(w => [w.isbn, w.notify !== false]));
   grid.innerHTML = isbns.map(isbn => {
     const b = bookMap[isbn] || { isbn, title: isbn };
-    const ndl = `https://ndlsearch.ndl.go.jp/thumbnail/${isbn}.jpg`;
     const notifyOn = notifyMap[isbn];
     return `<div class="mini-card" data-isbn="${isbn}">
       <div onclick="openModal('${isbn}')" style="cursor:pointer">
-        <img src="${b.cover || ndl}" alt="${esc(b.title)}" loading="lazy"
-          onerror="_coverFallback(this,'${ndl}')";">
+        ${_bookCoverHtml(isbn, b.isbn10 || "", b.cover || "", esc(b.title))}
         <div class="mini-title">${esc(b.title)}</div>
       </div>
       <button onclick="toggleWishNotify('${isbn}', this)"
@@ -1978,12 +1989,8 @@ async function _loadRelatedBooks(isbn) {
     const renderCarousel = (books, label) => {
       if (!books || books.length === 0) return "";
       const items = books.map(b => {
-        const ndlUrl = `https://ndlsearch.ndl.go.jp/thumbnail/${b.isbn}.jpg`;
-        const amzFb = b.isbn10 ? `https://images-na.ssl-images-amazon.com/images/P/${b.isbn10}.09.LZZZZZZZ.jpg` : "";
-        const imgOrPlaceholder = `<img src="${b.cover || ndlUrl}" alt="${esc(b.title)}" loading="lazy"
-          onerror="_coverFallback(this,'${amzFb}')">`;
         return `<div class="related-card" onclick="openModal('${b.isbn}')" onkeydown="if(event.key==='Enter'||event.key===' ')openModal('${b.isbn}')" role="button" tabindex="0" aria-label="${esc(b.title)}">
-          <div class="related-thumb">${imgOrPlaceholder}</div>
+          <div class="related-thumb">${_bookCoverHtml(b.isbn, b.isbn10 || "", b.cover || "", esc(b.title), "related-img")}</div>
           <div class="related-title">${esc(b.title)}</div>
           <div class="related-author">${esc(b.author || "")}</div>
         </div>`;
@@ -5100,12 +5107,9 @@ async function loadPopularBooks() {
     sec.style.display = "block";
     applySectionState("popular");
     row.innerHTML = books.map(b => {
-      const ndlUrl = `https://ndlsearch.ndl.go.jp/thumbnail/${b.isbn}.jpg`;
-      const amzFallback = b.isbn10 ? `https://images-na.ssl-images-amazon.com/images/P/${b.isbn10}.09.LZZZZZZZ.jpg` : "";
       const stars = b.score ? "★".repeat(Math.round(b.score)) + "☆".repeat(5 - Math.round(b.score)) : "";
       return `<div class="mini-card" data-isbn="${b.isbn}" role="button" tabindex="0" aria-label="${esc(b.title)} ${b.score.toFixed(1)}点">
-        <div class="mini-card-cover"><img src="${b.cover || ndlUrl}" alt="${esc(b.title)}" loading="lazy"
-          onerror="_coverFallback(this,'${amzFallback}')"></div>
+        <div class="mini-card-cover">${_bookCoverHtml(b.isbn, b.isbn10 || "", b.cover || "", esc(b.title))}</div>
         <div class="mini-card-title">${esc(b.title)}</div>
         <div style="color:#f0a500;font-size:0.72rem;margin-top:2px" aria-hidden="true">${stars} ${b.score.toFixed(1)}</div>
       </div>`;
@@ -5142,9 +5146,8 @@ async function loadCollections() {
         const container = document.getElementById(`col-books-${c.id}`);
         if (!container) continue;
         const items = books.filter(Boolean).map(b => {
-          const ndlFallback = `https://ndlsearch.ndl.go.jp/thumbnail/${b.isbn}.jpg`;
-          return `<div class="related-card" onclick="openModal('${b.isbn}')" role="button" tabindex="0">
-            <div class="related-thumb"><img src="${b.cover || ndlFallback}" alt="${esc(b.title)}" loading="lazy" onerror="_coverFallback(this,'${ndlFallback}')"></div>
+          return `<div class="related-card" onclick="openModal('${b.isbn}')" role="button" tabindex="0" aria-label="${esc(b.title)}">
+            <div class="related-thumb">${_bookCoverHtml(b.isbn, b.isbn10 || "", b.cover || "", esc(b.title), "related-img")}</div>
             <div class="related-title">${esc(b.title)}</div>
             <div class="related-author">${esc(b.author || "")}</div>
           </div>`;
