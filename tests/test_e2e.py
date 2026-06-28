@@ -217,6 +217,7 @@ ALLOWED_COVER_DOMAINS = (
     "covers.openlibrary.org",
     "books.google.com",
     "books.googleusercontent.com",
+    "lh3.googleusercontent.com",
 )
 
 def test_s7_new_arrival_cover_domains(client):
