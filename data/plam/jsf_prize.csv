@@ -1,0 +1,61 @@
+entry_id,work_id,award_id,award_name,award_year,award_no,award_term,title,author,isbn13,isbn_status,status,remarks
+JSF-001-H1-01,PLAM-000712,JSF,日本SF大賞,1980,1,H1,太陽風交点,堀晃,,missing,awarded,
+JSF-002-H1-01,PLAM-000713,JSF,日本SF大賞,1981,2,H1,吉里吉里人,井上ひさし,,missing,awarded,
+JSF-003-H1-01,PLAM-000714,JSF,日本SF大賞,1982,3,H1,最後の敵,山田正紀,,missing,awarded,
+JSF-004-H1-01,PLAM-000715,JSF,日本SF大賞,1983,4,H1,童夢,大友克洋,,missing,awarded,漫画作品
+JSF-005-H1-01,PLAM-000716,JSF,日本SF大賞,1984,5,H1,幻詩狩り,川又千秋,,missing,awarded,
+JSF-006-H1-01,PLAM-000717,JSF,日本SF大賞,1985,6,H1,首都消失,小松左京,,missing,awarded,
+JSF-007-H1-01,PLAM-000718,JSF,日本SF大賞,1986,7,H1,笑い宇宙の旅芸人,かんべむさし,,missing,awarded,
+JSF-008-H1-01,PLAM-000719,JSF,日本SF大賞,1987,8,H1,帝都物語,荒俣宏,,missing,awarded,
+JSF-009-H1-01,PLAM-000720,JSF,日本SF大賞,1988,9,H1,岬一郎の抵抗,半村良,,missing,co_winner,
+JSF-009-H1-02,PLAM-000721,JSF,日本SF大賞,1988,9,H1,快男児・押川春浪,横田順彌・會津信吾,,missing,co_winner,共著
+JSF-010-H1-01,PLAM-000722,JSF,日本SF大賞,1989,10,H1,上弦の月を喰べる獅子,夢枕獏,,missing,awarded,
+JSF-011-H1-01,PLAM-000723,JSF,日本SF大賞,1990,11,H1,アド・バード,椎名誠,,missing,awarded,
+JSF-012-H1-01,PLAM-000724,JSF,日本SF大賞,1991,12,H1,サラマンダー殲滅,梶尾真治,,missing,awarded,
+JSF-013-H1-01,PLAM-000725,JSF,日本SF大賞,1992,13,H1,朝のガスパール,筒井康隆,,missing,awarded,
+JSF-014-H1-01,PLAM-000726,JSF,日本SF大賞,1993,14,H1,ヴィーナス・シティ,柾悟郎,,missing,awarded,
+JSF-015-H1-01,PLAM-000727,JSF,日本SF大賞,1994,15,H1,戦争を演じた神々たち,大原まり子,,missing,co_winner,
+JSF-015-H1-02,PLAM-000728,JSF,日本SF大賞,1994,15,H1,女性状無意識,小谷真理,,missing,co_winner,SF評論
+JSF-016-H1-01,PLAM-000729,JSF,日本SF大賞,1995,16,H1,言壷,神林長平,,missing,awarded,
+JSF-017-H1-01,PLAM-000730,JSF,日本SF大賞,1996,17,H1,ガメラ2 レギオン襲来,金子修介,,missing,awarded,映画作品
+JSF-018-H1-01,PLAM-000731,JSF,日本SF大賞,1997,18,H1,蒲生邸事件,宮部みゆき,,missing,co_winner,
+JSF-018-H1-02,PLAM-000732,JSF,日本SF大賞,1997,18,H1,新世紀エヴァンゲリオン,庵野秀明,,missing,co_winner,アニメ作品
+JSF-019-H1-01,PLAM-000733,JSF,日本SF大賞,1998,19,H1,BRAIN VALLEY,瀬名秀明,,missing,awarded,
+JSF-020-H1-01,PLAM-000734,JSF,日本SF大賞,1999,20,H1,チグリスとユーフラテス,新井素子,,missing,awarded,
+JSF-021-H1-01,PLAM-000735,JSF,日本SF大賞,2000,21,H1,日本SF論争史,巽孝之,,missing,awarded,SF評論集（編著）
+JSF-022-H1-01,PLAM-000736,JSF,日本SF大賞,2001,22,H1,かめくん,北野勇作,,missing,awarded,
+JSF-023-H1-01,PLAM-000533,JSF,日本SF大賞,2002,23,H1,アラビアの夜の種族,古川日出男,,missing,co_winner,
+JSF-023-H1-02,PLAM-000737,JSF,日本SF大賞,2002,23,H1,傀儡后,牧野修,,missing,co_winner,
+JSF-024-H1-01,PLAM-000738,JSF,日本SF大賞,2003,24,H1,マルドゥック・スクランブル,冲方丁,,missing,awarded,
+JSF-025-H1-01,PLAM-000739,JSF,日本SF大賞,2004,25,H1,イノセンス,押井守,,missing,awarded,アニメ映画作品
+JSF-026-H1-01,PLAM-000740,JSF,日本SF大賞,2005,26,H1,象られた力,飛浩隆,,missing,awarded,
+JSF-027-H1-01,PLAM-000741,JSF,日本SF大賞,2006,27,H1,バルバラ異界,萩尾望都,,missing,awarded,漫画作品
+JSF-028-H1-01,PLAM-000742,JSF,日本SF大賞,2007,28,H1,星新一 一〇〇一話をつくった人,最相葉月,,missing,awarded,ノンフィクション・評伝
+JSF-029-H1-01,PLAM-000743,JSF,日本SF大賞,2008,29,H1,新世界より,貴志祐介,,missing,co_winner,
+JSF-029-H1-02,PLAM-000744,JSF,日本SF大賞,2008,29,H1,電脳コイル,磯光雄,,missing,co_winner,アニメ作品
+JSF-030-H1-01,PLAM-000745,JSF,日本SF大賞,2009,30,H1,ハーモニー,伊藤計劃,,missing,awarded,
+JSF-031-H1-01,PLAM-000746,JSF,日本SF大賞,2010,31,H1,日本SF精神史,長山靖生,,missing,co_winner,SF評論
+JSF-031-H1-02,PLAM-000747,JSF,日本SF大賞,2010,31,H1,ペンギン・ハイウェイ,森見登美彦,,missing,co_winner,
+JSF-032-H1-01,PLAM-000748,JSF,日本SF大賞,2011,32,H1,華竜の宮,上田早夕里,,missing,awarded,
+JSF-033-H1-01,PLAM-000749,JSF,日本SF大賞,2012,33,H1,機龍警察 自爆条項,月村了衛,,missing,co_winner,
+JSF-033-H1-02,PLAM-000750,JSF,日本SF大賞,2012,33,H1,盤上の夜,宮内悠介,,missing,co_winner,
+JSF-034-H1-01,PLAM-000751,JSF,日本SF大賞,2013,34,H1,皆勤の徒,酉島伝法,,missing,awarded,
+JSF-035-H1-01,PLAM-000752,JSF,日本SF大賞,2014,35,H1,オービタル・クラウド,藤井太洋,,missing,co_winner,
+JSF-035-H1-02,PLAM-000753,JSF,日本SF大賞,2014,35,H1,My Humanity,長谷敏司,,missing,co_winner,
+JSF-036-H1-01,PLAM-000754,JSF,日本SF大賞,2015,36,H1,コロンビア・ゼロ 新・航空宇宙軍史,谷甲州,,missing,co_winner,
+JSF-036-H1-02,PLAM-000755,JSF,日本SF大賞,2015,36,H1,突変,森岡浩之,,missing,co_winner,
+JSF-037-H1-01,PLAM-000756,JSF,日本SF大賞,2016,37,H1,WOMBS,白井弓子,,missing,awarded,漫画作品
+JSF-038-H1-01,PLAM-000623,JSF,日本SF大賞,2017,38,H1,ゲームの王国,小川哲,,missing,co_winner,
+JSF-038-H1-02,PLAM-000757,JSF,日本SF大賞,2017,38,H1,自生の夢,飛浩隆,,missing,co_winner,
+JSF-039-H1-01,PLAM-000758,JSF,日本SF大賞,2018,39,H1,飛ぶ孔雀,山尾悠子,,missing,co_winner,
+JSF-039-H1-02,PLAM-000759,JSF,日本SF大賞,2018,39,H1,文字渦,円城塔,,missing,co_winner,
+JSF-040-H1-01,PLAM-000760,JSF,日本SF大賞,2019,40,H1,天冥の標,小川一水,,missing,co_winner,
+JSF-040-H1-02,PLAM-000761,JSF,日本SF大賞,2019,40,H1,宿借りの星,酉島伝法,,missing,co_winner,
+JSF-041-H1-01,PLAM-000762,JSF,日本SF大賞,2020,41,H1,歓喜の歌 博物館惑星III,菅浩江,,missing,co_winner,
+JSF-041-H1-02,PLAM-000763,JSF,日本SF大賞,2020,41,H1,星系出雲の兵站,林譲治,,missing,co_winner,
+JSF-042-H1-01,PLAM-000764,JSF,日本SF大賞,2021,42,H1,大奥,よしながふみ,,missing,awarded,漫画作品
+JSF-043-H1-01,PLAM-000765,JSF,日本SF大賞,2022,43,H1,SFする思考 荒巻義雄評論集成,荒巻義雄,,missing,co_winner,SF評論集
+JSF-043-H1-02,PLAM-000766,JSF,日本SF大賞,2022,43,H1,残月記,小田雅久仁,,missing,co_winner,
+JSF-044-H1-01,PLAM-000767,JSF,日本SF大賞,2023,44,H1,プロトコル・オブ・ヒューマニティ,長谷敏司,,missing,awarded,
+JSF-045-H1-01,PLAM-000768,JSF,日本SF大賞,2024,45,H1,宝石の国,市川春子,,missing,awarded,漫画作品
+JSF-046-H1-01,PLAM-000769,JSF,日本SF大賞,2025,46,H1,伊藤典夫評論集成,伊藤典夫,,missing,awarded,SF翻訳評論集成

@@ -1,13 +1,15 @@
 """
-PLAM Version 2.0 — Version 2.0 拡張機能スクリプト
+PLAM Version 2.0/2.1 — 拡張分析スクリプト
 
 機能:
-  --similarity   award_similarity.csv を生成（Jaccard係数）
+  --similarity      award_similarity.csv を生成（Jaccard係数）
+  --graph           graph_data.csv を生成（D3.js/Cytoscape等向けグラフデータ）
   --validate-master awards_master.csv と実際のインポート済み賞を照合
 
 使い方:
   cd /tmp/Proud-library-fresh
   python3 scripts/plam_build_v20.py --similarity
+  python3 scripts/plam_build_v20.py --graph
 """
 from __future__ import annotations
 import argparse, csv, itertools
@@ -22,6 +24,8 @@ MASTER_PATH    = PLAM_DIR / "awards_master.csv"
 SIMILARITY_PATH = PLAM_DIR / "award_similarity.csv"
 SIMILARITY_FIELDS = ["award_a", "award_b", "jaccard", "shared_works",
                      "works_a", "works_b", "shared_titles"]
+GRAPH_PATH   = PLAM_DIR / "graph_data.csv"
+GRAPH_FIELDS = ["source", "target", "weight", "shared_works", "shared_titles"]
 
 
 def _read_csv(path: Path) -> list[dict]:
@@ -83,6 +87,40 @@ def _build_similarity():
               f"（{r['shared_works']}件 / {r['works_a']}+{r['works_b']}）")
 
 
+def _build_graph():
+    """Jaccard係数をエッジweightとしたグラフデータ（D3.js/Cytoscape向け）を生成。
+    閾値 > 0（共有作品が1件以上）のペアのみ出力。
+    """
+    if not SIMILARITY_PATH.exists():
+        print("award_similarity.csv が見つかりません。先に --similarity を実行してください。")
+        return
+
+    rows_out: list[dict] = []
+    with open(SIMILARITY_PATH, encoding="utf-8") as f:
+        for r in csv.DictReader(f):
+            if float(r["jaccard"]) > 0:
+                rows_out.append({
+                    "source":        r["award_a"],
+                    "target":        r["award_b"],
+                    "weight":        r["jaccard"],
+                    "shared_works":  r["shared_works"],
+                    "shared_titles": r["shared_titles"],
+                })
+
+    rows_out.sort(key=lambda r: float(r["weight"]), reverse=True)
+
+    with open(GRAPH_PATH, "w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=GRAPH_FIELDS)
+        w.writeheader()
+        w.writerows(rows_out)
+
+    print(f"✅ {GRAPH_PATH} 生成完了（{len(rows_out)} エッジ）")
+    print("\nエッジ一覧:")
+    for r in rows_out:
+        print(f"  {r['source']} → {r['target']}: weight={r['weight']} "
+              f"({r['shared_works']}作品: {r['shared_titles'][:40]})")
+
+
 def _validate_master():
     master = _read_csv(MASTER_PATH)
     history = _read_csv(HISTORY_PATH)
@@ -113,14 +151,17 @@ def _validate_master():
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--similarity",      action="store_true")
+    parser.add_argument("--graph",           action="store_true")
     parser.add_argument("--validate-master", action="store_true")
     args = parser.parse_args()
 
     if args.similarity:
         _build_similarity()
+    if args.graph:
+        _build_graph()
     if args.validate_master:
         _validate_master()
-    if not (args.similarity or args.validate_master):
+    if not (args.similarity or args.graph or args.validate_master):
         parser.print_help()
 
 
