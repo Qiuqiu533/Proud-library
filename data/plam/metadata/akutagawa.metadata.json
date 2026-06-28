@@ -1,0 +1,16 @@
+{
+  "award_id": "AKU",
+  "award_name": "芥川龍之介賞",
+  "source_name": "公益財団法人日本文学振興会",
+  "source_url": "https://bungakushinko.or.jp/award/akutagawa/list.html",
+  "checked_at": "2026-06-28",
+  "phases_completed": ["Phase1", "Phase2", "Phase3"],
+  "phase_ranges": {
+    "Phase1": {"award_no_start": 1,  "award_no_end": 32, "year_start": 1935, "year_end": 1954},
+    "Phase2": {"award_no_start": 33, "award_no_end": 72, "year_start": 1955, "year_end": 1974},
+    "Phase3": {"award_no_start": 73, "award_no_end": 112, "year_start": 1975, "year_end": 1994},
+    "Phase4": {"award_no_start": 113, "award_no_end": 130, "year_start": 1995, "year_end": 2003},
+    "Phase5": {"award_no_start": 131, "award_no_end": null, "year_start": 2004, "year_end": null}
+  },
+  "notes": "1944年第20回H2終了後〜1948年は戦争のため休止。1949年第21回H1から再開。"
+}

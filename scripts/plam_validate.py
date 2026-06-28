@@ -12,8 +12,9 @@ from datetime import datetime
 from collections import defaultdict
 
 
-VALID_STATUSES = {"awarded", "no_award", "co_winner"}
-VALID_TERMS    = {"H1", "H2"}
+VALID_STATUSES      = {"awarded", "no_award", "co_winner"}
+VALID_TERMS         = {"H1", "H2"}
+VALID_ISBN_STATUSES = {"missing", "verified", "multiple_editions", "unavailable", ""}
 
 
 def load_csv(path: str) -> list[dict]:
@@ -81,7 +82,13 @@ def validate(path: str, no_start: int | None = None, no_end: int | None = None) 
     if total != n_awarded + n_no_award:
         errors.append(f"[件数不整合] 総計{total} ≠ 受賞{n_awarded} + 該当なし{n_no_award}")
 
-    # ── 7. work_id 重複 ──────────────────────────
+    # ── 7. isbn_status ───────────────────────────
+    if rows and "isbn_status" in rows[0]:
+        for r in rows:
+            if r["isbn_status"] not in VALID_ISBN_STATUSES:
+                errors.append(f"[isbn_status] 不正値: 回{r['award_no']} '{r['isbn_status']}'")
+
+    # ── 8. work_id 重複 ──────────────────────────
     if "work_id" in (rows[0] if rows else {}):
         seen_ids: set[str] = set()
         for r in rows:
