@@ -1,7 +1,7 @@
 import os
 import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
-from flask import Flask
+from flask import Flask, request
 
 _SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
 if _SENTRY_DSN:
@@ -47,6 +47,29 @@ from services.books import _auto_classify_new_books
 
 _ensure_db()
 _auto_classify_new_books()   # バックグラウンドで週1回実行
+
+@app.after_request
+def set_security_headers(response):
+    csp = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' cdnjs.cloudflare.com; "
+        "style-src 'self' 'unsafe-inline' fonts.googleapis.com; "
+        "font-src 'self' fonts.gstatic.com; "
+        "img-src 'self' data: "
+            "ndlsearch.ndl.go.jp "
+            "images-na.ssl-images-amazon.com "
+            "covers.openlibrary.org "
+            "books.google.com; "
+        "connect-src 'self' *.ingest.us.sentry.io; "
+        "frame-ancestors 'none';"
+    )
+    response.headers["Content-Security-Policy"] = csp
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    return response
+
 
 if __name__ == "__main__":
     import os
