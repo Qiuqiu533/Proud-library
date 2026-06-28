@@ -177,22 +177,32 @@ def fetch_book_detail(isbn, hint_title=""):
             c1, c2 = _title_core(t1), _title_core(t2)
             return c1 == c2 or c1 in t2 or c2 in t1 or c1 in c2 or c2 in c1
 
-        cached = fetchone(dc, f"SELECT title, author, description, manual_review, manual_review_date, ai_review_date, ai_review_score, ai_model, helpful_count, ai_summary, ai_tags FROM genre_books WHERE isbn={ph}", (isbn,))
+        try:
+            cached = fetchone(dc, f"SELECT title, author, description, manual_review, manual_review_date, ai_review_date, ai_review_score, ai_model, helpful_count, ai_summary, ai_tags FROM genre_books WHERE isbn={ph}", (isbn,))
+        except Exception:
+            # 古いDBでカラムが足りない場合は最小セットでフォールバック
+            try:
+                cached = fetchone(dc, f"SELECT title, author, description, helpful_count, ai_summary, ai_tags FROM genre_books WHERE isbn={ph}", (isbn,))
+            except Exception:
+                cached = None
 
         if cached and cached.get("description") and lib_title:
             if not _title_match(lib_title, cached.get("title", "")):
                 cached = None
 
         if (not cached or not cached.get("description")) and lib_title:
-            cached = fetchone(dc,
-                f"SELECT title, author, description, manual_review, manual_review_date, ai_review_date, ai_review_score, ai_model FROM genre_books WHERE title={ph}",
-                (lib_title,))
+            _title_cols = "title, author, description, manual_review, manual_review_date, ai_review_date, ai_review_score, ai_model, ai_summary, ai_tags"
+            try:
+                cached = fetchone(dc, f"SELECT {_title_cols} FROM genre_books WHERE title={ph}", (lib_title,))
+            except Exception:
+                cached = fetchone(dc, f"SELECT title, author, description, ai_summary, ai_tags FROM genre_books WHERE title={ph}", (lib_title,))
             if not cached or not cached.get("description"):
                 title_prefix = _title_core(lib_title)
                 if len(title_prefix) >= 4:
-                    cached = fetchone(dc,
-                        f"SELECT title, author, description, manual_review, manual_review_date, ai_review_date, ai_review_score, ai_model FROM genre_books WHERE title LIKE {ph}",
-                        (title_prefix + "%",))
+                    try:
+                        cached = fetchone(dc, f"SELECT {_title_cols} FROM genre_books WHERE title LIKE {ph}", (title_prefix + "%",))
+                    except Exception:
+                        cached = fetchone(dc, f"SELECT title, author, description, ai_summary, ai_tags FROM genre_books WHERE title LIKE {ph}", (title_prefix + "%",))
 
         dc.close()
         if cached and cached.get("description"):
