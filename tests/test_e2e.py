@@ -33,8 +33,14 @@ def client():
 
 @pytest.fixture
 def registered_user(client):
-    """テスト用住民アカウントを登録してroomを返す。"""
+    """テスト用住民アカウントを登録してroomを返す。毎回クリーンな状態にする。"""
+    import sys, os
+    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+    from database import get_con, execute
     room = "5-0533"
+    con = get_con()
+    execute(con, "DELETE FROM user_accounts WHERE room=?", (room,))
+    con.commit(); con.close()
     client.post("/api/user/register", json={
         "room": room, "password": RESIDENT_PW,
         "email": "e2e@test.example"
