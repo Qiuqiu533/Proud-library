@@ -157,7 +157,7 @@ def api_books_batch():
         r = row_map.get(isbn)
         if r:
             isbn10 = isbn13_to_isbn10(isbn) if isbn.startswith("978") else ""
-            result.append({**r, "cover": get_cover_url(isbn, isbn10), "rating": {"score":0,"votes":0,"reviews":[]}})
+            result.append({**r, "isbn10": isbn10, "cover": get_cover_url(isbn, isbn10), "rating": {"score":0,"votes":0,"reviews":[]}})
         else:
             result.append({"isbn": isbn, "title": isbn, "author": "", "publisher": "", "cover": "", "rating": {"score":0,"votes":0,"reviews":[]}})
     return jsonify(result)
