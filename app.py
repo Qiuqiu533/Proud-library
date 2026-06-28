@@ -27,6 +27,7 @@ from routes.invite import invite_bp
 from routes.events import events_bp
 from routes.timeline import timeline_bp
 from routes.newsletter import newsletter_bp
+from routes.plam import plam_bp
 
 app.register_blueprint(pages_bp)
 app.register_blueprint(auth_bp)
@@ -40,6 +41,7 @@ app.register_blueprint(invite_bp)
 app.register_blueprint(events_bp)
 app.register_blueprint(timeline_bp)
 app.register_blueprint(newsletter_bp)
+app.register_blueprint(plam_bp)
 
 # ── DB初期化・マイグレーション ──────────────────────────────────────────────
 from migrations import _ensure_db
