@@ -1,13 +1,11 @@
-award_id,award_name,award_name_en,founded_year,organizer
-AKU,芥川賞,Akutagawa Prize,1935,公益財団法人日本文学振興会
-NAO,直木賞,Naoki Prize,1935,公益財団法人日本文学振興会
-HON,本屋大賞,Book of the Year,2004,NPO法人本屋大賞実行委員会
-ERP,江戸川乱歩賞,Edogawa Rampo Prize,1954,公益社団法人日本推理作家協会
-HMI,このミステリーがすごい！国内1位,Kono Mystery ga Sugoi! Domestic,1988,宝島社
-HOK,本格ミステリ大賞,Honkaku Mystery Award,2001,本格ミステリ作家クラブ
-JRM,日本推理作家協会賞,Japan Mystery Writers Association Award,1948,公益社団法人日本推理作家協会
-YMP,山本周五郎賞,Yamamoto Shugoro Prize,1988,公益財団法人日本文学振興会
-JSF,日本SF大賞,Japan SF Award,1980,日本SF作家クラブ
-YKE,吉川英治文学賞,Yoshikawa Eiji Literary Award,1966,公益財団法人吉川英治国民文化振興会
-TNZ,谷崎潤一郎賞,Tanizaki Jun'ichiro Prize,1965,中央公論新社
-MSM,三島由紀夫賞,Mishima Yukio Prize,1988,公益財団法人三島由紀夫文学振興会
+award_id,award_name,award_name_en,award_type,frequency,founded,organizer,data_status,weight,notes
+AKU,芥川賞,Akutagawa Prize,literary_work,biannual,1935,公益財団法人日本文学振興会,OFFICIAL,100,純文学・新人作家を対象
+NAO,直木賞,Naoki Prize,literary_work,biannual,1935,公益財団法人日本文学振興会,OFFICIAL,95,大衆文学・中堅〜新進作家を対象
+JRA,日本推理作家協会賞,Japan Mystery Writers Award,professional,annual,1948,一般社団法人日本推理作家協会,VERIFIED,92,協会員による作品評価・長編部門
+HKM,本格ミステリ大賞,Honkaku Mystery Award,critic,annual,2001,本格ミステリ作家クラブ,VERIFIED,90,本格ミステリ専門家による作品評価
+HON,本屋大賞,Book of the Year,reader_vote,annual,2004,NPO法人本屋大賞実行委員会,OFFICIAL,85,全国書店員による読者支持票
+YAM,山本周五郎賞,Yamamoto Shugoro Prize,entertainment,annual,1988,公益財団法人新潮文芸振興会,VERIFIED,82,エンターテインメント作品の質を評価
+KMS,このミステリーがすごい！,Kono Mystery ga Sugoi,ranking,annual,1988,宝島社,VERIFIED,80,書評家・ミステリ専門家によるランキング（年刊）
+RAN,江戸川乱歩賞,Edogawa Rampo Prize,debut,annual,1954,一般社団法人日本推理作家協会,VERIFIED,75,ミステリ新人発掘賞
+KIK,吉川英治文学賞,Yoshikawa Eiji Literary Prize,career,annual,1967,公益財団法人吉川英治国民文化振興会,VERIFIED,88,作家のキャリア・業績全体を評価
+JSF,日本SF大賞,Japan SF Award,professional,annual,1980,日本SF作家クラブ,planned,85,SF作家クラブによる年間最優秀SF作品（Phase 13予定）
