@@ -1129,7 +1129,8 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .plam21-dashboard { display: flex; flex-direction: column; gap: 0; }
 .plam21-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 .plam21-type { font-size: 0.88rem; font-weight: 700; color: #333; padding: 3px 8px; background: #f5f3ff; border-radius: 6px; }
-.plam21-score-chip { display: flex; align-items: baseline; gap: 1px; background: #3d6b4f; border-radius: 20px; padding: 3px 10px; }
+.plam21-score-chip { display: flex; align-items: baseline; gap: 3px; background: #3d6b4f; border-radius: 20px; padding: 3px 10px; }
+.plam21-score-label { font-size: 0.72rem; color: rgba(255,255,255,0.85); margin-right: 2px; letter-spacing: 0.03em; }
 .plam21-score-num { font-size: 1.1rem; font-weight: 800; color: #fff; }
 .plam21-score-den { font-size: 0.72rem; color: rgba(255,255,255,0.7); }
 .plam21-profile { font-size: 0.82rem; color: #555; line-height: 1.5; margin: 0 0 10px; }

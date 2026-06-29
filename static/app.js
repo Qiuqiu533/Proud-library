@@ -6782,12 +6782,19 @@ function renderReadingGoal() {
   const pct = target > 0 ? Math.min(100, Math.round(readThisYear / target * 100)) : 0;
 
   const ACHIEVEMENTS = [
-    { req: 1,   icon: "🌱", label: "はじめの一冊" },
-    { req: 5,   icon: "📖", label: "読書家の卵" },
-    { req: 10,  icon: "🌿", label: "本の虫" },
-    { req: 20,  icon: "📚", label: "多読家" },
-    { req: 50,  icon: "🏆", label: "読書マスター" },
-    { req: 100, icon: "👑", label: "図書館の星" },
+    { req: 1,    icon: "🌱", label: "はじめの一冊" },
+    { req: 5,    icon: "📖", label: "読書家の卵" },
+    { req: 10,   icon: "🌿", label: "本の虫" },
+    { req: 20,   icon: "📚", label: "多読家" },
+    { req: 50,   icon: "🏆", label: "読書マスター" },
+    { req: 100,  icon: "👑", label: "図書館の星" },
+    { req: 200,  icon: "🔥", label: "読書の求道者" },
+    { req: 500,  icon: "🌙", label: "活字の仙人" },
+    { req: 1000, icon: "⭐", label: "千冊の伝説" },
+    { req: 2000, icon: "🌊", label: "読書の大海" },
+    { req: 3000, icon: "⚡", label: "活字の覇者" },
+    { req: 4000, icon: "🌌", label: "書物の宇宙" },
+    { req: 5000, icon: "👑", label: "読書の神" },
   ];
   const earned = ACHIEVEMENTS.filter(a => readAllTime >= a.req);
   const latest = earned[earned.length - 1];
@@ -6854,10 +6861,22 @@ async function loadMyPlam() {
     const sc = data.plam_score || {};
     const roleColor = ROLE_COLORS[rt.graph_role] || "#888";
 
+    const _plamScoreLabel = (s) => {
+      if (s >= 90) return "殿堂級";
+      if (s >= 70) return "上級者";
+      if (s >= 50) return "中級者";
+      if (s >= 30) return "入門者";
+      return "探索中";
+    };
+
     const headerHtml = `
       <div class="plam21-header">
         ${rt.label ? `<div class="plam21-type" style="border-left:3px solid ${roleColor}">${esc(rt.label)}</div>` : ""}
-        ${sc.total != null ? `<div class="plam21-score-chip"><span class="plam21-score-num">${sc.total}</span><span class="plam21-score-den">/100</span></div>` : ""}
+        ${sc.total != null ? `
+          <div class="plam21-score-chip">
+            <span class="plam21-score-label">${_plamScoreLabel(sc.total)}</span>
+            <span class="plam21-score-num">${sc.total}</span><span class="plam21-score-den">/100</span>
+          </div>` : ""}
       </div>
       ${data.profile_text ? `<p class="plam21-profile">${esc(data.profile_text)}</p>` : ""}`;
 
