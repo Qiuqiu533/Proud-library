@@ -225,7 +225,10 @@
 
 <header>
   <h1>文学賞ネットワーク <span>PLAM</span> v2.0</h1>
-  <a href="/">← Proud Library</a>
+  <div style="display:flex;align-items:center;gap:12px">
+    <button id="resetLayoutBtn" onclick="resetLayout()" style="padding:5px 14px;background:#2a2d3e;color:#c8c8e8;border:1px solid #3a3d52;border-radius:8px;font-size:.8rem;cursor:pointer;transition:background .2s" onmouseover="this.style.background='#3a3d52'" onmouseout="this.style.background='#2a2d3e'">🔄 配置リセット</button>
+    <a href="/">← Proud Library</a>
+  </div>
 </header>
 
 <div style="background:#1e2130;border-bottom:1px solid #2a2d3e;padding:8px 20px;font-size:0.8rem;color:#9a9ab8;display:flex;align-items:center;gap:8px">
@@ -277,9 +280,9 @@
       </div>
 
       <div class="legend-block">
-        <h3>🧲 なぜ円が動くの？</h3>
-        <p>この図は「磁石を並べたような仕組み」で動いています。各賞の円が互いに引き合ったり反発したりする「力」を持っており、アプリが自動で最適な配置を計算して落ち着く場所に収めています。</p>
-        <p style="margin-top:8px">円をドラッグすると「手で動かした」状態になり、周りの円が引力・斥力で再計算されて動き直します。壁を一つ動かすとドミノのように周囲が再配置されるイメージです。自由に動かして遊んでみてください！</p>
+        <h3>🧲 なぜ円が自動配置されるの？</h3>
+        <p>ページを開くと「磁石を並べたような仕組み」で最初の配置が自動計算されます。各賞の円が互いに引き合ったり反発したりする「力」を持っており、アプリが最適な場所に落ち着くまで計算を繰り返します。</p>
+        <p style="margin-top:8px">円は自由にドラッグして動かせます。ただし、動かしても周りの円は追いかけてきません。位置が崩れたと感じたら、右上の <b style="color:#e85d04">🔄 配置リセット</b> ボタンを押すと元の配置に戻ります。</p>
       </div>
 
       <div class="legend-block">
@@ -474,6 +477,24 @@ function buildGraph(data) {
 
   // ローディング非表示
   document.getElementById("loading").style.display = "none";
+
+  // 配置リセット関数
+  window.resetLayout = function() {
+    const btn = document.getElementById("resetLayoutBtn");
+    if (btn) { btn.textContent = "⏳ 再配置中…"; btn.disabled = true; }
+    cy.layout({
+      name: "cose",
+      nodeRepulsion: () => 8000,
+      idealEdgeLength: () => 120,
+      animate: true,
+      animationDuration: 800,
+      randomize: false,
+      gravity: 0.4,
+      stop: () => {
+        if (btn) { btn.textContent = "🔄 配置リセット"; btn.disabled = false; }
+      }
+    }).run();
+  };
 
   // ── ノードクリック → 詳細表示 ──────────────────────────────────
   const nodeInfoEl = document.getElementById("node-info");
