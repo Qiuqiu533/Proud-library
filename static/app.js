@@ -1882,7 +1882,7 @@ async function openModal(isbn, preloadedBook) {
               const isProud = a.library && a.library.includes("プラウド");
               return `<div class="avail-row${isProud ? " avail-row--proud" : ""}"><span>${a.library}</span>${statusBadge(a.status)}</div>`;
             }).join("")
-          : `<div class="avail-row"><span>情報なし</span></div>`;
+          : `<div class="avail-row"><span style="color:#aaa">プラウド船橋図書館には未所蔵の本です。評価・コメントは投稿できます。</span></div>`;
         availEl.innerHTML = availHtml;
       }
       // 書籍詳細情報（出版年・ISBN等）をフル取得データで更新
@@ -1934,7 +1934,7 @@ async function openModal(isbn, preloadedBook) {
             const isProud = a.library && a.library.includes("プラウド");
             return `<div class="avail-row${isProud ? " avail-row--proud" : ""}"><span>${a.library}</span>${statusBadge(a.status)}</div>`;
           }).join("")
-        : `<div class="avail-row"><span>情報なし</span></div>`;
+        : `<div class="avail-row"><span style="color:#aaa">プラウド船橋図書館には未所蔵の本です。評価・コメントは投稿できます。</span></div>`;
       const html = _renderModalContent(isbn, book, rating);
       document.getElementById("modalContent").innerHTML = html;
       document.getElementById("modal-avail-body").innerHTML = availHtml;
