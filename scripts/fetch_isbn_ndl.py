@@ -76,10 +76,17 @@ def _search_ndl(title: str, author: str | None) -> str | None:
         isbns = _extract_isbns(item, ns)
         if not isbns:
             continue
-        match_len = min(len(title_n), 6)
-        if title_n[:match_len] and item_title.startswith(title_n[:match_len]):
+        # タイトル一致判定：前方一致・部分一致・逆包含の3段階
+        t_short = title_n[:4] if len(title_n) >= 4 else title_n
+        is_match = (
+            item_title.startswith(t_short)          # NDLタイトルが入力タイトルで始まる
+            or title_n in item_title                 # NDLタイトルに入力タイトルが含まれる
+            or item_title in title_n                 # 入力タイトルにNDLタイトルが含まれる（例: "64"→"64(ロクヨン)"）
+        )
+        is_strong = item_title.startswith(title_n[:min(len(title_n), 6)])
+        if is_strong:
             jp_results.extend(isbns)
-        elif title_n in item_title or (len(title_n) >= 2 and item_title.startswith(title_n[:2])):
+        elif is_match:
             fallback.extend(isbns)
 
     for isbn in jp_results:
