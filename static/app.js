@@ -6963,15 +6963,17 @@ async function loadMyPlam() {
         <div class="my-plam-meta">${data.matched}冊が文学賞受賞作 / 読了${data.total}冊</div>
       </div>`;
 
+    // Phase 21-C: next_reads work_idをマップに渡す
+    const nextWids = new Set((data.next_reads || []).map(w => w.work_id));
     // SVGマップを非同期レンダリング
-    loadPlamMap21(u.room);
+    loadPlamMap21(u.room, nextWids);
 
   } catch(e) {
     content.innerHTML = '<p style="font-size:0.85rem;color:#999;padding:4px 0">読書データを取得できませんでした。</p>';
   }
 }
 
-async function loadPlamMap21(room) {
+async function loadPlamMap21(room, nextWids = new Set()) {
   const container = document.getElementById("plamMapSvg21");
   if (!container) return;
 
@@ -6988,27 +6990,41 @@ async function loadPlamMap21(room) {
     };
     const CL = {mystery:"ミステリ",literary:"文学",sf:"SF",horror:"ホラー",career:"キャリア"};
 
-    const userWids = new Set(data.user_works || []);
+    const userWids  = new Set(data.user_works || []);
+    const bridgeSet = new Set(data.works.filter(w => w.cluster === "bridge").map(w => w.work_id));
 
-    // 背景ドット（インタラクションなし）
-    const dots = data.works.filter(w => !userWids.has(w.work_id)).map(w => {
+    // 背景ドット
+    const dots = data.works.filter(w => !userWids.has(w.work_id) && !nextWids.has(w.work_id)).map(w => {
       const cx = Math.round(w.x * W), cy = Math.round(w.y * H);
       const isbn = w.isbn ? ` data-isbn="${esc(w.isbn)}"` : "";
-      return `<circle cx="${cx}" cy="${cy}" r="2.5" fill="${CM[w.cluster]||'#ddd'}" opacity="0.4" data-title="${esc(w.title)}"${isbn} class="plam-dot"/>`;
+      const isBr = bridgeSet.has(w.work_id) ? " plam-dot--bridge" : "";
+      return `<circle cx="${cx}" cy="${cy}" r="2.5" fill="${CM[w.cluster]||'#ddd'}" opacity="0.4" data-title="${esc(w.title)}"${isbn} data-cluster="${w.cluster}" class="plam-dot${isBr}"/>`;
     }).join("");
 
-    // 読了済みドット（クリック可・強調）
+    // 読了済みドット（強調・クリック可）
     const uDots = data.works.filter(w => userWids.has(w.work_id)).map(w => {
       const cx = Math.round(w.x * W), cy = Math.round(w.y * H);
       const isbn = w.isbn ? ` data-isbn="${esc(w.isbn)}"` : "";
-      const clickable = w.isbn ? ` class="plam-dot plam-dot--read plam-dot--link"` : ` class="plam-dot plam-dot--read"`;
-      return `<circle cx="${cx}" cy="${cy}" r="6" fill="${CM[w.cluster]||'#ddd'}" stroke="#fff" stroke-width="2" opacity="0.95" data-title="${esc(w.title)}"${isbn}${clickable}/>`;
+      const linkCls = w.isbn ? " plam-dot--link" : "";
+      const isBr = bridgeSet.has(w.work_id) ? " plam-dot--bridge" : "";
+      return `<circle cx="${cx}" cy="${cy}" r="6" fill="${CM[w.cluster]||'#ddd'}" stroke="#fff" stroke-width="2" opacity="0.95" data-title="${esc(w.title)}"${isbn} data-cluster="${w.cluster}" class="plam-dot plam-dot--read${linkCls}${isBr}"/>`;
+    }).join("");
+
+    // Phase 21-C: ★ 次に読む3冊をマップ上にプロット
+    const recDots = data.works.filter(w => nextWids.has(w.work_id)).map(w => {
+      const cx = Math.round(w.x * W), cy = Math.round(w.y * H);
+      const isbn = w.isbn ? ` data-isbn="${esc(w.isbn)}"` : "";
+      const linkCls = w.isbn ? " plam-dot--link" : "";
+      return `<g class="plam-dot plam-dot--rec${linkCls}" data-title="★ ${esc(w.title)}"${isbn} data-cluster="${w.cluster}">
+        <circle cx="${cx}" cy="${cy}" r="9" fill="${CM[w.cluster]||'#ccc'}" opacity="0.15"/>
+        <text x="${cx}" y="${cy+5}" text-anchor="middle" font-size="13" class="plam-star">★</text>
+      </g>`;
     }).join("");
 
     const cc = data.cluster_centers || {};
     const labels = Object.entries(cc).map(([cid, pos]) => {
       const lx = Math.round(pos.x * W), ly = Math.round(pos.y * H);
-      return `<text x="${lx}" y="${ly}" text-anchor="middle" font-size="10" fill="${CM[cid]||'#999'}" font-weight="700" opacity="0.7">${CL[cid]||cid}</text>`;
+      return `<text x="${lx}" y="${ly}" text-anchor="middle" font-size="10" fill="${CM[cid]||'#999'}" font-weight="700" opacity="0.7" data-cluster-label="${cid}" class="plam-cluster-label">${CL[cid]||cid}</text>`;
     }).join("");
 
     let youMarker = "";
@@ -7021,8 +7037,11 @@ async function loadPlamMap21(room) {
 
     container.innerHTML = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="plam21-map-svg" id="plamMapSvgEl">
       <rect width="${W}" height="${H}" fill="#f8f6fc" rx="10"/>
-      ${dots}${uDots}${labels}${youMarker}
+      ${dots}${uDots}${recDots}${labels}${youMarker}
     </svg>`;
+
+    // Phase 21-C: フィルターボタンをマップ直下に追加
+    _renderClusterFilter(container, [...new Set(data.works.map(w => w.cluster))].filter(c => c !== "unknown"), bridgeSet.size > 0);
 
     // Phase 21-B: インタラクション追加
     _bindPlamMapEvents(container);
@@ -7094,6 +7113,67 @@ function _bindPlamMapEvents(container) {
     if (!el) return;
     const isbn = el.getAttribute("data-isbn");
     if (isbn) { hideTip(); openModal(isbn); }
+  });
+}
+
+// Phase 21-C: クラスタフィルターボタン生成・バインド
+function _renderClusterFilter(mapContainer, clusters, hasBridge) {
+  const existing = document.getElementById("plamClusterFilter");
+  if (existing) existing.remove();
+
+  const CLUSTER_COLORS_JS = {mystery:"#e85d04",literary:"#6a4c93",sf:"#0066cc",horror:"#2a9d8f",career:"#888",bridge:"#f4a261"};
+  const CL = {mystery:"ミステリ",literary:"文学",sf:"SF",horror:"ホラー",career:"キャリア",bridge:"Bridge"};
+
+  const filterClusters = [...clusters.filter(c => c !== "bridge"), ...(hasBridge ? ["bridge"] : [])];
+
+  const filterDiv = document.createElement("div");
+  filterDiv.id = "plamClusterFilter";
+  filterDiv.className = "plam21-filter";
+
+  const allBtn = document.createElement("button");
+  allBtn.className = "plam21-filter-btn plam21-filter-btn--active";
+  allBtn.dataset.filter = "all";
+  allBtn.textContent = "すべて";
+  filterDiv.appendChild(allBtn);
+
+  filterClusters.forEach(cid => {
+    const btn = document.createElement("button");
+    btn.className = "plam21-filter-btn";
+    btn.dataset.filter = cid;
+    btn.textContent = CL[cid] || cid;
+    btn.style.setProperty("--fc", CLUSTER_COLORS_JS[cid] || "#888");
+    filterDiv.appendChild(btn);
+  });
+
+  mapContainer.after(filterDiv);
+
+  // フィルタ適用
+  const applyFilter = (target) => {
+    const svg = document.getElementById("plamMapSvgEl");
+    if (!svg) return;
+
+    filterDiv.querySelectorAll(".plam21-filter-btn").forEach(b => {
+      b.classList.toggle("plam21-filter-btn--active", b.dataset.filter === target);
+    });
+
+    svg.querySelectorAll(".plam-dot").forEach(el => {
+      const c = el.getAttribute("data-cluster") || "";
+      if (target === "all") {
+        el.style.opacity = "";
+      } else if (target === "bridge") {
+        el.style.opacity = el.classList.contains("plam-dot--bridge") ? "1" : "0.12";
+      } else {
+        el.style.opacity = c === target ? "1" : "0.12";
+      }
+    });
+    // ★と you は常に表示
+    svg.querySelectorAll(".plam-dot--rec, text").forEach(el => { el.style.opacity = ""; });
+  };
+
+  filterDiv.addEventListener("click", e => {
+    const btn = e.target.closest(".plam21-filter-btn");
+    if (!btn) return;
+    applyFilter(btn.dataset.filter);
   });
 }
 
