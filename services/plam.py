@@ -507,8 +507,12 @@ def get_my_plam(room: str) -> dict | None:
             "top_award": top_award_name,
         })
 
-    # STEP4: 読書タイプ診断
-    reader_type = _diagnose_reader_type(clusters_out)
+    # STEP7: My PLAMスコア（19-D強化版）— bridge_centralityを先に計算
+    plam_score = _calc_plam_score(matched_wids, clusters_out, all_my_awards)
+    bridge_centrality = plam_score.get("bridge_centrality", 0.0)
+
+    # STEP4: 読書タイプ診断（19-D: bridge_centrality渡し）
+    reader_type = _diagnose_reader_type(clusters_out, bridge_centrality=bridge_centrality)
 
     # STEP5: 自然文プロフィール生成
     profile_text = _build_profile_text(clusters_out, matched, total, reader_type)
@@ -516,10 +520,7 @@ def get_my_plam(room: str) -> dict | None:
     # STEP6: 次に読むべき3冊の推薦
     next_reads = _recommend_next_reads(matched_wids, all_my_awards, clusters_out, limit=3)
 
-    # STEP7: My PLAMスコア（100点満点）
-    plam_score = _calc_plam_score(matched_wids, clusters_out, all_my_awards)
-
-    # STEP8: 年別読書推移（created_atを活用）
+    # STEP8: 年別読書推移
     yearly_trend = _calc_yearly_trend(timeline_rows, works_idx, history, cluster_m)
 
     # STEP9: チャレンジ提案
@@ -544,16 +545,44 @@ _READER_TYPES = {
     # diversity: 1=single cluster, 2=two clusters, 3+=multi
 }
 
-def _diagnose_reader_type(clusters: list[dict]) -> dict:
-    """読書タイプを診断する。"""
+def _diagnose_reader_type(clusters: list[dict], bridge_centrality: float = 0.0) -> dict:
+    """読書タイプをgraphベースで診断する（Phase 19-D強化版）。
+
+    19-Dの変更点:
+    - bridge_centrality（0〜1）を第三の軸として追加
+    - high bridge（>0.5）は「接続型」として優先判定
+    - stability低クラスタ（horror/sf）の読者を「希少探索型」として評価
+    """
     if not clusters:
-        return {"label": "分析中", "description": ""}
+        return {"label": "分析中", "description": "", "graph_role": "unknown"}
+
+    from services.plam_calibration import get_cluster_stability
+    stability = get_cluster_stability()
 
     top = clusters[0]
     diversity = len(clusters)
     top_pct = top["pct"]
+    top_id = top["id"]
 
-    if diversity == 1 or top_pct >= 70:
+    # ① Bridge中心型（bridge_centrality >= 0.5 かつ 複数クラスタ）
+    if bridge_centrality >= 0.5 and diversity >= 2:
+        t = (
+            "ネットワーク中心型",
+            "文学賞のジャンル境界を越えて読む「Bridge読者」です。"
+            "複数のクラスタを高精度に横断しており、PLAMネットワークの中心に近い読書傾向です。",
+            "bridge_hub",
+        )
+    # ② 希少クラスタ専門型（stability < 0.7 かつ 70%以上）
+    elif top_pct >= 70 and stability.get(top_id, 1.0) < 0.7:
+        rare_names = {
+            "horror": ("ホラー深淵型", "日本ホラー小説大賞など、データが希少な領域を深く探求する希少読書家です。"),
+            "sf":     ("SF希少探索型", "日本SF大賞など、小規模ながら独自世界を持つSF領域の専門読者です。"),
+            "career": ("作家軌跡型",   "吉川英治賞など、作家の長期キャリアに注目する希少な読書スタイルです。"),
+        }
+        base = rare_names.get(top_id, ("希少領域型", "PLAMの希少クラスタを深く読む独自の読書家です。"))
+        t = (*base, "rare_specialist")
+    # ③ 単一クラスタ深掘り型
+    elif diversity == 1 or top_pct >= 70:
         types = {
             "mystery":  ("ミステリ探究型", "本格ミステリや推理小説を深く読み込むタイプです。"),
             "literary": ("文学深読み型",   "芥川賞・直木賞などの純文学・文芸作品を好むタイプです。"),
@@ -561,19 +590,35 @@ def _diagnose_reader_type(clusters: list[dict]) -> dict:
             "horror":   ("ホラー沈潜型",   "ホラー小説の独自世界を深く探求するタイプです。"),
             "career":   ("作家キャリア型", "吉川英治賞など、作家の長期的評価に注目するタイプです。"),
         }
-        t = types.get(top["id"], ("独自探索型", "独自の読書スタイルを持つタイプです。"))
+        base = types.get(top_id, ("独自探索型", "独自の読書スタイルを持つタイプです。"))
+        t = (*base, "single_cluster")
+    # ④ 2クラスタ横断型
     elif diversity == 2:
         second = clusters[1]
-        if {top["id"], second["id"]} == {"mystery", "literary"}:
-            t = ("文学×ミステリ横断型", "文学性とミステリ性の両方を高く評価する、Bridge Work的な読書傾向です。")
-        elif "sf" in {top["id"], second["id"]}:
-            t = ("SF×文芸融合型", "SFと文芸の境界を越えた作品を好む、知的好奇心旺盛なタイプです。")
+        pair = frozenset({top_id, second["id"]})
+        if pair == frozenset({"mystery", "literary"}):
+            t = ("文学×ミステリ横断型",
+                 "文学性とミステリ性の両方を高く評価する、Bridge Work的な読書傾向です。",
+                 "cross_cluster")
+        elif "sf" in pair:
+            t = ("SF×文芸融合型",
+                 "SFと文芸の境界を越えた作品を好む、知的好奇心旺盛なタイプです。",
+                 "cross_cluster")
+        elif "horror" in pair:
+            t = ("ホラー×文芸型",
+                 "ホラーと文芸の両方に精通した、独自の感性を持つ読者です。",
+                 "cross_cluster")
         else:
-            t = ("クロスジャンル型", "複数のジャンルを横断する幅広い読書傾向のタイプです。")
+            t = ("クロスジャンル型",
+                 "複数のジャンルを横断する幅広い読書傾向のタイプです。",
+                 "cross_cluster")
+    # ⑤ 全クラスタ網羅型
     else:
-        t = ("バランス読書型", "特定のジャンルに偏らず、文学賞全般にわたって幅広く読むタイプです。")
+        t = ("バランス読書型",
+             "特定のジャンルに偏らず、文学賞全般にわたって幅広く読むタイプです。",
+             "balanced")
 
-    return {"label": t[0], "description": t[1]}
+    return {"label": t[0], "description": t[1], "graph_role": t[2]}
 
 
 def _recommend_next_reads(
@@ -704,30 +749,50 @@ def _calc_plam_score(
     clusters: list[dict],
     all_awards: set[str],
 ) -> dict:
-    """My PLAMスコアを100点満点で計算する。
+    """My PLAMスコアを100点満点で計算する（Phase 19-D強化版）。
 
     軸:
-    - 読書の広がり: 到達クラスタ数 / 5 × 40点
-    - 受賞作読了数: min(matched, 50) / 50 × 30点（50冊が最高）
-    - Bridge Work読了率: bridge_read / 12 × 20点
-    - クラスタバランス: 均等度（最大エントロピー比）× 10点
+    - 読書の広がり:        到達クラスタ数 / 5 × 30点
+    - 受賞作読了数:        min(matched, 50) / 50 × 25点
+    - Bridge参加度:        bridge_centrality × 20点  ← stability重み付き（19-D新）
+    - クラスタバランス:    シャノンエントロピー × 10点
+    - ユーザーPLAM一致度:  user_profile_score × 15点 ← 19-D新
     """
     import math
+    from services.plam_calibration import get_cluster_stability, get_bridge_work_ids
 
-    bridges = _bridge_set()
+    stability = get_cluster_stability()
+    bridge_ids_19c = get_bridge_work_ids()  # 19-C検出ブリッジ（award_historyベース）
+    bridges_legacy = _bridge_set()          # bridge_works.csvベース（既存）
+    all_bridges = bridge_ids_19c | bridges_legacy
+
     n_clusters = len(clusters)
-    bridge_read = len(matched_wids & bridges)
+    matched = len(matched_wids)
 
-    # 1. 広がり点
-    spread = round(n_clusters / 5 * 40)
+    # 1. 広がり点（30点）
+    spread = round(n_clusters / 5 * 30)
 
-    # 2. 受賞作読了点
-    award_score = round(min(len(matched_wids), 50) / 50 * 30)
+    # 2. 受賞作読了点（25点）
+    award_score = round(min(matched, 50) / 50 * 25)
 
-    # 3. Bridge Work点
-    bridge_score = round(bridge_read / 12 * 20)
+    # 3. Bridge参加度 centrality（20点）—— stability重み付き
+    # bridge作品ごとに所属クラスタのstabilityを乗じた重みで集計
+    bridge_centrality_sum = 0.0
+    cluster_m = _cluster_map()
+    history = _history_by_work()
+    for wid in matched_wids & all_bridges:
+        w_awards = {r["award_id"] for r in history.get(wid, []) if r.get("status") in ("awarded", "co_winner")}
+        w_clusters = {cluster_m.get(a, "unknown") for a in w_awards} - {"unknown"}
+        w_stab = max((stability.get(c, 0.5) for c in w_clusters), default=0.5)
+        bridge_centrality_sum += w_stab
+    max_bridge_centrality = sum(
+        max((stability.get(c, 0.5) for c in {cluster_m.get(a, "unknown") for a in
+             {r["award_id"] for r in history.get(wid, []) if r.get("status") in ("awarded", "co_winner")}} - {"unknown"}), default=0.5)
+        for wid in all_bridges
+    ) or 1.0
+    bridge_score = round(min(bridge_centrality_sum / max_bridge_centrality, 1.0) * 20)
 
-    # 4. バランス点（シャノンエントロピー）
+    # 4. バランス点（10点）
     total_votes = sum(c["count"] for c in clusters)
     if total_votes > 0 and n_clusters > 1:
         entropy = -sum(
@@ -739,16 +804,41 @@ def _calc_plam_score(
     else:
         balance = 0
 
-    total = spread + award_score + bridge_score + balance
+    # 5. ユーザーPLAM一致度（15点）—— 19-D新
+    # user_profile_score: 読了作品の19-C final_score平均
+    from services.plam_calibration import calibrate_sim, compute_final_score
+    from difflib import SequenceMatcher
+    cal_stats_ref = None  # キャッシュ済みなのでNoneでもget_calibration_stats()が使われる
+    profile_scores = []
+    works_idx = _works_index()
+    for wid in matched_wids:
+        work = next((v for v in works_idx.values() if v.get("work_id") == wid), None)
+        if not work:
+            continue
+        title = work.get("canonical_title", "")
+        w_awards = {r["award_id"] for r in history.get(wid, []) if r.get("status") in ("awarded", "co_winner")}
+        cluster_id = next(iter({cluster_m.get(a) for a in w_awards if cluster_m.get(a)}), None)
+        # 完全一致なのでbase=1.0として計算（読了済み=確実に一致）
+        score = compute_final_score(1.0, cluster_id, plam_work_id=wid,
+                                    stability=stability, bridge_ids=all_bridges)
+        profile_scores.append(score)
+
+    user_profile = sum(profile_scores) / len(profile_scores) if profile_scores else 0.0
+    profile_score = round(user_profile * 15)
+
+    total_score = spread + award_score + bridge_score + balance + profile_score
 
     return {
-        "total":        total,
-        "spread":       spread,
-        "award_score":  award_score,
-        "bridge_score": bridge_score,
-        "balance":      balance,
-        "bridge_read":  bridge_read,
-        "n_clusters":   n_clusters,
+        "total":          total_score,
+        "spread":         spread,
+        "award_score":    award_score,
+        "bridge_score":   bridge_score,
+        "balance":        balance,
+        "profile_score":  profile_score,
+        "bridge_read":    len(matched_wids & all_bridges),
+        "n_clusters":     n_clusters,
+        "user_profile":   round(user_profile, 3),
+        "bridge_centrality": round(bridge_centrality_sum / max_bridge_centrality, 3),
     }
 
 

@@ -6858,9 +6858,18 @@ async function loadMyPlam() {
       `<span class="my-plam-work-tag" title="${esc(w.awards.join(' / '))}">${esc(w.title)}</span>`
     ).join("");
 
-    // 読書タイプバッジ
-    const typeBadge = data.reader_type && data.reader_type.label
-      ? `<div class="my-plam-type-badge">${esc(data.reader_type.label)}</div>` : "";
+    // 読書タイプバッジ（19-D: graph_roleによる色分け）
+    const ROLE_COLORS = {
+      bridge_hub:      "#e85d04",
+      rare_specialist: "#6a4c93",
+      cross_cluster:   "#0066cc",
+      single_cluster:  "#2a9d8f",
+      balanced:        "#888",
+    };
+    const rt = data.reader_type || {};
+    const roleColor = ROLE_COLORS[rt.graph_role] || "#888";
+    const typeBadge = rt.label
+      ? `<div class="my-plam-type-badge" style="border-left:4px solid ${roleColor}">${esc(rt.label)}</div>` : "";
 
     // 次に読むべき3冊
     const nextCards = (data.next_reads || []).map(w => {
@@ -6886,12 +6895,15 @@ async function loadMyPlam() {
           <span class="my-plam-score-max">/100</span>
         </div>
         <div class="my-plam-score-axes">
-          <div class="my-plam-score-axis"><span>📖 広がり</span><span>${sc.spread}/40</span></div>
-          <div class="my-plam-score-axis"><span>🏆 受賞作</span><span>${sc.award_score}/30</span></div>
-          <div class="my-plam-score-axis"><span>🌉 Bridge</span><span>${sc.bridge_score}/20</span></div>
+          <div class="my-plam-score-axis"><span>📖 広がり</span><span>${sc.spread}/30</span></div>
+          <div class="my-plam-score-axis"><span>🏆 受賞作</span><span>${sc.award_score}/25</span></div>
+          <div class="my-plam-score-axis"><span>🌉 Bridge参加</span><span>${sc.bridge_score}/20</span></div>
           <div class="my-plam-score-axis"><span>⚖️ バランス</span><span>${sc.balance}/10</span></div>
+          <div class="my-plam-score-axis"><span>🧭 PLAM一致度</span><span>${sc.profile_score ?? 0}/15</span></div>
         </div>
-      </div>` : "";
+      </div>
+      ${sc.user_profile != null ? `<div style="font-size:0.78rem;color:#888;text-align:right;margin-top:2px">PLAM profile: ${(sc.user_profile*100).toFixed(1)}% / bridge centrality: ${(sc.bridge_centrality*100).toFixed(1)}%</div>` : ""}
+    ` : "";
 
     // 年別推移（直近3年）
     const trend = data.yearly_trend || [];
