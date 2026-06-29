@@ -5532,19 +5532,21 @@ function _renderAwardBooks(books, query) {
       ${g.books.map(b => {
         const isbn = b.library_isbn || (b.isbn13 && b.isbn13.length >= 10 ? b.isbn13 : "") || "";
         const coverUrl = get_cover_url_js(isbn);
+        const clickable = !!isbn;
         const coverHtml = coverUrl
-          ? `<img src="${coverUrl}" alt="" style="width:44px;height:60px;object-fit:cover;border-radius:4px;flex-shrink:0;background:#f0f0f0" onerror="this.style.display='none'">`
+          ? `<img src="${coverUrl}" alt="" style="width:44px;height:60px;object-fit:cover;border-radius:4px;flex-shrink:0;background:#f0f0f0${clickable ? ";cursor:pointer" : ""}" onerror="this.style.display='none'">`
           : `<div style="width:44px;height:60px;background:#f0f0f0;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.2rem">📖</div>`;
+        const clickAttr = clickable ? `onclick="openModal('${isbn.replace(/'/g,"\\'")}',{isbn:'${isbn.replace(/'/g,"\\'")}',title:${JSON.stringify(b.title)},author:${JSON.stringify(b.author||'')}})" style="cursor:pointer"` : "";
         return `
-        <div style="display:flex;align-items:center;gap:10px;margin-top:${g.books.length > 1 ? "8px" : "0"}">
+        <div ${clickAttr} style="display:flex;align-items:center;gap:10px;margin-top:${g.books.length > 1 ? "8px" : "0"};border-radius:8px;padding:4px;transition:background 0.15s${clickable ? ";cursor:pointer" : ""}"
+          ${clickable ? 'onmouseover="this.style.background=\'#f7f7f7\'" onmouseout="this.style.background=\'\'"' : ''}>
           ${coverHtml}
           <div style="flex:1;min-width:0">
-            <div style="font-size:0.95rem;font-weight:600;color:#222;line-height:1.3">${esc(b.title)}</div>
+            <div style="font-size:0.95rem;font-weight:600;color:${clickable?"#1a5c3a":"#222"};line-height:1.3">${esc(b.title)}</div>
             <div style="font-size:0.82rem;color:#666;margin-top:2px">${esc(b.author)}</div>
           </div>
           ${b.in_library
-            ? `<span style="font-size:0.72rem;background:#e8f5e9;color:#2e7d32;padding:3px 8px;border-radius:12px;white-space:nowrap;cursor:pointer;flex-shrink:0"
-                 onclick="switchToBooksAndSearch('${esc(b.title).replace(/'/g,"\\'")}')">📖 蔵書あり</span>`
+            ? `<span style="font-size:0.72rem;background:#e8f5e9;color:#2e7d32;padding:3px 8px;border-radius:12px;white-space:nowrap;flex-shrink:0">📖 蔵書あり</span>`
             : `<span style="font-size:0.72rem;background:#f5f5f5;color:#aaa;padding:3px 8px;border-radius:12px;white-space:nowrap;flex-shrink:0">未所蔵</span>`
           }
         </div>`;
