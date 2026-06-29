@@ -5503,14 +5503,11 @@ function filterAwardBooks() {
   _renderAwardBooks(books, q);
 }
 
-function _renderAwardBooks(books, query) {
-  const list = document.getElementById("awardBooksList");
-  if (!list) return;
-  if (!books.length) {
-    list.innerHTML = `<div style="color:#aaa;font-size:0.9rem;padding:20px 0;text-align:center">${query ? "該当する作品がありません" : "受賞作データがありません"}</div>`;
-    return;
-  }
-  // タイトルで統合（同一作が複数賞受賞の場合にまとめる）
+const AWARD_PAGE_SIZE = 30;
+let _awardPageItems = [];
+let _awardPageOffset = 0;
+
+function _buildAwardItems(books) {
   const _normTitle = t => (t || "").replace(/\s/g, "").toLowerCase();
   const byTitle = {};
   for (const b of books) {
@@ -5518,7 +5515,6 @@ function _renderAwardBooks(books, query) {
     if (!byTitle[key]) {
       byTitle[key] = { ...b, awards_list: [] };
     }
-    // ISBN・蔵書フラグは持っている方を優先
     if (b.library_isbn) byTitle[key].library_isbn = b.library_isbn;
     if (b.isbn13 && !byTitle[key].isbn13) byTitle[key].isbn13 = b.isbn13;
     if (b.in_library) byTitle[key].in_library = true;
@@ -5527,43 +5523,103 @@ function _renderAwardBooks(books, query) {
       byTitle[key].awards_list.push({ label: awardLabel, year: b.award_year });
     }
   }
-  // 最新受賞年で降順ソート
-  const items = Object.values(byTitle).sort((a, b) => {
+  return Object.values(byTitle).sort((a, b) => {
     const ya = Math.max(...a.awards_list.map(x => x.year || 0));
     const yb = Math.max(...b.awards_list.map(x => x.year || 0));
     return yb - ya;
   });
-  list.innerHTML = items.map(b => {
-    const isbn = b.library_isbn || (b.isbn13 && b.isbn13.length >= 10 ? b.isbn13 : "") || "";
-    const coverUrl = get_cover_url_js(isbn);
-    const clickable = !!isbn;
-    const coverHtml = coverUrl
-      ? `<img src="${coverUrl}" alt="" style="width:52px;height:70px;object-fit:cover;border-radius:5px;flex-shrink:0;background:#f0f0f0" onerror="this.style.display='none'">`
-      : `<div style="width:52px;height:70px;background:#f0f0f0;border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.4rem">📖</div>`;
-    const _iq = s => JSON.stringify(s).replace(/"/g, '&quot;');
-    const clickAttr = clickable
-      ? `onclick="openModal('${isbn.replace(/'/g,"\\'")}',{isbn:'${isbn.replace(/'/g,"\\'")}',title:${_iq(b.title)},author:${_iq(b.author||'')}})"`
-      : "";
-    const awardBadges = b.awards_list.map(a =>
-      `<span style="display:inline-block;font-size:0.7rem;background:#fff8e1;color:#b45309;border:1px solid #f6c744;border-radius:10px;padding:2px 8px;margin:2px 4px 2px 0;white-space:nowrap">🏆 ${esc(a.label)}</span>`
-    ).join("");
-    return `
-    <div ${clickAttr} style="display:flex;align-items:flex-start;gap:12px;border:1px solid #e8e8e8;border-radius:10px;padding:12px 14px;background:#fff;transition:background 0.15s${clickable ? ";cursor:pointer" : ""}"
-      ${clickable ? 'onmouseover="this.style.background=\'#f7f7f7\'" onmouseout="this.style.background=\'#fff\'"' : ''}>
-      ${coverHtml}
-      <div style="flex:1;min-width:0">
-        <div style="font-size:0.97rem;font-weight:700;color:${clickable ? "#1a5c3a" : "#222"};line-height:1.3;margin-bottom:2px">${esc(b.title)}</div>
-        <div style="font-size:0.83rem;color:#666;margin-bottom:6px">${esc(b.author)}</div>
-        <div style="line-height:1.8">${awardBadges}</div>
-      </div>
-      <div style="flex-shrink:0;padding-top:2px">
-        ${b.in_library
-          ? `<span style="font-size:0.72rem;background:#e8f5e9;color:#2e7d32;padding:3px 8px;border-radius:12px;white-space:nowrap">📖 蔵書あり</span>`
-          : `<span style="font-size:0.72rem;background:#f5f5f5;color:#aaa;padding:3px 8px;border-radius:12px;white-space:nowrap">未所蔵</span>`
-        }
-      </div>
-    </div>`;
-  }).join("");
+}
+
+function _awardCardHtml(b) {
+  const isbn = b.library_isbn || (b.isbn13 && b.isbn13.length >= 10 ? b.isbn13 : "") || "";
+  const coverUrl = get_cover_url_js(isbn);
+  const clickable = !!isbn;
+  const coverHtml = coverUrl
+    ? `<img src="${coverUrl}" alt="" style="width:52px;height:70px;object-fit:cover;border-radius:5px;flex-shrink:0;background:#f0f0f0" onerror="this.style.display='none'">`
+    : `<div style="width:52px;height:70px;background:#f0f0f0;border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.4rem">📖</div>`;
+  const _iq = s => JSON.stringify(s).replace(/"/g, '&quot;');
+  const clickAttr = clickable
+    ? `onclick="openModal('${isbn.replace(/'/g,"\\'")}',{isbn:'${isbn.replace(/'/g,"\\'")}',title:${_iq(b.title)},author:${_iq(b.author||'')}})"`
+    : "";
+  const awardBadges = b.awards_list.map(a =>
+    `<span style="display:inline-block;font-size:0.7rem;background:#fff8e1;color:#b45309;border:1px solid #f6c744;border-radius:10px;padding:2px 8px;margin:2px 4px 2px 0;white-space:nowrap">🏆 ${esc(a.label)}</span>`
+  ).join("");
+  const alreadyRead = isbn ? getReadStatus(isbn) === "読んだ" : false;
+  const readBtnHtml = isbn
+    ? `<button id="awdread-${isbn}" onclick="event.stopPropagation();toggleAwardRead('${isbn}',this)"
+        style="margin-top:6px;padding:3px 10px;border-radius:12px;border:1px solid ${alreadyRead ? "#2e7d32" : "#ccc"};background:${alreadyRead ? "#e8f5e9" : "#fff"};color:${alreadyRead ? "#2e7d32" : "#888"};font-size:0.75rem;cursor:pointer;transition:all 0.2s">
+        ${alreadyRead ? "✅ 読了済み" : "📖 読んだ"}
+      </button>`
+    : "";
+  return `
+  <div ${clickAttr} style="display:flex;align-items:flex-start;gap:12px;border:1px solid #e8e8e8;border-radius:10px;padding:12px 14px;background:#fff;transition:background 0.15s${clickable ? ";cursor:pointer" : ""}"
+    ${clickable ? 'onmouseover="this.style.background=\'#f7f7f7\'" onmouseout="this.style.background=\'#fff\'"' : ''}>
+    ${coverHtml}
+    <div style="flex:1;min-width:0">
+      <div style="font-size:0.97rem;font-weight:700;color:${clickable ? "#1a5c3a" : "#222"};line-height:1.3;margin-bottom:2px">${esc(b.title)}</div>
+      <div style="font-size:0.83rem;color:#666;margin-bottom:4px">${esc(b.author)}</div>
+      <div style="line-height:1.8">${awardBadges}</div>
+      ${readBtnHtml}
+    </div>
+    <div style="flex-shrink:0;padding-top:2px">
+      ${b.in_library
+        ? `<span style="font-size:0.72rem;background:#e8f5e9;color:#2e7d32;padding:3px 8px;border-radius:12px;white-space:nowrap">📖 蔵書あり</span>`
+        : `<span style="font-size:0.72rem;background:#f5f5f5;color:#aaa;padding:3px 8px;border-radius:12px;white-space:nowrap">未所蔵</span>`
+      }
+    </div>
+  </div>`;
+}
+
+function toggleAwardRead(isbn, btn) {
+  const current = getReadStatus(isbn);
+  if (current === "読んだ") {
+    setReadStatus(isbn, "");
+    btn.innerHTML = "📖 読んだ";
+    btn.style.background = "#fff";
+    btn.style.color = "#888";
+    btn.style.borderColor = "#ccc";
+  } else {
+    setReadStatus(isbn, "読んだ");
+    btn.innerHTML = "✅ 読了済み";
+    btn.style.background = "#e8f5e9";
+    btn.style.color = "#2e7d32";
+    btn.style.borderColor = "#2e7d32";
+  }
+}
+
+function _renderAwardBooks(books, query) {
+  const list = document.getElementById("awardBooksList");
+  if (!list) return;
+  if (!books.length) {
+    list.innerHTML = `<div style="color:#aaa;font-size:0.9rem;padding:20px 0;text-align:center">${query ? "該当する作品がありません" : "受賞作データがありません"}</div>`;
+    _awardPageItems = [];
+    return;
+  }
+  _awardPageItems = _buildAwardItems(books);
+  _awardPageOffset = 0;
+  _renderAwardPage(list, false);
+}
+
+function _renderAwardPage(list, append) {
+  const slice = _awardPageItems.slice(_awardPageOffset, _awardPageOffset + AWARD_PAGE_SIZE);
+  const html = slice.map(_awardCardHtml).join("");
+  if (append) {
+    const more = list.querySelector(".award-load-more");
+    if (more) more.remove();
+    list.insertAdjacentHTML("beforeend", html);
+  } else {
+    list.innerHTML = html;
+  }
+  _awardPageOffset += slice.length;
+  const remaining = _awardPageItems.length - _awardPageOffset;
+  if (remaining > 0) {
+    list.insertAdjacentHTML("beforeend",
+      `<button class="award-load-more" onclick="_renderAwardPage(document.getElementById('awardBooksList'),true)"
+        style="display:block;width:100%;margin-top:12px;padding:10px;border:1px solid #ccc;border-radius:10px;background:#fafafa;color:#555;font-size:0.88rem;cursor:pointer">
+        さらに ${Math.min(remaining, AWARD_PAGE_SIZE)} 件を表示（残り ${remaining} 件）
+      </button>`
+    );
+  }
 }
 
 async function loadAwardBooks(award) {
