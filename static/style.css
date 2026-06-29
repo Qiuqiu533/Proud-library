@@ -1074,3 +1074,17 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .my-plam-works { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
 .my-plam-work-tag { font-size: 0.78rem; background: #f3eef9; color: #5a3e8a; border-radius: 20px; padding: 2px 10px; border: 1px solid #d4c8ea; }
 .my-plam-meta { font-size: 0.75rem; color: #bbb; text-align: right; }
+
+/* My PLAM 読書タイプ・次に読むべき3冊 */
+.my-plam-type-badge { display: inline-block; font-size: 0.82rem; font-weight: 700; color: #5a3e8a; background: #f3eef9; border: 1.5px solid #d4c8ea; border-radius: 20px; padding: 3px 12px; margin-bottom: 12px; }
+.my-plam-next-label { font-size: 0.82rem; font-weight: 600; color: #5a3e8a; margin: 12px 0 6px; }
+.my-plam-next-grid { display: flex; flex-direction: column; gap: 8px; }
+.my-plam-next-card { background: #faf8ff; border: 1px solid #e8e0f5; border-radius: 8px; padding: 10px 12px; }
+.my-plam-next-card--link { cursor: pointer; transition: background .15s; }
+.my-plam-next-card--link:hover { background: #ede8f8; border-color: #c4b3ea; }
+.my-plam-next-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-bottom: 4px; }
+.my-plam-next-title { font-weight: 600; color: #333; font-size: 0.88rem; margin-bottom: 2px; }
+.my-plam-next-award { color: #888; font-size: 0.78rem; margin-bottom: 4px; }
+.my-plam-next-reason { color: #6a4c93; font-size: 0.78rem; line-height: 1.4; }
+.my-plam-expand-badge { font-size: 0.7rem; background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; border-radius: 10px; padding: 1px 6px; margin-right: 4px; }
+.my-plam-bridge-tag { font-size: 0.78rem; margin-right: 3px; }
