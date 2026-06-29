@@ -1148,3 +1148,23 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .plam21-detail[open] summary::before { transform: rotate(90deg); }
 .plam21-axes { display: flex; flex-direction: column; gap: 4px; padding: 6px 0 4px; }
 .plam21-axis { display: flex; justify-content: space-between; font-size: 0.8rem; color: #555; }
+
+/* Phase 21-B: マップインタラクション */
+.plam-dot--link { cursor: pointer; }
+.plam-dot--link:hover { opacity: 1 !important; filter: brightness(1.15); }
+.plam-tooltip {
+  display: none;
+  position: fixed;
+  z-index: 9999;
+  background: rgba(30,20,50,0.88);
+  color: #fff;
+  font-size: 0.78rem;
+  padding: 4px 9px;
+  border-radius: 6px;
+  pointer-events: none;
+  max-width: 180px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+}

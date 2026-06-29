@@ -1059,6 +1059,27 @@ def get_plam_embedding(room: str | None = None) -> dict:
     from services.plam_calibration import get_cluster_stability
     stability = get_cluster_stability()
 
+    # award_books から plam_work_id → isbn の逆引きマップを生成（21-B）
+    isbn_by_wid: dict[str, str] = {}
+    try:
+        from database import get_con, USE_PG
+        import sqlite3
+        con = get_con()
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        if USE_PG:
+            cur.execute("SELECT plam_work_id, isbn FROM award_books WHERE plam_work_id IS NOT NULL AND isbn IS NOT NULL AND isbn != ''")
+        else:
+            cur.execute("SELECT plam_work_id, isbn FROM award_books WHERE plam_work_id IS NOT NULL AND isbn != ''")
+        for row in cur.fetchall():
+            wid_key = row[0] if isinstance(row[0], str) else str(row[0])
+            isbn_val = row[1] if isinstance(row[1], str) else str(row[1])
+            if wid_key and isbn_val and wid_key not in isbn_by_wid:
+                isbn_by_wid[wid_key] = isbn_val
+        con.close()
+    except Exception:
+        pass
+
     works_out: list[dict] = []
     work_positions: dict[str, tuple[float, float]] = {}
 
@@ -1096,13 +1117,16 @@ def get_plam_embedding(room: str | None = None) -> dict:
         y = max(0.02, min(0.98, y))
 
         work_positions[wid] = (x, y)
-        works_out.append({
+        entry: dict = {
             "work_id": wid,
             "title":   title,
             "cluster": primary,
             "x":       x,
             "y":       y,
-        })
+        }
+        if wid in isbn_by_wid:
+            entry["isbn"] = isbn_by_wid[wid]
+        works_out.append(entry)
 
     # ユーザー位置（roomが指定された場合）
     user_pos = None

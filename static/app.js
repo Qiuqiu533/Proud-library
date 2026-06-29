@@ -6990,14 +6990,19 @@ async function loadPlamMap21(room) {
 
     const userWids = new Set(data.user_works || []);
 
+    // 背景ドット（インタラクションなし）
     const dots = data.works.filter(w => !userWids.has(w.work_id)).map(w => {
       const cx = Math.round(w.x * W), cy = Math.round(w.y * H);
-      return `<circle cx="${cx}" cy="${cy}" r="2" fill="${CM[w.cluster]||'#ddd'}" opacity="0.4"/>`;
+      const isbn = w.isbn ? ` data-isbn="${esc(w.isbn)}"` : "";
+      return `<circle cx="${cx}" cy="${cy}" r="2.5" fill="${CM[w.cluster]||'#ddd'}" opacity="0.4" data-title="${esc(w.title)}"${isbn} class="plam-dot"/>`;
     }).join("");
 
+    // 読了済みドット（クリック可・強調）
     const uDots = data.works.filter(w => userWids.has(w.work_id)).map(w => {
       const cx = Math.round(w.x * W), cy = Math.round(w.y * H);
-      return `<circle cx="${cx}" cy="${cy}" r="5" fill="${CM[w.cluster]||'#ddd'}" stroke="#fff" stroke-width="1.5" opacity="0.95" title="${esc(w.title)}"/>`;
+      const isbn = w.isbn ? ` data-isbn="${esc(w.isbn)}"` : "";
+      const clickable = w.isbn ? ` class="plam-dot plam-dot--read plam-dot--link"` : ` class="plam-dot plam-dot--read"`;
+      return `<circle cx="${cx}" cy="${cy}" r="6" fill="${CM[w.cluster]||'#ddd'}" stroke="#fff" stroke-width="2" opacity="0.95" data-title="${esc(w.title)}"${isbn}${clickable}/>`;
     }).join("");
 
     const cc = data.cluster_centers || {};
@@ -7014,13 +7019,82 @@ async function loadPlamMap21(room) {
         <text x="${ux}" y="${uy+4}" text-anchor="middle" font-size="10" fill="#e63946" font-weight="900">you</text>`;
     }
 
-    container.innerHTML = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="plam21-map-svg">
+    container.innerHTML = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="plam21-map-svg" id="plamMapSvgEl">
       <rect width="${W}" height="${H}" fill="#f8f6fc" rx="10"/>
       ${dots}${uDots}${labels}${youMarker}
     </svg>`;
+
+    // Phase 21-B: インタラクション追加
+    _bindPlamMapEvents(container);
+
   } catch(e) {
     container.innerHTML = '<span style="font-size:0.8rem;color:#bbb;padding:8px">マップを読み込めませんでした</span>';
   }
+}
+
+function _bindPlamMapEvents(container) {
+  // floating tooltip（既存があれば再利用）
+  let tip = document.getElementById("plamTooltip");
+  if (!tip) {
+    tip = document.createElement("div");
+    tip.id = "plamTooltip";
+    tip.className = "plam-tooltip";
+    document.body.appendChild(tip);
+  }
+
+  const showTip = (text, x, y) => {
+    tip.textContent = text;
+    tip.style.display = "block";
+    const tw = tip.offsetWidth || 120;
+    const vw = window.innerWidth;
+    const left = Math.min(x + 12, vw - tw - 8);
+    tip.style.left = left + "px";
+    tip.style.top  = (y - 36) + "px";
+  };
+  const hideTip = () => { tip.style.display = "none"; };
+
+  // event delegation on SVG container
+  container.addEventListener("mouseover", e => {
+    const el = e.target.closest(".plam-dot");
+    if (!el) { hideTip(); return; }
+    const title = el.getAttribute("data-title");
+    if (title) showTip(title, e.clientX, e.clientY);
+  });
+  container.addEventListener("mousemove", e => {
+    if (tip.style.display === "block") {
+      const tw = tip.offsetWidth || 120;
+      const vw = window.innerWidth;
+      tip.style.left = Math.min(e.clientX + 12, vw - tw - 8) + "px";
+      tip.style.top  = (e.clientY - 36) + "px";
+    }
+  });
+  container.addEventListener("mouseleave", hideTip);
+
+  // モバイル: touchstart でtooltip、link dotはopenModal
+  container.addEventListener("touchstart", e => {
+    const el = e.target.closest(".plam-dot");
+    if (!el) return;
+    const title = el.getAttribute("data-title");
+    const isbn  = el.getAttribute("data-isbn");
+    if (isbn && el.classList.contains("plam-dot--link")) {
+      e.preventDefault();
+      openModal(isbn);
+      return;
+    }
+    if (title) {
+      const t = e.touches[0];
+      showTip(title, t.clientX, t.clientY);
+      setTimeout(hideTip, 2000);
+    }
+  }, { passive: false });
+
+  // PC: クリックでopenModal（読了済み + ISBN持ちドット）
+  container.addEventListener("click", e => {
+    const el = e.target.closest(".plam-dot--link");
+    if (!el) return;
+    const isbn = el.getAttribute("data-isbn");
+    if (isbn) { hideTip(); openModal(isbn); }
+  });
 }
 
 function openGoalEdit() {
