@@ -1696,6 +1696,58 @@ def _migrate_plam_coverage_log():
         con.close()
 
 
+def _migrate_plam_fix_log():
+    """PLAMオートフィックスログテーブルを追加する。"""
+    if _migration_done("plam_fix_log_v1"):
+        return
+    con = get_con()
+    try:
+        if USE_PG:
+            cur = con.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS plam_fix_log (
+                    id SERIAL PRIMARY KEY,
+                    fixed_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                    award_book_id INTEGER NOT NULL,
+                    award TEXT,
+                    award_year INTEGER,
+                    db_title TEXT,
+                    db_author TEXT,
+                    plam_work_id TEXT NOT NULL,
+                    plam_title TEXT,
+                    plam_author TEXT,
+                    confidence REAL NOT NULL,
+                    fix_type TEXT NOT NULL,
+                    mode TEXT NOT NULL
+                )
+            """)
+        else:
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS plam_fix_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    fixed_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    award_book_id INTEGER NOT NULL,
+                    award TEXT,
+                    award_year INTEGER,
+                    db_title TEXT,
+                    db_author TEXT,
+                    plam_work_id TEXT NOT NULL,
+                    plam_title TEXT,
+                    plam_author TEXT,
+                    confidence REAL NOT NULL,
+                    fix_type TEXT NOT NULL,
+                    mode TEXT NOT NULL
+                )
+            """)
+        con.commit()
+        _mark_migration_done("plam_fix_log_v1")
+        logger.info("[migration] plam_fix_log テーブル追加完了")
+    except Exception as e:
+        logger.error("[migration] plam_fix_log error: %s", e)
+    finally:
+        con.close()
+
+
 def _migrate_collections_sort_order():
     """collections テーブルに sort_order カラムがなければ追加する。"""
     if _migration_done("collections_sort_order_v1"):
@@ -1797,6 +1849,7 @@ def _run_all_migrations():
         _migrate_ndc_column,               # ndc カラム追加
         _migrate_award_books_plam_work_id, # award_books.plam_work_id カラム追加
         _migrate_plam_coverage_log,        # PLAMカバレッジ履歴テーブル追加
+        _migrate_plam_fix_log,             # PLAMオートフィックスログテーブル追加
         _migrate_loan_history,             # 貸出履歴テーブル追加
         _verify_tables,
     ]
