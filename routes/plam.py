@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, render_template, request
-from services.plam import get_award_network, get_bridge_works, get_book_plam_info, get_related_works
+from services.plam import get_award_network, get_bridge_works, get_book_plam_info, get_related_works, get_my_plam
 
 plam_bp = Blueprint("plam", __name__)
 
@@ -30,6 +30,18 @@ def api_plam_related():
         return jsonify({"error": "work_id required"}), 400
     limit = min(int(request.args.get("limit", 6)), 12)
     return jsonify(get_related_works(work_id, limit=limit))
+
+
+@plam_bp.route("/api/plam/my")
+def api_plam_my():
+    """住民の読了履歴からMy PLAMプロフィールを返す"""
+    room = request.args.get("room", "").strip()
+    if not room:
+        return jsonify({"error": "room required"}), 400
+    result = get_my_plam(room)
+    if result is None:
+        return jsonify(None), 200
+    return jsonify(result)
 
 
 @plam_bp.route("/api/plam/book")
