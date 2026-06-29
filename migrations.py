@@ -1612,6 +1612,52 @@ def _migrate_ai_review_columns():
         con.close()
 
 
+def _migrate_ndc_column():
+    """genre_books に ndc カラムを追加する。"""
+    if _migration_done("ndc_column_v1"):
+        return
+    con = get_con()
+    try:
+        if USE_PG:
+            cur = con.cursor()
+            cur.execute("ALTER TABLE genre_books ADD COLUMN IF NOT EXISTS ndc TEXT DEFAULT ''")
+        else:
+            try:
+                con.execute("ALTER TABLE genre_books ADD COLUMN ndc TEXT DEFAULT ''")
+            except Exception:
+                pass
+        con.commit()
+        _mark_migration_done("ndc_column_v1")
+        logger.info("[migration] genre_books.ndc カラム追加完了")
+    except Exception as e:
+        logger.error("[migration] ndc_column error: %s", e)
+    finally:
+        con.close()
+
+
+def _migrate_award_books_plam_work_id():
+    """award_books に plam_work_id カラムを追加する（PLAM連携用）。"""
+    if _migration_done("award_books_plam_work_id_v1"):
+        return
+    con = get_con()
+    try:
+        if USE_PG:
+            cur = con.cursor()
+            cur.execute("ALTER TABLE award_books ADD COLUMN IF NOT EXISTS plam_work_id TEXT DEFAULT NULL")
+        else:
+            try:
+                con.execute("ALTER TABLE award_books ADD COLUMN plam_work_id TEXT DEFAULT NULL")
+            except Exception:
+                pass
+        con.commit()
+        _mark_migration_done("award_books_plam_work_id_v1")
+        logger.info("[migration] award_books.plam_work_id カラム追加完了")
+    except Exception as e:
+        logger.error("[migration] award_books_plam_work_id error: %s", e)
+    finally:
+        con.close()
+
+
 def _migrate_collections_sort_order():
     """collections テーブルに sort_order カラムがなければ追加する。"""
     if _migration_done("collections_sort_order_v1"):
@@ -1710,6 +1756,8 @@ def _run_all_migrations():
         _migrate_helpful_count,            # helpful_count カラム追加
         _migrate_helpful_votes,            # helpful_votes テーブル追加
         _migrate_ai_review_columns,        # ai_summary/ai_tags カラム追加
+        _migrate_ndc_column,               # ndc カラム追加
+        _migrate_award_books_plam_work_id, # award_books.plam_work_id カラム追加
         _migrate_loan_history,             # 貸出履歴テーブル追加
         _verify_tables,
     ]

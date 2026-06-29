@@ -504,28 +504,29 @@ def _save_genre_update_time():
 
 def _classify_genre(ndc, title="", description=""):
     """NDCコード＋キーワードでジャンルを自動判定"""
+    from config import NDC_TO_GENRE, KEYWORD_GENRE
     combined = (title or "") + " " + (description or "")
-    kw = {
-        "ミステリ・推理":    ["ミステリ","推理","探偵","殺人事件","謎解き","サスペンス","刑事","犯罪"],
-        "ファンタジー・SF":  ["ファンタジー","SF","魔法","異世界","宇宙","ロボット","タイムトラベル","ドラゴン"],
-        "時代小説・歴史小説":["時代小説","歴史小説","江戸","武士","侍","幕府","戦国","剣客","忍者","藩"],
-        "恋愛・青春小説":    ["恋愛小説","青春小説","ラブストーリー","純愛"],
-        "エッセイ・評論":    ["エッセイ","随筆","評論","コラム"],
-        "実用・ハウツー":    ["料理","レシピ","ダイエット","健康","投資","資産","育児","子育て","勉強法"],
-        "社会・ノンフィクション": ["ノンフィクション","ルポ","ドキュメンタリー","事件","経済","政治","歴史的事件"],
-    }
-    for genre, words in kw.items():
+
+    # 1. NDCコードで判定（最優先・長いコードから順にマッチ）
+    n = str(ndc or "").strip()
+    if n:
+        for length in (4, 3, 2):
+            prefix = n[:length]
+            if prefix in NDC_TO_GENRE:
+                return NDC_TO_GENRE[prefix]
+        # NDCの大分類フォールバック
+        if n.startswith("726") or n.startswith("72"): return "絵本・児童書"
+        if n.startswith("91"):  return "文芸小説"
+        if n[:1] == "9":        return "翻訳小説"
+        if n[:1] in ("1","2","3","4","5","6","0"): return "実用・ハウツー"
+
+    # 2. タイトル・説明のキーワードで判定
+    for words, genre in KEYWORD_GENRE:
         if any(w in combined for w in words):
             return genre
-    n = str(ndc or "")
-    if n.startswith("726"):   return "絵本・児童書"
-    if n.startswith("72"):    return "絵本・児童書"
-    if n.startswith("916"):   return "エッセイ・評論"
-    if n.startswith("913"):   return "文芸小説"
-    if n.startswith("91"):    return "文芸小説"
-    if n[:1] == "9":          return "翻訳小説"
-    if n[:1] in ("4","5","6","0","1","2","3"):  return "実用・ハウツー"
-    return "文芸小説"
+
+    # 3. どれにも当てはまらない場合は「その他」
+    return "その他"
 
 
 def _auto_classify_new_books():
