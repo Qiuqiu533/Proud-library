@@ -401,7 +401,7 @@ def get_my_plam(room: str) -> dict | None:
         con.row_factory = sqlite3.Row
         cur = con.cursor()
         cur.execute(
-            "SELECT title, author, status FROM reading_timeline WHERE room=? ORDER BY created_at DESC",
+            "SELECT title, author, status, created_at FROM reading_timeline WHERE room=? ORDER BY created_at DESC",
             (room,),
         )
         timeline_rows = [dict(r) for r in cur.fetchall()]
