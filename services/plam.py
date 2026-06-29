@@ -523,20 +523,24 @@ def get_my_plam(room: str) -> dict | None:
     # STEP8: 年別読書推移
     yearly_trend = _calc_yearly_trend(timeline_rows, works_idx, history, cluster_m)
 
+    # STEP8b: Phase 20-B クラスタ遷移タイムライン
+    cluster_timeline = _calc_cluster_timeline(timeline_rows, works_idx, history, cluster_m)
+
     # STEP9: チャレンジ提案
     challenges = _build_challenges(clusters_out, matched_wids, all_my_awards)
 
     return {
-        "matched":      matched,
-        "total":        total,
-        "clusters":     clusters_out,
-        "top_works":    top_works,
-        "profile_text": profile_text,
-        "reader_type":  reader_type,
-        "next_reads":   next_reads,
-        "plam_score":   plam_score,
-        "yearly_trend": yearly_trend,
-        "challenges":   challenges,
+        "matched":          matched,
+        "total":            total,
+        "clusters":         clusters_out,
+        "top_works":        top_works,
+        "profile_text":     profile_text,
+        "reader_type":      reader_type,
+        "next_reads":       next_reads,
+        "plam_score":       plam_score,
+        "yearly_trend":     yearly_trend,
+        "cluster_timeline": cluster_timeline,
+        "challenges":       challenges,
     }
 
 
@@ -897,6 +901,116 @@ def _calc_yearly_trend(
             "total_matched": sum(counts.values()),
         })
     return result
+
+
+def _calc_cluster_timeline(
+    timeline_rows: list[dict],
+    works_idx: dict,
+    history: dict,
+    cluster_m: dict,
+) -> dict:
+    """Phase 20-B: クラスタ遷移タイムラインを生成する。
+
+    Returns: {
+        "quarters": [{"period": "2023-Q1", "dominant": "mystery", "counts": {...}, "works": [...]}],
+        "transition_matrix": {"mystery->literary": 3, ...},
+        "migration_path": ["mystery", "literary", "sf"],
+        "drift_score": float,  # 0〜1: 高いほど多様なクラスタを横断
+    }
+    """
+    from datetime import datetime
+
+    # クォーター別にcluster集計
+    quarter_data: dict[str, dict] = {}  # "2023-Q1" -> {cluster -> [{title, work_id}]}
+
+    for row in timeline_rows:
+        ts = row.get("created_at", "")
+        if not ts:
+            continue
+        try:
+            dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+            period = f"{dt.year}-Q{(dt.month - 1) // 3 + 1}"
+        except Exception:
+            continue
+
+        title = row.get("title", "")
+        if not title:
+            continue
+        key = _normalize(title)
+        work = works_idx.get(key)
+        if not work:
+            # 前方一致フォールバック
+            if len(key) >= 2:
+                for k, v in works_idx.items():
+                    if k.startswith(key) or key.startswith(k):
+                        work = v
+                        break
+        if not work:
+            continue
+
+        wid = work["work_id"]
+        w_rows = [r for r in history.get(wid, []) if r.get("status") in ("awarded", "co_winner")]
+        clusters = {cluster_m.get(r["award_id"], "unknown") for r in w_rows} - {"unknown"}
+        if not clusters:
+            continue
+
+        quarter_data.setdefault(period, {})
+        for c in clusters:
+            quarter_data[period].setdefault(c, [])
+            quarter_data[period][c].append({
+                "work_id": wid,
+                "title": work.get("canonical_title", title),
+            })
+
+    if not quarter_data:
+        return {"quarters": [], "transition_matrix": {}, "migration_path": [], "drift_score": 0.0}
+
+    # クォーター順にソート（直近8四半期）
+    sorted_periods = sorted(quarter_data.keys())[-8:]
+    ALL_CLUSTERS = ["mystery", "literary", "sf", "horror", "career"]
+
+    quarters = []
+    dominant_seq: list[str] = []
+    for period in sorted_periods:
+        counts = {c: len(quarter_data[period].get(c, [])) for c in ALL_CLUSTERS}
+        dominant = max(counts, key=lambda c: counts[c]) if any(counts.values()) else "unknown"
+        works_sample = []
+        for c in ALL_CLUSTERS:
+            for w in quarter_data[period].get(c, [])[:2]:
+                works_sample.append({**w, "cluster": c})
+        quarters.append({
+            "period": period,
+            "dominant": dominant,
+            "counts": counts,
+            "works": works_sample[:4],
+        })
+        dominant_seq.append(dominant)
+
+    # 遷移行列: dominant cluster の連続遷移を集計
+    transition_matrix: dict[str, int] = {}
+    for i in range(len(dominant_seq) - 1):
+        a, b = dominant_seq[i], dominant_seq[i + 1]
+        if a != b:
+            key = f"{a}->{b}"
+            transition_matrix[key] = transition_matrix.get(key, 0) + 1
+
+    # migration path: 重複を除いた遷移シーケンス
+    migration_path: list[str] = []
+    for c in dominant_seq:
+        if not migration_path or migration_path[-1] != c:
+            migration_path.append(c)
+
+    # drift_score: ユニーク遷移数 / 可能な最大遷移数
+    n_transitions = len(dominant_seq) - 1
+    n_unique = len(set(transition_matrix.keys()))
+    drift_score = round(n_unique / max(n_transitions, 1), 3) if n_transitions > 0 else 0.0
+
+    return {
+        "quarters": quarters,
+        "transition_matrix": transition_matrix,
+        "migration_path": migration_path,
+        "drift_score": drift_score,
+    }
 
 
 def _build_challenges(

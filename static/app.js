@@ -6924,6 +6924,41 @@ async function loadMyPlam() {
         }).join("")}
       </div>` : "";
 
+    // Phase 20-B: クラスタ遷移タイムライン
+    const ct = data.cluster_timeline || {};
+    const quarters = ct.quarters || [];
+    const migPath = ct.migration_path || [];
+    const transMatrix = ct.transition_matrix || {};
+    const driftScore = ct.drift_score || 0;
+
+    const CLUSTER_LABEL = {mystery:"ミステリ",literary:"文学",sf:"SF",horror:"ホラー",career:"キャリア",unknown:"未分類"};
+
+    // migration path → 矢印表示
+    const migPathHtml = migPath.length >= 2
+      ? `<div class="my-plam-migpath">${migPath.map((c,i) => {
+          const color = CLUSTER_COLORS_JS[c] || "#ccc";
+          const arrow = i < migPath.length - 1 ? `<span class="my-plam-migpath-arrow">→</span>` : "";
+          return `<span class="my-plam-migpath-node" style="background:${color}">${CLUSTER_LABEL[c]||c}</span>${arrow}`;
+        }).join("")}</div>`
+      : "";
+
+    // クォーター別スパークライン
+    const quarterHtml = quarters.length >= 2 ? `
+      <div class="my-plam-timeline-label">🗺️ 読書軌跡 <span class="my-plam-drift-score" title="クラスタ横断度">${Math.round(driftScore*100)}%移動</span></div>
+      ${migPathHtml}
+      <div class="my-plam-quarters">
+        ${quarters.map(q => {
+          const color = CLUSTER_COLORS_JS[q.dominant] || "#ccc";
+          const label = CLUSTER_LABEL[q.dominant] || q.dominant;
+          const tooltip = Object.entries(q.counts).filter(([,v])=>v>0).map(([c,v])=>`${CLUSTER_LABEL[c]||c}:${v}`).join(" ");
+          return `<div class="my-plam-quarter-col" title="${q.period} ${tooltip}">
+            <div class="my-plam-quarter-dot" style="background:${color}"></div>
+            <div class="my-plam-quarter-period">${q.period.replace("-Q","Q")}</div>
+            <div class="my-plam-quarter-label" style="color:${color}">${label}</div>
+          </div>`;
+        }).join("")}
+      </div>` : "";
+
     // チャレンジ提案
     const challengeHtml = (data.challenges || []).length
       ? `<div class="my-plam-challenge-label">🎯 チャレンジ</div>
@@ -6935,6 +6970,7 @@ async function loadMyPlam() {
       ${scoreHtml}
       <div class="my-plam-clusters">${bars}</div>
       <p class="my-plam-profile">${esc(data.profile_text)}</p>
+      ${quarterHtml}
       ${trendHtml}
       ${challengeHtml}
       ${data.top_works.length ? `<div class="my-plam-works-label">照合できた受賞作</div><div class="my-plam-works">${works}</div>` : ""}
