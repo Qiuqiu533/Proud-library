@@ -91,17 +91,29 @@ def api_post_award_book():
 
 @awards_bp.route("/api/award-books/<int:book_id>", methods=["PATCH"])
 def api_patch_award_book(book_id):
-    """受賞作のステータスを更新（管理者）"""
+    """受賞作のステータス・ISBN更新（管理者）"""
     data = request.get_json() or {}
     if not check_password(data.get("password", ""), "board"):
         return jsonify({"error": "認証エラー"}), 403
-    status = (data.get("status") or "").strip()
-    if status not in ("確認済", "要確認"):
-        return jsonify({"error": "不正なステータス"}), 400
     if not USE_PG:
         return jsonify({"error": "PG only"}), 400
     con = get_con()
-    execute(con, "UPDATE award_books SET status=? WHERE id=?", (status, book_id))
+    if "isbn13" in data:
+        import re
+        isbn = re.sub(r"[^0-9X]", "", (data.get("isbn13") or "").upper().strip())
+        if isbn and len(isbn) not in (10, 13):
+            con.close()
+            return jsonify({"error": "ISBNは10桁または13桁で入力してください"}), 400
+        execute(con, "UPDATE award_books SET isbn13=? WHERE id=?", (isbn or None, book_id))
+    elif "status" in data:
+        status = (data.get("status") or "").strip()
+        if status not in ("確認済", "要確認"):
+            con.close()
+            return jsonify({"error": "不正なステータス"}), 400
+        execute(con, "UPDATE award_books SET status=? WHERE id=?", (status, book_id))
+    else:
+        con.close()
+        return jsonify({"error": "更新フィールドなし"}), 400
     con.commit()
     con.close()
     return jsonify({"ok": True})

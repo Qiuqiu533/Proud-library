@@ -5825,33 +5825,38 @@ async function loadAdminAwardBooks() {
     const books = await res.json();
     if (countEl) countEl.textContent = `${books.length}件`;
     if (!books.length) { list.innerHTML = '<div style="color:#aaa;padding:16px">登録データなし</div>'; return; }
+    const noIsbnOnly = document.getElementById("awdNoIsbnOnly")?.checked;
+    const filtered = noIsbnOnly ? books.filter(b => !b.isbn13) : books;
+    const noIsbnCount = books.filter(b => !b.isbn13).length;
+    const summary = document.getElementById("awdIsbnSummary");
+    if (summary) summary.innerHTML = `全 <b>${books.length}</b> 件 ／ ISBN未入力 <b style="color:${noIsbnCount>0?'#c62828':'#2e7d32'}">${noIsbnCount}</b> 件`;
+    if (!filtered.length) { list.innerHTML = '<div style="color:#aaa;padding:16px">該当データなし</div>'; return; }
     list.innerHTML = `
       <table style="width:100%;border-collapse:collapse;font-size:0.82rem">
         <thead>
           <tr style="background:#f0f0f0;text-align:left">
             <th style="padding:7px 8px;border-bottom:1px solid #ddd">賞名</th>
-            <th style="padding:7px 8px;border-bottom:1px solid #ddd">回</th>
-            <th style="padding:7px 8px;border-bottom:1px solid #ddd">年</th>
-            <th style="padding:7px 8px;border-bottom:1px solid #ddd">タイトル</th>
-            <th style="padding:7px 8px;border-bottom:1px solid #ddd">著者</th>
-            <th style="padding:7px 8px;border-bottom:1px solid #ddd">状態</th>
+            <th style="padding:7px 8px;border-bottom:1px solid #ddd">年/回</th>
+            <th style="padding:7px 8px;border-bottom:1px solid #ddd">タイトル・著者</th>
+            <th style="padding:7px 8px;border-bottom:1px solid #ddd">ISBN13</th>
             <th style="padding:7px 8px;border-bottom:1px solid #ddd"></th>
           </tr>
         </thead>
         <tbody>
-          ${books.map(b => `
-            <tr style="border-bottom:1px solid #eee" id="awdrow-${b.id}">
-              <td style="padding:6px 8px">${esc(b.award)}</td>
-              <td style="padding:6px 8px;text-align:center">${b.award_no ?? "—"}</td>
-              <td style="padding:6px 8px;text-align:center">${b.award_year ?? "—"}</td>
-              <td style="padding:6px 8px;font-weight:500">${esc(b.title)}</td>
-              <td style="padding:6px 8px">${esc(b.author || "—")}</td>
+          ${filtered.map(b => `
+            <tr style="border-bottom:1px solid #eee;background:${!b.isbn13?'#fff8f8':''}" id="awdrow-${b.id}">
+              <td style="padding:6px 8px;font-size:0.78rem">${esc(b.award)}</td>
+              <td style="padding:6px 8px;text-align:center;white-space:nowrap;font-size:0.78rem">${b.award_year ?? "—"}<br><span style="color:#aaa">第${b.award_no ?? "?"}回</span></td>
+              <td style="padding:6px 8px;font-weight:500">${esc(b.title)}<br><span style="font-size:0.75rem;color:#888">${esc(b.author||"")}</span></td>
               <td style="padding:6px 8px">
-                <span style="font-size:0.75rem;padding:2px 7px;border-radius:10px;background:${b.status==='確認済'?'#e8f5e9':'#fff8e1'};color:${b.status==='確認済'?'#2e7d32':'#f57f17'}">
-                  ${esc(b.status)}
-                </span>
+                <input id="isbn-input-${b.id}" type="text" value="${esc(b.isbn13||'')}" placeholder="例: 9784..."
+                  style="width:130px;padding:4px 6px;border:1px solid ${!b.isbn13?'#f4a261':'#ccc'};border-radius:5px;font-size:0.8rem">
               </td>
-              <td style="padding:6px 8px">
+              <td style="padding:6px 8px;white-space:nowrap">
+                <button onclick="saveAwardIsbn(${b.id})"
+                  style="font-size:0.75rem;padding:3px 8px;background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;border-radius:5px;cursor:pointer;margin-right:4px">
+                  保存
+                </button>
                 <button onclick="deleteAwardBook(${b.id})"
                   style="font-size:0.75rem;padding:3px 8px;background:#ffebee;color:#c62828;border:1px solid #ef9a9a;border-radius:5px;cursor:pointer">
                   削除
@@ -5894,6 +5899,27 @@ async function submitAwardBook() {
       msg.textContent = "❌ " + (err.error || res.status);
     }
   } catch(e) { msg.textContent = "❌ 通信エラー"; }
+}
+
+async function saveAwardIsbn(id) {
+  const input = document.getElementById(`isbn-input-${id}`);
+  if (!input) return;
+  const isbn = input.value.trim();
+  const res = await fetch(`/api/award-books/${id}`, {
+    method: "PATCH",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ password: boardPassword, isbn13: isbn })
+  });
+  if (res.ok) {
+    input.style.border = "1px solid #a5d6a7";
+    input.style.background = "#f1f8f1";
+    const row = document.getElementById(`awdrow-${id}`);
+    if (row) row.style.background = "";
+    setTimeout(() => { input.style.border = "1px solid #ccc"; input.style.background = ""; }, 2000);
+  } else {
+    const err = await res.json().catch(() => ({}));
+    alert("❌ " + (err.error || "保存エラー"));
+  }
 }
 
 async function deleteAwardBook(id) {
