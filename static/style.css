@@ -1106,3 +1106,15 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .my-plam-challenge-label { font-size: 0.82rem; font-weight: 600; color: #5a3e8a; margin: 12px 0 4px; }
 .my-plam-challenges { margin: 0 0 10px; padding-left: 18px; }
 .my-plam-challenges li { font-size: 0.82rem; color: #555; line-height: 1.6; margin-bottom: 4px; }
+
+/* Phase 20-B: クラスタ遷移タイムライン */
+.my-plam-timeline-label { font-size: 0.82rem; font-weight: 600; color: #5a3e8a; margin: 14px 0 6px; display: flex; align-items: center; gap: 6px; }
+.my-plam-drift-score { font-size: 0.72rem; font-weight: 400; color: #888; background: #f0ede8; padding: 1px 6px; border-radius: 10px; }
+.my-plam-migpath { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-bottom: 10px; }
+.my-plam-migpath-node { font-size: 0.75rem; font-weight: 600; color: #fff; padding: 3px 8px; border-radius: 12px; }
+.my-plam-migpath-arrow { color: #bbb; font-size: 0.9rem; }
+.my-plam-quarters { display: flex; overflow-x: auto; gap: 8px; padding-bottom: 6px; margin-bottom: 12px; scrollbar-width: thin; }
+.my-plam-quarter-col { display: flex; flex-direction: column; align-items: center; min-width: 54px; flex-shrink: 0; }
+.my-plam-quarter-dot { width: 14px; height: 14px; border-radius: 50%; margin-bottom: 4px; }
+.my-plam-quarter-period { font-size: 0.68rem; color: #aaa; margin-bottom: 2px; }
+.my-plam-quarter-label { font-size: 0.7rem; font-weight: 600; text-align: center; }
