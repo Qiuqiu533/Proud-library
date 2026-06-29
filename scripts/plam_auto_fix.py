@@ -131,8 +131,17 @@ def _find_candidates(
     return results[:5]
 
 
-def build_fix_list(con, plam_idx, plam_award_ids, cal_stats, threshold: float) -> list[dict]:
-    """閾値以上のすべての自動修正候補を返す"""
+def build_fix_list(
+    con, plam_idx, plam_award_ids, cal_stats, threshold: float,
+    cluster_thresholds: dict | None = None,
+) -> list[dict]:
+    """閾値以上のすべての自動修正候補を返す。
+
+    cluster_thresholds が与えられている場合、賞ごとのクラスタ閾値を優先する。
+    threshold は未知クラスタ / --auto-fix時の明示指定のフォールバック。
+    """
+    from services.plam_calibration import get_threshold_for_award
+
     cur = con.cursor()
     cur.execute("""
         SELECT id, award, award_year, title, author
@@ -144,13 +153,21 @@ def build_fix_list(con, plam_idx, plam_award_ids, cal_stats, threshold: float) -
 
     fixes = []
     for rid, award, year, title, author in rows:
+        # クラスタ別adaptive threshold を取得
+        if cluster_thresholds:
+            eff_threshold = get_threshold_for_award(
+                _plam_award_id_from_db_award(award), cluster_thresholds
+            )
+        else:
+            eff_threshold = threshold
+
         candidates = _find_candidates(
             title, author or "", award, plam_idx, plam_award_ids, cal_stats
         )
         if not candidates:
             continue
         top_score, fix_type, top_work = candidates[0]
-        if top_score >= threshold:
+        if top_score >= eff_threshold:
             fixes.append({
                 "id": rid,
                 "award": award,
@@ -162,14 +179,31 @@ def build_fix_list(con, plam_idx, plam_award_ids, cal_stats, threshold: float) -
                 "plam_author": top_work.get("author", ""),
                 "confidence": round(top_score, 4),
                 "fix_type": fix_type,
+                "threshold_used": round(eff_threshold, 4),
             })
     return fixes
 
 
-def cmd_dry_run(con, plam_idx, plam_award_ids, cal_stats, threshold: float):
-    fixes = build_fix_list(con, plam_idx, plam_award_ids, cal_stats, threshold)
+# award_books.award（日本語賞名）→ PLAM award_id への簡易マッピング
+_AWARD_NAME_TO_ID: dict[str, str] = {
+    "芥川賞": "AKU", "直木賞": "NAO", "日本推理作家協会賞": "JRA",
+    "本格ミステリ大賞": "HKM", "本屋大賞": "HON", "山本周五郎賞": "YAM",
+    "このミステリーがすごい！": "KMS", "江戸川乱歩賞": "RAN",
+    "吉川英治文学賞": "KIK", "日本SF大賞": "JSF", "日本ホラー小説大賞": "HOR",
+}
 
-    print(f"\n=== auto-fix 候補 (threshold={threshold}) ===")
+
+def _plam_award_id_from_db_award(db_award: str) -> str | None:
+    for name, aid in _AWARD_NAME_TO_ID.items():
+        if name in db_award or db_award in name:
+            return aid
+    return None
+
+
+def cmd_dry_run(con, plam_idx, plam_award_ids, cal_stats, threshold: float, cluster_thresholds: dict):
+    fixes = build_fix_list(con, plam_idx, plam_award_ids, cal_stats, threshold, cluster_thresholds)
+
+    print(f"\n=== auto-fix 候補 (baseline={threshold}, cluster adaptive) ===")
     print(f"対象: {len(fixes)}件\n")
 
     by_type: dict[str, list] = {}
@@ -179,7 +213,8 @@ def cmd_dry_run(con, plam_idx, plam_award_ids, cal_stats, threshold: float):
     for ftype, items in sorted(by_type.items()):
         print(f"--- {ftype} ({len(items)}件) ---")
         for f in items:
-            print(f"  [{f['confidence']:.3f}] {f['award']} {f['year'] or '?'}年")
+            thr = f.get("threshold_used", threshold)
+            print(f"  [{f['confidence']:.3f} ≥ {thr:.3f}] {f['award']} {f['year'] or '?'}年")
             print(f"    DB   : 「{f['db_title']}」著: {f['db_author'] or '?'}")
             print(f"    PLAM : 「{f['plam_title']}」著: {f['plam_author']}  ({f['plam_work_id']})")
 
@@ -228,25 +263,25 @@ def _do_apply(con, fixes: list[dict], mode: str):
     print(f"\n適用完了: {applied}件  カバレッジ: {pct}% ({linked}/{total})")
 
 
-def cmd_apply(con, plam_idx, plam_award_ids, cal_stats, threshold: float):
-    fixes = build_fix_list(con, plam_idx, plam_award_ids, cal_stats, threshold)
+def cmd_apply(con, plam_idx, plam_award_ids, cal_stats, threshold: float, cluster_thresholds: dict):
+    fixes = build_fix_list(con, plam_idx, plam_award_ids, cal_stats, threshold, cluster_thresholds)
     if not fixes:
-        print(f"threshold={threshold} 以上の候補はありませんでした。")
+        print(f"threshold={threshold}（cluster adaptive）以上の候補はありませんでした。")
         return
-    print(f"適用対象: {len(fixes)}件 (threshold={threshold})")
+    print(f"適用対象: {len(fixes)}件")
     _do_apply(con, fixes, mode="apply")
 
 
-def cmd_auto_fix(con, plam_idx, plam_award_ids, cal_stats, threshold: float):
+def cmd_auto_fix(con, plam_idx, plam_award_ids, cal_stats, threshold: float, cluster_thresholds: dict):
     if threshold < 0.85:
         print(f"[abort] threshold={threshold} は危険域です（0.85未満は手動レビュー推奨）。")
         sys.exit(1)
-    fixes = build_fix_list(con, plam_idx, plam_award_ids, cal_stats, threshold)
+    fixes = build_fix_list(con, plam_idx, plam_award_ids, cal_stats, threshold, cluster_thresholds)
     if not fixes:
-        print(f"threshold={threshold} 以上の候補はありませんでした。")
+        print(f"threshold={threshold}（cluster adaptive）以上の候補はありませんでした。")
         return
-    print(f"自動修正対象: {len(fixes)}件 (threshold={threshold})")
-    _do_apply(con, fixes, mode=f"auto-fix@{threshold}")
+    print(f"自動修正対象: {len(fixes)}件")
+    _do_apply(con, fixes, mode=f"auto-fix@{threshold}-cluster")
 
 
 def main():
@@ -268,19 +303,23 @@ def main():
     plam_award_ids = _load_award_history_titles()
     print(f"PLAMインデックス: {len(plam_idx)}作品  賞IDセット: {len(plam_award_ids)}件")
 
-    from services.plam_calibration import get_calibration_stats, calibration_report
+    from services.plam_calibration import get_calibration_stats, get_cluster_thresholds, calibration_report
     cal_stats = get_calibration_stats()
+    cluster_thresholds = get_cluster_thresholds()
     print(f"キャリブレーション統計: {len(cal_stats)-1}賞")
     print(calibration_report())
+    print("\n=== クラスタ別 adaptive threshold ===")
+    for cid, t in sorted(cluster_thresholds.items()):
+        print(f"  {cid:<12} {t:.4f}")
 
     con = get_con()
     try:
         if args.dry_run:
-            cmd_dry_run(con, plam_idx, plam_award_ids, cal_stats, args.threshold)
+            cmd_dry_run(con, plam_idx, plam_award_ids, cal_stats, args.threshold, cluster_thresholds)
         elif args.apply:
-            cmd_apply(con, plam_idx, plam_award_ids, cal_stats, args.threshold)
+            cmd_apply(con, plam_idx, plam_award_ids, cal_stats, args.threshold, cluster_thresholds)
         elif args.auto_fix:
-            cmd_auto_fix(con, plam_idx, plam_award_ids, cal_stats, args.threshold)
+            cmd_auto_fix(con, plam_idx, plam_award_ids, cal_stats, args.threshold, cluster_thresholds)
     finally:
         con.close()
 
