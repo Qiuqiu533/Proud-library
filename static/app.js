@@ -2239,7 +2239,7 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
     if (btn.dataset.tab === "news") { loadNews(); loadEvents(); }
     if (btn.dataset.tab === "info") loadInfo();
     if (btn.dataset.tab === "card") { loadCard(); loadWishlistCard(); }
-    if (btn.dataset.tab === "myaccount") { loadMyAccount(); renderReadingGoal(); }
+    if (btn.dataset.tab === "myaccount") { loadMyAccount(); renderReadingGoal(); loadMyPlam(); }
   });
 });
 
@@ -6762,6 +6762,53 @@ function renderReadingGoal() {
     </div>
     ${next ? `<div style="font-size:0.75rem;color:#aaa;margin-top:8px">次の実績：${next.icon} ${next.label}（あと${next.req - readAllTime}冊）</div>` : ""}
   `;
+}
+
+async function loadMyPlam() {
+  const u = residentSession || getCloudUser();
+  const card = document.getElementById("myPlamCard");
+  const content = document.getElementById("myPlamContent");
+  if (!card || !content) return;
+  if (!u || !u.room) { card.style.display = "none"; return; }
+
+  card.style.display = "block";
+  content.innerHTML = '<div class="loading" style="font-size:0.85rem;padding:8px 0">解析中…</div>';
+
+  try {
+    const res = await fetch(`/api/plam/my?room=${encodeURIComponent(u.room)}`);
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+
+    if (!data || !data.clusters || data.clusters.length === 0) {
+      content.innerHTML = '<p style="font-size:0.85rem;color:#999;padding:4px 0">読了作品にPLAM対象の文学賞受賞作が見つかりませんでした。</p>';
+      return;
+    }
+
+    // クラスタバー
+    const bars = data.clusters.map(c => {
+      const width = Math.max(c.pct, 4);
+      return `<div class="my-plam-cluster-row">
+        <span class="my-plam-cluster-name">${c.name}</span>
+        <div class="my-plam-bar-wrap">
+          <div class="my-plam-bar" style="width:${width}%;background:${c.color}"></div>
+        </div>
+        <span class="my-plam-pct">${c.pct}%</span>
+      </div>`;
+    }).join("");
+
+    // 代表作品
+    const works = data.top_works.map(w =>
+      `<span class="my-plam-work-tag" title="${esc(w.awards.join(' / '))}">${esc(w.title)}</span>`
+    ).join("");
+
+    content.innerHTML = `
+      <div class="my-plam-clusters">${bars}</div>
+      <p class="my-plam-profile">${esc(data.profile_text)}</p>
+      ${data.top_works.length ? `<div class="my-plam-works-label">受賞作品</div><div class="my-plam-works">${works}</div>` : ""}
+      <div class="my-plam-meta">${data.matched}冊 / 読了${data.total}冊</div>`;
+  } catch(e) {
+    content.innerHTML = '<p style="font-size:0.85rem;color:#999;padding:4px 0">読書データを取得できませんでした。</p>';
+  }
 }
 
 function openGoalEdit() {

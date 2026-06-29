@@ -377,6 +377,180 @@ def get_related_works(work_id: str, limit: int = 6) -> list[dict]:
     return result
 
 
+def get_my_plam(room: str) -> dict | None:
+    """住民の読了履歴からPLAMプロフィールを生成する。
+
+    Returns: {
+        matched: int,          # PLAM照合できた作品数
+        total: int,            # 読了履歴総数
+        clusters: [            # クラスタ別集計（割合降順）
+          {id, name, color, count, pct, top_award}
+        ],
+        top_works: [           # 照合できたPLAM作品（代表5件）
+          {work_id, title, author, awards}
+        ],
+        profile_text: str,     # 自然文プロフィール
+    }
+    """
+    from database import get_con
+    import sqlite3
+
+    # 読了履歴取得
+    try:
+        con = get_con()
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        cur.execute(
+            "SELECT title, author, status FROM reading_timeline WHERE room=? ORDER BY created_at DESC",
+            (room,),
+        )
+        timeline_rows = [dict(r) for r in cur.fetchall()]
+        con.close()
+    except Exception:
+        return None
+
+    if not timeline_rows:
+        return None
+
+    total = len(timeline_rows)
+    works_idx = _works_index()
+    history = _history_by_work()
+    cluster_m = _cluster_map()
+    master = _awards_master()
+
+    # STEP1: タイトル照合 → work_id
+    cluster_counter: dict[str, int] = {}
+    top_works: list[dict] = []
+    matched_wids: set[str] = set()
+
+    for row in timeline_rows:
+        title = row.get("title", "")
+        if not title:
+            continue
+        key = _normalize(title)
+        work = works_idx.get(key)
+        if not work:
+            # 前方一致フォールバック（2文字以上）
+            if len(key) >= 2:
+                for k, v in works_idx.items():
+                    if k.startswith(key) or key.startswith(k):
+                        work = v
+                        break
+        if not work:
+            continue
+
+        wid = work["work_id"]
+        if wid in matched_wids:
+            continue
+        matched_wids.add(wid)
+
+        # STEP2: クラスタ集計
+        w_rows = [r for r in history.get(wid, []) if r.get("status") in ("awarded", "co_winner")]
+        award_ids = {r["award_id"] for r in w_rows}
+        clusters = {cluster_m.get(a, "unknown") for a in award_ids} - {"unknown"}
+        for c in clusters:
+            cluster_counter[c] = cluster_counter.get(c, 0) + 1
+
+        # top_works（最大5件、award情報付き）
+        if len(top_works) < 5:
+            awards_summary = sorted(
+                [master.get(aid, {}).get("award_name", aid) for aid in award_ids if aid in master],
+                key=lambda n: -int(master.get(
+                    next((a for a in award_ids if master.get(a, {}).get("award_name") == n), ""),
+                    {}
+                ).get("weight", 0) or 0),
+            )[:2]
+            top_works.append({
+                "work_id": wid,
+                "title":   work.get("canonical_title", title),
+                "author":  work.get("author", ""),
+                "awards":  awards_summary,
+            })
+
+    matched = len(matched_wids)
+    if matched == 0:
+        return None
+
+    # STEP3: クラスタ割合計算
+    CLUSTER_NAMES = {
+        "mystery": "ミステリ",
+        "literary": "文学",
+        "sf": "SF",
+        "horror": "ホラー",
+        "career": "キャリア",
+        "debut": "デビュー",
+    }
+    total_cluster_votes = sum(cluster_counter.values()) or 1
+    clusters_sorted = sorted(cluster_counter.items(), key=lambda x: -x[1])
+    clusters_out = []
+    for cid, cnt in clusters_sorted:
+        # そのクラスタで最も多く受賞している賞名を取得
+        award_counts: dict[str, int] = {}
+        for wid in matched_wids:
+            for r in history.get(wid, []):
+                if r.get("status") not in ("awarded", "co_winner"):
+                    continue
+                aid = r["award_id"]
+                if cluster_m.get(aid) == cid:
+                    award_counts[aid] = award_counts.get(aid, 0) + 1
+        top_aid = max(award_counts, key=lambda a: award_counts[a]) if award_counts else ""
+        top_award_name = master.get(top_aid, {}).get("award_name", "") if top_aid else ""
+
+        clusters_out.append({
+            "id":        cid,
+            "name":      CLUSTER_NAMES.get(cid, cid),
+            "color":     CLUSTER_COLORS.get(cid, "#ccc"),
+            "count":     cnt,
+            "pct":       round(cnt / total_cluster_votes * 100),
+            "top_award": top_award_name,
+        })
+
+    # STEP4: 自然文プロフィール生成
+    profile_text = _build_profile_text(clusters_out, matched, total)
+
+    return {
+        "matched":      matched,
+        "total":        total,
+        "clusters":     clusters_out,
+        "top_works":    top_works,
+        "profile_text": profile_text,
+    }
+
+
+def _build_profile_text(clusters: list[dict], matched: int, total: int) -> str:
+    """My PLAMの自然文プロフィールを生成する。"""
+    if not clusters:
+        return ""
+
+    top = clusters[0]
+    lines: list[str] = []
+
+    # 主要クラスタの説明
+    if top["top_award"]:
+        lines.append(
+            f"「{top['top_award']}」の受賞作品を多く読まれています。"
+        )
+    else:
+        lines.append(f"{top['name']}系の作品を多く読まれています。")
+
+    # 2番目のクラスタ言及
+    if len(clusters) >= 2:
+        second = clusters[1]
+        lines.append(
+            f"{second['name']}作品も{second['pct']}%を占めており、"
+            f"幅広い読書傾向が見られます。"
+        )
+
+    # 未照合作品へのコメント
+    unmatched = total - matched
+    if unmatched > 0:
+        lines.append(
+            f"（読了{total}冊中{matched}冊が文学賞受賞作です）"
+        )
+
+    return " ".join(lines)
+
+
 def invalidate_cache() -> None:
     _awards_master.cache_clear()
     _cluster_map.cache_clear()
