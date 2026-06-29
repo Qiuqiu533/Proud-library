@@ -249,20 +249,38 @@ def _build_reason(
     my_clusters: set[str],
     w_clusters: set[str],
 ) -> str:
-    """推薦理由テキストを生成する。"""
+    """推薦理由テキストを生成する（司書の言葉を意識した自然な日本語）。"""
     master = _awards_master()
-    parts: list[str] = []
 
     if shared_awards:
-        names = [master.get(a, {}).get("award_name", a) for a in sorted(shared_awards)]
-        parts.append(f"{'・'.join(names)}の評価軸が共通")
-    if is_bridge:
-        parts.append("クラスタ横断のBridge Work")
-    cross = my_clusters & w_clusters - {"unknown"}
-    if cross and not shared_awards:
-        parts.append(f"同じ{list(cross)[0]}クラスタ")
+        names = sorted(
+            [master.get(a, {}).get("award_name", a) for a in shared_awards],
+            key=lambda n: -int(master.get(
+                next((a for a in shared_awards if master.get(a, {}).get("award_name") == n), ""),
+                {}
+            ).get("weight", 0) or 0),
+        )
+        if len(names) == 1:
+            base = f"「{names[0]}」の評価傾向が近い作品です。"
+        else:
+            listed = "」と「".join(names)
+            base = f"「{listed}」の両方で高く評価された作品群に近い位置付けです。"
+        if is_bridge:
+            return base + " クラスタを横断するBridge Workでもあります。"
+        return base
 
-    return "・".join(parts) if parts else ""
+    if is_bridge:
+        cross = (my_clusters & w_clusters) - {"unknown"}
+        if cross:
+            label = "・".join(sorted(cross))
+            return f"{label}クラスタを横断する、評価軸の広いBridge Workです。"
+        return "複数のジャンルにまたがるBridge Workです。"
+
+    cross = (my_clusters & w_clusters) - {"unknown"}
+    if cross:
+        return f"同じ{list(cross)[0]}クラスタで評価された作品です。"
+
+    return ""
 
 
 def get_related_works(work_id: str, limit: int = 6) -> list[dict]:
