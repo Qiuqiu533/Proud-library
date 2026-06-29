@@ -130,6 +130,22 @@ def cmd_apply(con, plam_idx):
     con.commit()
     print(f"award_books.plam_work_id 更新完了: {updated}件 / {len(rows)}件")
 
+    # カバレッジ履歴を記録
+    cur.execute("SELECT COUNT(*) FROM award_books WHERE status='確認済'")
+    total = cur.fetchone()[0]
+    cur.execute("SELECT COUNT(*) FROM award_books WHERE status='確認済' AND plam_work_id IS NOT NULL")
+    linked = cur.fetchone()[0]
+    pct = round(linked / total * 100, 1) if total else 0
+    try:
+        cur.execute(
+            "INSERT INTO plam_coverage_log (total, linked, coverage_pct, note) VALUES (%s, %s, %s, %s)",
+            (total, linked, pct, f"apply +{updated}件")
+        )
+        con.commit()
+        print(f"カバレッジ履歴記録: {pct}% ({linked}/{total})")
+    except Exception as e:
+        print(f"[warn] 履歴記録スキップ: {e}")
+
 
 def main():
     parser = argparse.ArgumentParser(description="award_books ↔ PLAM マッピング")

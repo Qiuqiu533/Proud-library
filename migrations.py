@@ -1658,6 +1658,44 @@ def _migrate_award_books_plam_work_id():
         con.close()
 
 
+def _migrate_plam_coverage_log():
+    """PLAMカバレッジ履歴テーブルを追加する。"""
+    if _migration_done("plam_coverage_log_v1"):
+        return
+    con = get_con()
+    try:
+        if USE_PG:
+            cur = con.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS plam_coverage_log (
+                    id SERIAL PRIMARY KEY,
+                    logged_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                    total INTEGER NOT NULL,
+                    linked INTEGER NOT NULL,
+                    coverage_pct REAL NOT NULL,
+                    note TEXT DEFAULT NULL
+                )
+            """)
+        else:
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS plam_coverage_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    logged_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    total INTEGER NOT NULL,
+                    linked INTEGER NOT NULL,
+                    coverage_pct REAL NOT NULL,
+                    note TEXT DEFAULT NULL
+                )
+            """)
+        con.commit()
+        _mark_migration_done("plam_coverage_log_v1")
+        logger.info("[migration] plam_coverage_log テーブル追加完了")
+    except Exception as e:
+        logger.error("[migration] plam_coverage_log error: %s", e)
+    finally:
+        con.close()
+
+
 def _migrate_collections_sort_order():
     """collections テーブルに sort_order カラムがなければ追加する。"""
     if _migration_done("collections_sort_order_v1"):
@@ -1758,6 +1796,7 @@ def _run_all_migrations():
         _migrate_ai_review_columns,        # ai_summary/ai_tags カラム追加
         _migrate_ndc_column,               # ndc カラム追加
         _migrate_award_books_plam_work_id, # award_books.plam_work_id カラム追加
+        _migrate_plam_coverage_log,        # PLAMカバレッジ履歴テーブル追加
         _migrate_loan_history,             # 貸出履歴テーブル追加
         _verify_tables,
     ]

@@ -5920,6 +5920,24 @@ async function loadPlamCoverage() {
   unlinked.innerHTML = d.unlinked_sample.map(r =>
     `<div>・${r.year||"？"}年 ${r.award} ／ ${r.title}${r.author ? " 著: "+r.author : ""}</div>`
   ).join("") || "（未リンクなし）";
+
+  // 履歴
+  const histEl = document.getElementById("plamCoverageHistory");
+  if (histEl) {
+    if (!d.history || d.history.length === 0) {
+      histEl.innerHTML = "<p style='color:#aaa;font-size:0.8rem'>（記録なし — --apply 実行後に表示されます）</p>";
+    } else {
+      histEl.innerHTML = `<table style="font-size:0.8rem;border-collapse:collapse;width:100%">
+        <tr style="background:#f5f5f5"><th style="padding:4px 8px;text-align:left">日付</th><th>連携数</th><th>カバレッジ</th><th>メモ</th></tr>
+        ${d.history.map(h => `<tr style="border-top:1px solid #eee">
+          <td style="padding:4px 8px">${h.date}</td>
+          <td style="padding:4px 8px;text-align:center">${h.linked}/${h.total}</td>
+          <td style="padding:4px 8px;text-align:center;font-weight:bold">${h.pct}%</td>
+          <td style="padding:4px 8px;color:#888">${h.note||""}</td>
+        </tr>`).join("")}
+      </table>`;
+    }
+  }
 }
 
 
