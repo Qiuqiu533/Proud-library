@@ -422,6 +422,7 @@ def get_my_plam(room: str) -> dict | None:
     cluster_counter: dict[str, int] = {}
     top_works: list[dict] = []
     matched_wids: set[str] = set()
+    all_my_awards: set[str] = set()  # 読了作品の全受賞賞IDを収集
 
     for row in timeline_rows:
         title = row.get("title", "")
@@ -447,6 +448,7 @@ def get_my_plam(room: str) -> dict | None:
         # STEP2: クラスタ集計
         w_rows = [r for r in history.get(wid, []) if r.get("status") in ("awarded", "co_winner")]
         award_ids = {r["award_id"] for r in w_rows}
+        all_my_awards |= award_ids
         clusters = {cluster_m.get(a, "unknown") for a in award_ids} - {"unknown"}
         for c in clusters:
             cluster_counter[c] = cluster_counter.get(c, 0) + 1
@@ -505,8 +507,14 @@ def get_my_plam(room: str) -> dict | None:
             "top_award": top_award_name,
         })
 
-    # STEP4: 自然文プロフィール生成
-    profile_text = _build_profile_text(clusters_out, matched, total)
+    # STEP4: 読書タイプ診断
+    reader_type = _diagnose_reader_type(clusters_out)
+
+    # STEP5: 自然文プロフィール生成
+    profile_text = _build_profile_text(clusters_out, matched, total, reader_type)
+
+    # STEP6: 次に読むべき3冊の推薦
+    next_reads = _recommend_next_reads(matched_wids, all_my_awards, clusters_out, limit=3)
 
     return {
         "matched":      matched,
@@ -514,10 +522,141 @@ def get_my_plam(room: str) -> dict | None:
         "clusters":     clusters_out,
         "top_works":    top_works,
         "profile_text": profile_text,
+        "reader_type":  reader_type,
+        "next_reads":   next_reads,
     }
 
 
-def _build_profile_text(clusters: list[dict], matched: int, total: int) -> str:
+_READER_TYPES = {
+    # (dominant_cluster, has_bridge, diversity) → (label, description)
+    # diversity: 1=single cluster, 2=two clusters, 3+=multi
+}
+
+def _diagnose_reader_type(clusters: list[dict]) -> dict:
+    """読書タイプを診断する。"""
+    if not clusters:
+        return {"label": "分析中", "description": ""}
+
+    top = clusters[0]
+    diversity = len(clusters)
+    top_pct = top["pct"]
+
+    if diversity == 1 or top_pct >= 70:
+        types = {
+            "mystery":  ("ミステリ探究型", "本格ミステリや推理小説を深く読み込むタイプです。"),
+            "literary": ("文学深読み型",   "芥川賞・直木賞などの純文学・文芸作品を好むタイプです。"),
+            "sf":       ("SF開拓型",       "日本SF大賞など、SF作品に特化した読書をするタイプです。"),
+            "horror":   ("ホラー沈潜型",   "ホラー小説の独自世界を深く探求するタイプです。"),
+            "career":   ("作家キャリア型", "吉川英治賞など、作家の長期的評価に注目するタイプです。"),
+        }
+        t = types.get(top["id"], ("独自探索型", "独自の読書スタイルを持つタイプです。"))
+    elif diversity == 2:
+        second = clusters[1]
+        if {top["id"], second["id"]} == {"mystery", "literary"}:
+            t = ("文学×ミステリ横断型", "文学性とミステリ性の両方を高く評価する、Bridge Work的な読書傾向です。")
+        elif "sf" in {top["id"], second["id"]}:
+            t = ("SF×文芸融合型", "SFと文芸の境界を越えた作品を好む、知的好奇心旺盛なタイプです。")
+        else:
+            t = ("クロスジャンル型", "複数のジャンルを横断する幅広い読書傾向のタイプです。")
+    else:
+        t = ("バランス読書型", "特定のジャンルに偏らず、文学賞全般にわたって幅広く読むタイプです。")
+
+    return {"label": t[0], "description": t[1]}
+
+
+def _recommend_next_reads(
+    read_wids: set[str],
+    my_awards: set[str],
+    clusters: list[dict],
+    limit: int = 3,
+) -> list[dict]:
+    """読了作品から、まだ読んでいないPLAM作品を推薦する。
+
+    優先: Bridge Work > 未経験クラスタ > 既存クラスタの高スコア作品
+    """
+    from database import get_con
+    import sqlite3
+
+    history = _history_by_work()
+    cluster_m = _cluster_map()
+    master = _awards_master()
+    bridges = _bridge_set()
+    jaccard_m = _jaccard_map()
+
+    my_clusters = {cluster_m.get(a, "unknown") for a in my_awards}
+    unread_clusters = {"mystery", "literary", "sf", "horror", "career"} - my_clusters
+
+    # genre_books照合
+    try:
+        con = get_con()
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        cur.execute("SELECT isbn, title FROM genre_books")
+        db_books = {_normalize(r["title"]): r["isbn"] for r in cur.fetchall()}
+        con.close()
+    except Exception:
+        db_books = {}
+
+    wid_to_work = {r["work_id"]: r for r in _read("works.csv")}
+    candidates: list[tuple[float, str]] = []
+
+    for wid, rows in history.items():
+        if wid in read_wids:
+            continue
+        w_awards = {r["award_id"] for r in rows if r.get("status") in ("awarded", "co_winner")}
+        if not w_awards:
+            continue
+
+        is_bridge = wid in bridges
+        score, shared, max_j = _plam_score(my_awards, my_clusters, w_awards, is_bridge, jaccard_m)
+
+        # 未経験クラスタへのボーナス
+        w_clusters = {cluster_m.get(a, "unknown") for a in w_awards}
+        expansion_bonus = 5 if w_clusters & unread_clusters else 0
+        candidates.append((score + expansion_bonus, wid))
+
+    candidates.sort(key=lambda x: -x[0])
+
+    result = []
+    for score, wid in candidates:
+        if len(result) >= limit:
+            break
+        work = wid_to_work.get(wid)
+        if not work:
+            continue
+
+        title = work.get("canonical_title", "")
+        w_rows = [r for r in history.get(wid, []) if r.get("status") in ("awarded", "co_winner")]
+        top_aid = max(w_rows, key=lambda r: int(master.get(r["award_id"], {}).get("weight", 0) or 0))["award_id"]
+        w_clusters = {cluster_m.get(r["award_id"], "unknown") for r in w_rows}
+        expansion = bool(w_clusters & unread_clusters)
+
+        # 推薦理由
+        shared_awards = my_awards & {r["award_id"] for r in w_rows}
+        reason = _build_reason(shared_awards, wid in bridges, my_clusters, w_clusters)
+        if expansion:
+            exp_name = {"mystery": "ミステリ", "literary": "文学", "sf": "SF", "horror": "ホラー"}.get(
+                (w_clusters & unread_clusters).pop(), "新ジャンル"
+            )
+            reason = f"{exp_name}クラスタへの入口となる作品です。" + (" " + reason if reason else "")
+
+        result.append({
+            "work_id":    wid,
+            "title":      title,
+            "author":     work.get("author", ""),
+            "isbn":       db_books.get(_normalize(title)),
+            "in_library": _normalize(title) in db_books,
+            "top_award":  master.get(top_aid, {}).get("award_name", top_aid),
+            "color":      CLUSTER_COLORS.get(cluster_m.get(top_aid, "unknown"), "#ccc"),
+            "is_bridge":  wid in bridges,
+            "expansion":  expansion,
+            "reason":     reason,
+        })
+
+    return result
+
+
+def _build_profile_text(clusters: list[dict], matched: int, total: int, reader_type: dict | None = None) -> str:
     """My PLAMの自然文プロフィールを生成する。"""
     if not clusters:
         return ""
@@ -525,11 +664,11 @@ def _build_profile_text(clusters: list[dict], matched: int, total: int) -> str:
     top = clusters[0]
     lines: list[str] = []
 
-    # 主要クラスタの説明
-    if top["top_award"]:
-        lines.append(
-            f"「{top['top_award']}」の受賞作品を多く読まれています。"
-        )
+    # 読書タイプの説明から始める
+    if reader_type and reader_type.get("description"):
+        lines.append(reader_type["description"])
+    elif top["top_award"]:
+        lines.append(f"「{top['top_award']}」の受賞作品を多く読まれています。")
     else:
         lines.append(f"{top['name']}系の作品を多く読まれています。")
 
@@ -537,16 +676,13 @@ def _build_profile_text(clusters: list[dict], matched: int, total: int) -> str:
     if len(clusters) >= 2:
         second = clusters[1]
         lines.append(
-            f"{second['name']}作品も{second['pct']}%を占めており、"
-            f"幅広い読書傾向が見られます。"
+            f"{second['name']}作品も{second['pct']}%を占めており、幅広い読書傾向が見られます。"
         )
 
     # 未照合作品へのコメント
     unmatched = total - matched
-    if unmatched > 0:
-        lines.append(
-            f"（読了{total}冊中{matched}冊が文学賞受賞作です）"
-        )
+    if unmatched > 0 and total >= 5:
+        lines.append(f"（読了{total}冊中{matched}冊が文学賞受賞作です）")
 
     return " ".join(lines)
 

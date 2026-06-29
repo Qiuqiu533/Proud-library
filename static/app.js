@@ -6801,11 +6801,32 @@ async function loadMyPlam() {
       `<span class="my-plam-work-tag" title="${esc(w.awards.join(' / '))}">${esc(w.title)}</span>`
     ).join("");
 
+    // 読書タイプバッジ
+    const typeBadge = data.reader_type && data.reader_type.label
+      ? `<div class="my-plam-type-badge">${esc(data.reader_type.label)}</div>` : "";
+
+    // 次に読むべき3冊
+    const nextCards = (data.next_reads || []).map(w => {
+      const clickable = w.in_library && w.isbn;
+      const expansionBadge = w.expansion ? `<span class="my-plam-expand-badge">新ジャンル</span>` : "";
+      const bridgeBadge = w.is_bridge ? `<span class="my-plam-bridge-tag">🌉</span>` : "";
+      const inner = `
+        <div class="my-plam-next-dot" style="background:${w.color}"></div>
+        <div class="my-plam-next-title">${bridgeBadge}${expansionBadge}${esc(w.title)}</div>
+        <div class="my-plam-next-award">${esc(w.top_award)}</div>
+        <div class="my-plam-next-reason">${esc(w.reason || "")}</div>`;
+      return clickable
+        ? `<div class="my-plam-next-card my-plam-next-card--link" onclick="openModal('${w.isbn}')" role="button" tabindex="0">${inner}</div>`
+        : `<div class="my-plam-next-card">${inner}</div>`;
+    }).join("");
+
     content.innerHTML = `
+      ${typeBadge}
       <div class="my-plam-clusters">${bars}</div>
       <p class="my-plam-profile">${esc(data.profile_text)}</p>
-      ${data.top_works.length ? `<div class="my-plam-works-label">受賞作品</div><div class="my-plam-works">${works}</div>` : ""}
-      <div class="my-plam-meta">${data.matched}冊 / 読了${data.total}冊</div>`;
+      ${data.top_works.length ? `<div class="my-plam-works-label">照合できた受賞作</div><div class="my-plam-works">${works}</div>` : ""}
+      ${nextCards ? `<div class="my-plam-next-label">📚 次に読むべき3冊</div><div class="my-plam-next-grid">${nextCards}</div>` : ""}
+      <div class="my-plam-meta">${data.matched}冊が文学賞受賞作 / 読了${data.total}冊</div>`;
   } catch(e) {
     content.innerHTML = '<p style="font-size:0.85rem;color:#999;padding:4px 0">読書データを取得できませんでした。</p>';
   }
