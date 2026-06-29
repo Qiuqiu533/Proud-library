@@ -1168,3 +1168,17 @@ body { padding-bottom: env(safe-area-inset-bottom); }
   text-overflow: ellipsis;
   box-shadow: 0 2px 8px rgba(0,0,0,0.25);
 }
+
+/* Phase 21-C: クラスタフィルター & ★マーカー */
+.plam21-filter { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0 10px; }
+.plam21-filter-btn {
+  font-size: 0.72rem; font-weight: 600; padding: 3px 10px; border-radius: 12px;
+  border: 1.5px solid var(--fc, #888); color: var(--fc, #888);
+  background: transparent; cursor: pointer; transition: background .15s, color .15s;
+}
+.plam21-filter-btn:first-child { border-color: #3d6b4f; color: #3d6b4f; }
+.plam21-filter-btn--active { background: var(--fc, #888); color: #fff; }
+.plam21-filter-btn:first-child.plam21-filter-btn--active { background: #3d6b4f; color: #fff; border-color: #3d6b4f; }
+.plam-star { fill: #f4a261; font-weight: 900; pointer-events: none; }
+.plam-dot--rec { cursor: default; }
+.plam-dot--rec.plam-dot--link { cursor: pointer; }
