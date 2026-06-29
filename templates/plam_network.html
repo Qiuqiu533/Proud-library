@@ -100,17 +100,52 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 4px 0;
-      font-size: .82rem;
-      color: #b0b0c8;
+      padding: 5px 0;
+      font-size: .83rem;
+      color: #c0c0d8;
       cursor: pointer;
     }
     .legend-item:hover { color: #e8e8e8; }
     .legend-dot {
-      width: 12px;
-      height: 12px;
+      width: 13px;
+      height: 13px;
       border-radius: 50%;
       flex-shrink: 0;
+    }
+    /* 凡例セクション */
+    .legend-block {
+      margin-bottom: 18px;
+    }
+    .legend-block h3 {
+      font-size: .72rem;
+      font-weight: 700;
+      letter-spacing: .08em;
+      color: #e85d04;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .legend-block p {
+      font-size: .8rem;
+      color: #9a9ab8;
+      line-height: 1.7;
+    }
+    .legend-block .legend-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 5px 0;
+      border-bottom: 1px solid #23263a;
+      font-size: .8rem;
+      color: #b0b0c8;
+      line-height: 1.5;
+    }
+    .legend-block .legend-row:last-child { border: none; }
+    .legend-block .legend-row .licon {
+      font-size: .95rem;
+      flex-shrink: 0;
+      width: 22px;
+      text-align: center;
+      margin-top: 1px;
     }
 
     /* Bridge Works */
@@ -207,45 +242,61 @@
   <aside class="panel">
     <!-- タブ -->
     <div class="tabs">
-      <div class="tab active" data-tab="info">選択情報</div>
-      <div class="tab" data-tab="legend">凡例</div>
-      <div class="tab" data-tab="bridge">橋渡し作品</div>
+      <div class="tab active" data-tab="info">賞の詳細</div>
+      <div class="tab" data-tab="legend">見方・操作</div>
+      <div class="tab" data-tab="bridge">複数受賞作</div>
     </div>
 
-    <!-- 選択情報 -->
+    <!-- 賞の詳細 -->
     <div class="tab-content active panel-section" id="tab-info">
-      <h2>ノード情報</h2>
       <div id="node-info">
-        <span style="color:#8888aa;font-size:.8rem">賞ノードをクリックしてください</span>
+        <div style="color:#8888aa;font-size:.82rem;line-height:1.7;padding:8px 0">
+          🖱️ 気になる賞の円をクリックすると、<br>その賞の受賞作品や他の賞との関係が表示されます。
+        </div>
       </div>
     </div>
 
-    <!-- 凡例 -->
+    <!-- 見方・操作 -->
     <div class="tab-content panel-section" id="tab-legend">
-      <h2>クラスタ</h2>
-      <div id="legend-list"></div>
-      <div style="margin-top:16px">
-        <h2>エッジ</h2>
-        <p style="font-size:.78rem;color:#8888aa;line-height:1.6">
-          エッジの太さ = Jaccard類似度<br>
-          エッジなし = 共有受賞作品 0件<br>
-          孤立ノード = 独立クラスタ
-        </p>
+
+      <div class="legend-block">
+        <h3>🔵 円の色 ── ジャンルグループ</h3>
+        <div id="legend-list"></div>
+        <p style="margin-top:8px">似たジャンルの賞が同じ色でまとまっています。</p>
       </div>
-      <div style="margin-top:16px">
-        <h2>操作</h2>
-        <p style="font-size:.78rem;color:#8888aa;line-height:1.6">
-          ノードをクリック → 詳細表示<br>
-          ドラッグ → 移動<br>
-          スクロール → ズーム<br>
-          背景ドラッグ → パン
-        </p>
+
+      <div class="legend-block">
+        <h3>⭕ 円の大きさ ── 作品数</h3>
+        <div class="legend-row"><span class="licon">🔵</span><span>円が大きいほど受賞作品数が多い賞です。直木賞・芥川賞などが大きく表示されます。</span></div>
       </div>
+
+      <div class="legend-block">
+        <h3>📍 位置 ── 賞どうしの近さ</h3>
+        <div class="legend-row"><span class="licon">↔️</span><span>両方を受賞した作品が多い賞ほど近くに配置されます。離れている賞は独自路線で、受賞傾向が異なります。</span></div>
+        <div class="legend-row"><span class="licon">➖</span><span>賞を結ぶ線が太いほど、両方を受賞した作品が多く、傾向が似ています。</span></div>
+      </div>
+
+      <div class="legend-block">
+        <h3>🧲 なぜ円が動くの？</h3>
+        <p>この図は「磁石を並べたような仕組み」で動いています。各賞の円が互いに引き合ったり反発したりする「力」を持っており、アプリが自動で最適な配置を計算して落ち着く場所に収めています。</p>
+        <p style="margin-top:8px">円をドラッグすると「手で動かした」状態になり、周りの円が引力・斥力で再計算されて動き直します。壁を一つ動かすとドミノのように周囲が再配置されるイメージです。自由に動かして遊んでみてください！</p>
+      </div>
+
+      <div class="legend-block">
+        <h3>🕹️ 操作方法</h3>
+        <div class="legend-row"><span class="licon">👆</span><span>円をタップ / クリック → 賞の詳細を表示</span></div>
+        <div class="legend-row"><span class="licon">✋</span><span>円をドラッグ → 自由に動かせる</span></div>
+        <div class="legend-row"><span class="licon">🔍</span><span>スクロール / ピンチ → ズームイン・アウト</span></div>
+        <div class="legend-row"><span class="licon">🖐️</span><span>背景をドラッグ → 画面全体を移動</span></div>
+      </div>
+
     </div>
 
-    <!-- Bridge Works -->
+    <!-- 複数受賞作 -->
     <div class="tab-content panel-section" id="tab-bridge">
-      <h2>クラスタ横断作品 <span style="font-weight:400;color:#8888aa">(cross-cluster)</span></h2>
+      <div style="font-size:.82rem;color:#9a9ab8;line-height:1.6;margin-bottom:12px">
+        複数の文学賞を受賞した注目作品です。ジャンルを超えた傑作の証です。
+      </div>
       <div id="bridge-list"><span style="color:#8888aa;font-size:.8rem">読み込み中…</span></div>
     </div>
   </aside>
