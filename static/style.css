@@ -1088,3 +1088,21 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .my-plam-next-reason { color: #6a4c93; font-size: 0.78rem; line-height: 1.4; }
 .my-plam-expand-badge { font-size: 0.7rem; background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; border-radius: 10px; padding: 1px 6px; margin-right: 4px; }
 .my-plam-bridge-tag { font-size: 0.78rem; margin-right: 3px; }
+
+/* My PLAM スコア・年別推移・チャレンジ */
+.my-plam-score-row { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+.my-plam-score-circle { width: 68px; height: 68px; border-radius: 50%; background: linear-gradient(135deg, #6a4c93, #9b7cc8); display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; }
+.my-plam-score-num { font-size: 1.5rem; font-weight: 700; color: #fff; line-height: 1; }
+.my-plam-score-max { font-size: 0.65rem; color: rgba(255,255,255,0.75); }
+.my-plam-score-axes { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.my-plam-score-axis { display: flex; justify-content: space-between; font-size: 0.78rem; color: #666; }
+.my-plam-trend-label { font-size: 0.82rem; font-weight: 600; color: #5a3e8a; margin: 12px 0 6px; }
+.my-plam-trend { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.my-plam-trend-row { display: flex; align-items: center; gap: 8px; }
+.my-plam-trend-year { width: 36px; font-size: 0.78rem; color: #888; flex-shrink: 0; }
+.my-plam-trend-bar { flex: 1; height: 14px; border-radius: 7px; overflow: hidden; background: #f0ede8; display: flex; }
+.my-plam-trend-seg { height: 100%; transition: width .4s ease; }
+.my-plam-trend-count { width: 28px; text-align: right; font-size: 0.72rem; color: #aaa; flex-shrink: 0; }
+.my-plam-challenge-label { font-size: 0.82rem; font-weight: 600; color: #5a3e8a; margin: 12px 0 4px; }
+.my-plam-challenges { margin: 0 0 10px; padding-left: 18px; }
+.my-plam-challenges li { font-size: 0.82rem; color: #555; line-height: 1.6; margin-bottom: 4px; }

@@ -516,6 +516,15 @@ def get_my_plam(room: str) -> dict | None:
     # STEP6: 次に読むべき3冊の推薦
     next_reads = _recommend_next_reads(matched_wids, all_my_awards, clusters_out, limit=3)
 
+    # STEP7: My PLAMスコア（100点満点）
+    plam_score = _calc_plam_score(matched_wids, clusters_out, all_my_awards)
+
+    # STEP8: 年別読書推移（created_atを活用）
+    yearly_trend = _calc_yearly_trend(timeline_rows, works_idx, history, cluster_m)
+
+    # STEP9: チャレンジ提案
+    challenges = _build_challenges(clusters_out, matched_wids, all_my_awards)
+
     return {
         "matched":      matched,
         "total":        total,
@@ -524,6 +533,9 @@ def get_my_plam(room: str) -> dict | None:
         "profile_text": profile_text,
         "reader_type":  reader_type,
         "next_reads":   next_reads,
+        "plam_score":   plam_score,
+        "yearly_trend": yearly_trend,
+        "challenges":   challenges,
     }
 
 
@@ -685,6 +697,172 @@ def _build_profile_text(clusters: list[dict], matched: int, total: int, reader_t
         lines.append(f"（読了{total}冊中{matched}冊が文学賞受賞作です）")
 
     return " ".join(lines)
+
+
+def _calc_plam_score(
+    matched_wids: set[str],
+    clusters: list[dict],
+    all_awards: set[str],
+) -> dict:
+    """My PLAMスコアを100点満点で計算する。
+
+    軸:
+    - 読書の広がり: 到達クラスタ数 / 5 × 40点
+    - 受賞作読了数: min(matched, 50) / 50 × 30点（50冊が最高）
+    - Bridge Work読了率: bridge_read / 12 × 20点
+    - クラスタバランス: 均等度（最大エントロピー比）× 10点
+    """
+    import math
+
+    bridges = _bridge_set()
+    n_clusters = len(clusters)
+    bridge_read = len(matched_wids & bridges)
+
+    # 1. 広がり点
+    spread = round(n_clusters / 5 * 40)
+
+    # 2. 受賞作読了点
+    award_score = round(min(len(matched_wids), 50) / 50 * 30)
+
+    # 3. Bridge Work点
+    bridge_score = round(bridge_read / 12 * 20)
+
+    # 4. バランス点（シャノンエントロピー）
+    total_votes = sum(c["count"] for c in clusters)
+    if total_votes > 0 and n_clusters > 1:
+        entropy = -sum(
+            (c["count"] / total_votes) * math.log2(c["count"] / total_votes)
+            for c in clusters if c["count"] > 0
+        )
+        max_entropy = math.log2(n_clusters)
+        balance = round(entropy / max_entropy * 10) if max_entropy > 0 else 0
+    else:
+        balance = 0
+
+    total = spread + award_score + bridge_score + balance
+
+    return {
+        "total":        total,
+        "spread":       spread,
+        "award_score":  award_score,
+        "bridge_score": bridge_score,
+        "balance":      balance,
+        "bridge_read":  bridge_read,
+        "n_clusters":   n_clusters,
+    }
+
+
+def _calc_yearly_trend(
+    timeline_rows: list[dict],
+    works_idx: dict,
+    history: dict,
+    cluster_m: dict,
+) -> list[dict]:
+    """年別のクラスタ分布推移を計算する。直近3年分。"""
+    from datetime import datetime
+
+    year_data: dict[str, dict[str, int]] = {}
+    for row in timeline_rows:
+        ts = row.get("created_at", "")
+        if not ts:
+            continue
+        try:
+            year = str(datetime.fromisoformat(str(ts).replace("Z", "+00:00")).year)
+        except Exception:
+            year = str(ts)[:4]
+        if not year.isdigit() or int(year) < 2020:
+            continue
+
+        title = row.get("title", "")
+        if not title:
+            continue
+        key = _normalize(title)
+        work = works_idx.get(key)
+        if not work:
+            continue
+
+        wid = work["work_id"]
+        w_rows = [r for r in history.get(wid, []) if r.get("status") in ("awarded", "co_winner")]
+        clusters = {cluster_m.get(r["award_id"], "unknown") for r in w_rows} - {"unknown"}
+        for c in clusters:
+            year_data.setdefault(year, {})
+            year_data[year][c] = year_data[year].get(c, 0) + 1
+
+    if not year_data:
+        return []
+
+    # 直近3年のみ返す
+    years = sorted(year_data.keys())[-3:]
+    ALL_CLUSTERS = ["mystery", "literary", "sf", "horror", "career"]
+    result = []
+    for y in years:
+        counts = year_data[y]
+        total = sum(counts.values()) or 1
+        result.append({
+            "year": y,
+            "clusters": {
+                c: round(counts.get(c, 0) / total * 100)
+                for c in ALL_CLUSTERS
+            },
+            "total_matched": sum(counts.values()),
+        })
+    return result
+
+
+def _build_challenges(
+    clusters: list[dict],
+    matched_wids: set[str],
+    all_awards: set[str],
+) -> list[str]:
+    """チャレンジ提案文を生成する（最大3件）。"""
+    bridges = _bridge_set()
+    cluster_m = _cluster_map()
+    history = _history_by_work()
+
+    achieved_clusters = {c["id"] for c in clusters}
+    all_clusters = {"mystery", "literary", "sf", "horror", "career"}
+    missing_clusters = all_clusters - achieved_clusters
+    bridge_read = len(matched_wids & bridges)
+    total_bridges = 12
+
+    CLUSTER_NAMES = {
+        "mystery": "ミステリ", "literary": "文学", "sf": "SF",
+        "horror": "ホラー", "career": "キャリア",
+    }
+
+    challenges: list[str] = []
+
+    # 1. クラスタ制覇チャレンジ
+    if missing_clusters:
+        if len(missing_clusters) == 1:
+            m = CLUSTER_NAMES.get(list(missing_clusters)[0], list(missing_clusters)[0])
+            challenges.append(f"🎯 {m}クラスタの作品を1冊読むと、全5クラスタ制覇達成です！")
+        else:
+            names = "・".join(CLUSTER_NAMES.get(c, c) for c in sorted(missing_clusters))
+            challenges.append(f"📚 未読クラスタ: {names}。制覇まであと{len(missing_clusters)}クラスタ！")
+
+    # 2. Bridge Workチャレンジ
+    remaining_bridges = total_bridges - bridge_read
+    if remaining_bridges > 0:
+        if bridge_read == 0:
+            challenges.append(f"🌉 Bridge Workをまだ読んでいません。クラスタを横断する{total_bridges}冊の特別作品に挑戦してみましょう！")
+        elif remaining_bridges <= 3:
+            challenges.append(f"🌉 Bridge Workをあと{remaining_bridges}冊で全制覇（{bridge_read}/{total_bridges}冊読了）！")
+        else:
+            challenges.append(f"🌉 Bridge Workを{bridge_read}冊読了中。残り{remaining_bridges}冊があります。")
+
+    # 3. 少数派クラスタ強化チャレンジ
+    if len(clusters) >= 2:
+        weakest = min(clusters, key=lambda c: c["pct"])
+        if weakest["pct"] <= 15:
+            # あと何冊でしきい値超えか試算
+            top_count = clusters[0]["count"]
+            needed = max(1, int(top_count * 0.25) - weakest["count"] + 1)
+            challenges.append(
+                f"📈 「{weakest['name']}」作品があと{needed}冊増えると読書バランスが向上します。"
+            )
+
+    return challenges[:3]
 
 
 def invalidate_cache() -> None:
