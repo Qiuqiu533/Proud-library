@@ -1812,6 +1812,184 @@ def _migrate_loan_history():
         con.close()
 
 
+def _migrate_sync_plam_to_award_books():
+    """PLAM CSV (award_history.csv + works.csv) を award_books に同期する。"""
+    if _migration_done("sync_plam_to_award_books_v1"):
+        return
+    if not USE_PG:
+        return
+
+    import csv
+    import unicodedata
+    import os
+
+    AWARD_MAP = {
+        "AKU": "芥川賞", "NAO": "直木賞", "JRA": "日本推理作家協会賞",
+        "HKM": "本格ミステリ大賞", "HON": "本屋大賞", "YAM": "山本周五郎賞",
+        "KMS": "このミステリーがすごい！国内1位", "RAN": "江戸川乱歩賞",
+        "KIK": "吉川英治文学賞", "JSF": "日本SF大賞", "HOR": "日本ホラー小説大賞",
+    }
+
+    def _n(s):
+        s = unicodedata.normalize("NFKC", s or "").strip()
+        return "".join(s.split())
+
+    base = os.path.join(os.path.dirname(__file__), "data", "plam")
+    try:
+        works = {r["work_id"]: r for r in csv.DictReader(open(os.path.join(base, "works.csv")))}
+        history = list(csv.DictReader(open(os.path.join(base, "award_history.csv"))))
+    except Exception as e:
+        logger.error("[migration] sync_plam: CSV読み込みエラー: %s", e)
+        return
+
+    con = get_con()
+    try:
+        existing_rows = fetchall(con, "SELECT award, title FROM award_books")
+        existing = {(_n(r["title"]), r["award"]) for r in existing_rows}
+
+        inserted = 0
+        cur = con.cursor()
+        for row in history:
+            award_name = AWARD_MAP.get(row["award_id"])
+            if not award_name:
+                continue
+            work = works.get(row["work_id"])
+            if not work:
+                continue
+            title = work["canonical_title"] or work["title"]
+            author = work["author"]
+            isbn13 = work.get("isbn13", "").strip() or None
+            award_year = int(row["award_year"]) if row.get("award_year") else None
+            award_no = int(row["award_no"]) if row.get("award_no") else None
+
+            if (_n(title), award_name) in existing:
+                continue
+
+            cur.execute(
+                "INSERT INTO award_books (award, award_no, award_year, title, author, isbn13, status) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+                (award_name, award_no, award_year, title, author, isbn13, "確認済"),
+            )
+            existing.add((_n(title), award_name))
+            inserted += 1
+
+        con.commit()
+        _mark_migration_done("sync_plam_to_award_books_v1")
+        logger.info("[migration] PLAM→award_books 同期完了: %d件追加", inserted)
+    except Exception as e:
+        logger.error("[migration] sync_plam_to_award_books error: %s", e)
+    finally:
+        con.close()
+
+
+def _migrate_fetch_isbn_ndl():
+    """award_books の isbn13 が空のエントリを NDL API で補完する（バックグラウンド）。"""
+    if _migration_done("fetch_isbn_ndl_v1"):
+        return
+    if not USE_PG:
+        return
+
+    def _run():
+        import time
+        import re
+        import urllib.request
+        import urllib.parse
+        import xml.etree.ElementTree as ET
+        import unicodedata
+
+        def _norm(s):
+            return unicodedata.normalize("NFKC", s or "").strip()
+
+        def _isbn10_to_13(digits10):
+            if len(digits10) != 10:
+                return None
+            base = "978" + digits10[:9]
+            total = sum(int(c) * (1 if i % 2 == 0 else 3) for i, c in enumerate(base))
+            return base + str((10 - (total % 10)) % 10)
+
+        def _extract_isbns(item, ns):
+            seen, jp, other = set(), [], []
+            for ident in item.findall("dc:identifier", ns):
+                digits = re.sub(r"[^0-9X]", "", (ident.text or "").upper())
+                if digits in seen:
+                    continue
+                seen.add(digits)
+                isbn13 = None
+                if len(digits) == 13 and digits.startswith("978"):
+                    isbn13 = digits
+                elif len(digits) == 10:
+                    isbn13 = _isbn10_to_13(digits)
+                if isbn13:
+                    (jp if isbn13.startswith("9784") else other).append(isbn13)
+            return jp + other
+
+        def _ndl_search(title_n, author_n):
+            params = {"title": title_n, "cnt": "8"}
+            if author_n:
+                params["creator"] = author_n
+            url = "https://ndlsearch.ndl.go.jp/api/opensearch?" + urllib.parse.urlencode(params)
+            try:
+                with urllib.request.urlopen(url, timeout=10) as r:
+                    xml_text = r.read().decode("utf-8")
+            except Exception:
+                return None
+            tree = ET.fromstring(xml_text)
+            ns = {"dc": "http://purl.org/dc/elements/1.1/"}
+            jp_res, fallback = [], []
+            for item in tree.findall(".//item"):
+                t_el = item.find("title")
+                t = _norm(t_el.text or "") if t_el is not None else ""
+                isbns = _extract_isbns(item, ns)
+                if not isbns:
+                    continue
+                match_len = min(len(title_n), 6)
+                if title_n[:match_len] and t.startswith(title_n[:match_len]):
+                    jp_res.extend(isbns)
+                elif title_n in t or (len(title_n) >= 2 and t.startswith(title_n[:2])):
+                    fallback.extend(isbns)
+            for isbn in jp_res:
+                if isbn.startswith("9784"):
+                    return isbn
+            if jp_res:
+                return jp_res[0]
+            for isbn in fallback:
+                if isbn.startswith("9784"):
+                    return isbn
+            return fallback[0] if fallback else None
+
+        con = get_con()
+        try:
+            rows = fetchall(
+                con,
+                "SELECT id, title, author FROM award_books WHERE (isbn13 IS NULL OR isbn13='') AND status='確認済' ORDER BY award_year DESC NULLS LAST, id",
+            )
+        finally:
+            con.close()
+
+        logger.info("[migration] NDL ISBN補完: %d件対象", len(rows))
+        found = 0
+        for row in rows:
+            title_n = _norm(row["title"])
+            author_n = _norm(row["author"] or "")
+            isbn = _ndl_search(title_n, author_n)
+            if not isbn:
+                time.sleep(0.3)
+                isbn = _ndl_search(title_n, None)
+            if isbn:
+                con2 = get_con()
+                try:
+                    execute(con2, "UPDATE award_books SET isbn13=%s WHERE id=%s", (isbn, row["id"]))
+                    con2.commit()
+                    found += 1
+                finally:
+                    con2.close()
+            time.sleep(0.6)
+
+        _mark_migration_done("fetch_isbn_ndl_v1")
+        logger.info("[migration] NDL ISBN補完完了: %d件取得", found)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
 def _run_all_migrations():
     """全マイグレーションをシングルスレッドで順次実行する（race condition防止）。"""
     steps = [
@@ -1851,6 +2029,8 @@ def _run_all_migrations():
         _migrate_plam_coverage_log,        # PLAMカバレッジ履歴テーブル追加
         _migrate_plam_fix_log,             # PLAMオートフィックスログテーブル追加
         _migrate_loan_history,             # 貸出履歴テーブル追加
+        _migrate_sync_plam_to_award_books, # PLAM CSV → award_books 同期
+        _migrate_fetch_isbn_ndl,           # NDL API で isbn13 補完（バックグラウンド）
         _verify_tables,
     ]
     for step in steps:
