@@ -83,12 +83,27 @@ def api_plam_coverage():
         """)
         unlinked = [{"title": r[0], "author": r[1], "award": r[2], "year": r[3]} for r in cur.fetchall()]
 
+        # 履歴（直近10件）
+        try:
+            cur.execute("""
+                SELECT logged_at, total, linked, coverage_pct, note
+                FROM plam_coverage_log
+                ORDER BY logged_at DESC LIMIT 10
+            """)
+            history = [
+                {"date": str(r[0])[:10], "total": r[1], "linked": r[2], "pct": r[3], "note": r[4]}
+                for r in cur.fetchall()
+            ]
+        except Exception:
+            history = []
+
         return jsonify({
             "total": total,
             "linked": linked,
             "coverage": round(linked / total * 100, 1) if total else 0,
             "by_award": by_award,
             "unlinked_sample": unlinked,
+            "history": history,
         })
     finally:
         con.close()
