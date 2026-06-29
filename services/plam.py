@@ -1013,6 +1013,145 @@ def _calc_cluster_timeline(
     }
 
 
+def get_plam_embedding(room: str | None = None) -> dict:
+    """Phase 20-C: 作品距離マップの2D座標とユーザー位置を返す。
+
+    作品座標の算出:
+      - 各クラスタを正五角形の頂点に配置（固定）
+      - 単一クラスタ作品 → クラスタ中心 + work_idハッシュベースのジッター
+      - Bridge work（複数クラスタ）→ クラスタ中心の加重平均
+    ユーザー位置:
+      - 読了済み作品座標の単純平均
+
+    Returns: {
+        "works": [{work_id, x, y, cluster, title}],
+        "user_pos": {x, y} | None,
+        "user_works": [work_id, ...],
+    }
+    """
+    import math
+    import hashlib
+
+    # クラスタ中心（正五角形、中心(0.5, 0.5)・半径0.38）
+    _PENTAGON_ANGLES = {
+        "literary": -math.pi / 2,           # 上
+        "mystery":  -math.pi / 2 + 2 * math.pi / 5,
+        "sf":       -math.pi / 2 + 4 * math.pi / 5,
+        "horror":   -math.pi / 2 + 6 * math.pi / 5,
+        "career":   -math.pi / 2 + 8 * math.pi / 5,
+    }
+    _R = 0.38
+    CLUSTER_CENTERS: dict[str, tuple[float, float]] = {
+        cid: (round(0.5 + _R * math.cos(a), 4), round(0.5 + _R * math.sin(a), 4))
+        for cid, a in _PENTAGON_ANGLES.items()
+    }
+
+    def _jitter(work_id: str, radius: float = 0.10) -> tuple[float, float]:
+        h = int(hashlib.md5(work_id.encode()).hexdigest()[:8], 16)
+        angle = (h % 360) * math.pi / 180
+        r = (h % 1000) / 1000 * radius
+        return (round(r * math.cos(angle), 4), round(r * math.sin(angle), 4))
+
+    cluster_m = _cluster_map()
+    works_raw = _read("works.csv")
+    history = _history_by_work()
+
+    from services.plam_calibration import get_cluster_stability
+    stability = get_cluster_stability()
+
+    works_out: list[dict] = []
+    work_positions: dict[str, tuple[float, float]] = {}
+
+    for w in works_raw:
+        wid = w.get("work_id", "")
+        if not wid:
+            continue
+        title = w.get("canonical_title", "")
+
+        # このworkが属するクラスタ（受賞歴から）
+        w_rows = [r for r in history.get(wid, []) if r.get("status") in ("awarded", "co_winner")]
+        award_ids = {r["award_id"] for r in w_rows}
+        clusters = {cluster_m.get(a, "unknown") for a in award_ids} - {"unknown"}
+
+        if not clusters:
+            # クラスタ不明: マップ中央付近にジッター
+            jx, jy = _jitter(wid, radius=0.08)
+            x, y = round(0.5 + jx, 4), round(0.5 + jy, 4)
+            primary = "unknown"
+        elif len(clusters) == 1:
+            primary = list(clusters)[0]
+            cx, cy = CLUSTER_CENTERS.get(primary, (0.5, 0.5))
+            jx, jy = _jitter(wid, radius=0.12)
+            x, y = round(cx + jx, 4), round(cy + jy, 4)
+        else:
+            # Bridge work: stability重みつき加重平均
+            primary = "bridge"
+            total_w = sum(stability.get(c, 0.5) for c in clusters)
+            x = round(sum(CLUSTER_CENTERS.get(c, (0.5, 0.5))[0] * stability.get(c, 0.5) for c in clusters) / max(total_w, 0.01), 4)
+            y = round(sum(CLUSTER_CENTERS.get(c, (0.5, 0.5))[1] * stability.get(c, 0.5) for c in clusters) / max(total_w, 0.01), 4)
+            jx, jy = _jitter(wid, radius=0.04)
+            x, y = round(x + jx, 4), round(y + jy, 4)
+
+        x = max(0.02, min(0.98, x))
+        y = max(0.02, min(0.98, y))
+
+        work_positions[wid] = (x, y)
+        works_out.append({
+            "work_id": wid,
+            "title":   title,
+            "cluster": primary,
+            "x":       x,
+            "y":       y,
+        })
+
+    # ユーザー位置（roomが指定された場合）
+    user_pos = None
+    user_wids: list[str] = []
+
+    if room:
+        from database import get_con
+        import sqlite3
+        try:
+            con = get_con()
+            con.row_factory = sqlite3.Row
+            cur = con.cursor()
+            cur.execute(
+                "SELECT title FROM reading_timeline WHERE room=? ORDER BY created_at DESC",
+                (room,)
+            )
+            rows = [dict(r) for r in cur.fetchall()]
+            con.close()
+
+            works_idx = _works_index()
+            for row in rows:
+                key = _normalize(row.get("title", ""))
+                work = works_idx.get(key)
+                if not work:
+                    if len(key) >= 2:
+                        for k, v in works_idx.items():
+                            if k.startswith(key) or key.startswith(k):
+                                work = v
+                                break
+                if work:
+                    wid = work["work_id"]
+                    if wid in work_positions and wid not in user_wids:
+                        user_wids.append(wid)
+
+            if user_wids:
+                xs = [work_positions[w][0] for w in user_wids]
+                ys = [work_positions[w][1] for w in user_wids]
+                user_pos = {"x": round(sum(xs) / len(xs), 4), "y": round(sum(ys) / len(ys), 4)}
+        except Exception:
+            pass
+
+    return {
+        "works":       works_out,
+        "user_pos":    user_pos,
+        "user_works":  user_wids,
+        "cluster_centers": {k: {"x": v[0], "y": v[1]} for k, v in CLUSTER_CENTERS.items()},
+    }
+
+
 def _build_challenges(
     clusters: list[dict],
     matched_wids: set[str],

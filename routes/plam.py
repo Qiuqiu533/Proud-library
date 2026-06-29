@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, render_template, request
-from services.plam import get_award_network, get_bridge_works, get_book_plam_info, get_related_works, get_my_plam
+from services.plam import get_award_network, get_bridge_works, get_book_plam_info, get_related_works, get_my_plam, get_plam_embedding
 from database import get_con
 from config import check_password
 
@@ -43,6 +43,14 @@ def api_plam_my():
     result = get_my_plam(room)
     if result is None:
         return jsonify(None), 200
+    return jsonify(result)
+
+
+@plam_bp.route("/api/plam/embedding")
+def api_plam_embedding():
+    """Phase 20-C: 作品距離マップ（2D座標 + ユーザー位置）"""
+    room = request.args.get("room", "").strip() or None
+    result = get_plam_embedding(room)
     return jsonify(result)
 
 

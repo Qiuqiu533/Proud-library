@@ -1107,6 +1107,12 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .my-plam-challenges { margin: 0 0 10px; padding-left: 18px; }
 .my-plam-challenges li { font-size: 0.82rem; color: #555; line-height: 1.6; margin-bottom: 4px; }
 
+/* Phase 20-C: 作品距離マップ */
+.my-plam-map-container { margin: 14px 0 4px; }
+.my-plam-map-label { font-size: 0.82rem; font-weight: 600; color: #5a3e8a; margin-bottom: 6px; }
+.my-plam-map-loading { font-size: 0.78rem; color: #bbb; padding: 8px 0; }
+.my-plam-map-svg { width: 100%; border-radius: 8px; display: block; }
+
 /* Phase 20-B: クラスタ遷移タイムライン */
 .my-plam-timeline-label { font-size: 0.82rem; font-weight: 600; color: #5a3e8a; margin: 14px 0 6px; display: flex; align-items: center; gap: 6px; }
 .my-plam-drift-score { font-size: 0.72rem; font-weight: 400; color: #888; background: #f0ede8; padding: 1px 6px; border-radius: 10px; }

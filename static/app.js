@@ -6975,9 +6975,90 @@ async function loadMyPlam() {
       ${challengeHtml}
       ${data.top_works.length ? `<div class="my-plam-works-label">照合できた受賞作</div><div class="my-plam-works">${works}</div>` : ""}
       ${nextCards ? `<div class="my-plam-next-label">📚 次に読むべき3冊</div><div class="my-plam-next-grid">${nextCards}</div>` : ""}
-      <div class="my-plam-meta">${data.matched}冊が文学賞受賞作 / 読了${data.total}冊</div>`;
+      <div class="my-plam-meta">${data.matched}冊が文学賞受賞作 / 読了${data.total}冊</div>
+      <div id="plamMapContainer" class="my-plam-map-container">
+        <div class="my-plam-map-label">🗾 作品距離マップ</div>
+        <div id="plamMapSvg" class="my-plam-map-loading">読み込み中…</div>
+      </div>`;
+
+    // Phase 20-C: SVGマップを非同期ロード
+    loadPlamMap(u.room);
+
   } catch(e) {
     content.innerHTML = '<p style="font-size:0.85rem;color:#999;padding:4px 0">読書データを取得できませんでした。</p>';
+  }
+}
+
+async function loadPlamMap(room) {
+  const container = document.getElementById("plamMapSvg");
+  if (!container) return;
+
+  try {
+    const url = room ? `/api/plam/embedding?room=${encodeURIComponent(room)}` : "/api/plam/embedding";
+    const res = await fetch(url);
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+
+    const W = 280, H = 280;
+    const CLUSTER_COLORS_MAP = {
+      mystery: "#e85d04", literary: "#6a4c93", sf: "#0066cc",
+      horror: "#2a9d8f", career: "#888888", bridge: "#f4a261", unknown: "#ddd",
+    };
+    const CLUSTER_LABEL = {
+      mystery: "ミステリ", literary: "文学", sf: "SF", horror: "ホラー", career: "キャリア",
+    };
+
+    const userWids = new Set(data.user_works || []);
+
+    // 作品ドット（userの読了済みを除く）
+    const dots = data.works.map(w => {
+      const cx = Math.round(w.x * W);
+      const cy = Math.round(w.y * H);
+      const isUser = userWids.has(w.work_id);
+      if (isUser) return "";
+      const col = CLUSTER_COLORS_MAP[w.cluster] || "#ddd";
+      return `<circle cx="${cx}" cy="${cy}" r="2" fill="${col}" opacity="0.45" title="${esc(w.title)}"/>`;
+    }).join("");
+
+    // ユーザー読了作品（強調）
+    const userDots = data.works.filter(w => userWids.has(w.work_id)).map(w => {
+      const cx = Math.round(w.x * W);
+      const cy = Math.round(w.y * H);
+      const col = CLUSTER_COLORS_MAP[w.cluster] || "#ddd";
+      return `<circle cx="${cx}" cy="${cy}" r="4.5" fill="${col}" stroke="#fff" stroke-width="1.5" opacity="0.9" title="${esc(w.title)}"/>`;
+    }).join("");
+
+    // クラスタラベル
+    const cc = data.cluster_centers || {};
+    const clusterLabels = Object.entries(cc).map(([cid, pos]) => {
+      const lx = Math.round(pos.x * W);
+      const ly = Math.round(pos.y * H);
+      const col = CLUSTER_COLORS_MAP[cid] || "#999";
+      const label = CLUSTER_LABEL[cid] || cid;
+      return `<text x="${lx}" y="${ly}" text-anchor="middle" font-size="9" fill="${col}" font-weight="700" opacity="0.6">${label}</text>`;
+    }).join("");
+
+    // ユーザー位置マーカー
+    let userMarker = "";
+    if (data.user_pos) {
+      const ux = Math.round(data.user_pos.x * W);
+      const uy = Math.round(data.user_pos.y * H);
+      userMarker = `
+        <circle cx="${ux}" cy="${uy}" r="9" fill="#fff" stroke="#e63946" stroke-width="2.5" opacity="0.95"/>
+        <text x="${ux}" y="${uy + 4}" text-anchor="middle" font-size="10" fill="#e63946" font-weight="900">you</text>`;
+    }
+
+    const svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="my-plam-map-svg">
+      <rect width="${W}" height="${H}" fill="#faf8ff" rx="8"/>
+      ${dots}
+      ${userDots}
+      ${clusterLabels}
+      ${userMarker}
+    </svg>`;
+
+    container.innerHTML = svg;
+  } catch(e) {
+    container.innerHTML = '<span style="font-size:0.8rem;color:#bbb">マップを読み込めませんでした</span>';
   }
 }
 
