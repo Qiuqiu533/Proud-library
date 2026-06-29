@@ -285,9 +285,6 @@ def _build_reason(
 
 def get_related_works(work_id: str, limit: int = 6) -> list[dict]:
     """PLAMネットワークを使って関連作品を返す（Jaccard補正スコアリング付き）。"""
-    from database import get_con
-    import sqlite3
-
     history = _history_by_work()
     cluster_m = _cluster_map()
     master = _awards_master()
@@ -331,11 +328,10 @@ def get_related_works(work_id: str, limit: int = 6) -> list[dict]:
 
     # genre_books との照合（タイトル正規化）
     try:
+        from database import get_con, fetchall as db_fetchall
         con = get_con()
-        con.row_factory = sqlite3.Row
-        cur = con.cursor()
-        cur.execute("SELECT isbn, title, author FROM genre_books")
-        db_books = {_normalize(r["title"]): dict(r) for r in cur.fetchall()}
+        rows = db_fetchall(con, "SELECT isbn, title, author FROM genre_books")
+        db_books = {_normalize(r["title"]): r for r in rows}
         con.close()
     except Exception:
         db_books = {}
@@ -392,19 +388,15 @@ def get_my_plam(room: str) -> dict | None:
         profile_text: str,     # 自然文プロフィール
     }
     """
-    from database import get_con
-    import sqlite3
-
     # 読了履歴取得
     try:
+        from database import get_con, fetchall as db_fetchall
         con = get_con()
-        con.row_factory = sqlite3.Row
-        cur = con.cursor()
-        cur.execute(
+        timeline_rows = db_fetchall(
+            con,
             "SELECT title, author, status, created_at FROM reading_timeline WHERE room=? ORDER BY created_at DESC",
             (room,),
         )
-        timeline_rows = [dict(r) for r in cur.fetchall()]
         con.close()
     except Exception:
         return None
@@ -635,9 +627,6 @@ def _recommend_next_reads(
 
     優先: Bridge Work > 未経験クラスタ > 既存クラスタの高スコア作品
     """
-    from database import get_con
-    import sqlite3
-
     history = _history_by_work()
     cluster_m = _cluster_map()
     master = _awards_master()
@@ -649,11 +638,10 @@ def _recommend_next_reads(
 
     # genre_books照合
     try:
+        from database import get_con, fetchall as db_fetchall
         con = get_con()
-        con.row_factory = sqlite3.Row
-        cur = con.cursor()
-        cur.execute("SELECT isbn, title FROM genre_books")
-        db_books = {_normalize(r["title"]): r["isbn"] for r in cur.fetchall()}
+        rows = db_fetchall(con, "SELECT isbn, title FROM genre_books")
+        db_books = {_normalize(r["title"]): r["isbn"] for r in rows}
         con.close()
     except Exception:
         db_books = {}
@@ -1062,18 +1050,15 @@ def get_plam_embedding(room: str | None = None) -> dict:
     # award_books から plam_work_id → isbn の逆引きマップを生成（21-B）
     isbn_by_wid: dict[str, str] = {}
     try:
-        from database import get_con, USE_PG
-        import sqlite3
+        from database import get_con, fetchall as db_fetchall
         con = get_con()
-        con.row_factory = sqlite3.Row
-        cur = con.cursor()
-        if USE_PG:
-            cur.execute("SELECT plam_work_id, isbn FROM award_books WHERE plam_work_id IS NOT NULL AND isbn IS NOT NULL AND isbn != ''")
-        else:
-            cur.execute("SELECT plam_work_id, isbn FROM award_books WHERE plam_work_id IS NOT NULL AND isbn != ''")
-        for row in cur.fetchall():
-            wid_key = row[0] if isinstance(row[0], str) else str(row[0])
-            isbn_val = row[1] if isinstance(row[1], str) else str(row[1])
+        rows = db_fetchall(
+            con,
+            "SELECT plam_work_id, isbn FROM award_books WHERE plam_work_id IS NOT NULL AND isbn IS NOT NULL AND isbn != ''"
+        )
+        for row in rows:
+            wid_key = str(row["plam_work_id"])
+            isbn_val = str(row["isbn"])
             if wid_key and isbn_val and wid_key not in isbn_by_wid:
                 isbn_by_wid[wid_key] = isbn_val
         con.close()
@@ -1133,17 +1118,14 @@ def get_plam_embedding(room: str | None = None) -> dict:
     user_wids: list[str] = []
 
     if room:
-        from database import get_con
-        import sqlite3
         try:
+            from database import get_con, fetchall as db_fetchall
             con = get_con()
-            con.row_factory = sqlite3.Row
-            cur = con.cursor()
-            cur.execute(
+            rows = db_fetchall(
+                con,
                 "SELECT title FROM reading_timeline WHERE room=? ORDER BY created_at DESC",
                 (room,)
             )
-            rows = [dict(r) for r in cur.fetchall()]
             con.close()
 
             works_idx = _works_index()
