@@ -6863,9 +6863,14 @@ async function loadMyPlam() {
 
     const _plamScoreLabel = (s) => {
       if (s >= 90) return "殿堂級";
-      if (s >= 70) return "上級者";
-      if (s >= 50) return "中級者";
-      if (s >= 30) return "入門者";
+      if (s >= 80) return "文学博士";
+      if (s >= 70) return "読書の達人";
+      if (s >= 60) return "賞の目利き";
+      if (s >= 50) return "文学通";
+      if (s >= 40) return "読書家";
+      if (s >= 30) return "本の友";
+      if (s >= 20) return "活字好き";
+      if (s >= 10) return "読書入門";
       return "探索中";
     };
 

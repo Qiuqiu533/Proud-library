@@ -1814,7 +1814,7 @@ def _migrate_loan_history():
 
 def _migrate_sync_plam_to_award_books():
     """PLAM CSV (award_history.csv + works.csv) を award_books に同期する。"""
-    if _migration_done("sync_plam_to_award_books_v1"):
+    if _migration_done("sync_plam_to_award_books_v2"):
         return
     if not USE_PG:
         return
@@ -1836,8 +1836,8 @@ def _migrate_sync_plam_to_award_books():
 
     base = os.path.join(os.path.dirname(__file__), "data", "plam")
     try:
-        works = {r["work_id"]: r for r in csv.DictReader(open(os.path.join(base, "works.csv")))}
-        history = list(csv.DictReader(open(os.path.join(base, "award_history.csv"))))
+        works = {r["work_id"]: r for r in csv.DictReader(open(os.path.join(base, "works.csv"), encoding="utf-8"))}
+        history = list(csv.DictReader(open(os.path.join(base, "award_history.csv"), encoding="utf-8")))
     except Exception as e:
         logger.error("[migration] sync_plam: CSV読み込みエラー: %s", e)
         return
@@ -1846,9 +1846,9 @@ def _migrate_sync_plam_to_award_books():
     try:
         existing_rows = fetchall(con, "SELECT award, title FROM award_books")
         existing = {(_n(r["title"]), r["award"]) for r in existing_rows}
+        logger.info("[migration] sync_plam: 既存 %d件、history %d件", len(existing_rows), len(history))
 
         inserted = 0
-        cur = con.cursor()
         for row in history:
             award_name = AWARD_MAP.get(row["award_id"])
             if not award_name:
@@ -1856,8 +1856,10 @@ def _migrate_sync_plam_to_award_books():
             work = works.get(row["work_id"])
             if not work:
                 continue
-            title = work["canonical_title"] or work["title"]
-            author = work["author"]
+            title = (work.get("canonical_title") or work.get("title") or "").strip()
+            if not title:
+                continue
+            author = (work.get("author") or "").strip()
             isbn13 = work.get("isbn13", "").strip() or None
             award_year = int(row["award_year"]) if row.get("award_year") else None
             award_no = int(row["award_no"]) if row.get("award_no") else None
@@ -1865,18 +1867,18 @@ def _migrate_sync_plam_to_award_books():
             if (_n(title), award_name) in existing:
                 continue
 
-            cur.execute(
-                "INSERT INTO award_books (award, award_no, award_year, title, author, isbn13, status) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+            execute(con,
+                "INSERT INTO award_books (award, award_no, award_year, title, author, isbn13, status) VALUES (?,?,?,?,?,?,?)",
                 (award_name, award_no, award_year, title, author, isbn13, "確認済"),
             )
             existing.add((_n(title), award_name))
             inserted += 1
 
         con.commit()
-        _mark_migration_done("sync_plam_to_award_books_v1")
+        _mark_migration_done("sync_plam_to_award_books_v2")
         logger.info("[migration] PLAM→award_books 同期完了: %d件追加", inserted)
     except Exception as e:
-        logger.error("[migration] sync_plam_to_award_books error: %s", e)
+        logger.error("[migration] sync_plam_to_award_books error: %s", e, exc_info=True)
     finally:
         con.close()
 
