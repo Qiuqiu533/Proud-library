@@ -5568,6 +5568,12 @@ async function loadAwardBooks(award) {
     if (selectedAwards.size > 0) {
       books = books.filter(b => selectedAwards.has(b.award));
     }
+    // 年フィルター
+    const yearSel = document.getElementById("awardYearSelect");
+    const selYear = yearSel ? parseInt(yearSel.value) : NaN;
+    if (!isNaN(selYear)) {
+      books = books.filter(b => b.award_year === selYear);
+    }
     const q = (document.getElementById("awardSearch")?.value || "").trim().toLowerCase();
     _renderAwardBooks(q ? books.filter(b => (b.title||"").toLowerCase().includes(q)||(b.author||"").toLowerCase().includes(q)) : books, q);
   } catch(e) {
@@ -5581,6 +5587,8 @@ async function initAwardsTab() {
   filterRow.dataset.loaded = "1";
   _allAwardBooks = [];  // キャッシュリセット
   selectedAwards.clear();
+  const yearSel = document.getElementById("awardYearSelect");
+  if (yearSel) yearSel.value = "";
   try {
     const res = await fetch("/api/award-books/awards");
     const awards = await res.json();
@@ -5600,6 +5608,19 @@ async function initAwardsTab() {
         style="padding:5px 12px;border-radius:16px;border:1px solid #ccc;background:${a.award==="すべて"?"#3d6b4f":"#fff"};color:${a.award==="すべて"?"#fff":"#444"};font-size:0.8rem;cursor:pointer">
         ${a.award}（${a.count}）
       </button>`).join("");
+  } catch(e) {}
+  // 全件取得して年一覧を構築
+  try {
+    if (!_allAwardBooks || _allAwardBooks.length === 0) {
+      const r2 = await fetch("/api/award-books");
+      _allAwardBooks = await r2.json();
+    }
+    const years = [...new Set(_allAwardBooks.map(b => b.award_year).filter(Boolean))].sort((a,b)=>b-a);
+    const yearSel2 = document.getElementById("awardYearSelect");
+    if (yearSel2) {
+      yearSel2.innerHTML = '<option value="">年（すべて）</option>' +
+        years.map(y => `<option value="${y}">${y}年</option>`).join("");
+    }
   } catch(e) {}
   loadAwardBooks("");
 }
@@ -5640,6 +5661,8 @@ function selectAwardFilter(btn) {
 }
 
 function resetAwardFilter() {
+  const yearSel = document.getElementById("awardYearSelect");
+  if (yearSel) yearSel.value = "";
   const allBtn = document.querySelector('.award-filter-btn[data-award=""]');
   if (allBtn) selectAwardFilter(allBtn);
 }

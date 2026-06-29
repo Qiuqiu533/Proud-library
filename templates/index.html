@@ -517,6 +517,10 @@
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px">
           <div id="awardTabFilter" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+          <select id="awardYearSelect" onchange="loadAwardBooks('')"
+            style="padding:5px 10px;border-radius:16px;border:1px solid #ccc;font-size:0.8rem;color:#444;background:#fff;cursor:pointer;height:32px">
+            <option value="">年（すべて）</option>
+          </select>
           <button id="awardResetBtn" onclick="resetAwardFilter()" style="display:none;padding:5px 14px;border-radius:16px;border:1.5px solid #c0392b;background:#fff;color:#c0392b;font-size:0.8rem;font-weight:600;cursor:pointer">× クリア</button>
         </div>
         <div id="awardBooksList" style="display:flex;flex-direction:column;gap:10px">
