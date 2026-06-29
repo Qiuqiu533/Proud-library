@@ -57,7 +57,7 @@ def _load_plam_works() -> dict[str, dict]:
 
 
 def _load_award_history_titles() -> set[str]:
-    """award_history.csv の award 名セット（賞名ボーナス判定用）"""
+    """award_history.csv の award_id セット（賞名ボーナス判定用）"""
     awards: set[str] = set()
     path = PLAM_DIR / "award_history.csv"
     if not path.exists():
@@ -76,32 +76,32 @@ def _score_candidate(
     db_award: str,
     plam_work: dict,
     plam_award_ids: set[str],
+    cal_stats: dict,
 ) -> tuple[float, str]:
-    """(信頼スコア, fix_type) を返す"""
+    """キャリブレーション済み信頼スコアと fix_type を返す"""
+    from services.plam_calibration import calibrated_score
+
     pt = _normalize(plam_work.get("canonical_title", ""))
     dt = _normalize(db_title)
     pa = _normalize(plam_work.get("author", ""))
     da = _normalize(db_author or "")
-    plam_wid = plam_work.get("work_id", "")
+    raw_sim = _sim(dt, pt)
 
-    title_sim = _sim(dt, pt)
+    has_award = _normalize(db_award) in plam_award_ids
+    score = calibrated_score(
+        db_title, db_author, db_award,
+        plam_work.get("canonical_title", ""),
+        plam_work.get("author", ""),
+        stats=cal_stats,
+        has_award_match=has_award,
+    )
 
-    # 著者一致ボーナス
-    author_ok = 0.0
-    if da and pa:
-        author_ok = 0.10 if (da == pa or da in pa or pa in da) else 0.0
-
-    # 賞名一致ボーナス（award_books.award が PLAM賞IDに近ければ）
-    award_bonus = 0.05 if _normalize(db_award) in plam_award_ids else 0.0
-
-    score = min(1.0, title_sim * 0.85 + author_ok + award_bonus)
-
-    # fix_type 判定
-    if title_sim >= 0.99 and (not da or not pa or da == pa or da in pa or pa in da):
+    # fix_type は raw_sim で判定（キャリブレーション後スコアは閾値判定に使う）
+    if raw_sim >= 0.99 and (not da or not pa or da == pa or da in pa or pa in da):
         fix_type = "exact"
-    elif title_sim >= 0.85:
+    elif raw_sim >= 0.85:
         fix_type = "title_variant"
-    elif title_sim >= 0.60:
+    elif raw_sim >= 0.60:
         fix_type = "partial_match"
     else:
         fix_type = "weak_match"
@@ -115,22 +115,23 @@ def _find_candidates(
     award: str,
     plam_idx: dict[str, dict],
     plam_award_ids: set[str],
+    cal_stats: dict,
     min_sim: float = 0.55,
 ) -> list[tuple[float, str, dict]]:
-    """(score, fix_type, plam_work) のリスト（スコア降順）"""
+    """(calibrated_score, fix_type, plam_work) のリスト（スコア降順）"""
     dt = _normalize(title)
     results = []
     for pt, work in plam_idx.items():
         ts = _sim(dt, pt)
         if ts < min_sim:
             continue
-        score, fix_type = _score_candidate(title, author, award, work, plam_award_ids)
+        score, fix_type = _score_candidate(title, author, award, work, plam_award_ids, cal_stats)
         results.append((score, fix_type, work))
     results.sort(key=lambda x: -x[0])
-    return results[:5]  # 上位5候補
+    return results[:5]
 
 
-def build_fix_list(con, plam_idx, plam_award_ids, threshold: float) -> list[dict]:
+def build_fix_list(con, plam_idx, plam_award_ids, cal_stats, threshold: float) -> list[dict]:
     """閾値以上のすべての自動修正候補を返す"""
     cur = con.cursor()
     cur.execute("""
@@ -143,7 +144,9 @@ def build_fix_list(con, plam_idx, plam_award_ids, threshold: float) -> list[dict
 
     fixes = []
     for rid, award, year, title, author in rows:
-        candidates = _find_candidates(title, author or "", award, plam_idx, plam_award_ids)
+        candidates = _find_candidates(
+            title, author or "", award, plam_idx, plam_award_ids, cal_stats
+        )
         if not candidates:
             continue
         top_score, fix_type, top_work = candidates[0]
@@ -163,8 +166,8 @@ def build_fix_list(con, plam_idx, plam_award_ids, threshold: float) -> list[dict
     return fixes
 
 
-def cmd_dry_run(con, plam_idx, plam_award_ids, threshold: float):
-    fixes = build_fix_list(con, plam_idx, plam_award_ids, threshold)
+def cmd_dry_run(con, plam_idx, plam_award_ids, cal_stats, threshold: float):
+    fixes = build_fix_list(con, plam_idx, plam_award_ids, cal_stats, threshold)
 
     print(f"\n=== auto-fix 候補 (threshold={threshold}) ===")
     print(f"対象: {len(fixes)}件\n")
@@ -225,8 +228,8 @@ def _do_apply(con, fixes: list[dict], mode: str):
     print(f"\n適用完了: {applied}件  カバレッジ: {pct}% ({linked}/{total})")
 
 
-def cmd_apply(con, plam_idx, plam_award_ids, threshold: float):
-    fixes = build_fix_list(con, plam_idx, plam_award_ids, threshold)
+def cmd_apply(con, plam_idx, plam_award_ids, cal_stats, threshold: float):
+    fixes = build_fix_list(con, plam_idx, plam_award_ids, cal_stats, threshold)
     if not fixes:
         print(f"threshold={threshold} 以上の候補はありませんでした。")
         return
@@ -234,11 +237,11 @@ def cmd_apply(con, plam_idx, plam_award_ids, threshold: float):
     _do_apply(con, fixes, mode="apply")
 
 
-def cmd_auto_fix(con, plam_idx, plam_award_ids, threshold: float):
+def cmd_auto_fix(con, plam_idx, plam_award_ids, cal_stats, threshold: float):
     if threshold < 0.85:
         print(f"[abort] threshold={threshold} は危険域です（0.85未満は手動レビュー推奨）。")
         sys.exit(1)
-    fixes = build_fix_list(con, plam_idx, plam_award_ids, threshold)
+    fixes = build_fix_list(con, plam_idx, plam_award_ids, cal_stats, threshold)
     if not fixes:
         print(f"threshold={threshold} 以上の候補はありませんでした。")
         return
@@ -265,14 +268,19 @@ def main():
     plam_award_ids = _load_award_history_titles()
     print(f"PLAMインデックス: {len(plam_idx)}作品  賞IDセット: {len(plam_award_ids)}件")
 
+    from services.plam_calibration import get_calibration_stats, calibration_report
+    cal_stats = get_calibration_stats()
+    print(f"キャリブレーション統計: {len(cal_stats)-1}賞")
+    print(calibration_report())
+
     con = get_con()
     try:
         if args.dry_run:
-            cmd_dry_run(con, plam_idx, plam_award_ids, args.threshold)
+            cmd_dry_run(con, plam_idx, plam_award_ids, cal_stats, args.threshold)
         elif args.apply:
-            cmd_apply(con, plam_idx, plam_award_ids, args.threshold)
+            cmd_apply(con, plam_idx, plam_award_ids, cal_stats, args.threshold)
         elif args.auto_fix:
-            cmd_auto_fix(con, plam_idx, plam_award_ids, args.threshold)
+            cmd_auto_fix(con, plam_idx, plam_award_ids, cal_stats, args.threshold)
     finally:
         con.close()
 
