@@ -6820,10 +6820,54 @@ async function loadMyPlam() {
         : `<div class="my-plam-next-card">${inner}</div>`;
     }).join("");
 
+    // My PLAMスコア
+    const sc = data.plam_score || {};
+    const scoreHtml = sc.total != null ? `
+      <div class="my-plam-score-row">
+        <div class="my-plam-score-circle">
+          <span class="my-plam-score-num">${sc.total}</span>
+          <span class="my-plam-score-max">/100</span>
+        </div>
+        <div class="my-plam-score-axes">
+          <div class="my-plam-score-axis"><span>📖 広がり</span><span>${sc.spread}/40</span></div>
+          <div class="my-plam-score-axis"><span>🏆 受賞作</span><span>${sc.award_score}/30</span></div>
+          <div class="my-plam-score-axis"><span>🌉 Bridge</span><span>${sc.bridge_score}/20</span></div>
+          <div class="my-plam-score-axis"><span>⚖️ バランス</span><span>${sc.balance}/10</span></div>
+        </div>
+      </div>` : "";
+
+    // 年別推移（直近3年）
+    const trend = data.yearly_trend || [];
+    const CLUSTER_COLORS_JS = {mystery:"#e85d04",literary:"#6a4c93",sf:"#0066cc",horror:"#2a9d8f",career:"#888"};
+    const trendHtml = trend.length >= 2 ? `
+      <div class="my-plam-trend-label">📅 年別読書推移</div>
+      <div class="my-plam-trend">
+        ${trend.map(y => {
+          const segments = Object.entries(y.clusters).filter(([,v]) => v > 0)
+            .sort(([,a],[,b]) => b-a)
+            .map(([c,v]) => `<div class="my-plam-trend-seg" style="width:${v}%;background:${CLUSTER_COLORS_JS[c]||'#ccc'}" title="${c} ${v}%"></div>`)
+            .join("");
+          return `<div class="my-plam-trend-row">
+            <span class="my-plam-trend-year">${y.year}</span>
+            <div class="my-plam-trend-bar">${segments}</div>
+            <span class="my-plam-trend-count">${y.total_matched}冊</span>
+          </div>`;
+        }).join("")}
+      </div>` : "";
+
+    // チャレンジ提案
+    const challengeHtml = (data.challenges || []).length
+      ? `<div class="my-plam-challenge-label">🎯 チャレンジ</div>
+         <ul class="my-plam-challenges">${(data.challenges||[]).map(c=>`<li>${esc(c)}</li>`).join("")}</ul>`
+      : "";
+
     content.innerHTML = `
       ${typeBadge}
+      ${scoreHtml}
       <div class="my-plam-clusters">${bars}</div>
       <p class="my-plam-profile">${esc(data.profile_text)}</p>
+      ${trendHtml}
+      ${challengeHtml}
       ${data.top_works.length ? `<div class="my-plam-works-label">照合できた受賞作</div><div class="my-plam-works">${works}</div>` : ""}
       ${nextCards ? `<div class="my-plam-next-label">📚 次に読むべき3冊</div><div class="my-plam-next-grid">${nextCards}</div>` : ""}
       <div class="my-plam-meta">${data.matched}冊が文学賞受賞作 / 読了${data.total}冊</div>`;
