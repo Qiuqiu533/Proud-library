@@ -5518,8 +5518,9 @@ function _renderAwardBooks(books, query) {
     if (!byTitle[key]) {
       byTitle[key] = { ...b, awards_list: [] };
     }
-    // ISBNは先着優先（library_isbnがあれば上書き）
+    // ISBN・蔵書フラグは持っている方を優先
     if (b.library_isbn) byTitle[key].library_isbn = b.library_isbn;
+    if (b.isbn13 && !byTitle[key].isbn13) byTitle[key].isbn13 = b.isbn13;
     if (b.in_library) byTitle[key].in_library = true;
     const awardLabel = `${b.award}${b.award_no != null ? ` 第${b.award_no}回` : ""}（${b.award_year}年）`;
     if (!byTitle[key].awards_list.find(a => a.label === awardLabel)) {
