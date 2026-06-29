@@ -5510,48 +5510,58 @@ function _renderAwardBooks(books, query) {
     list.innerHTML = `<div style="color:#aaa;font-size:0.9rem;padding:20px 0;text-align:center">${query ? "該当する作品がありません" : "受賞作データがありません"}</div>`;
     return;
   }
-  // タイトル+賞+年で重複除去
-  const seen = new Set();
-  books = books.filter(b => {
-    const dk = `${b.award}_${b.award_year}_${b.title}`;
-    if (seen.has(dk)) return false;
-    seen.add(dk); return true;
-  });
-  const byYear = {};
+  // タイトルで統合（同一作が複数賞受賞の場合にまとめる）
+  const _normTitle = t => (t || "").replace(/\s/g, "").toLowerCase();
+  const byTitle = {};
   for (const b of books) {
-    const k = `${b.award_year}_${b.award}`;
-    if (!byYear[k]) byYear[k] = { award: b.award, year: b.award_year, no: b.award_no, books: [] };
-    byYear[k].books.push(b);
+    const key = _normTitle(b.title);
+    if (!byTitle[key]) {
+      byTitle[key] = { ...b, awards_list: [] };
+    }
+    // ISBNは先着優先（library_isbnがあれば上書き）
+    if (b.library_isbn) byTitle[key].library_isbn = b.library_isbn;
+    if (b.in_library) byTitle[key].in_library = true;
+    const awardLabel = `${b.award}${b.award_no != null ? ` 第${b.award_no}回` : ""}（${b.award_year}年）`;
+    if (!byTitle[key].awards_list.find(a => a.label === awardLabel)) {
+      byTitle[key].awards_list.push({ label: awardLabel, year: b.award_year });
+    }
   }
-  const groups = Object.values(byYear).sort((a, b) => b.year - a.year || b.no - a.no);
-  list.innerHTML = groups.map(g => `
-    <div style="border:1px solid #e8e8e8;border-radius:10px;padding:12px 14px;background:#fff">
-      <div style="font-size:0.78rem;color:#888;margin-bottom:6px">
-        ${esc(g.award)}${g.no != null ? ` 第${g.no}回` : ""}（${g.year}年）
+  // 最新受賞年で降順ソート
+  const items = Object.values(byTitle).sort((a, b) => {
+    const ya = Math.max(...a.awards_list.map(x => x.year || 0));
+    const yb = Math.max(...b.awards_list.map(x => x.year || 0));
+    return yb - ya;
+  });
+  list.innerHTML = items.map(b => {
+    const isbn = b.library_isbn || (b.isbn13 && b.isbn13.length >= 10 ? b.isbn13 : "") || "";
+    const coverUrl = get_cover_url_js(isbn);
+    const clickable = !!isbn;
+    const coverHtml = coverUrl
+      ? `<img src="${coverUrl}" alt="" style="width:52px;height:70px;object-fit:cover;border-radius:5px;flex-shrink:0;background:#f0f0f0" onerror="this.style.display='none'">`
+      : `<div style="width:52px;height:70px;background:#f0f0f0;border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.4rem">📖</div>`;
+    const clickAttr = clickable
+      ? `onclick="openModal('${isbn.replace(/'/g,"\\'")}',{isbn:'${isbn.replace(/'/g,"\\'")}',title:${JSON.stringify(b.title)},author:${JSON.stringify(b.author||'')}})"`
+      : "";
+    const awardBadges = b.awards_list.map(a =>
+      `<span style="display:inline-block;font-size:0.7rem;background:#fff8e1;color:#b45309;border:1px solid #f6c744;border-radius:10px;padding:2px 8px;margin:2px 4px 2px 0;white-space:nowrap">🏆 ${esc(a.label)}</span>`
+    ).join("");
+    return `
+    <div ${clickAttr} style="display:flex;align-items:flex-start;gap:12px;border:1px solid #e8e8e8;border-radius:10px;padding:12px 14px;background:#fff;transition:background 0.15s${clickable ? ";cursor:pointer" : ""}"
+      ${clickable ? 'onmouseover="this.style.background=\'#f7f7f7\'" onmouseout="this.style.background=\'#fff\'"' : ''}>
+      ${coverHtml}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:0.97rem;font-weight:700;color:${clickable ? "#1a5c3a" : "#222"};line-height:1.3;margin-bottom:2px">${esc(b.title)}</div>
+        <div style="font-size:0.83rem;color:#666;margin-bottom:6px">${esc(b.author)}</div>
+        <div style="line-height:1.8">${awardBadges}</div>
       </div>
-      ${g.books.map(b => {
-        const isbn = b.library_isbn || (b.isbn13 && b.isbn13.length >= 10 ? b.isbn13 : "") || "";
-        const coverUrl = get_cover_url_js(isbn);
-        const clickable = !!isbn;
-        const coverHtml = coverUrl
-          ? `<img src="${coverUrl}" alt="" style="width:44px;height:60px;object-fit:cover;border-radius:4px;flex-shrink:0;background:#f0f0f0${clickable ? ";cursor:pointer" : ""}" onerror="this.style.display='none'">`
-          : `<div style="width:44px;height:60px;background:#f0f0f0;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.2rem">📖</div>`;
-        const clickAttr = clickable ? `onclick="openModal('${isbn.replace(/'/g,"\\'")}',{isbn:'${isbn.replace(/'/g,"\\'")}',title:${JSON.stringify(b.title)},author:${JSON.stringify(b.author||'')}})" style="cursor:pointer"` : "";
-        return `
-        <div ${clickAttr} style="display:flex;align-items:center;gap:10px;margin-top:${g.books.length > 1 ? "8px" : "0"};border-radius:8px;padding:4px;transition:background 0.15s${clickable ? ";cursor:pointer" : ""}"
-          ${clickable ? 'onmouseover="this.style.background=\'#f7f7f7\'" onmouseout="this.style.background=\'\'"' : ''}>
-          ${coverHtml}
-          <div style="flex:1;min-width:0">
-            <div style="font-size:0.95rem;font-weight:600;color:${clickable?"#1a5c3a":"#222"};line-height:1.3">${esc(b.title)}</div>
-            <div style="font-size:0.82rem;color:#666;margin-top:2px">${esc(b.author)}</div>
-          </div>
-          ${b.in_library
-            ? `<span style="font-size:0.72rem;background:#e8f5e9;color:#2e7d32;padding:3px 8px;border-radius:12px;white-space:nowrap;flex-shrink:0">📖 蔵書あり</span>`
-            : `<span style="font-size:0.72rem;background:#f5f5f5;color:#aaa;padding:3px 8px;border-radius:12px;white-space:nowrap;flex-shrink:0">未所蔵</span>`
-          }
-        </div>`;
-      }).join("")}
-    </div>`).join("");
+      <div style="flex-shrink:0;padding-top:2px">
+        ${b.in_library
+          ? `<span style="font-size:0.72rem;background:#e8f5e9;color:#2e7d32;padding:3px 8px;border-radius:12px;white-space:nowrap">📖 蔵書あり</span>`
+          : `<span style="font-size:0.72rem;background:#f5f5f5;color:#aaa;padding:3px 8px;border-radius:12px;white-space:nowrap">未所蔵</span>`
+        }
+      </div>
+    </div>`;
+  }).join("");
 }
 
 async function loadAwardBooks(award) {
