@@ -77,9 +77,11 @@ def _score_candidate(
     plam_work: dict,
     plam_award_ids: set[str],
     cal_stats: dict,
+    cluster_stability: dict,
+    bridge_ids: set,
 ) -> tuple[float, str]:
-    """キャリブレーション済み信頼スコアと fix_type を返す"""
-    from services.plam_calibration import calibrated_score
+    """Phase 19-C 統合信頼度スコアと fix_type を返す"""
+    from services.plam_calibration import calibrated_score, compute_final_score, _CLUSTER_MAP
 
     pt = _normalize(plam_work.get("canonical_title", ""))
     dt = _normalize(db_title)
@@ -88,7 +90,9 @@ def _score_candidate(
     raw_sim = _sim(dt, pt)
 
     has_award = _normalize(db_award) in plam_award_ids
-    score = calibrated_score(
+
+    # base calibrated score
+    base_cal = calibrated_score(
         db_title, db_author, db_award,
         plam_work.get("canonical_title", ""),
         plam_work.get("author", ""),
@@ -96,7 +100,18 @@ def _score_candidate(
         has_award_match=has_award,
     )
 
-    # fix_type は raw_sim で判定（キャリブレーション後スコアは閾値判定に使う）
+    # 19-C: cluster + stability + bridge → final score
+    plam_award_id = _plam_award_id_from_db_award(db_award)
+    cluster_id = _CLUSTER_MAP.get(plam_award_id or "", None)
+    score = compute_final_score(
+        base_cal,
+        cluster_id,
+        plam_work_id=plam_work.get("work_id"),
+        stability=cluster_stability,
+        bridge_ids=bridge_ids,
+    )
+
+    # fix_type は raw_sim で判定
     if raw_sim >= 0.99 and (not da or not pa or da == pa or da in pa or pa in da):
         fix_type = "exact"
     elif raw_sim >= 0.85:
@@ -116,32 +131,33 @@ def _find_candidates(
     plam_idx: dict[str, dict],
     plam_award_ids: set[str],
     cal_stats: dict,
+    cluster_stability: dict,
+    bridge_ids: set,
     min_sim: float = 0.55,
 ) -> list[tuple[float, str, dict]]:
-    """(calibrated_score, fix_type, plam_work) のリスト（スコア降順）"""
+    """(final_score, fix_type, plam_work) のリスト（スコア降順）"""
     dt = _normalize(title)
     results = []
     for pt, work in plam_idx.items():
         ts = _sim(dt, pt)
         if ts < min_sim:
             continue
-        score, fix_type = _score_candidate(title, author, award, work, plam_award_ids, cal_stats)
+        score, fix_type = _score_candidate(
+            title, author, award, work, plam_award_ids, cal_stats,
+            cluster_stability, bridge_ids
+        )
         results.append((score, fix_type, work))
     results.sort(key=lambda x: -x[0])
     return results[:5]
 
 
 def build_fix_list(
-    con, plam_idx, plam_award_ids, cal_stats, threshold: float,
-    cluster_thresholds: dict | None = None,
+    con, plam_idx, plam_award_ids, cal_stats,
+    threshold: float,
+    cluster_stability: dict,
+    bridge_ids: set,
 ) -> list[dict]:
-    """閾値以上のすべての自動修正候補を返す。
-
-    cluster_thresholds が与えられている場合、賞ごとのクラスタ閾値を優先する。
-    threshold は未知クラスタ / --auto-fix時の明示指定のフォールバック。
-    """
-    from services.plam_calibration import get_threshold_for_award
-
+    """threshold 以上の統合信頼度スコアを持つ候補を返す（Phase 19-C）。"""
     cur = con.cursor()
     cur.execute("""
         SELECT id, award, award_year, title, author
@@ -153,21 +169,14 @@ def build_fix_list(
 
     fixes = []
     for rid, award, year, title, author in rows:
-        # クラスタ別adaptive threshold を取得
-        if cluster_thresholds:
-            eff_threshold = get_threshold_for_award(
-                _plam_award_id_from_db_award(award), cluster_thresholds
-            )
-        else:
-            eff_threshold = threshold
-
         candidates = _find_candidates(
-            title, author or "", award, plam_idx, plam_award_ids, cal_stats
+            title, author or "", award, plam_idx, plam_award_ids,
+            cal_stats, cluster_stability, bridge_ids
         )
         if not candidates:
             continue
         top_score, fix_type, top_work = candidates[0]
-        if top_score >= eff_threshold:
+        if top_score >= threshold:
             fixes.append({
                 "id": rid,
                 "award": award,
@@ -179,7 +188,7 @@ def build_fix_list(
                 "plam_author": top_work.get("author", ""),
                 "confidence": round(top_score, 4),
                 "fix_type": fix_type,
-                "threshold_used": round(eff_threshold, 4),
+                "threshold_used": round(threshold, 4),
             })
     return fixes
 
@@ -200,10 +209,10 @@ def _plam_award_id_from_db_award(db_award: str) -> str | None:
     return None
 
 
-def cmd_dry_run(con, plam_idx, plam_award_ids, cal_stats, threshold: float, cluster_thresholds: dict):
-    fixes = build_fix_list(con, plam_idx, plam_award_ids, cal_stats, threshold, cluster_thresholds)
+def cmd_dry_run(con, plam_idx, plam_award_ids, cal_stats, threshold, cluster_stability, bridge_ids):
+    fixes = build_fix_list(con, plam_idx, plam_award_ids, cal_stats, threshold, cluster_stability, bridge_ids)
 
-    print(f"\n=== auto-fix 候補 (baseline={threshold}, cluster adaptive) ===")
+    print(f"\n=== auto-fix 候補 (unified threshold={threshold}) ===")
     print(f"対象: {len(fixes)}件\n")
 
     by_type: dict[str, list] = {}
@@ -213,8 +222,7 @@ def cmd_dry_run(con, plam_idx, plam_award_ids, cal_stats, threshold: float, clus
     for ftype, items in sorted(by_type.items()):
         print(f"--- {ftype} ({len(items)}件) ---")
         for f in items:
-            thr = f.get("threshold_used", threshold)
-            print(f"  [{f['confidence']:.3f} ≥ {thr:.3f}] {f['award']} {f['year'] or '?'}年")
+            print(f"  [final={f['confidence']:.3f}] {f['award']} {f['year'] or '?'}年")
             print(f"    DB   : 「{f['db_title']}」著: {f['db_author'] or '?'}")
             print(f"    PLAM : 「{f['plam_title']}」著: {f['plam_author']}  ({f['plam_work_id']})")
 
@@ -263,25 +271,25 @@ def _do_apply(con, fixes: list[dict], mode: str):
     print(f"\n適用完了: {applied}件  カバレッジ: {pct}% ({linked}/{total})")
 
 
-def cmd_apply(con, plam_idx, plam_award_ids, cal_stats, threshold: float, cluster_thresholds: dict):
-    fixes = build_fix_list(con, plam_idx, plam_award_ids, cal_stats, threshold, cluster_thresholds)
+def cmd_apply(con, plam_idx, plam_award_ids, cal_stats, threshold, cluster_stability, bridge_ids):
+    fixes = build_fix_list(con, plam_idx, plam_award_ids, cal_stats, threshold, cluster_stability, bridge_ids)
     if not fixes:
-        print(f"threshold={threshold}（cluster adaptive）以上の候補はありませんでした。")
+        print(f"unified threshold={threshold} 以上の候補はありませんでした。")
         return
     print(f"適用対象: {len(fixes)}件")
-    _do_apply(con, fixes, mode="apply")
+    _do_apply(con, fixes, mode="apply-19c")
 
 
-def cmd_auto_fix(con, plam_idx, plam_award_ids, cal_stats, threshold: float, cluster_thresholds: dict):
-    if threshold < 0.85:
-        print(f"[abort] threshold={threshold} は危険域です（0.85未満は手動レビュー推奨）。")
+def cmd_auto_fix(con, plam_idx, plam_award_ids, cal_stats, threshold, cluster_stability, bridge_ids):
+    if threshold < 0.80:
+        print(f"[abort] threshold={threshold} は危険域です（0.80未満は手動レビュー推奨）。")
         sys.exit(1)
-    fixes = build_fix_list(con, plam_idx, plam_award_ids, cal_stats, threshold, cluster_thresholds)
+    fixes = build_fix_list(con, plam_idx, plam_award_ids, cal_stats, threshold, cluster_stability, bridge_ids)
     if not fixes:
-        print(f"threshold={threshold}（cluster adaptive）以上の候補はありませんでした。")
+        print(f"unified threshold={threshold} 以上の候補はありませんでした。")
         return
     print(f"自動修正対象: {len(fixes)}件")
-    _do_apply(con, fixes, mode=f"auto-fix@{threshold}-cluster")
+    _do_apply(con, fixes, mode=f"auto-fix-19c@{threshold}")
 
 
 def main():
@@ -303,23 +311,32 @@ def main():
     plam_award_ids = _load_award_history_titles()
     print(f"PLAMインデックス: {len(plam_idx)}作品  賞IDセット: {len(plam_award_ids)}件")
 
-    from services.plam_calibration import get_calibration_stats, get_cluster_thresholds, calibration_report
+    from services.plam_calibration import (
+        get_calibration_stats, get_cluster_stability,
+        get_bridge_work_ids, get_unified_threshold, calibration_report,
+    )
     cal_stats = get_calibration_stats()
-    cluster_thresholds = get_cluster_thresholds()
+    cluster_stability = get_cluster_stability()
+    bridge_ids = get_bridge_work_ids()
+
+    threshold = args.threshold if args.threshold != DEFAULT_THRESHOLD else get_unified_threshold()
+
     print(f"キャリブレーション統計: {len(cal_stats)-1}賞")
     print(calibration_report())
-    print("\n=== クラスタ別 adaptive threshold ===")
-    for cid, t in sorted(cluster_thresholds.items()):
-        print(f"  {cid:<12} {t:.4f}")
+    print("\n=== クラスタ別 stability ===")
+    for cid, s in sorted(cluster_stability.items()):
+        print(f"  {cid:<12} {s:.4f}")
+    print(f"\nBridge Works: {len(bridge_ids)}件")
+    print(f"統合 threshold: {threshold}")
 
     con = get_con()
     try:
         if args.dry_run:
-            cmd_dry_run(con, plam_idx, plam_award_ids, cal_stats, args.threshold, cluster_thresholds)
+            cmd_dry_run(con, plam_idx, plam_award_ids, cal_stats, threshold, cluster_stability, bridge_ids)
         elif args.apply:
-            cmd_apply(con, plam_idx, plam_award_ids, cal_stats, args.threshold, cluster_thresholds)
+            cmd_apply(con, plam_idx, plam_award_ids, cal_stats, threshold, cluster_stability, bridge_ids)
         elif args.auto_fix:
-            cmd_auto_fix(con, plam_idx, plam_award_ids, cal_stats, args.threshold, cluster_thresholds)
+            cmd_auto_fix(con, plam_idx, plam_award_ids, cal_stats, threshold, cluster_stability, bridge_ids)
     finally:
         con.close()
 

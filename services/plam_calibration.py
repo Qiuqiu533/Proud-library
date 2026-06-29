@@ -160,6 +160,10 @@ def calibrated_score(
     return min(1.0, cal_sim * 0.85 + author_ok + bonus)
 
 
+_BRIDGE_BONUS = 0.15      # Bridge Work への加算ボーナス
+_CLUSTER_BASE_WEIGHT = 0.85   # stability=0 時の最低クラスタ係数
+_CLUSTER_STABILITY_SCALE = 0.15  # stability=1 時の最大追加分
+
 _CLUSTER_MAP: dict[str, str] = {
     "HKM": "mystery", "JRA": "mystery", "KMS": "mystery",
     "RAN": "mystery", "YAM": "mystery",
@@ -248,6 +252,104 @@ def get_threshold_for_award(award_id: str | None, thresholds: dict | None = None
         thresholds = get_cluster_thresholds()
     cluster = _CLUSTER_MAP.get(award_id or "", None)
     return thresholds.get(cluster, thresholds.get("__global__", _BASELINE_THRESHOLD))
+
+
+# ─── Phase 19-C: 統合信頼度関数 ──────────────────────────────────────────────
+
+@lru_cache(maxsize=1)
+def get_cluster_stability() -> dict[str, float]:
+    """クラスタ別 stability = log(1+n_works) / log(1+n_ref) を返す。
+
+    n_ref = 最大ワーク数クラスタ（literary ≈ 416）を基準。
+    stability が低いクラスタ（horror: 0.45, sf: 0.68）は
+    cluster_factor と bridge_bonus が抑制される。
+
+    Returns:
+        {cluster_id: stability_score}  ← "__global__" キーにフォールバック値あり
+    """
+    from collections import defaultdict
+
+    cluster_works: dict[str, set[str]] = defaultdict(set)
+    with open(PLAM_DIR / "award_history.csv", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            wid = row.get("work_id", "")
+            aid = row.get("award_id", "")
+            if wid and aid:
+                cluster = _CLUSTER_MAP.get(aid, "unknown")
+                cluster_works[cluster].add(wid)
+
+    n_ref = max((len(v) for v in cluster_works.values()), default=1)
+    stab: dict[str, float] = {}
+    for cid, wids in cluster_works.items():
+        n = len(wids)
+        stab[cid] = round(math.log(1 + n) / math.log(1 + n_ref), 4)
+
+    stab["__global__"] = round(sum(stab.values()) / len(stab), 4) if stab else 0.8
+    return stab
+
+
+@lru_cache(maxsize=1)
+def get_bridge_work_ids() -> set[str]:
+    """クラスタ横断作品（Bridge Work）の work_id セットを返す。
+
+    award_history で2つ以上の異なるクラスタに属する作品を Bridge とする。
+    """
+    from collections import defaultdict
+
+    work_clusters: dict[str, set[str]] = defaultdict(set)
+    with open(PLAM_DIR / "award_history.csv", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            wid = row.get("work_id", "")
+            aid = row.get("award_id", "")
+            if wid and aid:
+                cluster = _CLUSTER_MAP.get(aid, "unknown")
+                work_clusters[wid].add(cluster)
+
+    return {wid for wid, clusters in work_clusters.items() if len(clusters) >= 2}
+
+
+def compute_final_score(
+    base_calibrated: float,
+    cluster_id: str | None,
+    plam_work_id: str | None = None,
+    stability: dict | None = None,
+    bridge_ids: set | None = None,
+) -> float:
+    """Phase 19-C 統合信頼度スコア。
+
+    設計:
+        cluster_factor = BASE_WEIGHT + stability[cluster] × STABILITY_SCALE
+        bridge_bonus   = BRIDGE_BONUS × stability[cluster]  (Bridge Workのみ)
+        final = min(1.0, base_calibrated × cluster_factor + bridge_bonus)
+
+    直感:
+        - stability が高いクラスタ（literary≈1.0）→ cluster_factor≈1.0 →
+          base_calibrated をほぼそのまま使う
+        - stability が低いクラスタ（horror≈0.45）→ cluster_factor≈0.92 →
+          境界付近のスコアが保守的に押し下げられる
+        - Bridge Work → stability に応じた追加ボーナス
+        - 比較用 threshold は単一グローバル値（0.85）で統一
+    """
+    if stability is None:
+        stability = get_cluster_stability()
+    if bridge_ids is None:
+        bridge_ids = get_bridge_work_ids()
+
+    stab = stability.get(cluster_id or "", stability.get("__global__", 0.8))
+    cluster_factor = _CLUSTER_BASE_WEIGHT + stab * _CLUSTER_STABILITY_SCALE
+
+    is_bridge = bool(plam_work_id and plam_work_id in bridge_ids)
+    bonus = _BRIDGE_BONUS * stab if is_bridge else 0.0
+
+    return min(1.0, base_calibrated * cluster_factor + bonus)
+
+
+_UNIFIED_THRESHOLD = 0.85  # 19-C以降の単一グローバル閾値
+
+
+def get_unified_threshold() -> float:
+    """19-C以降で使う単一グローバル閾値を返す。"""
+    return _UNIFIED_THRESHOLD
 
 
 def calibration_report() -> str:
