@@ -5881,7 +5881,46 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll('.board-tab[data-btab="awarddb"]').forEach(btn => {
     btn.addEventListener("click", () => setTimeout(loadAdminAwardBooks, 0));
   });
+
+  document.getElementById("plamCoverageBtn")?.addEventListener("click", loadPlamCoverage);
 });
+
+async function loadPlamCoverage() {
+  const panel = document.getElementById("plamCoveragePanel");
+  const summary = document.getElementById("plamCoverageSummary");
+  const byAward = document.getElementById("plamCoverageByAward");
+  const unlinked = document.getElementById("plamUnlinkedList");
+  if (!panel) return;
+
+  summary.textContent = "読み込み中…";
+  panel.style.display = "block";
+
+  const res = await fetch("/api/plam/coverage", {
+    headers: { "X-Password": boardPassword }
+  });
+  if (!res.ok) { summary.textContent = "取得に失敗しました"; return; }
+  const d = await res.json();
+
+  const pct = d.coverage;
+  const color = pct >= 70 ? "#2a7" : pct >= 40 ? "#e90" : "#c44";
+  summary.innerHTML = `
+    <div style="font-size:2rem;font-weight:bold;color:${color}">${pct}%</div>
+    <div style="font-size:0.88rem;color:#555;margin-top:4px">PLAMリンク済み ${d.linked}件 / 全${d.total}件</div>`;
+
+  byAward.innerHTML = d.by_award.map(r => {
+    const p = r.total ? Math.round(r.linked / r.total * 100) : 0;
+    const bar = `<div style="height:8px;background:#e0e0e0;border-radius:4px;overflow:hidden;margin-top:2px">
+      <div style="width:${p}%;height:100%;background:${p>=70?"#2a7":p>=40?"#e90":"#c44"};border-radius:4px"></div></div>`;
+    return `<div style="margin-bottom:8px;font-size:0.82rem">
+      <div style="display:flex;justify-content:space-between"><span>${r.award}</span><span style="color:#888">${r.linked}/${r.total} (${p}%)</span></div>
+      ${bar}
+    </div>`;
+  }).join("");
+
+  unlinked.innerHTML = d.unlinked_sample.map(r =>
+    `<div>・${r.year||"？"}年 ${r.award} ／ ${r.title}${r.author ? " 著: "+r.author : ""}</div>`
+  ).join("") || "（未リンクなし）";
+}
 
 
 // ── イベント申込機能 ──────────────────────────────────────────────────────────
