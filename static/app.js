@@ -7028,16 +7028,31 @@ async function loadPlamMap21(room, nextWids = new Set()) {
     }).join("");
 
     let youMarker = "";
+    let recPaths = "";
     if (data.user_pos) {
       const ux = Math.round(data.user_pos.x * W), uy = Math.round(data.user_pos.y * H);
       youMarker = `
         <circle cx="${ux}" cy="${uy}" r="11" fill="#fff" stroke="#e63946" stroke-width="2.5" opacity="0.97"/>
         <text x="${ux}" y="${uy+4}" text-anchor="middle" font-size="10" fill="#e63946" font-weight="900">you</text>`;
+
+      // Phase 21-D: you → ★ 破線ガイドライン
+      const recWorks = data.works.filter(w => nextWids.has(w.work_id));
+      if (recWorks.length > 0) {
+        const maxDist = Math.sqrt(W * W + H * H);
+        const lines = recWorks.map(w => {
+          const rx = Math.round(w.x * W), ry = Math.round(w.y * H);
+          const dist = Math.sqrt((rx - ux) ** 2 + (ry - uy) ** 2);
+          const t = Math.min(dist / (maxDist * 0.5), 1);
+          const opacity = (0.60 - 0.35 * t).toFixed(2);
+          return `<line x1="${ux}" y1="${uy}" x2="${rx}" y2="${ry}" stroke="#f4a261" stroke-width="1.2" stroke-dasharray="3 3" opacity="${opacity}"/>`;
+        }).join("");
+        recPaths = `<g id="recommendation-paths">${lines}</g>`;
+      }
     }
 
     container.innerHTML = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="plam21-map-svg" id="plamMapSvgEl">
       <rect width="${W}" height="${H}" fill="#f8f6fc" rx="10"/>
-      ${dots}${uDots}${recDots}${labels}${youMarker}
+      ${dots}${uDots}${recPaths}${recDots}${labels}${youMarker}
     </svg>`;
 
     // Phase 21-C: フィルターボタンをマップ直下に追加
@@ -7168,6 +7183,9 @@ function _renderClusterFilter(mapContainer, clusters, hasBridge) {
     });
     // ★と you は常に表示
     svg.querySelectorAll(".plam-dot--rec, text").forEach(el => { el.style.opacity = ""; });
+    // Phase 21-D: フィルタ時はガイドラインを非表示
+    const paths = svg.getElementById("recommendation-paths");
+    if (paths) paths.style.display = target === "all" ? "" : "none";
   };
 
   filterDiv.addEventListener("click", e => {
