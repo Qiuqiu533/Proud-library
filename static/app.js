@@ -5566,7 +5566,7 @@ async function loadAwardBooks(award) {
     let books = _allAwardBooks;
     // 複数賞フィルター
     if (selectedAwards.size > 0) {
-      books = books.filter(b => (b.awards || []).some(a => selectedAwards.has(a.award)));
+      books = books.filter(b => selectedAwards.has(b.award));
     }
     const q = (document.getElementById("awardSearch")?.value || "").trim().toLowerCase();
     _renderAwardBooks(q ? books.filter(b => (b.title||"").toLowerCase().includes(q)||(b.author||"").toLowerCase().includes(q)) : books, q);
