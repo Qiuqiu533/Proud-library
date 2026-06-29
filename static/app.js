@@ -5540,8 +5540,9 @@ function _renderAwardBooks(books, query) {
     const coverHtml = coverUrl
       ? `<img src="${coverUrl}" alt="" style="width:52px;height:70px;object-fit:cover;border-radius:5px;flex-shrink:0;background:#f0f0f0" onerror="this.style.display='none'">`
       : `<div style="width:52px;height:70px;background:#f0f0f0;border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.4rem">📖</div>`;
+    const _iq = s => JSON.stringify(s).replace(/"/g, '&quot;');
     const clickAttr = clickable
-      ? `onclick="openModal('${isbn.replace(/'/g,"\\'")}',{isbn:'${isbn.replace(/'/g,"\\'")}',title:${JSON.stringify(b.title)},author:${JSON.stringify(b.author||'')}})"`
+      ? `onclick="openModal('${isbn.replace(/'/g,"\\'")}',{isbn:'${isbn.replace(/'/g,"\\'")}',title:${_iq(b.title)},author:${_iq(b.author||'')}})"`
       : "";
     const awardBadges = b.awards_list.map(a =>
       `<span style="display:inline-block;font-size:0.7rem;background:#fff8e1;color:#b45309;border:1px solid #f6c744;border-radius:10px;padding:2px 8px;margin:2px 4px 2px 0;white-space:nowrap">🏆 ${esc(a.label)}</span>`
