@@ -6821,6 +6821,7 @@ function renderReadingGoal() {
   `;
 }
 
+// Phase 21-A: 統合My PLAMダッシュボード
 async function loadMyPlam() {
   const u = residentSession || getCloudUser();
   const card = document.getElementById("myPlamCard");
@@ -6841,156 +6842,137 @@ async function loadMyPlam() {
       return;
     }
 
-    // クラスタバー
-    const bars = data.clusters.map(c => {
-      const width = Math.max(c.pct, 4);
-      return `<div class="my-plam-cluster-row">
-        <span class="my-plam-cluster-name">${c.name}</span>
-        <div class="my-plam-bar-wrap">
-          <div class="my-plam-bar" style="width:${width}%;background:${c.color}"></div>
-        </div>
-        <span class="my-plam-pct">${c.pct}%</span>
-      </div>`;
-    }).join("");
+    const CLUSTER_COLORS_JS = {mystery:"#e85d04",literary:"#6a4c93",sf:"#0066cc",horror:"#2a9d8f",career:"#888"};
+    const CLUSTER_LABEL = {mystery:"ミステリ",literary:"文学",sf:"SF",horror:"ホラー",career:"キャリア",unknown:"未分類"};
 
-    // 代表作品
-    const works = data.top_works.map(w =>
-      `<span class="my-plam-work-tag" title="${esc(w.awards.join(' / '))}">${esc(w.title)}</span>`
-    ).join("");
-
-    // 読書タイプバッジ（19-D: graph_roleによる色分け）
+    // ── ヘッダー: タイプ + スコア ─────────────────────────
     const ROLE_COLORS = {
-      bridge_hub:      "#e85d04",
-      rare_specialist: "#6a4c93",
-      cross_cluster:   "#0066cc",
-      single_cluster:  "#2a9d8f",
-      balanced:        "#888",
+      bridge_hub:"#e85d04", rare_specialist:"#6a4c93",
+      cross_cluster:"#0066cc", single_cluster:"#2a9d8f", balanced:"#888",
     };
     const rt = data.reader_type || {};
+    const sc = data.plam_score || {};
     const roleColor = ROLE_COLORS[rt.graph_role] || "#888";
-    const typeBadge = rt.label
-      ? `<div class="my-plam-type-badge" style="border-left:4px solid ${roleColor}">${esc(rt.label)}</div>` : "";
 
-    // 次に読むべき3冊
+    const headerHtml = `
+      <div class="plam21-header">
+        ${rt.label ? `<div class="plam21-type" style="border-left:3px solid ${roleColor}">${esc(rt.label)}</div>` : ""}
+        ${sc.total != null ? `<div class="plam21-score-chip"><span class="plam21-score-num">${sc.total}</span><span class="plam21-score-den">/100</span></div>` : ""}
+      </div>
+      ${data.profile_text ? `<p class="plam21-profile">${esc(data.profile_text)}</p>` : ""}`;
+
+    // ── 中心: 作品マップ（主役・非同期） ─────────────────
+    const mapHtml = `
+      <div id="plamMapSvg21" class="plam21-map">
+        <div class="plam21-map-loading">🗾 読書空間を読み込み中…</div>
+      </div>`;
+
+    // ── 軌跡: migration path（マップ直下・注釈） ──────────
+    const ct = data.cluster_timeline || {};
+    const migPath = ct.migration_path || [];
+    const driftScore = ct.drift_score || 0;
+    const migHtml = migPath.length >= 2 ? `
+      <div class="plam21-traj">
+        <span class="plam21-traj-label">軌跡</span>
+        <div class="plam21-migpath">
+          ${migPath.map((c,i) => {
+            const col = CLUSTER_COLORS_JS[c] || "#ccc";
+            const arr = i < migPath.length-1 ? `<span class="plam21-arr">→</span>` : "";
+            return `<span class="plam21-mnode" style="background:${col}">${CLUSTER_LABEL[c]||c}</span>${arr}`;
+          }).join("")}
+        </div>
+        <span class="plam21-drift">${Math.round(driftScore*100)}%移動</span>
+      </div>` : "";
+
+    // ── スコア詳細（折り畳み） ────────────────────────────
+    const scoreDetail = sc.total != null ? `
+      <details class="plam21-detail">
+        <summary>スコア詳細</summary>
+        <div class="plam21-axes">
+          <div class="plam21-axis"><span>📖 広がり</span><span>${sc.spread}/30</span></div>
+          <div class="plam21-axis"><span>🏆 受賞作</span><span>${sc.award_score}/25</span></div>
+          <div class="plam21-axis"><span>🌉 Bridge</span><span>${sc.bridge_score}/20</span></div>
+          <div class="plam21-axis"><span>⚖️ バランス</span><span>${sc.balance}/10</span></div>
+          <div class="plam21-axis"><span>🧭 PLAM一致</span><span>${sc.profile_score ?? 0}/15</span></div>
+        </div>
+      </details>` : "";
+
+    // ── クラスタバー（折り畳み） ──────────────────────────
+    const bars = data.clusters.map(c => `
+      <div class="my-plam-cluster-row">
+        <span class="my-plam-cluster-name">${c.name}</span>
+        <div class="my-plam-bar-wrap">
+          <div class="my-plam-bar" style="width:${Math.max(c.pct,4)}%;background:${c.color}"></div>
+        </div>
+        <span class="my-plam-pct">${c.pct}%</span>
+      </div>`).join("");
+    const clusterDetail = `
+      <details class="plam21-detail">
+        <summary>ジャンル内訳</summary>
+        <div class="my-plam-clusters" style="margin-top:8px">${bars}</div>
+      </details>`;
+
+    // ── 年別推移（折り畳み） ──────────────────────────────
+    const trend = data.yearly_trend || [];
+    const trendDetail = trend.length >= 2 ? `
+      <details class="plam21-detail">
+        <summary>年別推移</summary>
+        <div class="my-plam-trend" style="margin-top:8px">
+          ${trend.map(y => {
+            const segs = Object.entries(y.clusters).filter(([,v])=>v>0)
+              .sort(([,a],[,b])=>b-a)
+              .map(([c,v])=>`<div class="my-plam-trend-seg" style="width:${v}%;background:${CLUSTER_COLORS_JS[c]||'#ccc'}"></div>`)
+              .join("");
+            return `<div class="my-plam-trend-row">
+              <span class="my-plam-trend-year">${y.year}</span>
+              <div class="my-plam-trend-bar">${segs}</div>
+              <span class="my-plam-trend-count">${y.total_matched}冊</span>
+            </div>`;
+          }).join("")}
+        </div>
+      </details>` : "";
+
+    // ── 次に読む3冊 ───────────────────────────────────────
     const nextCards = (data.next_reads || []).map(w => {
       const clickable = w.in_library && w.isbn;
-      const expansionBadge = w.expansion ? `<span class="my-plam-expand-badge">新ジャンル</span>` : "";
-      const bridgeBadge = w.is_bridge ? `<span class="my-plam-bridge-tag">🌉</span>` : "";
+      const expBadge = w.expansion ? `<span class="my-plam-expand-badge">新ジャンル</span>` : "";
+      const brBadge  = w.is_bridge ? `<span class="my-plam-bridge-tag">🌉</span>` : "";
       const inner = `
         <div class="my-plam-next-dot" style="background:${w.color}"></div>
-        <div class="my-plam-next-title">${bridgeBadge}${expansionBadge}${esc(w.title)}</div>
+        <div class="my-plam-next-title">${brBadge}${expBadge}${esc(w.title)}</div>
         <div class="my-plam-next-award">${esc(w.top_award)}</div>
         <div class="my-plam-next-reason">${esc(w.reason || "")}</div>`;
       return clickable
         ? `<div class="my-plam-next-card my-plam-next-card--link" onclick="openModal('${w.isbn}')" role="button" tabindex="0">${inner}</div>`
         : `<div class="my-plam-next-card">${inner}</div>`;
     }).join("");
-
-    // My PLAMスコア
-    const sc = data.plam_score || {};
-    const scoreHtml = sc.total != null ? `
-      <div class="my-plam-score-row">
-        <div class="my-plam-score-circle">
-          <span class="my-plam-score-num">${sc.total}</span>
-          <span class="my-plam-score-max">/100</span>
-        </div>
-        <div class="my-plam-score-axes">
-          <div class="my-plam-score-axis"><span>📖 広がり</span><span>${sc.spread}/30</span></div>
-          <div class="my-plam-score-axis"><span>🏆 受賞作</span><span>${sc.award_score}/25</span></div>
-          <div class="my-plam-score-axis"><span>🌉 Bridge参加</span><span>${sc.bridge_score}/20</span></div>
-          <div class="my-plam-score-axis"><span>⚖️ バランス</span><span>${sc.balance}/10</span></div>
-          <div class="my-plam-score-axis"><span>🧭 PLAM一致度</span><span>${sc.profile_score ?? 0}/15</span></div>
-        </div>
-      </div>
-      ${sc.user_profile != null ? `<div style="font-size:0.78rem;color:#888;text-align:right;margin-top:2px">PLAM profile: ${(sc.user_profile*100).toFixed(1)}% / bridge centrality: ${(sc.bridge_centrality*100).toFixed(1)}%</div>` : ""}
-    ` : "";
-
-    // 年別推移（直近3年）
-    const trend = data.yearly_trend || [];
-    const CLUSTER_COLORS_JS = {mystery:"#e85d04",literary:"#6a4c93",sf:"#0066cc",horror:"#2a9d8f",career:"#888"};
-    const trendHtml = trend.length >= 2 ? `
-      <div class="my-plam-trend-label">📅 年別読書推移</div>
-      <div class="my-plam-trend">
-        ${trend.map(y => {
-          const segments = Object.entries(y.clusters).filter(([,v]) => v > 0)
-            .sort(([,a],[,b]) => b-a)
-            .map(([c,v]) => `<div class="my-plam-trend-seg" style="width:${v}%;background:${CLUSTER_COLORS_JS[c]||'#ccc'}" title="${c} ${v}%"></div>`)
-            .join("");
-          return `<div class="my-plam-trend-row">
-            <span class="my-plam-trend-year">${y.year}</span>
-            <div class="my-plam-trend-bar">${segments}</div>
-            <span class="my-plam-trend-count">${y.total_matched}冊</span>
-          </div>`;
-        }).join("")}
-      </div>` : "";
-
-    // Phase 20-B: クラスタ遷移タイムライン
-    const ct = data.cluster_timeline || {};
-    const quarters = ct.quarters || [];
-    const migPath = ct.migration_path || [];
-    const transMatrix = ct.transition_matrix || {};
-    const driftScore = ct.drift_score || 0;
-
-    const CLUSTER_LABEL = {mystery:"ミステリ",literary:"文学",sf:"SF",horror:"ホラー",career:"キャリア",unknown:"未分類"};
-
-    // migration path → 矢印表示
-    const migPathHtml = migPath.length >= 2
-      ? `<div class="my-plam-migpath">${migPath.map((c,i) => {
-          const color = CLUSTER_COLORS_JS[c] || "#ccc";
-          const arrow = i < migPath.length - 1 ? `<span class="my-plam-migpath-arrow">→</span>` : "";
-          return `<span class="my-plam-migpath-node" style="background:${color}">${CLUSTER_LABEL[c]||c}</span>${arrow}`;
-        }).join("")}</div>`
+    const nextHtml = nextCards
+      ? `<div class="my-plam-next-label">📚 次に読むべき3冊</div><div class="my-plam-next-grid">${nextCards}</div>`
       : "";
 
-    // クォーター別スパークライン
-    const quarterHtml = quarters.length >= 2 ? `
-      <div class="my-plam-timeline-label">🗺️ 読書軌跡 <span class="my-plam-drift-score" title="クラスタ横断度">${Math.round(driftScore*100)}%移動</span></div>
-      ${migPathHtml}
-      <div class="my-plam-quarters">
-        ${quarters.map(q => {
-          const color = CLUSTER_COLORS_JS[q.dominant] || "#ccc";
-          const label = CLUSTER_LABEL[q.dominant] || q.dominant;
-          const tooltip = Object.entries(q.counts).filter(([,v])=>v>0).map(([c,v])=>`${CLUSTER_LABEL[c]||c}:${v}`).join(" ");
-          return `<div class="my-plam-quarter-col" title="${q.period} ${tooltip}">
-            <div class="my-plam-quarter-dot" style="background:${color}"></div>
-            <div class="my-plam-quarter-period">${q.period.replace("-Q","Q")}</div>
-            <div class="my-plam-quarter-label" style="color:${color}">${label}</div>
-          </div>`;
-        }).join("")}
-      </div>` : "";
-
-    // チャレンジ提案
-    const challengeHtml = (data.challenges || []).length
-      ? `<div class="my-plam-challenge-label">🎯 チャレンジ</div>
-         <ul class="my-plam-challenges">${(data.challenges||[]).map(c=>`<li>${esc(c)}</li>`).join("")}</ul>`
-      : "";
-
+    // ── 統合レイアウト ────────────────────────────────────
     content.innerHTML = `
-      ${typeBadge}
-      ${scoreHtml}
-      <div class="my-plam-clusters">${bars}</div>
-      <p class="my-plam-profile">${esc(data.profile_text)}</p>
-      ${quarterHtml}
-      ${trendHtml}
-      ${challengeHtml}
-      ${data.top_works.length ? `<div class="my-plam-works-label">照合できた受賞作</div><div class="my-plam-works">${works}</div>` : ""}
-      ${nextCards ? `<div class="my-plam-next-label">📚 次に読むべき3冊</div><div class="my-plam-next-grid">${nextCards}</div>` : ""}
-      <div class="my-plam-meta">${data.matched}冊が文学賞受賞作 / 読了${data.total}冊</div>
-      <div id="plamMapContainer" class="my-plam-map-container">
-        <div class="my-plam-map-label">🗾 作品距離マップ</div>
-        <div id="plamMapSvg" class="my-plam-map-loading">読み込み中…</div>
+      <div class="plam21-dashboard">
+        ${headerHtml}
+        ${mapHtml}
+        ${migHtml}
+        ${scoreDetail}
+        ${clusterDetail}
+        ${trendDetail}
+        ${nextHtml}
+        <div class="my-plam-meta">${data.matched}冊が文学賞受賞作 / 読了${data.total}冊</div>
       </div>`;
 
-    // Phase 20-C: SVGマップを非同期ロード
-    loadPlamMap(u.room);
+    // SVGマップを非同期レンダリング
+    loadPlamMap21(u.room);
 
   } catch(e) {
     content.innerHTML = '<p style="font-size:0.85rem;color:#999;padding:4px 0">読書データを取得できませんでした。</p>';
   }
 }
 
-async function loadPlamMap(room) {
-  const container = document.getElementById("plamMapSvg");
+async function loadPlamMap21(room) {
+  const container = document.getElementById("plamMapSvg21");
   if (!container) return;
 
   try {
@@ -6999,66 +6981,45 @@ async function loadPlamMap(room) {
     if (!res.ok) throw new Error();
     const data = await res.json();
 
-    const W = 280, H = 280;
-    const CLUSTER_COLORS_MAP = {
-      mystery: "#e85d04", literary: "#6a4c93", sf: "#0066cc",
-      horror: "#2a9d8f", career: "#888888", bridge: "#f4a261", unknown: "#ddd",
+    const W = 300, H = 300;
+    const CM = {
+      mystery:"#e85d04", literary:"#6a4c93", sf:"#0066cc",
+      horror:"#2a9d8f", career:"#888888", bridge:"#f4a261", unknown:"#ddd",
     };
-    const CLUSTER_LABEL = {
-      mystery: "ミステリ", literary: "文学", sf: "SF", horror: "ホラー", career: "キャリア",
-    };
+    const CL = {mystery:"ミステリ",literary:"文学",sf:"SF",horror:"ホラー",career:"キャリア"};
 
     const userWids = new Set(data.user_works || []);
 
-    // 作品ドット（userの読了済みを除く）
-    const dots = data.works.map(w => {
-      const cx = Math.round(w.x * W);
-      const cy = Math.round(w.y * H);
-      const isUser = userWids.has(w.work_id);
-      if (isUser) return "";
-      const col = CLUSTER_COLORS_MAP[w.cluster] || "#ddd";
-      return `<circle cx="${cx}" cy="${cy}" r="2" fill="${col}" opacity="0.45" title="${esc(w.title)}"/>`;
+    const dots = data.works.filter(w => !userWids.has(w.work_id)).map(w => {
+      const cx = Math.round(w.x * W), cy = Math.round(w.y * H);
+      return `<circle cx="${cx}" cy="${cy}" r="2" fill="${CM[w.cluster]||'#ddd'}" opacity="0.4"/>`;
     }).join("");
 
-    // ユーザー読了作品（強調）
-    const userDots = data.works.filter(w => userWids.has(w.work_id)).map(w => {
-      const cx = Math.round(w.x * W);
-      const cy = Math.round(w.y * H);
-      const col = CLUSTER_COLORS_MAP[w.cluster] || "#ddd";
-      return `<circle cx="${cx}" cy="${cy}" r="4.5" fill="${col}" stroke="#fff" stroke-width="1.5" opacity="0.9" title="${esc(w.title)}"/>`;
+    const uDots = data.works.filter(w => userWids.has(w.work_id)).map(w => {
+      const cx = Math.round(w.x * W), cy = Math.round(w.y * H);
+      return `<circle cx="${cx}" cy="${cy}" r="5" fill="${CM[w.cluster]||'#ddd'}" stroke="#fff" stroke-width="1.5" opacity="0.95" title="${esc(w.title)}"/>`;
     }).join("");
 
-    // クラスタラベル
     const cc = data.cluster_centers || {};
-    const clusterLabels = Object.entries(cc).map(([cid, pos]) => {
-      const lx = Math.round(pos.x * W);
-      const ly = Math.round(pos.y * H);
-      const col = CLUSTER_COLORS_MAP[cid] || "#999";
-      const label = CLUSTER_LABEL[cid] || cid;
-      return `<text x="${lx}" y="${ly}" text-anchor="middle" font-size="9" fill="${col}" font-weight="700" opacity="0.6">${label}</text>`;
+    const labels = Object.entries(cc).map(([cid, pos]) => {
+      const lx = Math.round(pos.x * W), ly = Math.round(pos.y * H);
+      return `<text x="${lx}" y="${ly}" text-anchor="middle" font-size="10" fill="${CM[cid]||'#999'}" font-weight="700" opacity="0.7">${CL[cid]||cid}</text>`;
     }).join("");
 
-    // ユーザー位置マーカー
-    let userMarker = "";
+    let youMarker = "";
     if (data.user_pos) {
-      const ux = Math.round(data.user_pos.x * W);
-      const uy = Math.round(data.user_pos.y * H);
-      userMarker = `
-        <circle cx="${ux}" cy="${uy}" r="9" fill="#fff" stroke="#e63946" stroke-width="2.5" opacity="0.95"/>
-        <text x="${ux}" y="${uy + 4}" text-anchor="middle" font-size="10" fill="#e63946" font-weight="900">you</text>`;
+      const ux = Math.round(data.user_pos.x * W), uy = Math.round(data.user_pos.y * H);
+      youMarker = `
+        <circle cx="${ux}" cy="${uy}" r="11" fill="#fff" stroke="#e63946" stroke-width="2.5" opacity="0.97"/>
+        <text x="${ux}" y="${uy+4}" text-anchor="middle" font-size="10" fill="#e63946" font-weight="900">you</text>`;
     }
 
-    const svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="my-plam-map-svg">
-      <rect width="${W}" height="${H}" fill="#faf8ff" rx="8"/>
-      ${dots}
-      ${userDots}
-      ${clusterLabels}
-      ${userMarker}
+    container.innerHTML = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="plam21-map-svg">
+      <rect width="${W}" height="${H}" fill="#f8f6fc" rx="10"/>
+      ${dots}${uDots}${labels}${youMarker}
     </svg>`;
-
-    container.innerHTML = svg;
   } catch(e) {
-    container.innerHTML = '<span style="font-size:0.8rem;color:#bbb">マップを読み込めませんでした</span>';
+    container.innerHTML = '<span style="font-size:0.8rem;color:#bbb;padding:8px">マップを読み込めませんでした</span>';
   }
 }
 

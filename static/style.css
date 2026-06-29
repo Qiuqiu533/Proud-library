@@ -1124,3 +1124,27 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .my-plam-quarter-dot { width: 14px; height: 14px; border-radius: 50%; margin-bottom: 4px; }
 .my-plam-quarter-period { font-size: 0.68rem; color: #aaa; margin-bottom: 2px; }
 .my-plam-quarter-label { font-size: 0.7rem; font-weight: 600; text-align: center; }
+
+/* Phase 21-A: 統合My PLAMダッシュボード */
+.plam21-dashboard { display: flex; flex-direction: column; gap: 0; }
+.plam21-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.plam21-type { font-size: 0.88rem; font-weight: 700; color: #333; padding: 3px 8px; background: #f5f3ff; border-radius: 6px; }
+.plam21-score-chip { display: flex; align-items: baseline; gap: 1px; background: #3d6b4f; border-radius: 20px; padding: 3px 10px; }
+.plam21-score-num { font-size: 1.1rem; font-weight: 800; color: #fff; }
+.plam21-score-den { font-size: 0.72rem; color: rgba(255,255,255,0.7); }
+.plam21-profile { font-size: 0.82rem; color: #555; line-height: 1.5; margin: 0 0 10px; }
+.plam21-map { width: 100%; margin: 0 0 8px; border-radius: 10px; overflow: hidden; background: #f8f6fc; min-height: 80px; display: flex; align-items: center; justify-content: center; }
+.plam21-map-loading { font-size: 0.78rem; color: #bbb; padding: 16px; text-align: center; }
+.plam21-map-svg { width: 100%; display: block; }
+.plam21-traj { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+.plam21-traj-label { font-size: 0.72rem; color: #888; flex-shrink: 0; }
+.plam21-migpath { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; flex: 1; }
+.plam21-mnode { font-size: 0.72rem; font-weight: 700; color: #fff; padding: 2px 7px; border-radius: 10px; }
+.plam21-arr { color: #ccc; font-size: 0.85rem; }
+.plam21-drift { font-size: 0.7rem; color: #aaa; background: #f0ede8; padding: 1px 6px; border-radius: 10px; flex-shrink: 0; }
+.plam21-detail { border-top: 1px solid #f0ede8; margin: 0; padding: 4px 0; }
+.plam21-detail summary { font-size: 0.78rem; color: #888; cursor: pointer; padding: 4px 0; user-select: none; list-style: none; display: flex; align-items: center; gap: 4px; }
+.plam21-detail summary::before { content: "▶"; font-size: 0.6rem; transition: transform .2s; }
+.plam21-detail[open] summary::before { transform: rotate(90deg); }
+.plam21-axes { display: flex; flex-direction: column; gap: 4px; padding: 6px 0 4px; }
+.plam21-axis { display: flex; justify-content: space-between; font-size: 0.8rem; color: #555; }
