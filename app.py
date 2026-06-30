@@ -43,6 +43,15 @@ app.register_blueprint(timeline_bp)
 app.register_blueprint(newsletter_bp)
 app.register_blueprint(plam_bp)
 
+# ── DBコネクション自動返却 ────────────────────────────────────────────────
+# get_con()のclose()忘れ・例外発生時の接続リークを防ぐため、
+# リクエスト終了時に未closeの接続を強制的にプールへ返却する。
+from database import close_request_connections
+
+@app.teardown_appcontext
+def _teardown_db(exception=None):
+    close_request_connections()
+
 # ── DB初期化・マイグレーション ──────────────────────────────────────────────
 from migrations import _ensure_db
 from services.books import _auto_classify_new_books

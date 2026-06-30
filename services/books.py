@@ -11,7 +11,7 @@ from config import (
     LIBRARYLIFE_BASE, LIBRARY_CODE, OPENBD_API, NDL_THUMB,
     _KANA_ROWS, KEYWORD_GENRE, NDC_TO_GENRE,
 )
-from database import get_con, execute, fetchone, fetchall, USE_PG
+from database import get_con, db_session, execute, fetchone, fetchall, USE_PG
 from services.utils import _keyword_genre, _ndc_to_genre
 
 import re as _re_inertia
@@ -144,16 +144,16 @@ def fetch_book_detail(isbn, hint_title=""):
             avail_status = "unknown"
         def _save_cache(isbn_, status_, title_, author_):
             try:
-                c = get_con()
-                if USE_PG:
-                    execute(c, """INSERT INTO availability_cache (isbn, status, title, author, updated_at)
-                        VALUES (%s,%s,%s,%s,NOW()) ON CONFLICT (isbn) DO UPDATE SET
-                        status=EXCLUDED.status, title=EXCLUDED.title, author=EXCLUDED.author, updated_at=NOW()
-                    """, (isbn_, status_, title_, author_))
-                else:
-                    execute(c, """INSERT OR REPLACE INTO availability_cache (isbn, status, title, author, updated_at)
-                        VALUES (?,?,?,?,datetime('now','localtime'))""", (isbn_, status_, title_, author_))
-                c.commit(); c.close()
+                with db_session() as c:
+                    if USE_PG:
+                        execute(c, """INSERT INTO availability_cache (isbn, status, title, author, updated_at)
+                            VALUES (%s,%s,%s,%s,NOW()) ON CONFLICT (isbn) DO UPDATE SET
+                            status=EXCLUDED.status, title=EXCLUDED.title, author=EXCLUDED.author, updated_at=NOW()
+                        """, (isbn_, status_, title_, author_))
+                    else:
+                        execute(c, """INSERT OR REPLACE INTO availability_cache (isbn, status, title, author, updated_at)
+                            VALUES (?,?,?,?,datetime('now','localtime'))""", (isbn_, status_, title_, author_))
+                    c.commit()
             except Exception:
                 pass
         threading.Thread(target=_save_cache, args=(isbn, avail_status, result.get("title",""), result.get("author","")), daemon=True).start()
@@ -272,20 +272,19 @@ def fetch_book_detail(isbn, hint_title=""):
                     result["description"] = desc[:600]
                     def _save_desc(isbn_, desc_, title_, author_, publisher_):
                         try:
-                            dc = get_con()
-                            ph = "%s" if USE_PG else "?"
-                            existing = fetchone(dc, f"SELECT description FROM genre_books WHERE isbn={ph}", (isbn_,))
-                            if existing and existing.get("description"):
-                                dc.close()
-                                return
-                            if USE_PG:
-                                execute(dc, """INSERT INTO genre_books (isbn, title, author, publisher, genre, format, description)
-                                    VALUES (%s,%s,%s,%s,'その他','その他',%s)
-                                    ON CONFLICT (isbn) DO UPDATE SET description=EXCLUDED.description""",
-                                    (isbn_, title_, author_, publisher_, desc_))
-                            else:
-                                execute(dc, "UPDATE genre_books SET description=? WHERE isbn=?", (desc_, isbn_))
-                            dc.commit(); dc.close()
+                            with db_session() as dc:
+                                ph = "%s" if USE_PG else "?"
+                                existing = fetchone(dc, f"SELECT description FROM genre_books WHERE isbn={ph}", (isbn_,))
+                                if existing and existing.get("description"):
+                                    return
+                                if USE_PG:
+                                    execute(dc, """INSERT INTO genre_books (isbn, title, author, publisher, genre, format, description)
+                                        VALUES (%s,%s,%s,%s,'その他','その他',%s)
+                                        ON CONFLICT (isbn) DO UPDATE SET description=EXCLUDED.description""",
+                                        (isbn_, title_, author_, publisher_, desc_))
+                                else:
+                                    execute(dc, "UPDATE genre_books SET description=? WHERE isbn=?", (desc_, isbn_))
+                                dc.commit()
                         except Exception:
                             pass
                     threading.Thread(target=_save_desc, args=(
@@ -422,9 +421,8 @@ def _build_recent_isbns():
     import datetime
     today = datetime.date.today()
     try:
-        con = get_con()
-        rows = fetchall(con, "SELECT isbn, title, author, publisher FROM genre_books")
-        con.close()
+        with db_session() as con:
+            rows = fetchall(con, "SELECT isbn, title, author, publisher FROM genre_books")
         if not rows:
             return []
         isbns = [r["isbn"] for r in rows]
@@ -447,10 +445,10 @@ def _build_recent_isbns():
                         recent.append(rec)
                 except Exception:
                     pass
-        con2 = get_con()
-        _upsert_setting(con2, "recent_books_cache", json.dumps(recent, ensure_ascii=False))
-        _upsert_setting(con2, "recent_books_cache_date", str(today))
-        con2.commit(); con2.close()
+        with db_session() as con2:
+            _upsert_setting(con2, "recent_books_cache", json.dumps(recent, ensure_ascii=False))
+            _upsert_setting(con2, "recent_books_cache_date", str(today))
+            con2.commit()
         _recent_isbns_cache["isbns"] = recent
         _recent_isbns_cache["date"] = today
         return recent
@@ -466,17 +464,15 @@ def get_recent_isbns():
     if cache["date"] == today and cache["isbns"]:
         return cache["isbns"]
     try:
-        con = get_con()
-        date_row = fetchone(con, "SELECT value FROM settings WHERE key='recent_books_cache_date'")
-        if date_row and date_row["value"] == str(today):
-            data_row = fetchone(con, "SELECT value FROM settings WHERE key='recent_books_cache'")
-            con.close()
-            if data_row:
-                isbns = json.loads(data_row["value"])
-                cache["isbns"] = isbns
-                cache["date"] = today
-                return isbns
-        con.close()
+        with db_session() as con:
+            date_row = fetchone(con, "SELECT value FROM settings WHERE key='recent_books_cache_date'")
+            if date_row and date_row["value"] == str(today):
+                data_row = fetchone(con, "SELECT value FROM settings WHERE key='recent_books_cache'")
+                if data_row:
+                    isbns = json.loads(data_row["value"])
+                    cache["isbns"] = isbns
+                    cache["date"] = today
+                    return isbns
     except Exception:
         pass
     threading.Thread(target=_build_recent_isbns, daemon=True).start()
@@ -600,30 +596,30 @@ def _auto_classify_new_books():
                 except Exception as e:
                     logger.info(f"OpenBD バッチエラー: {e}")
 
-                con = get_con()
-                for b in batch:
-                    isbn = b["isbn"]
-                    genre = _classify_genre(
-                        ndc_map.get(isbn, ""),
-                        b.get("title", ""),
-                        desc_map.get(isbn, "")
-                    )
-                    if USE_PG:
-                        execute(con,
-                            "INSERT INTO genre_books (isbn,genre,title,author,publisher,format) "
-                            "VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT(isbn) DO UPDATE SET "
-                            "title=EXCLUDED.title, author=EXCLUDED.author, "
-                            "publisher=EXCLUDED.publisher, format=EXCLUDED.format",
-                            (isbn, genre, b.get("title",""), b.get("author",""),
-                             b.get("publisher",""), b.get("format","")))
-                    else:
-                        execute(con,
-                            "INSERT OR REPLACE INTO genre_books "
-                            "(isbn,genre,title,author,publisher,format) VALUES (?,?,?,?,?,?)",
-                            (isbn, genre, b.get("title",""), b.get("author",""),
-                             b.get("publisher",""), b.get("format","")))
-                    classified += 1
-                con.commit(); con.close()
+                with db_session() as con:
+                    for b in batch:
+                        isbn = b["isbn"]
+                        genre = _classify_genre(
+                            ndc_map.get(isbn, ""),
+                            b.get("title", ""),
+                            desc_map.get(isbn, "")
+                        )
+                        if USE_PG:
+                            execute(con,
+                                "INSERT INTO genre_books (isbn,genre,title,author,publisher,format) "
+                                "VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT(isbn) DO UPDATE SET "
+                                "title=EXCLUDED.title, author=EXCLUDED.author, "
+                                "publisher=EXCLUDED.publisher, format=EXCLUDED.format",
+                                (isbn, genre, b.get("title",""), b.get("author",""),
+                                 b.get("publisher",""), b.get("format","")))
+                        else:
+                            execute(con,
+                                "INSERT OR REPLACE INTO genre_books "
+                                "(isbn,genre,title,author,publisher,format) VALUES (?,?,?,?,?,?)",
+                                (isbn, genre, b.get("title",""), b.get("author",""),
+                                 b.get("publisher",""), b.get("format","")))
+                        classified += 1
+                    con.commit()
                 time.sleep(0.5)
 
             _save_genre_update_time()
