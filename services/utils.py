@@ -188,6 +188,7 @@ def auto_cleanup_images():
     """DB使用量が95%超の場合、古い画像データを自動削除する"""
     if not USE_PG:
         return
+    con = None
     try:
         con = get_con()
         size_row = fetchone(con, "SELECT pg_database_size(current_database()) AS bytes")
@@ -210,6 +211,8 @@ def auto_cleanup_images():
                 )
             """)
             con.commit()
-        con.close()
     except Exception as e:
         logger.error(f"auto_cleanup_images error: %s", e)
+    finally:
+        if con:
+            con.close()

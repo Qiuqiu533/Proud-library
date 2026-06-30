@@ -1,6 +1,7 @@
 from __future__ import annotations
 import os
-from typing import Any
+from contextlib import contextmanager
+from typing import Any, Iterator
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 USE_PG = bool(DATABASE_URL)
@@ -29,8 +30,13 @@ class _PooledConnection:
     """プールから借りた接続をラップし、close() でプールに返却する。"""
     def __init__(self, conn: Any) -> None:
         self._conn = conn
+        self._closed = False
 
     def close(self) -> None:
+        # 二重close（明示close() + teardown自動close()）でプールが壊れないようガード
+        if self._closed:
+            return
+        self._closed = True
         _get_pool().putconn(self._conn)
 
     def commit(self) -> None:
@@ -50,13 +56,52 @@ class _PooledConnection:
 
 
 def get_con() -> Any:
-    """DB接続を返す。PG はプールから取得、SQLite はそのまま開く。"""
+    """DB接続を返す。PG はプールから取得、SQLite はそのまま開く。
+    Flaskリクエスト中に呼ばれた場合、呼び出し側がclose()を忘れても
+    teardown_appcontext（app.py側）でリクエスト終了時に自動返却される。
+    """
     if USE_PG:
-        return _PooledConnection(_get_pool().getconn())
+        con = _PooledConnection(_get_pool().getconn())
     else:
         con = sqlite3.connect(DB_PATH)
         con.row_factory = sqlite3.Row
-        return con
+
+    try:
+        from flask import g, has_app_context
+        if has_app_context():
+            if not hasattr(g, "_db_connections"):
+                g._db_connections = []
+            g._db_connections.append(con)
+    except RuntimeError:
+        pass  # Flaskコンテキスト外（スクリプト等）からの呼び出し
+
+    return con
+
+
+@contextmanager
+def db_session() -> Iterator[Any]:
+    """`with db_session() as con:` で使う。例外発生時も確実に接続をプールへ返却する。
+    バックグラウンドスレッド・スクリプト等、Flaskリクエストコンテキスト外で
+    DB接続を使う場合は必ずこれを使うこと（teardown_appcontextの保護が効かないため）。
+    """
+    con = get_con()
+    try:
+        yield con
+    finally:
+        con.close()
+
+
+def close_request_connections() -> None:
+    """リクエスト終了時に未closeの接続をすべてプールへ返却する（teardown_appcontext用）。"""
+    try:
+        from flask import g
+        for con in getattr(g, "_db_connections", []):
+            try:
+                con.close()
+            except Exception:
+                pass
+    except RuntimeError:
+        pass
 
 
 def execute(con: Any, sql: str, params: tuple = ()) -> Any:
