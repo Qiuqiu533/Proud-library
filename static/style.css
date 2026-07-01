@@ -1266,10 +1266,17 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .log-month-bar--current { background: #f0a500; }
 .log-month-bar--zero    { background: #ece9e3; min-height: 3px; }
 .log-month-bar--has     { background: #3d6b4f; }
-.log-month-label { font-size: 0.62rem; color: #bbb; margin-top: 4px; }
+.log-month-label { font-size: 0.74rem; color: #999; margin-top: 5px; white-space: nowrap; }
 .log-month-label--current { color: #f0a500; font-weight: 700; }
-.log-month-count { font-size: 0.72rem; font-weight: 700; color: #3d6b4f; min-height: 14px; line-height: 1; }
+.log-month-count { font-size: 0.85rem; font-weight: 700; color: #3d6b4f; min-height: 16px; line-height: 1; }
 .log-month-count--current { color: #f0a500; }
+.log-year-btn {
+  font-size: 0.76rem; font-weight: 600; padding: 3px 10px;
+  border: 1.5px solid #c8ddd0; border-radius: 14px;
+  background: white; color: #666; cursor: pointer; transition: all .15s;
+}
+.log-year-btn:hover { border-color: #3d6b4f; color: #3d6b4f; }
+.log-year-btn--active { background: #3d6b4f; color: white; border-color: #3d6b4f; }
 /* ジャンルグラフ */
 .log-genre-chart { display: flex; flex-direction: column; gap: 8px; }
 .log-genre-row { display: flex; align-items: center; gap: 10px; }
