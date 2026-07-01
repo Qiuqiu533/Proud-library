@@ -1285,3 +1285,28 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .log-genre-bar-wrap { flex: 1; background: #f0ede8; border-radius: 6px; height: 14px; overflow: hidden; }
 .log-genre-bar { height: 100%; background: linear-gradient(90deg, #3d6b4f, #5a9e78); border-radius: 6px; transition: width .6s ease; }
 .log-genre-count { font-size: 0.75rem; color: #555; font-weight: 600; width: 28px; text-align: right; flex-shrink: 0; }
+
+/* ===== 管理画面リクエスト管理UI改善 ===== */
+.req-status-badge {
+  display: inline-flex; align-items: center;
+  padding: 2px 9px; border-radius: 10px;
+  font-size: 0.75rem; font-weight: 600; margin-left: 8px; vertical-align: middle;
+}
+.req-subtab-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #e04040; color: #fff; border-radius: 10px;
+  padding: 1px 6px; font-size: 0.72rem; font-weight: 700;
+  min-width: 18px; margin-left: 5px; vertical-align: middle;
+}
+.req-sum-box--alert .req-sum-num { color: #e04040 !important; }
+.req-filter-bar {
+  display: flex; gap: 8px; align-items: center; margin-bottom: 12px;
+}
+.req-filter-lbl { font-size: 0.77rem; color: #888; font-weight: 600; flex-shrink: 0; }
+.req-filter-btn {
+  padding: 4px 13px; border-radius: 20px;
+  border: 1.5px solid #d0d0d0; background: #fff; color: #666;
+  font-size: 0.8rem; cursor: pointer; font-weight: 600; transition: all .15s;
+}
+.req-filter-btn:hover { border-color: #888; color: #333; }
+.req-filter-btn--active { background: #3d6b4f; color: #fff !important; border-color: #3d6b4f !important; }

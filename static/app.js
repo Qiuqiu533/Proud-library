@@ -4052,9 +4052,49 @@ async function loadReqList() {
   }
 }
 
+function _reqStatusBadge(r) {
+  const isFb = r.type === "feedback";
+  const s = r.status;
+  let label, color, bg;
+  if (isFb) {
+    if (!s || s === "fb_received" || s === "pending") { label = "📬 受付中"; color = "#888"; bg = "#f0f0f0"; }
+    else if (s === "fb_checking") { label = "🔍 確認中"; color = "#5b8dd9"; bg = "#eef3fd"; }
+    else if (s === "fb_done")     { label = "✅ 対応済";  color = "#3d8a4f"; bg = "#e8f5ec"; }
+    else if (s === "fb_rejected") { label = "❌ 見送り";  color = "#c00";    bg = "#fff0f0"; }
+    else if (s === "fb_pending")  { label = "⏳ 検討中";  color = "#e08a00"; bg = "#fff8e8"; }
+    else if (s === "fb_noted")    { label = "📝 受理済";  color = "#6a5acd"; bg = "#f5f3ff"; }
+    else if (s === "fb_none")     { label = "➖ 対応なし"; color = "#999";   bg = "#f0f0f0"; }
+    else { label = "📬 受付中"; color = "#888"; bg = "#f0f0f0"; }
+  } else {
+    if (!s || s === "pending") { label = "⏳ 検討中";   color = "#888";    bg = "#f0f0f0"; }
+    else if (s === "approved") { label = "✅ 購入決定"; color = "#3d8a4f"; bg = "#e8f5ec"; }
+    else if (s === "rejected") { label = "❌ 見送り";   color = "#c00";    bg = "#fff0f0"; }
+    else if (s === "done")     { label = "📦 入荷済";   color = "#555";    bg = "#efefef"; }
+    else { label = "⏳ 検討中"; color = "#888"; bg = "#f0f0f0"; }
+  }
+  return `<span class="req-status-badge" style="color:${color};background:${bg}">${label}</span>`;
+}
+
+function _reqIsPending(r) {
+  const s = r.status;
+  return r.type === "feedback"
+    ? (!s || s === "fb_received" || s === "pending" || s === "fb_checking" || s === "fb_pending")
+    : (!s || s === "pending");
+}
+
+function _reqFilter(btn, mode, containerId) {
+  const bar = btn.closest(".req-filter-bar");
+  bar.querySelectorAll(".req-filter-btn").forEach(b => b.classList.remove("req-filter-btn--active"));
+  btn.classList.add("req-filter-btn--active");
+  document.getElementById(containerId).querySelectorAll(".req-admin-card").forEach(card => {
+    card.style.display = (mode === "all" || card.dataset.pending === "1") ? "" : "none";
+  });
+}
+
 function reqAdminCardHtml(r) {
   const isFb = r.type === "feedback";
   const borderColor = isFb ? "#5b8dd9" : "#3d6b4f";
+  const pending = _reqIsPending(r) ? ' data-pending="1"' : "";
   const statusOpts = isFb ? `
     <option value="fb_received" ${r.status==="fb_received"||!r.status||r.status==="pending"?"selected":""}>📬 受付中</option>
     <option value="fb_checking" ${r.status==="fb_checking"?"selected":""}>🔍 確認中</option>
@@ -4070,7 +4110,7 @@ function reqAdminCardHtml(r) {
     <option value="done"     ${r.status==="done"    ?"selected":""}>📦 入荷済</option>
   `;
   return `
-    <div class="req-admin-card" style="border-left:4px solid ${borderColor}">
+    <div class="req-admin-card" style="border-left:4px solid ${borderColor}"${pending}>
       <div class="req-admin-card-header">
         <div>
           <div class="req-book-title">${esc(r.title)} ${!isFb?`<span class="req-vote-admin">👍 ${r.votes||0}</span>`:""}</div>
@@ -4079,7 +4119,7 @@ function reqAdminCardHtml(r) {
         <button class="news-del req-del" data-id="${r.id}" title="削除">🗑</button>
       </div>
       ${r.reason ? `<div class="req-reason">"${esc(r.reason)}"</div>` : ""}
-      <div class="req-meta">${r.room ? `🏠 ${esc(r.room)}　` : ""}🕐 ${(r.created_at||"").slice(0,10)}</div>
+      <div class="req-meta">${r.room ? `🏠 ${esc(r.room)}　` : ""}🕐 ${(r.created_at||"").slice(0,10)}${_reqStatusBadge(r)}</div>
       <div class="req-admin-controls">
         <select class="req-status-sel" data-id="${r.id}">${statusOpts}</select>
         <input class="req-note-input" type="text" placeholder="管理者メモ（非公開）"
@@ -4171,7 +4211,7 @@ async function loadReqManage() {
     else { if (cnt[r.status]!==undefined) cnt[r.status]++; else cnt.pending++; }
   });
   document.getElementById("reqSummary").innerHTML = `
-    <div class="req-sum-box"><div class="req-sum-num" style="color:#888">${cnt.pending}</div><div class="req-sum-lbl">⏳ 検討中</div></div>
+    <div class="req-sum-box${cnt.pending > 0 ? ' req-sum-box--alert' : ''}"><div class="req-sum-num">${cnt.pending}</div><div class="req-sum-lbl">⏳ 検討中</div></div>
     <div class="req-sum-box"><div class="req-sum-num" style="color:#3d8a4f">${cnt.approved}</div><div class="req-sum-lbl">✅ 購入決定</div></div>
     <div class="req-sum-box"><div class="req-sum-num" style="color:#c00">${cnt.rejected}</div><div class="req-sum-lbl">❌ 見送り</div></div>
     <div class="req-sum-box"><div class="req-sum-num" style="color:#555">${cnt.done}</div><div class="req-sum-lbl">📦 入荷済</div></div>
@@ -4181,8 +4221,27 @@ async function loadReqManage() {
   const books = items.filter(r => r.type !== "feedback");
   const fbs = items.filter(r => r.type === "feedback");
 
-  elBooks.innerHTML = books.length ? books.map(reqAdminCardHtml).join("") : '<div class="loading">本のリクエストはまだありません</div>';
-  elFb.innerHTML = fbs.length ? fbs.map(reqAdminCardHtml).join("") : '<div class="loading">ご要望・ご意見はまだありません</div>';
+  // サブタブ未対応バッジ更新
+  const booksPendingCnt = books.filter(_reqIsPending).length;
+  const fbPendingCnt = fbs.filter(_reqIsPending).length;
+  const booksTabBtn = document.querySelector('.req-subtab-btn[data-subtab="books"]');
+  const fbTabBtn = document.querySelector('.req-subtab-btn[data-subtab="feedback"]');
+  if (booksTabBtn) booksTabBtn.innerHTML = `📖 本のリクエスト${booksPendingCnt > 0 ? ` <span class="req-subtab-badge">${booksPendingCnt}</span>` : ""}`;
+  if (fbTabBtn) fbTabBtn.innerHTML = `💬 ご要望・ご意見${fbPendingCnt > 0 ? ` <span class="req-subtab-badge">${fbPendingCnt}</span>` : ""}`;
+
+  const filterBar = (containerId) => `
+    <div class="req-filter-bar">
+      <span class="req-filter-lbl">絞り込み：</span>
+      <button class="req-filter-btn req-filter-btn--active" onclick="_reqFilter(this,'all','${containerId}')">全件</button>
+      <button class="req-filter-btn" onclick="_reqFilter(this,'pending','${containerId}')">⏳ 未対応のみ</button>
+    </div>`;
+
+  elBooks.innerHTML = books.length
+    ? filterBar("reqAdminBooks") + books.map(reqAdminCardHtml).join("")
+    : '<div class="loading">本のリクエストはまだありません</div>';
+  elFb.innerHTML = fbs.length
+    ? filterBar("reqAdminFeedback") + fbs.map(reqAdminCardHtml).join("")
+    : '<div class="loading">ご要望・ご意見はまだありません</div>';
 
   bindReqAdminEvents(elBooks);
   bindReqAdminEvents(elFb);
