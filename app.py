@@ -80,7 +80,7 @@ def set_security_headers(response):
             "*.googleusercontent.com "
             "www.librarylife.net "
             "librarylife.net; "
-        "connect-src 'self' *.ingest.us.sentry.io; "
+        "connect-src 'self' *.ingest.us.sentry.io fonts.googleapis.com fonts.gstatic.com cdnjs.cloudflare.com; "
         "frame-ancestors 'none';"
     )
     response.headers["Content-Security-Policy"] = csp
