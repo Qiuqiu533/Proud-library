@@ -247,28 +247,70 @@ def api_stats():
 
 @books_bp.route("/api/books/popular")
 def api_books_popular():
-    """評価スコア上位の本（1票以上・上位20件）を返す"""
+    """住民人気ランキング（星評価×2 ＋ お気に入り数×0.5 の合算スコア上位20件）"""
     con = get_con()
-    ph = "%s" if USE_PG else "?"
-    sql = f"""
-        SELECT g.isbn, g.title, g.author, r.score, r.votes
-        FROM ratings r
-        JOIN genre_books g ON g.isbn = r.isbn
-        WHERE r.votes >= 1 AND r.score >= 1
-        ORDER BY r.score DESC, r.votes DESC
-        LIMIT 20
-    """
-    rows = fetchall(con, sql, ())
+
+    # ── 星評価データ ──
+    rating_rows = fetchall(con, "SELECT isbn, score, votes FROM ratings WHERE votes >= 1 AND score >= 1")
+    rating_map = {r["isbn"]: {"score": r["score"], "votes": r["votes"]} for r in rating_rows}
+
+    # ── お気に入りデータ（全ユーザー集計） ──
+    fav_rows = fetchall(con, "SELECT favorites FROM user_accounts WHERE favorites IS NOT NULL AND favorites != '[]'")
+    fav_count: dict[str, int] = {}
+    for row in fav_rows:
+        try:
+            for isbn in json.loads(row["favorites"] or "[]"):
+                if isbn:
+                    fav_count[isbn] = fav_count.get(isbn, 0) + 1
+        except Exception:
+            pass
+
     con.close()
+
+    # ── 合算スコアを計算（星評価がある本を優先、ない本はお気に入り数で補完） ──
+    all_isbns = set(rating_map) | set(fav_count)
+    candidates = []
+    for isbn in all_isbns:
+        r   = rating_map.get(isbn, {})
+        fav = fav_count.get(isbn, 0)
+        if not r and fav == 0:
+            continue
+        composite = r.get("score", 0) * r.get("votes", 0) * 2 + fav * 0.5
+        candidates.append({
+            "isbn": isbn,
+            "composite": composite,
+            "score": r.get("score", 0.0),
+            "votes": r.get("votes", 0),
+            "fav_count": fav,
+        })
+
+    candidates.sort(key=lambda x: x["composite"], reverse=True)
+    top20 = candidates[:20]
+    if not top20:
+        return jsonify([])
+
+    # ── 書籍情報を一括取得 ──
+    con2 = get_con()
+    ph = "%s" if USE_PG else "?"
+    placeholders = ",".join([ph] * len(top20))
+    book_rows = fetchall(con2, f"SELECT isbn,title,author FROM genre_books WHERE isbn IN ({placeholders})", tuple(c["isbn"] for c in top20))
+    con2.close()
+    book_map = {b["isbn"]: b for b in book_rows}
+
     result = []
-    for b in rows:
-        isbn13 = b["isbn"]
+    for c in top20:
+        b = book_map.get(c["isbn"])
+        if not b:
+            continue
+        isbn13 = c["isbn"]
         isbn10 = isbn13_to_isbn10(isbn13) if isbn13.startswith("978") else ""
         result.append({
             "isbn": isbn13, "isbn10": isbn10,
             "title": b["title"], "author": b["author"],
             "cover": get_cover_url(isbn13, isbn10),
-            "score": b["score"], "votes": b["votes"],
+            "score": round(c["score"], 1),
+            "votes": c["votes"],
+            "fav_count": c["fav_count"],
         })
     return jsonify(result)
 

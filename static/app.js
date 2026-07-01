@@ -5133,13 +5133,16 @@ async function loadPopularBooks() {
       const stars = b.score ? "★".repeat(Math.round(b.score)) + "☆".repeat(5 - Math.round(b.score)) : "";
       const rankLabel = medals[i] || `${i+1}`;
       const rankClass = i < 3 ? ` rank-badge--${i+1}` : "";
-      return `<div class="mini-card" data-isbn="${b.isbn}" role="button" tabindex="0" aria-label="${esc(b.title)} ${b.score.toFixed(1)}点">
+      const scoreLabel = b.score > 0
+        ? `<span style="color:#f0a500">${stars}</span> <span style="color:#888">${b.score.toFixed(1)}</span>`
+        : (b.fav_count > 0 ? `<span style="color:#e05">♥</span> <span style="color:#888">${b.fav_count}</span>` : "");
+      return `<div class="mini-card" data-isbn="${b.isbn}" role="button" tabindex="0" aria-label="${esc(b.title)}">
         <div class="mini-card-cover">
           <span class="rank-badge${rankClass}" aria-label="${i+1}位">${rankLabel}</span>
           ${_bookCoverHtml(b.isbn, b.isbn10 || "", b.cover || "", esc(b.title))}
         </div>
         <div class="mini-card-title">${esc(b.title)}</div>
-        <div style="color:#f0a500;font-size:0.72rem;margin-top:2px" aria-hidden="true">${stars} ${b.score.toFixed(1)}</div>
+        <div style="font-size:0.72rem;margin-top:2px" aria-hidden="true">${scoreLabel}</div>
       </div>`;
     }).join("");
     row.querySelectorAll(".mini-card").forEach(el => {
