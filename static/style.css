@@ -1,4 +1,5 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 body { font-family: 'Noto Sans JP', sans-serif; background: #f5f3ef; color: #2c2c2c; min-height: 100vh; overscroll-behavior-y: none; -webkit-tap-highlight-color: transparent; }
 /* iPhoneホームバー対応 */
 body { padding-bottom: env(safe-area-inset-bottom); }
