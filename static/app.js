@@ -1203,6 +1203,7 @@ function renderLogStats() {
 async function loadLog(filter = "all") {
   logFilter = filter;
   renderLogStats();
+  renderReadingCharts();
   document.querySelectorAll(".log-filter-btn").forEach(b => b.classList.toggle("active", b.dataset.status === filter));
   const grid = document.getElementById("logGrid");
   let entries = getLogEntries();
@@ -3764,6 +3765,7 @@ checkAuth();
 loadBooks();
 loadPopularBooks();
 loadCollections();
+loadHomeEvents();
 loadTopNew();
 loadReqList();
 renderRecentBooks();
@@ -5126,10 +5128,16 @@ async function loadPopularBooks() {
     if (!books.length) return;
     sec.style.display = "block";
     applySectionState("popular");
-    row.innerHTML = books.map(b => {
+    const medals = ["🥇","🥈","🥉"];
+    row.innerHTML = books.map((b, i) => {
       const stars = b.score ? "★".repeat(Math.round(b.score)) + "☆".repeat(5 - Math.round(b.score)) : "";
+      const rankLabel = medals[i] || `${i+1}`;
+      const rankClass = i < 3 ? ` rank-badge--${i+1}` : "";
       return `<div class="mini-card" data-isbn="${b.isbn}" role="button" tabindex="0" aria-label="${esc(b.title)} ${b.score.toFixed(1)}点">
-        <div class="mini-card-cover">${_bookCoverHtml(b.isbn, b.isbn10 || "", b.cover || "", esc(b.title))}</div>
+        <div class="mini-card-cover">
+          <span class="rank-badge${rankClass}" aria-label="${i+1}位">${rankLabel}</span>
+          ${_bookCoverHtml(b.isbn, b.isbn10 || "", b.cover || "", esc(b.title))}
+        </div>
         <div class="mini-card-title">${esc(b.title)}</div>
         <div style="color:#f0a500;font-size:0.72rem;margin-top:2px" aria-hidden="true">${stars} ${b.score.toFixed(1)}</div>
       </div>`;
@@ -5176,6 +5184,97 @@ async function loadCollections() {
       } catch {}
     }
   } catch {}
+}
+
+// ===== ホームイベント予告 =====
+async function loadHomeEvents() {
+  const sec = document.getElementById("homeEventsSection");
+  const list = document.getElementById("homeEventsList");
+  if (!sec || !list) return;
+  try {
+    const res = await fetch("/api/events");
+    if (!res.ok) return;
+    const events = await res.json();
+    const upcoming = events.filter(e => e.status !== "cancelled" && e.status !== "hidden").slice(0, 3);
+    if (!upcoming.length) return;
+    sec.style.display = "block";
+    list.innerHTML = upcoming.map(ev => {
+      const d = ev.event_date ? new Date(ev.event_date) : null;
+      const month = d ? (d.getMonth() + 1) + "月" : "";
+      const day   = d ? d.getDate() : "";
+      const sub   = [ev.event_time, ev.location].filter(Boolean).join(" ／ ");
+      return `<div class="home-event-item" onclick="showTab('news')" role="button" tabindex="0">
+        <div class="home-event-date">
+          <div class="home-event-date-month">${month}</div>
+          <div class="home-event-date-day">${day || "🗓"}</div>
+        </div>
+        <div class="home-event-body">
+          <div class="home-event-title">${esc(ev.title)}</div>
+          ${sub ? `<div class="home-event-sub">${esc(sub)}</div>` : ""}
+        </div>
+      </div>`;
+    }).join("");
+  } catch {}
+}
+
+// ===== 読書統計グラフ =====
+async function renderReadingCharts() {
+  const chartsEl = document.getElementById("logCharts");
+  if (!chartsEl) return;
+  const readEntries = getLogEntries().filter(e => e.status === "読んだ");
+  if (!readEntries.length) { chartsEl.style.display = "none"; return; }
+  chartsEl.style.display = "block";
+
+  // ── 月別グラフ ──
+  const now = new Date();
+  const year = now.getFullYear();
+  const monthCounts = Array(12).fill(0);
+  readEntries.forEach(e => {
+    const m = getReadMeta(e.isbn);
+    if (!m.date) return;
+    const d = new Date(m.date);
+    if (d.getFullYear() === year) monthCounts[d.getMonth()]++;
+  });
+  const maxMonth = Math.max(...monthCounts, 1);
+  const monthEl = document.getElementById("logMonthChart");
+  if (monthEl) {
+    const monthNames = ["1","2","3","4","5","6","7","8","9","10","11","12"];
+    monthEl.innerHTML = monthCounts.map((c, i) => {
+      const h = Math.round((c / maxMonth) * 68);
+      return `<div class="log-month-bar-wrap">
+        <div class="log-month-count">${c || ""}</div>
+        <div class="log-month-bar${c === 0 ? " log-month-bar--zero" : ""}" style="height:${c === 0 ? 4 : h}px"></div>
+        <div class="log-month-label">${monthNames[i]}</div>
+      </div>`;
+    }).join("");
+  }
+
+  // ── ジャンル内訳グラフ ──
+  const genreEl = document.getElementById("logGenreChart");
+  const genreSec = document.getElementById("logGenreSection");
+  if (genreEl && genreSec && readEntries.length) {
+    try {
+      const isbns = readEntries.map(e => e.isbn).join(",");
+      const res = await fetch(`/api/books/batch?isbns=${isbns}`);
+      const books = await res.json();
+      const genreMap = {};
+      books.filter(Boolean).forEach(b => {
+        const g = b.genre || "その他";
+        genreMap[g] = (genreMap[g] || 0) + 1;
+      });
+      const sorted = Object.entries(genreMap).sort((a, b) => b[1] - a[1]).slice(0, 7);
+      if (!sorted.length) { genreSec.style.display = "none"; return; }
+      const maxG = sorted[0][1];
+      genreEl.innerHTML = sorted.map(([g, c]) => {
+        const w = Math.round((c / maxG) * 100);
+        return `<div class="log-genre-row">
+          <div class="log-genre-name" title="${esc(g)}">${esc(g)}</div>
+          <div class="log-genre-bar-wrap"><div class="log-genre-bar" style="width:${w}%"></div></div>
+          <div class="log-genre-count">${c}</div>
+        </div>`;
+      }).join("");
+    } catch { genreSec.style.display = "none"; }
+  }
 }
 
 async function loadAdminCollections() {

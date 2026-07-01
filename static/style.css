@@ -1211,3 +1211,57 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .plam-star { fill: #f4a261; font-weight: 900; pointer-events: none; }
 .plam-dot--rec { cursor: default; }
 .plam-dot--rec.plam-dot--link { cursor: pointer; }
+
+/* ===== ランキングバッジ ===== */
+.rank-badge {
+  position: absolute; top: 4px; left: 4px; z-index: 2;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #3d6b4f; color: #fff;
+  font-size: 0.65rem; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+  line-height: 1;
+}
+.rank-badge--1 { background: #d4a000; font-size: 0.78rem; width: 24px; height: 24px; }
+.rank-badge--2 { background: #8a9ba8; font-size: 0.78rem; width: 24px; height: 24px; }
+.rank-badge--3 { background: #a0693a; font-size: 0.78rem; width: 24px; height: 24px; }
+.mini-card-cover { position: relative; }
+
+/* ===== ホームイベント予告 ===== */
+.home-event-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 9px 12px; background: white; border-radius: 10px;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.07); margin-bottom: 7px;
+  cursor: pointer; transition: box-shadow .2s;
+}
+.home-event-item:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.13); }
+.home-event-date {
+  flex-shrink: 0; text-align: center; background: #3d6b4f;
+  color: #fff; border-radius: 8px; padding: 4px 8px; min-width: 46px;
+}
+.home-event-date-month { font-size: 0.62rem; line-height: 1.2; }
+.home-event-date-day   { font-size: 1.1rem; font-weight: 800; line-height: 1.1; }
+.home-event-body { flex: 1; min-width: 0; }
+.home-event-title { font-size: 0.88rem; font-weight: 600; color: #1a3a28; line-height: 1.35; }
+.home-event-sub   { font-size: 0.76rem; color: #888; margin-top: 2px; }
+.home-events-more {
+  font-size: 0.78rem; color: #3d6b4f; background: none; border: none;
+  cursor: pointer; font-weight: 600; padding: 0;
+}
+.home-events-more:hover { text-decoration: underline; }
+
+/* ===== 読書統計グラフ ===== */
+.log-chart-section { background: white; border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; box-shadow: 0 1px 6px rgba(0,0,0,0.07); }
+.log-chart-title { font-size: 0.82rem; font-weight: 700; color: #3d6b4f; margin-bottom: 10px; }
+.log-month-chart { display: flex; align-items: flex-end; gap: 4px; height: 80px; }
+.log-month-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; height: 100%; justify-content: flex-end; }
+.log-month-bar { width: 100%; background: #3d6b4f; border-radius: 3px 3px 0 0; min-height: 2px; transition: height .4s; }
+.log-month-bar--zero { background: #e8e8e8; }
+.log-month-label { font-size: 0.6rem; color: #aaa; }
+.log-month-count { font-size: 0.65rem; color: #3d6b4f; font-weight: 700; min-height: 12px; }
+.log-genre-chart { display: flex; flex-direction: column; gap: 6px; }
+.log-genre-row { display: flex; align-items: center; gap: 8px; }
+.log-genre-name { font-size: 0.76rem; color: #444; width: 110px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.log-genre-bar-wrap { flex: 1; background: #f0f0f0; border-radius: 4px; height: 12px; overflow: hidden; }
+.log-genre-bar { height: 100%; background: #3d6b4f; border-radius: 4px; transition: width .5s; }
+.log-genre-count { font-size: 0.72rem; color: #666; width: 24px; text-align: right; flex-shrink: 0; }
