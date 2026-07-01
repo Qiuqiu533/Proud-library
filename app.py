@@ -61,6 +61,9 @@ _auto_classify_new_books()   # バックグラウンドで週1回実行
 
 @app.after_request
 def set_security_headers(response):
+    # 静的ファイルは1年キャッシュ（app.jsはSWでバージョン管理）
+    if request.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     csp = (
         "default-src 'self'; "
         "script-src 'self' 'unsafe-inline' cdnjs.cloudflare.com; "

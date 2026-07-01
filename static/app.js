@@ -2537,13 +2537,8 @@ function openBoardPanel() {
   document.getElementById("boardPanel").style.display = "flex";
   document.body.style.overflow = "hidden";
   applyRoleTabVisibility();
-  // デフォルトタブを「ダッシュボード」に設定
-  document.querySelectorAll(".board-tab").forEach(b => b.classList.remove("active"));
-  document.querySelectorAll(".board-tab-panel").forEach(p => p.classList.remove("active"));
-  const dashTab = document.querySelector('.board-tab[data-btab="dashboard"]');
-  const dashPanel = document.getElementById("btab-dashboard");
-  if (dashTab) dashTab.classList.add("active");
-  if (dashPanel) dashPanel.classList.add("active");
+  // デフォルトタブを「ダッシュボード」に設定（グループタブも同期）
+  switchBoardTab("dashboard");
   loadDashboard();
 }
 
@@ -3112,6 +3107,18 @@ function switchBoardTab(tabKey) {
   const panel = document.getElementById(`btab-${tabKey}`);
   if (btn) btn.classList.add("active");
   if (panel) panel.classList.add("active");
+  // グループタブを同期
+  if (btn) {
+    const parentGroup = btn.closest(".board-subtab-group");
+    if (parentGroup) {
+      const groupKey = parentGroup.dataset.bgroup;
+      document.querySelectorAll(".board-group-tab").forEach(g => g.classList.remove("active"));
+      document.querySelectorAll(".board-subtab-group").forEach(g => g.classList.remove("active"));
+      const groupTab = document.querySelector(`.board-group-tab[data-bgroup="${groupKey}"]`);
+      if (groupTab) groupTab.classList.add("active");
+      parentGroup.classList.add("active");
+    }
+  }
   if (tabKey === "adminnews") loadAdminNews();
   if (tabKey === "newarrival") loadNewArrivalAdmin();
   if (tabKey === "analytics") loadOpsStats();
