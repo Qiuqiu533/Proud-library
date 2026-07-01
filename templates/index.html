@@ -201,6 +201,15 @@
         <div id="recentBooksRow" class="recent-row"></div>
       </div>
 
+      <!-- ホームイベント予告 -->
+      <div id="homeEventsSection" style="display:none;margin-bottom:14px">
+        <div class="section-label-row">
+          <span class="top-new-label">📅 イベント・お知らせ</span>
+          <button class="home-events-more" onclick="showTab('news')">もっと見る ›</button>
+        </div>
+        <div id="homeEventsList"></div>
+      </div>
+
       <!-- ジャンルフィルター（表紙ずれ解消まで非表示） -->
       <div class="genre-filter-row" style="display:none">
         <span class="genre-filter-label">ジャンル：</span>
@@ -393,6 +402,17 @@
       <h2 class="section-title">📝 読書記録</h2>
       <p class="section-desc">本のステータスを記録できます（このデバイスに保存）</p>
       <div id="logStats" class="log-stats-bar"></div>
+      <!-- 読書統計グラフ -->
+      <div id="logCharts" style="display:none;margin-bottom:18px">
+        <div class="log-chart-section">
+          <div class="log-chart-title">📊 今年の月別読書数</div>
+          <div id="logMonthChart" class="log-month-chart"></div>
+        </div>
+        <div class="log-chart-section" id="logGenreSection">
+          <div class="log-chart-title">📚 ジャンル内訳（読んだ本）</div>
+          <div id="logGenreChart" class="log-genre-chart"></div>
+        </div>
+      </div>
       <div class="log-filters">
         <button class="log-filter-btn active" data-status="all">すべて</button>
         <button class="log-filter-btn" data-status="読んだ">✅ 読んだ</button>
