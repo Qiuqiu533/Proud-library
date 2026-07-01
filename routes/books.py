@@ -149,7 +149,7 @@ def api_books_batch():
     con = get_con()
     ph = "%s" if USE_PG else "?"
     placeholders = ",".join([ph for _ in isbns])
-    rows = fetchall(con, f"SELECT isbn,title,author,publisher,format FROM genre_books WHERE isbn IN ({placeholders})", tuple(isbns))
+    rows = fetchall(con, f"SELECT isbn,title,author,publisher,format,genre FROM genre_books WHERE isbn IN ({placeholders})", tuple(isbns))
     con.close()
     row_map = {r["isbn"]: r for r in rows}
     result = []

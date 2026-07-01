@@ -5236,15 +5236,24 @@ async function renderReadingCharts() {
     if (d.getFullYear() === year) monthCounts[d.getMonth()]++;
   });
   const maxMonth = Math.max(...monthCounts, 1);
+  const curMonth = now.getMonth();
   const monthEl = document.getElementById("logMonthChart");
   if (monthEl) {
     const monthNames = ["1","2","3","4","5","6","7","8","9","10","11","12"];
     monthEl.innerHTML = monthCounts.map((c, i) => {
-      const h = Math.round((c / maxMonth) * 68);
+      const isCur    = i === curMonth;
+      const isFuture = i > curMonth;
+      const h = Math.round((c / maxMonth) * 90);
+      const barCls = isCur ? " log-month-bar--current"
+                   : isFuture ? " log-month-bar--zero"
+                   : c > 0 ? " log-month-bar--has"
+                   : " log-month-bar--zero";
+      const countCls = isCur ? " log-month-count--current" : "";
+      const labelCls = isCur ? " log-month-label--current" : "";
       return `<div class="log-month-bar-wrap">
-        <div class="log-month-count">${c || ""}</div>
-        <div class="log-month-bar${c === 0 ? " log-month-bar--zero" : ""}" style="height:${c === 0 ? 4 : h}px"></div>
-        <div class="log-month-label">${monthNames[i]}</div>
+        <div class="log-month-count${countCls}">${(c > 0 || isCur) ? c : ""}</div>
+        <div class="log-month-bar${barCls}" style="height:${c === 0 ? 4 : h}px"></div>
+        <div class="log-month-label${labelCls}">${monthNames[i]}</div>
       </div>`;
     }).join("");
   }
