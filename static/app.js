@@ -86,7 +86,8 @@ function _bookCoverHtml(isbn13, isbn10, coverUrl, altText, cssClass) {
   const [first, ...rest] = _coverFallbackUrls(isbn13, isbn10, coverUrl);
   if (!first) return `<div class="book-cover-placeholder" aria-hidden="true">📖</div>`;
   const fb = rest.length ? JSON.stringify(rest).replace(/"/g, "&quot;") : "[]";
-  return `<img class="${cssClass}" src="${first}" alt="${altText}" loading="lazy" onerror="_coverFallback(this,${fb})">`;
+  // width/height でブラウザがアスペクト比(2:3)を事前確保→CLS低減
+  return `<img class="${cssClass}" src="${first}" alt="${altText}" width="100" height="150" loading="lazy" onerror="_coverFallback(this,${fb})">`;
 }
 
 // ===== Auth =====
