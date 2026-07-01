@@ -90,6 +90,13 @@ function _bookCoverHtml(isbn13, isbn10, coverUrl, altText, cssClass) {
 }
 
 // ===== Auth =====
+// ===== Skeleton Loader =====
+function _skeletonGrid(count) {
+  count = count || 12;
+  const card = '<div class="skeleton-card" aria-hidden="true"><div class="skeleton-block skeleton-cover"></div><div class="skeleton-body"><div class="skeleton-block skeleton-title"></div><div class="skeleton-block skeleton-author"></div><div class="skeleton-block skeleton-meta"></div></div></div>';
+  return '<div id="skeletonNotice"></div>' + Array(count).fill(card).join("");
+}
+
 // residentSession: {room, password} をsessionStorageで保持
 let residentSession = null;
 try { residentSession = JSON.parse(sessionStorage.getItem("resident_session") || "null"); } catch {}
@@ -802,7 +809,8 @@ function renderPagination(containerId, total, page, onPage) {
 async function loadBooks(keyword = "", page = 1) {
   currentKeyword = keyword;
   currentPage = page;
-  document.getElementById("bookGrid").innerHTML = '<div class="loading">読み込み中…</div>';
+  const grid = document.getElementById("bookGrid");
+  grid.innerHTML = _skeletonGrid(12);
   document.getElementById("totalCount").textContent = "";
   const ppSel = document.getElementById("perPageSelect");
 
@@ -814,10 +822,8 @@ async function loadBooks(keyword = "", page = 1) {
   if (currentKana)  url += `&kana_row=${encodeURIComponent(currentKana)}`;
   // 3秒経っても返答がない場合はサーバー起動中メッセージを表示
   const _slowTimer = setTimeout(() => {
-    const grid = document.getElementById("bookGrid");
-    if (grid && grid.innerHTML.includes("読み込み中")) {
-      grid.innerHTML = '<div class="loading">⏳ サーバー起動中です（最大50秒かかる場合があります）<br><small>しばらくそのままお待ちください…</small></div>';
-    }
+    const notice = document.getElementById("skeletonNotice");
+    if (notice) { notice.innerHTML = "⏳ サーバー起動中です（最大50秒かかる場合があります）<br><small>しばらくそのままお待ちください…</small>"; notice.style.display = "block"; }
   }, 3000);
   try {
     const res = await fetch(url);
