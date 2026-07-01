@@ -2,6 +2,7 @@ from __future__ import annotations
 import threading
 import logging
 import requests
+import psycopg2.errors
 
 logger = logging.getLogger(__name__)
 
@@ -46,13 +47,13 @@ def init_db():
         try:
             cur.execute("ALTER TABLE announcements ADD COLUMN event_date TEXT DEFAULT ''")
             con.commit()
-        except Exception:
-            pass
+        except psycopg2.errors.DuplicateColumn:
+            con.rollback()
         try:
             cur.execute("ALTER TABLE genre_books ADD COLUMN description TEXT DEFAULT ''")
             con.commit()
-        except Exception:
-            pass
+        except psycopg2.errors.DuplicateColumn:
+            con.rollback()
         cur.execute("""
             CREATE TABLE IF NOT EXISTS issues (
                 id SERIAL PRIMARY KEY,
