@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, Response
 from services.utils import auto_cleanup_images
 
 pages_bp = Blueprint("pages", __name__)
@@ -13,6 +13,13 @@ def index():
 def reset_password_page():
     """パスワードリセットページ（メールリンクから遷移）"""
     return render_template("index.html")
+
+
+@pages_bp.route("/robots.txt")
+def robots_txt():
+    """非公開アプリのため全クローラーを拒否"""
+    content = "User-agent: *\nDisallow: /\n"
+    return Response(content, mimetype="text/plain")
 
 
 @pages_bp.route("/ping")

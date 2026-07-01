@@ -2738,6 +2738,19 @@ async function loadIssues() {
 function renderIssues() {
   const list = document.getElementById("issueList");
   let items = issueFilter === "all" ? [...allIssues] : allIssues.filter(i => i.status === issueFilter);
+
+  // フィルターボタンに件数バッジ更新
+  const cntAll = allIssues.length;
+  const cntNew = allIssues.filter(i => i.status === "未対応").length;
+  const cntWip = allIssues.filter(i => i.status === "対応中").length;
+  const cntDone = allIssues.filter(i => i.status === "完了").length;
+  const filterCounts = {all: cntAll, "未対応": cntNew, "対応中": cntWip, "完了": cntDone};
+  document.querySelectorAll(".issue-filter-btn").forEach(btn => {
+    const f = btn.dataset.filter;
+    const n = filterCounts[f] || 0;
+    btn.textContent = (f === "all" ? "すべて" : f) + (n > 0 ? ` (${n})` : "");
+  });
+
   if (!items.length) { list.innerHTML = '<div class="loading">課題はありません</div>'; return; }
   const priMap = {"高":"🔴","中":"🟡","低":"🟢"};
   const stMap = {"未対応":"issue-new","対応中":"issue-wip","完了":"issue-done"};
