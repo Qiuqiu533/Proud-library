@@ -405,7 +405,10 @@
       <!-- 読書統計グラフ -->
       <div id="logCharts" style="display:none;margin-bottom:18px">
         <div class="log-chart-section">
-          <div class="log-chart-title">📊 今年の月別読書数</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div class="log-chart-title" style="margin-bottom:0" id="logMonthChartTitle">📊 月別読書数</div>
+            <div id="logYearSelector" style="display:none;gap:6px;flex-wrap:wrap"></div>
+          </div>
           <div id="logMonthChart" class="log-month-chart"></div>
         </div>
         <div class="log-chart-section" id="logGenreSection">

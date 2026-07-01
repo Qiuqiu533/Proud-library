@@ -5221,16 +5221,39 @@ async function loadHomeEvents() {
 }
 
 // ===== 読書統計グラフ =====
-async function renderReadingCharts() {
+async function renderReadingCharts(selectedYear) {
   const chartsEl = document.getElementById("logCharts");
   if (!chartsEl) return;
   const readEntries = getLogEntries().filter(e => e.status === "読んだ");
   if (!readEntries.length) { chartsEl.style.display = "none"; return; }
   chartsEl.style.display = "block";
 
-  // ── 月別グラフ ──
+  // ── 記録がある年を収集して年セレクター描画 ──
   const now = new Date();
-  const year = now.getFullYear();
+  const curYear = now.getFullYear();
+  const yearSet = new Set([curYear]);
+  readEntries.forEach(e => {
+    const m = getReadMeta(e.isbn);
+    if (m.date) yearSet.add(new Date(m.date).getFullYear());
+  });
+  const sortedYears = [...yearSet].filter(y => y > 2000).sort((a, b) => b - a);
+  const year = selectedYear || curYear;
+
+  const yearSel = document.getElementById("logYearSelector");
+  if (yearSel) {
+    if (sortedYears.length > 1) {
+      yearSel.style.display = "flex";
+      yearSel.innerHTML = sortedYears.map(y =>
+        `<button class="log-year-btn${y === year ? " log-year-btn--active" : ""}" onclick="renderReadingCharts(${y})">${y}年</button>`
+      ).join("");
+    } else {
+      yearSel.style.display = "none";
+    }
+  }
+  const titleEl = document.getElementById("logMonthChartTitle");
+  if (titleEl) titleEl.textContent = `📊 ${year}年 月別読書数`;
+
+  // ── 月別グラフ ──
   const monthCounts = Array(12).fill(0);
   readEntries.forEach(e => {
     const m = getReadMeta(e.isbn);
@@ -5239,13 +5262,13 @@ async function renderReadingCharts() {
     if (d.getFullYear() === year) monthCounts[d.getMonth()]++;
   });
   const maxMonth = Math.max(...monthCounts, 1);
-  const curMonth = now.getMonth();
+  const curMonth = year === curYear ? now.getMonth() : -1;
   const monthEl = document.getElementById("logMonthChart");
   if (monthEl) {
-    const monthNames = ["1","2","3","4","5","6","7","8","9","10","11","12"];
+    const monthNames = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
     monthEl.innerHTML = monthCounts.map((c, i) => {
       const isCur    = i === curMonth;
-      const isFuture = i > curMonth;
+      const isFuture = year === curYear && i > curMonth;
       const h = Math.round((c / maxMonth) * 90);
       const barCls = isCur ? " log-month-bar--current"
                    : isFuture ? " log-month-bar--zero"
@@ -5253,8 +5276,9 @@ async function renderReadingCharts() {
                    : " log-month-bar--zero";
       const countCls = isCur ? " log-month-count--current" : "";
       const labelCls = isCur ? " log-month-label--current" : "";
+      const countLabel = c > 0 ? `${c}冊` : (isCur ? "0冊" : "");
       return `<div class="log-month-bar-wrap">
-        <div class="log-month-count${countCls}">${(c > 0 || isCur) ? c : ""}</div>
+        <div class="log-month-count${countCls}">${countLabel}</div>
         <div class="log-month-bar${barCls}" style="height:${c === 0 ? 4 : h}px"></div>
         <div class="log-month-label${labelCls}">${monthNames[i]}</div>
       </div>`;
