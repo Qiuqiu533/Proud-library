@@ -670,3 +670,200 @@ def test_books_by_tag_no_tag(client):
     assert res.status_code == 200
     data = res.get_json()
     assert data["books"] == []
+
+
+# ── community.py カバレッジ補強 ──────────────────────────────────────────────
+
+BOARD_H = {"X-Password": "test-board-pw"}
+ADMIN_H = {"X-Password": "test-admin-pw"}
+
+# --- カレンダー ---
+def test_calendar_post_ok(client):
+    """正しい認証でカレンダーイベントを登録できる"""
+    res = client.post("/api/calendar",
+                      json={"title": "テスト総会", "event_date": "2026-08-01", "body": ""},
+                      headers=BOARD_H)
+    assert res.status_code == 200
+    assert res.get_json().get("ok")
+
+
+def test_calendar_post_wrong_auth(client):
+    """認証なしカレンダー登録は 401"""
+    res = client.post("/api/calendar",
+                      json={"title": "テスト総会", "event_date": "2026-08-01"})
+    assert res.status_code == 401
+
+
+def test_calendar_patch_ok(client):
+    """カレンダーイベントを更新できる"""
+    client.post("/api/calendar",
+                json={"title": "更新前", "event_date": "2026-09-01", "body": ""},
+                headers=BOARD_H)
+    ev_id = client.get("/api/calendar").get_json()[-1]["id"]
+    res = client.patch(f"/api/calendar/{ev_id}",
+                       json={"title": "更新後", "event_date": "2026-09-01", "body": ""},
+                       headers=BOARD_H)
+    assert res.status_code == 200
+    assert res.get_json().get("ok")
+
+
+def test_calendar_delete_ok(client):
+    """カレンダーイベントを削除できる"""
+    client.post("/api/calendar",
+                json={"title": "削除用イベント", "event_date": "2026-10-01", "body": ""},
+                headers=BOARD_H)
+    ev_id = client.get("/api/calendar").get_json()[-1]["id"]
+    res = client.delete(f"/api/calendar/{ev_id}", json={}, headers=BOARD_H)
+    assert res.status_code == 200
+    assert res.get_json().get("ok")
+
+
+def test_calendar_reorder_ok(client):
+    """カレンダーの並び替えが正常動作する"""
+    events = client.get("/api/calendar").get_json()
+    if not events:
+        return
+    order = [{"id": e["id"], "sort_order": i} for i, e in enumerate(events)]
+    res = client.post("/api/calendar/reorder", json={"order": order}, headers=BOARD_H)
+    assert res.status_code == 200
+    assert res.get_json().get("ok")
+
+
+# --- 休館日スケジュール ---
+def test_lib_schedule_post_ok(client):
+    """正しい認証で休館日を登録できる"""
+    res = client.post("/api/lib-schedule",
+                      json={"title": "臨時休館テスト", "event_date": "2026-08-15", "type": "closed"},
+                      headers=BOARD_H)
+    assert res.status_code == 200
+    assert res.get_json().get("ok")
+
+
+def test_lib_schedule_patch_ok(client):
+    """休館日スケジュールを更新できる"""
+    client.post("/api/lib-schedule",
+                json={"title": "更新前休館", "event_date": "2026-11-01", "type": "closed"},
+                headers=BOARD_H)
+    schedules = client.get("/api/lib-schedule").get_json()
+    sch_id = schedules[-1]["id"]
+    res = client.patch(f"/api/lib-schedule/{sch_id}",
+                       json={"title": "更新後休館", "event_date": "2026-11-01", "type": "closed"},
+                       headers=BOARD_H)
+    assert res.status_code == 200
+    assert res.get_json().get("ok")
+
+
+def test_lib_schedule_delete_ok(client):
+    """休館日スケジュールを削除できる"""
+    client.post("/api/lib-schedule",
+                json={"title": "削除用休館", "event_date": "2026-12-01", "type": "closed"},
+                headers=BOARD_H)
+    schedules = client.get("/api/lib-schedule").get_json()
+    sch_id = schedules[-1]["id"]
+    res = client.delete(f"/api/lib-schedule/{sch_id}", json={}, headers=BOARD_H)
+    assert res.status_code == 200
+    assert res.get_json().get("ok")
+
+
+# --- お知らせ ---
+def test_announcement_post_ok(client):
+    """管理者認証でお知らせを投稿できる"""
+    res = client.post("/api/announcements",
+                      json={"title": "テストお知らせ", "body": "本文テスト", "category": "お知らせ"},
+                      headers=ADMIN_H)
+    assert res.status_code == 200
+    assert res.get_json().get("ok")
+
+
+def test_announcement_post_board_ok(client):
+    """理事会認証でもお知らせを投稿できる"""
+    res = client.post("/api/announcements",
+                      json={"title": "理事会お知らせ", "body": "内容", "category": "お知らせ"},
+                      headers=BOARD_H)
+    assert res.status_code == 200
+    assert res.get_json().get("ok")
+
+
+def test_announcement_post_wrong_auth(client):
+    """認証なしお知らせ投稿は 401"""
+    res = client.post("/api/announcements",
+                      json={"title": "テスト", "body": "本文"})
+    assert res.status_code == 401
+
+
+def test_announcement_post_missing_fields(client):
+    """タイトル・本文なしは 400"""
+    res = client.post("/api/announcements",
+                      json={"title": "", "body": ""},
+                      headers=ADMIN_H)
+    assert res.status_code == 400
+
+
+def test_announcement_patch_ok(client):
+    """お知らせを更新できる"""
+    client.post("/api/announcements",
+                json={"title": "更新前", "body": "内容", "category": "お知らせ"},
+                headers=ADMIN_H)
+    ann_id = client.get("/api/announcements").get_json()[0]["id"]
+    res = client.patch(f"/api/announcements/{ann_id}",
+                       json={"title": "更新後", "body": "新内容", "category": "お知らせ"},
+                       headers=ADMIN_H)
+    assert res.status_code == 200
+    assert res.get_json().get("ok")
+
+
+def test_announcement_delete_ok(client):
+    """お知らせを削除できる"""
+    client.post("/api/announcements",
+                json={"title": "削除用", "body": "本文", "category": "お知らせ"},
+                headers=ADMIN_H)
+    ann_id = client.get("/api/announcements").get_json()[0]["id"]
+    res = client.delete(f"/api/announcements/{ann_id}", json={}, headers=ADMIN_H)
+    assert res.status_code == 200
+    assert res.get_json().get("ok")
+
+
+def test_announcement_delete_wrong_auth(client):
+    """認証なしお知らせ削除は 401"""
+    res = client.delete("/api/announcements/1", json={})
+    assert res.status_code == 401
+
+
+# --- リクエスト管理 ---
+def test_requests_admin_ok(client):
+    """管理者認証でリクエスト管理一覧が取得できる"""
+    res = client.get("/api/requests/admin", headers=BOARD_H)
+    assert res.status_code == 200
+    assert isinstance(res.get_json(), list)
+
+
+def test_requests_admin_no_auth(client):
+    """認証なしリクエスト管理一覧は 401"""
+    res = client.get("/api/requests/admin")
+    assert res.status_code == 401
+
+
+def test_request_vote_ok(client):
+    """リクエストへの投票が正常動作する"""
+    client.post("/api/user/register",
+                json={"room": "2-201", "password": "testpass1", "email": "t201@example.com"})
+    client.post("/api/requests",
+                json={"title": "投票テスト本", "room": "2-201", "password": "testpass1", "type": "request"})
+    req_id = client.get("/api/requests").get_json()[-1]["id"]
+    res = client.post(f"/api/requests/{req_id}/vote", json={})
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data.get("ok")
+    assert isinstance(data.get("votes"), int)
+
+
+# --- 課題並び替え ---
+def test_issues_reorder_ok(client):
+    """課題の並び替えが正常動作する"""
+    issues = client.get("/api/issues").get_json()
+    if not issues:
+        return
+    order = [{"id": i["id"], "sort_order": idx} for idx, i in enumerate(issues)]
+    res = client.post("/api/issues/reorder", json={"order": order}, headers=BOARD_H)
+    assert res.status_code == 200
+    assert res.get_json().get("ok")

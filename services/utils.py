@@ -212,7 +212,11 @@ def auto_cleanup_images():
             """)
             con.commit()
     except Exception as e:
-        logger.error(f"auto_cleanup_images error: %s", e)
+        msg = str(e)
+        if "SSL" in msg or "unexpected eof" in msg.lower() or "connection" in msg.lower():
+            logger.warning("auto_cleanup_images: DB transient disconnect (harmless): %s", e)
+        else:
+            logger.error("auto_cleanup_images error: %s", e)
     finally:
         if con:
             con.close()
