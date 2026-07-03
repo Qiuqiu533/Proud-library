@@ -300,13 +300,63 @@ def api_admin_members():
     ph = "%s" if USE_PG else "?"
     con = get_con()
     try:
-        rows = fetchall(con, "SELECT room, email, created_at FROM user_accounts ORDER BY created_at DESC")
+        if USE_PG:
+            rows = fetchall(con, "SELECT room, email, created_at FROM user_accounts ORDER BY created_at DESC")
+        else:
+            rows = fetchall(con, "SELECT room, email, updated_at AS created_at FROM user_accounts ORDER BY updated_at DESC")
         con.close()
         return jsonify([{
             "room": r["room"],
             "email": r["email"] or "",
-            "created_at": str(r["created_at"])[:10],
+            "created_at": str(r.get("created_at") or "")[:10],
         } for r in rows])
+    except Exception as e:
+        con.close()
+        return jsonify({"error": str(e)}), 500
+
+
+@loans_bp.route("/api/admin/requests-csv")
+def api_requests_csv():
+    """リクエスト・ご要望一覧をCSVでダウンロード（管理者用）"""
+    if not check_password(request.args.get("password"), "board"):
+        return jsonify({"error": "unauthorized"}), 401
+    con = get_con()
+    try:
+        rows = fetchall(con, "SELECT id,type,title,author,reason,room,status,votes,created_at,reply FROM book_requests ORDER BY id DESC")
+        con.close()
+        import csv, io
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(["ID","種別","タイトル","著者","理由","部屋","ステータス","賛同数","登録日","返信"])
+        for r in rows:
+            w.writerow([r["id"], r["type"], r["title"], r["author"], r["reason"],
+                        r["room"], r["status"], r["votes"], str(r["created_at"])[:10], r["reply"]])
+        from flask import Response
+        return Response("﻿" + buf.getvalue(), mimetype="text/csv; charset=utf-8",
+                        headers={"Content-Disposition": "attachment; filename=requests.csv"})
+    except Exception as e:
+        con.close()
+        return jsonify({"error": str(e)}), 500
+
+
+@loans_bp.route("/api/admin/books-csv")
+def api_books_csv():
+    """蔵書一覧をCSVでダウンロード（棚卸し用）"""
+    if not check_password(request.args.get("password"), "board"):
+        return jsonify({"error": "unauthorized"}), 401
+    con = get_con()
+    try:
+        rows = fetchall(con, "SELECT isbn, title, author, publisher, genre FROM genre_books ORDER BY genre, title")
+        con.close()
+        import csv, io
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(["ISBN","タイトル","著者","出版社","ジャンル"])
+        for r in rows:
+            w.writerow([r["isbn"], r["title"], r["author"], r["publisher"], r["genre"]])
+        from flask import Response
+        return Response("﻿" + buf.getvalue(), mimetype="text/csv; charset=utf-8",
+                        headers={"Content-Disposition": "attachment; filename=books.csv"})
     except Exception as e:
         con.close()
         return jsonify({"error": str(e)}), 500

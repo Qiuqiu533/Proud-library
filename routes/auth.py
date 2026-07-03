@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from config import get_admin_password, get_resident_password, get_board_password, check_password
 from database import get_con, execute, fetchone
 from services.utils import rate_limit, _hash_password, _verify_password
+from services.audit import log_action
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -12,6 +13,7 @@ def api_auth():
     body = request.get_json()
     if check_password(body.get("password"), "resident"):
         return jsonify({"ok": True})
+    log_action("ログイン失敗", "resident", "住民パスワード誤り")
     return jsonify({"error": "unauthorized"}), 401
 
 
@@ -22,6 +24,7 @@ def api_board_auth():
     body = request.get_json()
     if check_password(body.get("password"), "board"):
         return jsonify({"ok": True})
+    log_action("ログイン失敗", "board", "理事会パスワード誤り")
     return jsonify({"error": "unauthorized"}), 401
 
 
@@ -37,6 +40,7 @@ def api_admin_login():
     row = fetchone(con, "SELECT id,code,name,password_hash,salt,role FROM admin_users WHERE code=?", (code,))
     con.close()
     if not row or not _verify_password(password, row["password_hash"], row["salt"]):
+        log_action("ログイン失敗", f"admin:{code}", "管理者コード/パスワード誤り")
         return jsonify({"error": "コードまたはパスワードが正しくありません"}), 401
     return jsonify({"ok": True, "code": row["code"], "name": row["name"], "role": row["role"]})
 

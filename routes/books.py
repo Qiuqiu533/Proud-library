@@ -102,8 +102,20 @@ def api_books():
     data = fetch_books(keyword, page)
     isbns = [b["isbn"] for b in data["books"] if b.get("isbn")]
     ratings = get_ratings_bulk(isbns)
+    helpful_counts = {}
+    if isbns:
+        try:
+            con = get_con()
+            ph = "%s" if USE_PG else "?"
+            placeholders = ",".join([ph] * len(isbns))
+            rows = fetchall(con, f"SELECT isbn, helpful_count FROM genre_books WHERE isbn IN ({placeholders})", tuple(isbns))
+            con.close()
+            helpful_counts = {r["isbn"]: (r.get("helpful_count") or 0) for r in rows}
+        except Exception:
+            pass
     for book in data["books"]:
         book["rating"] = ratings.get(book["isbn"], {"score": 0, "votes": 0, "reviews": []})
+        book["helpful_count"] = helpful_counts.get(book["isbn"], 0)
     return jsonify(data)
 
 

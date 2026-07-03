@@ -66,10 +66,13 @@ def api_plam_coverage():
         cur = con.cursor()
 
         # 全体集計
-        cur.execute("SELECT COUNT(*) FROM award_books WHERE status='確認済'")
-        total = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM award_books WHERE status='確認済' AND plam_work_id IS NOT NULL")
-        linked = cur.fetchone()[0]
+        try:
+            cur.execute("SELECT COUNT(*) FROM award_books WHERE status='確認済'")
+            total = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM award_books WHERE status='確認済' AND plam_work_id IS NOT NULL")
+            linked = cur.fetchone()[0]
+        except Exception:
+            return jsonify({"total": 0, "linked": 0, "coverage": 0, "by_award": [], "unlinked_sample": [], "history": []})
 
         # 賞別集計
         cur.execute("""

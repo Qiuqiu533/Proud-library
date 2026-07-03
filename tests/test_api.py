@@ -867,3 +867,161 @@ def test_issues_reorder_ok(client):
     res = client.post("/api/issues/reorder", json={"order": order}, headers=BOARD_H)
     assert res.status_code == 200
     assert res.get_json().get("ok")
+
+
+# ── loans.py カバレッジ補強 ──────────────────────────────────────────────────
+
+def test_library_info(client):
+    """GET /api/library-info が図書館情報を返す"""
+    res = client.get("/api/library-info")
+    assert res.status_code == 200
+    assert isinstance(res.get_json(), dict)
+
+
+def test_availability_cached_empty(client):
+    """ISBNパラメータなしは空オブジェクトを返す"""
+    res = client.get("/api/availability/cached")
+    assert res.status_code == 200
+    assert res.get_json() == {}
+
+
+def test_dashboard_no_auth(client):
+    """認証なしのダッシュボードデータは 401"""
+    res = client.get("/api/admin/dashboard-data")
+    assert res.status_code == 401
+
+
+def test_dashboard_with_auth(client):
+    """正しい認証でダッシュボードデータが取得できる"""
+    res = client.get("/api/admin/dashboard-data", headers=BOARD_H)
+    assert res.status_code == 200
+    data = res.get_json()
+    assert "requests" in data
+    assert "issues" in data
+    assert "total_books" in data
+
+
+def test_db_size_no_auth(client):
+    """認証なしのDB容量確認は 401"""
+    res = client.get("/api/admin/db-size")
+    assert res.status_code == 401
+
+
+def test_members_no_auth(client):
+    """認証なしの会員一覧は 401"""
+    res = client.get("/api/admin/members")
+    assert res.status_code == 401
+
+
+def test_members_with_auth(client):
+    """正しい認証で会員一覧が取得できる"""
+    res = client.get("/api/admin/members", headers=BOARD_H)
+    assert res.status_code == 200
+    assert isinstance(res.get_json(), list)
+
+
+# ── plam.py カバレッジ補強 ──────────────────────────────────────────────────
+
+def test_plam_network(client):
+    """GET /api/plam/network が200を返す"""
+    res = client.get("/api/plam/network")
+    assert res.status_code == 200
+
+
+def test_plam_bridge_works(client):
+    """GET /api/plam/bridge-works が200を返す"""
+    res = client.get("/api/plam/bridge-works")
+    assert res.status_code == 200
+
+
+def test_plam_related_no_work_id(client):
+    """work_idなしは 400"""
+    res = client.get("/api/plam/related")
+    assert res.status_code == 400
+
+
+def test_plam_related_with_work_id(client):
+    """work_id指定で200を返す"""
+    res = client.get("/api/plam/related?work_id=test_id")
+    assert res.status_code == 200
+
+
+def test_plam_my_no_room(client):
+    """roomなしは 400"""
+    res = client.get("/api/plam/my")
+    assert res.status_code == 400
+
+
+def test_plam_my_with_room(client):
+    """room指定で200を返す（データなしはnull）"""
+    res = client.get("/api/plam/my?room=1-101")
+    assert res.status_code == 200
+
+
+def test_plam_coverage_no_auth(client):
+    """認証なしのPLAMカバレッジは 401"""
+    res = client.get("/api/plam/coverage")
+    assert res.status_code == 401
+
+
+def test_plam_coverage_with_auth(client):
+    """正しい認証でPLAMカバレッジが取得できる"""
+    res = client.get("/api/plam/coverage", headers=BOARD_H)
+    assert res.status_code == 200
+    data = res.get_json()
+    assert "total" in data
+    assert "linked" in data
+
+
+# ── timeline.py カバレッジ補強 ──────────────────────────────────────────────
+
+def test_timeline_list(client):
+    """GET /api/timeline が200を返す"""
+    res = client.get("/api/timeline")
+    assert res.status_code == 200
+    assert isinstance(res.get_json(), list)
+
+
+def test_timeline_post_no_auth(client):
+    """認証なしのタイムライン投稿は 401"""
+    res = client.post("/api/timeline",
+                      json={"isbn": "9784000000000", "title": "テスト本", "status": "読んだ"})
+    assert res.status_code == 401
+
+
+def test_timeline_post_invalid_status(client):
+    """不正なステータスは 400"""
+    client.post("/api/user/register",
+                json={"room": "3-101", "password": "testpass1", "email": "t3101@example.com"})
+    res = client.post("/api/timeline",
+                      json={"isbn": "9784000000000", "title": "テスト本",
+                            "status": "不正ステータス", "room": "3-101", "password": "testpass1"})
+    assert res.status_code == 400
+
+
+def test_timeline_post_and_delete_ok(client):
+    """タイムライン投稿→削除の正常系"""
+    client.post("/api/user/register",
+                json={"room": "3-102", "password": "testpass1", "email": "t3102@example.com"})
+    res = client.post("/api/timeline",
+                      json={"isbn": "9784000000099", "title": "タイムラインテスト本",
+                            "author": "著者", "status": "読んだ", "comment": "良かった",
+                            "room": "3-102", "password": "testpass1"})
+    assert res.status_code == 200
+    assert res.get_json().get("ok")
+
+    timeline = client.get("/api/timeline").get_json()
+    post = next((p for p in timeline if p["isbn"] == "9784000000099"), None)
+    assert post is not None
+    post_id = post["id"]
+
+    res2 = client.delete(f"/api/timeline/{post_id}",
+                         json={"room": "3-102", "password": "testpass1"})
+    assert res2.status_code == 200
+    assert res2.get_json().get("ok")
+
+
+def test_timeline_delete_no_auth(client):
+    """認証なしの削除は 401"""
+    res = client.delete("/api/timeline/9999", json={})
+    assert res.status_code == 401
