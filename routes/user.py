@@ -434,6 +434,80 @@ def api_delete_wishlist():
     return jsonify({"ok": True})
 
 
+# --- My Loans（自己申告貸出・返却リマインダー） ---
+@user_bp.route("/api/my-loans")
+def api_get_my_loans():
+    room     = request.args.get("room", "").strip()
+    password = request.headers.get("X-Password", "").strip()
+    if not room or not password:
+        return jsonify({"error": "unauthorized"}), 401
+    authed = _wish_auth({"room": room, "password": password})
+    if not authed:
+        return jsonify({"error": "unauthorized"}), 401
+    con = get_con()
+    items = fetchall(con, "SELECT isbn, title, author, due_date, created_at FROM my_loans WHERE room=? AND returned_at IS NULL ORDER BY due_date ASC", (room,))
+    con.close()
+    return jsonify([{**r, "due_date": str(r["due_date"])[:10] if r.get("due_date") else None} for r in items])
+
+
+@user_bp.route("/api/my-loans", methods=["POST"])
+def api_upsert_my_loan():
+    """借りた本を登録・返却期限を更新する（「借り中」ステータス保存時に呼ばれる）"""
+    body = request.get_json() or {}
+    room = _wish_auth(body)
+    if not room:
+        return jsonify({"error": "unauthorized"}), 401
+    isbn = (body.get("isbn") or "").strip()
+    due_date = (body.get("due_date") or "").strip()
+    title = (body.get("title") or "").strip()
+    author = (body.get("author") or "").strip()
+    if not isbn or not due_date:
+        return jsonify({"error": "isbn and due_date required"}), 400
+    con = get_con()
+    try:
+        if USE_PG:
+            execute(con, """
+                INSERT INTO my_loans (room, isbn, title, author, due_date, reminder_sent_at, returned_at)
+                VALUES (?,?,?,?,?,NULL,NULL)
+                ON CONFLICT (room, isbn) DO UPDATE SET
+                    title=EXCLUDED.title, author=EXCLUDED.author, due_date=EXCLUDED.due_date,
+                    reminder_sent_at=NULL, returned_at=NULL
+            """, (room, isbn, title, author, due_date))
+        else:
+            execute(con, """
+                INSERT INTO my_loans (room, isbn, title, author, due_date, reminder_sent_at, returned_at)
+                VALUES (?,?,?,?,?,NULL,NULL)
+                ON CONFLICT (room, isbn) DO UPDATE SET
+                    title=excluded.title, author=excluded.author, due_date=excluded.due_date,
+                    reminder_sent_at=NULL, returned_at=NULL
+            """, (room, isbn, title, author, due_date))
+        con.commit()
+        con.close()
+        return jsonify({"ok": True})
+    except Exception:
+        con.close()
+        return jsonify({"error": "db error"}), 500
+
+
+@user_bp.route("/api/my-loans/return", methods=["PATCH"])
+def api_return_my_loan():
+    """返却済みにする（読書ステータスを「借り中」から他に変更/解除した際に呼ばれる）"""
+    body = request.get_json() or {}
+    room = _wish_auth(body)
+    if not room:
+        return jsonify({"error": "unauthorized"}), 401
+    isbn = (body.get("isbn") or "").strip()
+    if not isbn:
+        return jsonify({"error": "isbn required"}), 400
+    con = get_con()
+    if USE_PG:
+        execute(con, "UPDATE my_loans SET returned_at=NOW() WHERE room=%s AND isbn=%s", (room, isbn))
+    else:
+        execute(con, "UPDATE my_loans SET returned_at=CURRENT_TIMESTAMP WHERE room=? AND isbn=?", (room, isbn))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+
 @user_bp.route("/api/admin/reset-user-password", methods=["POST"])
 @rate_limit(limit=20, window=60)
 def api_admin_reset_user_password():

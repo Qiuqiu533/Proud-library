@@ -1,0 +1,31 @@
+name: 返却リマインダー
+
+on:
+  schedule:
+    - cron: "0 22 * * *"
+  workflow_dispatch:
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Python セットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 依存パッケージインストール
+        run: pip install psycopg2-binary
+
+      - name: 返却リマインダースクリプト実行
+        env:
+          DATABASE_URL:        ${{ secrets.DATABASE_URL }}
+          BREVO_SMTP_PASSWORD: ${{ secrets.BREVO_SMTP_PASSWORD }}
+          BREVO_SMTP_USER:     ${{ secrets.BREVO_SMTP_USER }}
+          NOTIFY_FROM_EMAIL:   ${{ secrets.NOTIFY_FROM_EMAIL }}
+          APP_BASE_URL:        ${{ secrets.APP_BASE_URL }}
+        run: python remind_due.py

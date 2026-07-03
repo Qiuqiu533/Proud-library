@@ -1,8 +1,8 @@
-name: DB週次バックアップ（Neon → GitHub Artifacts）
+name: DB日次バックアップ（Neon → GitHub Artifacts）
 
 on:
   schedule:
-    - cron: "0 20 * * 0"  # 毎週日曜 JST 05:00（UTC 20:00）
+    - cron: "0 20 * * *"  # 毎日 JST 05:00（UTC 20:00）
   workflow_dispatch:       # 手動実行も可能
 
 jobs:

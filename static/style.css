@@ -1035,6 +1035,15 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 
 .card-helpful { font-size: 0.78rem; color: #888; margin-left: 6px; vertical-align: middle; }
 
+.read-meta-public-toggle { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: #666; margin: 8px 0; cursor: pointer; }
+.read-meta-public-toggle input { cursor: pointer; }
+
+/* ===== お気に入りへのメモ ===== */
+.fav-memo-wrap { margin-top: 8px; position: relative; }
+.fav-memo-input { width: 100%; box-sizing: border-box; border: 1px solid #ddd; border-radius: 6px; padding: 6px 8px; font-size: 0.78rem; resize: vertical; min-height: 32px; font-family: inherit; color: #444; }
+.fav-memo-input:focus { outline: none; border-color: #3d6b4f; }
+.fav-memo-saved { font-size: 0.7rem; color: #2a7; display: block; margin-top: 2px; }
+
 /* ===== 文学賞ガイド ===== */
 .award-guide-wrap { border: 1px solid #d4c9a8; border-radius: 10px; background: #fdfaf3; margin-bottom: 16px; }
 .award-guide-summary { padding: 12px 16px; font-size: 0.9rem; font-weight: 700; color: #5a4a1a; cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; }
