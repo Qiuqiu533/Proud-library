@@ -696,7 +696,7 @@ function renderCard(book, opts = {}) {
       <div class="book-title">${esc(book.title)}</div>
       <div class="book-author author-link" data-author="${esc(book.author||"")}">${esc(book.author) || "著者不明"}</div>
       <div class="book-meta">${esc(book.publisher || "")}</div>
-      <div class="card-stars">${starsHtml(rating.score)}</div>
+      <div class="card-stars">${starsHtml(rating.score)}${book.helpful_count > 0 ? `<span class="card-helpful" title="参考になった数">👍${book.helpful_count}</span>` : ""}</div>
       <div class="avail-status" id="avail-${book.isbn}"></div>
       ${renderAwardBadges(book.awards)}
     </div>`;
@@ -2112,7 +2112,7 @@ document.getElementById("searchInput").addEventListener("keydown", e => {
   let _timer = null, _active = -1;
   const _box = document.createElement("div");
   _box.id = "suggestBox";
-  _box.style.cssText = "position:absolute;background:#fff;border:1px solid #c8dcc0;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.12);z-index:9999;max-width:480px;width:100%;display:none;overflow:hidden";
+  _box.style.cssText = "position:absolute;background:#fff;color:#222;border:1px solid #c8dcc0;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.12);z-index:9999;max-width:480px;width:100%;display:none;overflow:hidden";
   inp.parentNode.style.position = "relative";
   inp.parentNode.appendChild(_box);
   window._hideSuggest = () => { _box.style.display = "none"; _active = -1; };
@@ -4229,7 +4229,8 @@ async function loadReqManage() {
     <div class="req-sum-box"><div class="req-sum-num" style="color:#c00">${cnt.rejected}</div><div class="req-sum-lbl">❌ 見送り</div></div>
     <div class="req-sum-box"><div class="req-sum-num" style="color:#555">${cnt.done}</div><div class="req-sum-lbl">📦 入荷済</div></div>
     <div class="req-sum-box" style="border-left:2px solid #e0e0e0;padding-left:12px;margin-left:4px"><div class="req-sum-num" style="color:#5b8dd9">${fbTotal}</div><div class="req-sum-lbl">💬 ご要望</div></div>
-    <div class="req-sum-box"><div class="req-sum-num" style="color:#3d8a4f">${fbDone}</div><div class="req-sum-lbl">✅ 対応済</div></div>`;
+    <div class="req-sum-box"><div class="req-sum-num" style="color:#3d8a4f">${fbDone}</div><div class="req-sum-lbl">✅ 対応済</div></div>
+    <button onclick="exportRequestsCsv()" style="margin-left:auto;padding:5px 12px;border:1.5px solid #3d6b4f;border-radius:8px;background:#fff;color:#3d6b4f;font-size:0.78rem;cursor:pointer;font-weight:600;">📥 CSV</button>`;
 
   const books = items.filter(r => r.type !== "feedback");
   const fbs = items.filter(r => r.type === "feedback");
@@ -7570,3 +7571,148 @@ function openGoalEdit() {
   setReadingGoal(year, n);
   renderReadingGoal();
 }
+
+// ===== 検索履歴 =====
+(function _initSearchHistory() {
+  const HISTORY_KEY = "search_history";
+  const MAX = 6;
+  function getHistory() { try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]"); } catch { return []; } }
+  function saveHistory(kw) {
+    if (!kw || kw.length < 2) return;
+    let h = getHistory().filter(s => s !== kw);
+    h.unshift(kw);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, MAX)));
+  }
+  function showHistory() {
+    const inp = document.getElementById("searchInput");
+    if (!inp) return;
+    const h = getHistory();
+    if (!h.length) return;
+    const box = document.getElementById("suggestBox");
+    if (!box) return;
+    box.innerHTML = `<div style="font-size:0.75rem;color:#aaa;padding:6px 14px 2px">最近の検索</div>` +
+      h.map(kw => `<div class="suggest-item" data-title="${esc(kw)}" style="padding:8px 14px;cursor:pointer;border-bottom:1px solid #f0ede8;font-size:0.87rem">
+        <span style="color:#888;margin-right:6px">🕒</span>${esc(kw)}
+      </div>`).join("");
+    box.querySelectorAll(".suggest-item").forEach(el => {
+      el.addEventListener("mousedown", () => {
+        inp.value = el.dataset.title;
+        window._hideSuggest && window._hideSuggest();
+        switchToBooksAndSearch(inp.value);
+      });
+    });
+    box.style.display = "block";
+  }
+  const origSwitch = window.switchToBooksAndSearch;
+  window.switchToBooksAndSearch = function(kw) {
+    saveHistory(kw.trim());
+    return origSwitch(kw);
+  };
+  const inp = document.getElementById("searchInput");
+  if (inp) {
+    inp.addEventListener("focus", () => {
+      if (!inp.value.trim()) showHistory();
+    });
+  }
+})();
+
+// ===== パスワード強度チェック =====
+(function _initPasswordStrength() {
+  const passEl = document.getElementById("regPass");
+  if (!passEl) return;
+  const bar = document.createElement("div");
+  bar.id = "pwStrengthBar";
+  bar.style.cssText = "height:4px;border-radius:4px;margin-top:4px;transition:all .3s;background:#eee;";
+  const label = document.createElement("div");
+  label.style.cssText = "font-size:0.72rem;color:#888;margin-top:2px;height:14px;";
+  passEl.insertAdjacentElement("afterend", label);
+  passEl.insertAdjacentElement("afterend", bar);
+  passEl.addEventListener("input", () => {
+    const pw = passEl.value;
+    let score = 0;
+    if (pw.length >= 8) score++;
+    if (pw.length >= 12) score++;
+    if (/[A-Z]/.test(pw)) score++;
+    if (/[0-9]/.test(pw)) score++;
+    if (/[^A-Za-z0-9]/.test(pw)) score++;
+    const colors = ["#eee","#e05050","#e08a00","#e0c000","#5ba85a","#3d6b4f"];
+    const labels = ["","弱い","やや弱い","普通","強い","とても強い"];
+    const widths  = ["0%","20%","40%","60%","80%","100%"];
+    bar.style.width = widths[score] || "0%";
+    bar.style.background = colors[score] || "#eee";
+    label.textContent = labels[score] || "";
+    label.style.color = colors[score] || "#888";
+  });
+})();
+
+// ===== 読書記録 CSVエクスポート =====
+async function exportReadingLogCsv() {
+  const entries = getLogEntries();
+  if (!entries.length) { showToast("読書記録がありません", "warn"); return; }
+  let rows = [["ISBN", "タイトル", "著者", "ステータス", "読んだ日", "メモ"]];
+  try {
+    const res = await fetch(`/api/books/batch?isbns=${entries.map(e => e.isbn).join(",")}`);
+    const books = await res.json();
+    const bookMap = Object.fromEntries(books.filter(Boolean).map(b => [b.isbn, b]));
+    for (const e of entries) {
+      const b = bookMap[e.isbn] || {};
+      const m = getReadMeta(e.isbn);
+      rows.push([e.isbn, b.title || "", b.author || "", e.status, m.date || "", m.memo || ""]);
+    }
+  } catch {
+    for (const e of entries) {
+      const m = getReadMeta(e.isbn);
+      rows.push([e.isbn, "", "", e.status, m.date || "", m.memo || ""]);
+    }
+  }
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `読書記録_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
+// ===== 管理者 リクエストCSVエクスポート =====
+async function exportRequestsCsv() {
+  const pw = boardPassword;
+  if (!pw) { showToast("理事会パスワードが必要です", "warn"); return; }
+  const url = `/api/admin/requests-csv?password=${encodeURIComponent(pw)}`;
+  const a = document.createElement("a");
+  a.href = url; a.download = `リクエスト一覧_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+// ===== 管理者 蔵書CSVエクスポート =====
+async function exportBooksCsv() {
+  const pw = boardPassword;
+  if (!pw) { showToast("理事会パスワードが必要です", "warn"); return; }
+  const url = `/api/admin/books-csv?password=${encodeURIComponent(pw)}`;
+  const a = document.createElement("a");
+  a.href = url; a.download = `蔵書一覧_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+// ===== フローティング「リクエストする」ボタン =====
+function switchToRequestTab() {
+  document.querySelectorAll(".tab-btn").forEach(b => { b.classList.remove("active"); b.setAttribute("aria-selected", "false"); });
+  document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+  const btn = document.querySelector('.tab-btn[data-tab="request"]');
+  const panel = document.getElementById("tab-request");
+  if (btn) { btn.classList.add("active"); btn.setAttribute("aria-selected", "true"); }
+  if (panel) { panel.classList.add("active"); panel.scrollIntoView({ behavior: "smooth", block: "start" }); }
+}
+
+// ===== 読書記録タブのCSVボタン =====
+(function _initLogCsvBtn() {
+  const logSection = document.getElementById("tab-log");
+  if (!logSection) return;
+  const btn = document.createElement("button");
+  btn.id = "logCsvBtn";
+  btn.textContent = "📥 CSVエクスポート";
+  btn.style.cssText = "margin:8px 0 0 0;padding:6px 14px;border:1.5px solid #3d6b4f;border-radius:8px;background:#fff;color:#3d6b4f;font-size:0.82rem;cursor:pointer;font-weight:600;";
+  btn.onclick = exportReadingLogCsv;
+  const firstEl = logSection.querySelector(".log-stats, .log-filter-bar, #logCharts");
+  if (firstEl) firstEl.insertAdjacentElement("beforebegin", btn);
+  else logSection.insertAdjacentElement("afterbegin", btn);
+})();

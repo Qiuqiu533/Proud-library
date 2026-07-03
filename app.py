@@ -1,7 +1,7 @@
 import os
 import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
-from flask import Flask, request
+from flask import Flask, request, jsonify
 
 _SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
 if _SENTRY_DSN:
@@ -13,6 +13,13 @@ if _SENTRY_DSN:
     )
 
 app = Flask(__name__)
+
+# ── Gzip圧縮 ───────────────────────────────────────────────────────────────
+try:
+    from flask_compress import Compress
+    Compress(app)
+except ImportError:
+    pass
 
 # ── Blueprint登録 ──────────────────────────────────────────────────────────
 from routes.pages import pages_bp
@@ -89,6 +96,18 @@ def set_security_headers(response):
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
     return response
+
+
+@app.errorhandler(404)
+def not_found(e):
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "not found"}), 404
+    return jsonify({"error": "not found"}), 404
+
+
+@app.errorhandler(500)
+def server_error(e):
+    return jsonify({"error": "internal server error"}), 500
 
 
 if __name__ == "__main__":

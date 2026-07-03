@@ -2034,6 +2034,7 @@ def _run_all_migrations():
         _migrate_loan_history,             # 貸出履歴テーブル追加
         _migrate_sync_plam_to_award_books, # PLAM CSV → award_books 同期
         _migrate_fetch_isbn_ndl,           # NDL API で isbn13 補完（バックグラウンド）
+        _migrate_db_indices,               # パフォーマンス用インデックス
         _verify_tables,
     ]
     for step in steps:
@@ -2041,6 +2042,33 @@ def _run_all_migrations():
             step()
         except Exception as e:
             logger.error(f"[migration error] {step.__name__}: %s", e)
+
+
+def _migrate_db_indices():
+    """パフォーマンス改善用インデックスを追加する"""
+    try:
+        con = get_con()
+        indices = [
+            "CREATE INDEX IF NOT EXISTS idx_genre_books_genre ON genre_books(genre)",
+            "CREATE INDEX IF NOT EXISTS idx_requests_status ON book_requests(status)",
+            "CREATE INDEX IF NOT EXISTS idx_requests_type ON book_requests(type)",
+        ]
+        for sql in indices:
+            try:
+                if USE_PG:
+                    cur = con.cursor()
+                    cur.execute(sql)
+                else:
+                    con.execute(sql)
+                con.commit()
+            except Exception:
+                try:
+                    con.rollback()
+                except Exception:
+                    pass
+        con.close()
+    except Exception as e:
+        logger.error("[migration] _migrate_db_indices: %s", e)
 
 
 def _ensure_db():

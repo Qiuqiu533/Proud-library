@@ -1,5 +1,6 @@
 from __future__ import annotations
 import os
+import time
 from contextlib import contextmanager
 from typing import Any, Iterator
 
@@ -61,7 +62,17 @@ def get_con() -> Any:
     teardown_appcontext（app.py側）でリクエスト終了時に自動返却される。
     """
     if USE_PG:
-        con = _PooledConnection(_get_pool().getconn())
+        last_err = None
+        for attempt in range(3):
+            try:
+                con = _PooledConnection(_get_pool().getconn())
+                break
+            except Exception as e:
+                last_err = e
+                if attempt < 2:
+                    time.sleep(0.3 * (attempt + 1))
+        else:
+            raise last_err
     else:
         con = sqlite3.connect(DB_PATH)
         con.row_factory = sqlite3.Row
