@@ -1025,3 +1025,62 @@ def test_timeline_delete_no_auth(client):
     """認証なしの削除は 401"""
     res = client.delete("/api/timeline/9999", json={})
     assert res.status_code == 401
+
+
+# ===== マイ貸出リスト（返却リマインダー） =====
+
+def test_my_loans_get_no_auth(client):
+    """認証なしの取得は 401"""
+    res = client.get("/api/my-loans?room=1-101")
+    assert res.status_code == 401
+
+
+def test_my_loans_post_no_auth(client):
+    """認証なしの登録は 401"""
+    res = client.post("/api/my-loans", json={"isbn": "9784000000001", "due_date": "2099-01-01"})
+    assert res.status_code == 401
+
+
+def test_my_loans_post_missing_fields(client):
+    """isbn/due_date欠如は 400"""
+    client.post("/api/user/register", json={"room": "4-101", "password": "testpass1", "email": "t4101@example.com"})
+    res = client.post("/api/my-loans", json={"room": "4-101", "password": "testpass1"})
+    assert res.status_code == 400
+
+
+def test_my_loans_upsert_and_get(client):
+    """借りた本の登録→一覧取得の正常系"""
+    client.post("/api/user/register", json={"room": "4-102", "password": "testpass1", "email": "t4102@example.com"})
+    add = client.post("/api/my-loans", json={
+        "room": "4-102", "password": "testpass1", "isbn": "9784000000002",
+        "due_date": "2099-01-01", "title": "テスト本2", "author": "著者"
+    })
+    assert add.status_code == 200
+    assert add.get_json().get("ok")
+
+    get_res = client.get("/api/my-loans?room=4-102", headers={"X-Password": "testpass1"})
+    assert get_res.status_code == 200
+    items = get_res.get_json()
+    isbns = [i["isbn"] for i in items]
+    assert "9784000000002" in isbns
+
+
+def test_my_loans_return(client):
+    """返却済みマーク後は一覧に出てこない"""
+    client.post("/api/user/register", json={"room": "4-103", "password": "testpass1", "email": "t4103@example.com"})
+    client.post("/api/my-loans", json={
+        "room": "4-103", "password": "testpass1", "isbn": "9784000000003", "due_date": "2099-01-01"
+    })
+    ret = client.patch("/api/my-loans/return", json={"room": "4-103", "password": "testpass1", "isbn": "9784000000003"})
+    assert ret.status_code == 200
+    assert ret.get_json().get("ok")
+
+    get_res = client.get("/api/my-loans?room=4-103", headers={"X-Password": "testpass1"})
+    isbns = [i["isbn"] for i in get_res.get_json()]
+    assert "9784000000003" not in isbns
+
+
+def test_my_loans_return_no_auth(client):
+    """認証なしの返却は 401"""
+    res = client.patch("/api/my-loans/return", json={"isbn": "9784000000003"})
+    assert res.status_code == 401

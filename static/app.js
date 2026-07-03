@@ -570,6 +570,14 @@ function getFavIsbns() {
     .map(k => k.slice(4)).filter(isbn => /^\d{13}$/.test(isbn));
 }
 
+// ===== お気に入りへのメモ =====
+function _favMemoKey(isbn) { const r = _curRoom(); return r ? `favmemo_${r}_${isbn}` : `favmemo_${isbn}`; }
+function getFavMemo(isbn) { return localStorage.getItem(_favMemoKey(isbn)) || ""; }
+function setFavMemo(isbn, memo) {
+  if (memo) localStorage.setItem(_favMemoKey(isbn), memo);
+  else localStorage.removeItem(_favMemoKey(isbn));
+}
+
 function _curRoom() {
   return ((residentSession || getCloudUser()) || {}).room || "";
 }
@@ -578,9 +586,61 @@ function _metaKey(isbn) { const r = _curRoom(); return r ? `readmeta_${r}_${isbn
 
 function getReadStatus(isbn) { return localStorage.getItem(_readKey(isbn)) || ""; }
 function setReadStatus(isbn, status) {
+  const prevStatus = getReadStatus(isbn);
   if (status) localStorage.setItem(_readKey(isbn), status);
   else localStorage.removeItem(_readKey(isbn));
+  if (prevStatus === "借り中" && status !== "借り中") syncMyLoanReturn(isbn);
   setTimeout(cloudSync, 500);
+}
+
+// ===== マイ貸出リスト（返却期限リマインダー用サーバー同期） =====
+function _residentAuth() {
+  const u = residentSession || getCloudUser();
+  if (!u || !u.room) return null;
+  return { room: u.room, password: u.password || u.pin || "" };
+}
+async function syncMyLoan(isbn, due_date) {
+  const auth = _residentAuth();
+  if (!auth) return;
+  const title = (document.querySelector(".modal-header h2") || {}).textContent || "";
+  try {
+    await fetch("/api/my-loans", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...auth, isbn, due_date, title }),
+    });
+  } catch {}
+}
+async function syncMyLoanReturn(isbn) {
+  const auth = _residentAuth();
+  if (!auth) return;
+  try {
+    await fetch("/api/my-loans/return", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...auth, isbn }),
+    });
+  } catch {}
+}
+
+// ===== 読書メモを公開してタイムラインに投稿（非公開メモとの分離） =====
+async function publishMemoToTimeline(isbn, status, memo) {
+  const auth = _residentAuth();
+  if (!auth) return;
+  const title = (document.querySelector(".modal-header h2") || {}).textContent || "";
+  try {
+    const r = await fetch(`/api/book/${isbn}`);
+    const b = await r.json().catch(() => ({}));
+    await fetch("/api/timeline", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...auth, isbn, title: title || b.title || "", author: b.author || "", cover: b.cover || "",
+        status: status || "読書中", comment: memo.slice(0, 200),
+      }),
+    });
+    showToast("読書タイムラインにも公開しました", "info");
+  } catch {}
 }
 function getLogEntries() {
   const prefix = (() => { const r = _curRoom(); return r ? `read_${r}_` : `read_`; })();
@@ -1172,6 +1232,38 @@ async function loadFavorites() {
   const res = await fetch(`/api/books/batch?isbns=${isbns.join(",")}`);
   const books = await res.json();
   renderGrid("favGrid", books.filter(Boolean));
+  _initFavMemoUI();
+}
+
+function _initFavMemoUI() {
+  const grid = document.getElementById("favGrid");
+  if (!grid) return;
+  grid.querySelectorAll(".book-card").forEach(card => {
+    const favBtn = card.querySelector(".fav-btn");
+    const isbn = favBtn ? favBtn.dataset.isbn : "";
+    if (!isbn) return;
+    const wrap = document.createElement("div");
+    wrap.className = "fav-memo-wrap";
+    const existing = getFavMemo(isbn);
+    wrap.innerHTML = `
+      <textarea class="fav-memo-input" maxlength="200" placeholder="メモを追加（一言・保管場所など）">${esc(existing)}</textarea>
+      <span class="fav-memo-saved" style="display:none">保存しました</span>
+    `;
+    const info = card.querySelector(".book-info");
+    if (info) info.appendChild(wrap);
+    const textarea = wrap.querySelector(".fav-memo-input");
+    const savedLabel = wrap.querySelector(".fav-memo-saved");
+    let timer = null;
+    textarea.addEventListener("click", e => e.stopPropagation());
+    textarea.addEventListener("input", () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        setFavMemo(isbn, textarea.value.trim());
+        savedLabel.style.display = "inline";
+        setTimeout(() => { savedLabel.style.display = "none"; }, 1500);
+      }, 600);
+    });
+  });
 }
 
 // ===== Reading log =====
@@ -1614,6 +1706,11 @@ function _renderModalContent(isbn, book, rating) {
         <button class="wish-btn-large" data-isbn="${isbn}" style="margin-top:6px;width:100%;padding:10px 14px;border-radius:20px;border:1.5px solid #5b8dd9;background:#f0f5ff;color:#3a6aaa;font-size:0.9rem;font-weight:700;cursor:pointer">
           📚 読みたいリストに追加
         </button>
+        ${boardPassword ? `
+        <button class="book-qr-btn" data-isbn="${isbn}" style="margin-top:6px;width:100%;padding:8px 14px;border-radius:20px;border:1.5px solid #999;background:#fafafa;color:#555;font-size:0.82rem;font-weight:600;cursor:pointer">
+          🏷️ この本のQRコードシールを表示（管理者用）
+        </button>
+        <div id="bookQrPreview" style="display:none;text-align:center;margin-top:8px"></div>` : ''}
       </div>
     </div>
 
@@ -1639,10 +1736,14 @@ function _renderModalContent(isbn, book, rating) {
           <input type="date" id="readMetaDate" class="read-meta-date" value="${m.date || ''}" max="${new Date().toISOString().slice(0,10)}">
         </div>`}
         <div class="read-meta-row">
-          <label class="read-meta-label">✏️ 読書感想</label>
+          <label class="read-meta-label">✏️ 読書感想（非公開・自分だけ見られます）</label>
           <textarea id="readMetaMemo" class="read-meta-memo" rows="3" maxlength="300" placeholder="感想を入力（300文字まで）">${esc(m.memo || '')}</textarea>
           <div class="read-meta-count" id="readMetaCount">${(m.memo || '').length}/300文字</div>
         </div>
+        <label class="read-meta-public-toggle">
+          <input type="checkbox" id="readMetaPublic">
+          📣 この感想をみんなの読書タイムラインにも公開する
+        </label>
         <button class="btn-primary read-meta-save" id="readMetaSave">💾 保存</button>
         <span class="read-meta-saved" id="readMetaSaved" style="display:none;color:#2a7;font-size:0.85rem;margin-left:8px">保存しました</span>
       </div>`; })() : ''}
@@ -1780,6 +1881,8 @@ function _bindModalEvents(isbn) {
     e.currentTarget.textContent = active ? "❤️ お気に入り済み" : "🤍 お気に入りに追加";
   });
   _initWishBtn(isbn);
+  const qrBtn = document.querySelector(".book-qr-btn");
+  if (qrBtn) qrBtn.addEventListener("click", () => showBookQr(isbn));
   document.querySelectorAll(".read-status-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       setReadStatus(isbn, btn.dataset.status);
@@ -1797,8 +1900,11 @@ function _bindModalEvents(isbn) {
       const date = (document.getElementById("readMetaDate") || {}).value || "";
       const due_date = (document.getElementById("readDueDate") || {}).value || "";
       const memo = memoEl ? memoEl.value : "";
+      const publicEl = document.getElementById("readMetaPublic");
+      const status = getReadStatus(isbn);
       setReadMeta(isbn, date, memo, due_date || undefined);
-      if (due_date) setDueDate(isbn, due_date);
+      if (due_date) { setDueDate(isbn, due_date); syncMyLoan(isbn, due_date); }
+      if (publicEl && publicEl.checked && memo.trim()) publishMemoToTimeline(isbn, status, memo);
       checkLoanReminders();
       const saved = document.getElementById("readMetaSaved");
       if (saved) { saved.style.display = "inline"; setTimeout(() => { saved.style.display = "none"; }, 2000); }
@@ -3789,6 +3895,16 @@ loadCollections();
 loadHomeEvents();
 loadTopNew();
 loadReqList();
+_openBookFromUrlParam();
+
+// ===== QRコード等からのディープリンク（?book=<isbn>）で本詳細を直接開く =====
+function _openBookFromUrlParam() {
+  const params = new URLSearchParams(window.location.search);
+  const isbn = (params.get("book") || "").trim();
+  if (!isbn || !/^\d{10,13}$/.test(isbn)) return;
+  window.history.replaceState({}, "", "/");
+  setTimeout(() => openModal(isbn), 300);
+}
 renderRecentBooks();
 applyTopSectionsState();
 applyFilterRowsState();
@@ -7716,3 +7832,107 @@ function switchToRequestTab() {
   if (firstEl) firstEl.insertAdjacentElement("beforebegin", btn);
   else logSection.insertAdjacentElement("afterbegin", btn);
 })();
+
+// ===== QRコードポスター生成（管理者向け） =====
+function generateQrPoster() {
+  const title = (document.getElementById("qrPosterTitle")?.value || "").trim() || "プラウド船橋コミュニティ図書館";
+  const subtitle = (document.getElementById("qrPosterSubtitle")?.value || "").trim();
+  const url = window.location.origin;
+  const canvas = document.getElementById("qrPosterCanvas");
+  const wrap = document.getElementById("qrPosterPreviewWrap");
+  if (!canvas || typeof QRCode === "undefined") { showToast("QRコード生成に失敗しました", "warn"); return; }
+
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#3d6b4f";
+  ctx.fillRect(0, 0, W, 16);
+
+  ctx.fillStyle = "#222";
+  ctx.textAlign = "center";
+  ctx.font = "bold 54px sans-serif";
+  _wrapText(ctx, title, W / 2, 150, W - 100, 64);
+
+  if (subtitle) {
+    ctx.font = "32px sans-serif";
+    ctx.fillStyle = "#666";
+    ctx.fillText(subtitle, W / 2, 260);
+  }
+
+  const qrHolder = document.createElement("div");
+  new QRCode(qrHolder, { text: url, width: 480, height: 480, correctLevel: QRCode.CorrectLevel.M });
+  setTimeout(() => {
+    const qrImg = qrHolder.querySelector("img") || qrHolder.querySelector("canvas");
+    const qrSize = 480, qrX = (W - qrSize) / 2, qrY = 340;
+    const drawRestAndFinish = () => {
+      ctx.font = "28px monospace";
+      ctx.fillStyle = "#444";
+      ctx.fillText(url, W / 2, qrY + qrSize + 60);
+      ctx.font = "24px sans-serif";
+      ctx.fillStyle = "#999";
+      ctx.fillText("スマホのカメラでQRコードを読み取ってアクセス", W / 2, qrY + qrSize + 110);
+      wrap.style.display = "block";
+    };
+    if (qrImg && qrImg.tagName === "IMG") {
+      const img = new Image();
+      img.onload = () => { ctx.drawImage(img, qrX, qrY, qrSize, qrSize); drawRestAndFinish(); };
+      img.src = qrImg.src;
+    } else if (qrImg) {
+      ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+      drawRestAndFinish();
+    }
+  }, 100);
+}
+
+function _wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+  const chars = text.split("");
+  let line = "";
+  let curY = y;
+  for (let i = 0; i < chars.length; i++) {
+    const test = line + chars[i];
+    if (ctx.measureText(test).width > maxWidth && line) {
+      ctx.fillText(line, x, curY);
+      line = chars[i];
+      curY += lineHeight;
+    } else {
+      line = test;
+    }
+  }
+  if (line) ctx.fillText(line, x, curY);
+}
+
+function downloadQrPoster() {
+  const canvas = document.getElementById("qrPosterCanvas");
+  if (!canvas) return;
+  const a = document.createElement("a");
+  a.href = canvas.toDataURL("image/png");
+  a.download = `QRポスター_${new Date().toISOString().slice(0,10)}.png`;
+  a.click();
+}
+
+// ===== 個別書籍QR（棚シール用・管理者向け） =====
+function showBookQr(isbn) {
+  const preview = document.getElementById("bookQrPreview");
+  if (!preview || typeof QRCode === "undefined") return;
+  preview.style.display = "block";
+  preview.innerHTML = "";
+  const holder = document.createElement("div");
+  preview.appendChild(holder);
+  const url = `${window.location.origin}/?book=${isbn}`;
+  new QRCode(holder, { text: url, width: 160, height: 160, correctLevel: QRCode.CorrectLevel.M });
+  const dlBtn = document.createElement("button");
+  dlBtn.textContent = "📥 このQRを画像で保存";
+  dlBtn.style.cssText = "display:block;margin:8px auto 0;padding:5px 12px;font-size:0.78rem;border:1px solid #999;border-radius:6px;background:#fff;cursor:pointer";
+  dlBtn.onclick = () => {
+    setTimeout(() => {
+      const img = holder.querySelector("img") || holder.querySelector("canvas");
+      const a = document.createElement("a");
+      a.href = img.tagName === "IMG" ? img.src : img.toDataURL("image/png");
+      a.download = `本QR_${isbn}.png`;
+      a.click();
+    }, 50);
+  };
+  preview.appendChild(dlBtn);
+}

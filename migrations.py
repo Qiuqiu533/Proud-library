@@ -2035,6 +2035,7 @@ def _run_all_migrations():
         _migrate_sync_plam_to_award_books, # PLAM CSV → award_books 同期
         _migrate_fetch_isbn_ndl,           # NDL API で isbn13 補完（バックグラウンド）
         _migrate_db_indices,               # パフォーマンス用インデックス
+        _migrate_my_loans,                 # マイ貸出リスト（返却リマインダー用）
         _verify_tables,
     ]
     for step in steps:
@@ -2042,6 +2043,53 @@ def _run_all_migrations():
             step()
         except Exception as e:
             logger.error(f"[migration error] {step.__name__}: %s", e)
+
+
+def _migrate_my_loans():
+    """my_loans テーブルを追加（住民の自己申告貸出・返却期限リマインダー用）。"""
+    if _migration_done("my_loans_v1"):
+        return
+    con = get_con()
+    try:
+        if USE_PG:
+            cur = con.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS my_loans (
+                    id SERIAL PRIMARY KEY,
+                    room TEXT NOT NULL,
+                    isbn TEXT NOT NULL,
+                    title TEXT,
+                    author TEXT,
+                    due_date DATE,
+                    reminder_sent_at TIMESTAMPTZ,
+                    returned_at TIMESTAMPTZ,
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    UNIQUE(room, isbn)
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_my_loans_due ON my_loans(due_date) WHERE returned_at IS NULL")
+        else:
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS my_loans (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    room TEXT NOT NULL,
+                    isbn TEXT NOT NULL,
+                    title TEXT,
+                    author TEXT,
+                    due_date DATE,
+                    reminder_sent_at TIMESTAMP,
+                    returned_at TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(room, isbn)
+                )
+            """)
+        con.commit()
+        _mark_migration_done("my_loans_v1")
+        logger.info("[migration] my_loans テーブル追加完了")
+    except Exception as e:
+        logger.error(f"[migration] my_loans error: %s", e)
+    finally:
+        con.close()
 
 
 def _migrate_db_indices():

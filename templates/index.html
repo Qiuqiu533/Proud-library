@@ -1154,6 +1154,7 @@
         <button class="board-tab" data-btab="dashboard">🏠 ダッシュボード</button>
         <button class="board-tab" data-btab="adminusers">👥 管理者設定</button>
         <button class="board-tab" data-btab="invitecodes">🎟️ 招待コード</button>
+        <button class="board-tab" data-btab="qrposter">🖨️ QRポスター</button>
         <button class="board-tab" data-btab="settings">⚙️ 設定</button>
         <button class="board-tab" data-btab="libschedule">🗓️ 休館日</button>
         <button class="board-tab" data-btab="calendar">📅 活動記録</button>
@@ -1938,6 +1939,31 @@
           <!-- コード一覧 -->
           <div style="font-weight:700;font-size:0.9rem;margin-bottom:8px">発行済みコード一覧</div>
           <div id="inviteCodesList"><div class="loading">読み込み中…</div></div>
+        </div>
+      </div>
+
+      <!-- QRコードポスター生成 -->
+      <div id="btab-qrposter" class="board-tab-panel">
+        <div style="max-width:500px">
+          <h3 style="margin-bottom:4px">🖨️ QRコードポスター生成</h3>
+          <p style="font-size:0.82rem;color:#888;margin-bottom:16px">
+            掲示板・エントランス等に貼るための、アプリURLへのQRコード付きポスターを生成します。
+          </p>
+          <div style="background:#f9f9f9;border:1px solid #e0e0e0;border-radius:10px;padding:14px 16px;margin-bottom:16px">
+            <div style="font-size:0.78rem;color:#666;margin-bottom:4px">見出し文言</div>
+            <input id="qrPosterTitle" type="text" value="プラウド船橋コミュニティ図書館"
+              style="width:100%;padding:7px 8px;border:1px solid #ccc;border-radius:6px;font-size:0.9rem;box-sizing:border-box;margin-bottom:10px">
+            <div style="font-size:0.78rem;color:#666;margin-bottom:4px">サブ文言（任意）</div>
+            <input id="qrPosterSubtitle" type="text" placeholder="例：スマホでQRコードを読み取ってアクセス"
+              style="width:100%;padding:7px 8px;border:1px solid #ccc;border-radius:6px;font-size:0.9rem;box-sizing:border-box">
+          </div>
+          <button onclick="generateQrPoster()" class="btn-primary" style="width:100%;margin-bottom:16px">🎨 ポスターを生成する</button>
+          <div id="qrPosterPreviewWrap" style="text-align:center;display:none">
+            <canvas id="qrPosterCanvas" width="900" height="1273" style="width:100%;max-width:360px;border:1px solid #ddd;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1)"></canvas>
+            <div style="margin-top:12px">
+              <button onclick="downloadQrPoster()" class="btn-primary">📥 PNGでダウンロード</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -2862,6 +2888,7 @@
     </div>
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="/static/app.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
