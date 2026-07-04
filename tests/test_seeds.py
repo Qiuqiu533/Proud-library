@@ -111,6 +111,13 @@ def test_award_books_noma_must_exist():
     assert not missing, f"野間文芸賞の必須エントリが欠落しています: {missing}"
 
 
+def test_award_books_akutagawa_naoki_award_no_required():
+    """芥川賞・直木賞は日本文学振興会公式サイトで全件回次(award_no)が確認できるため、
+    award_no=Noneのエントリが混入したら検知する。"""
+    missing = [t for t in _AWARD_BOOKS_SEED if t[0] in ("芥川賞", "直木賞") and t[1] is None]
+    assert not missing, f"芥川賞・直木賞でaward_noが欠落しているエントリがあります: {missing}"
+
+
 def test_award_books_no_duplicate_entries():
     """award, award_year, title, author の組み合わせで重複がないか確認（award_noは含めない）。
     award_no違いだけの重複（例: 直木賞2024回のNone混入）を検出するため、キーに award_no を含めない。"""
