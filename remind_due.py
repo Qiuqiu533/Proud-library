@@ -1,12 +1,12 @@
 """
-返却リマインダースクリプト
+返却リマインダースクリプト（段階的督促対応）
 GitHub Actions から毎日実行される。
 
 対象: my_loans（住民が自己申告で登録した「借りている本」）のうち
-  - 返却期限の3日前
-  - 返却期限当日
-  - 返却期限を過ぎている（延滞）
-のいずれかに該当し、まだ本日リマインドを送っていないもの。
+  - 返却期限の3日前〜当日: 毎日1回、穏やかな予告文面
+  - 延滞1〜6日: 3日おきに、通常の督促文面
+  - 延滞7〜13日: 2日おきに、やや強めの督促文面
+  - 延滞14日以上: 毎日、強い督促文面
 
 必要な環境変数:
   DATABASE_URL        — Neon PostgreSQL 接続文字列
@@ -48,21 +48,17 @@ def get_con():
 
 
 def fetch_targets(con) -> list[dict]:
-    """リマインド対象を返す。
-    条件:
-      - 未返却（returned_at IS NULL）
-      - 返却期限が3日以内（当日・延滞含む）
-      - 本日まだリマインドを送っていない（reminder_sent_at が今日より前 or NULL）
+    """リマインド候補を返す（送信すべきかの最終判定はPython側のshould_remind_todayで行う）。
+    条件: 未返却（returned_at IS NULL）・返却期限が3日以内（当日・延滞含む）・メール登録済み
     """
     sql = """
         SELECT
-            m.id, m.room, m.isbn, m.title, m.author, m.due_date,
+            m.id, m.room, m.isbn, m.title, m.author, m.due_date, m.reminder_sent_at,
             u.email
         FROM my_loans m
         LEFT JOIN user_accounts u ON u.room = m.room
         WHERE m.returned_at IS NULL
           AND m.due_date <= CURRENT_DATE + INTERVAL '3 days'
-          AND (m.reminder_sent_at IS NULL OR m.reminder_sent_at::date < CURRENT_DATE)
           AND u.email IS NOT NULL
           AND u.email <> ''
         ORDER BY m.due_date ASC
@@ -70,6 +66,27 @@ def fetch_targets(con) -> list[dict]:
     with con.cursor() as cur:
         cur.execute(sql)
         return cur.fetchall()
+
+
+def should_remind_today(due_date: date, reminder_sent_at) -> bool:
+    """延滞日数に応じた送信間隔で、本日送るべきかを判定する。
+    予告〜当日: 毎日／延滞1-6日: 3日おき／延滞7-13日: 2日おき／延滞14日以上: 毎日
+    """
+    if reminder_sent_at is None:
+        return True
+    last_sent_date = reminder_sent_at.date() if hasattr(reminder_sent_at, "date") else reminder_sent_at
+    days_since_last = (date.today() - last_sent_date).days
+    if days_since_last <= 0:
+        return False
+    days_left = (due_date - date.today()).days
+    if days_left >= 0:
+        return True
+    overdue_days = -days_left
+    if overdue_days <= 6:
+        return days_since_last >= 3
+    elif overdue_days <= 13:
+        return days_since_last >= 2
+    return True
 
 
 def mark_reminded(con, loan_id: int) -> None:
@@ -83,17 +100,30 @@ def build_email(to: str, title: str, author: str, isbn: str, due_date: date) -> 
     author_line = f"　著者：{author}" if author else ""
     today = date.today()
     days_left = (due_date - today).days
+    due_str = due_date.strftime("%Y年%m月%d日")
 
     if days_left > 0:
-        status_line = f"返却期限まであと{days_left}日です（期限: {due_date.strftime('%Y年%m月%d日')}）。"
         subject = f"【プラウド船橋図書館】返却期限のお知らせ（あと{days_left}日）"
+        status_line = f"返却期限まであと{days_left}日です（期限: {due_str}）。"
+        closing = "お手数ですが、期限までのご返却にご協力をお願いいたします。"
     elif days_left == 0:
-        status_line = f"本日が返却期限です（{due_date.strftime('%Y年%m月%d日')}）。"
         subject = "【プラウド船橋図書館】本日が返却期限です"
+        status_line = f"本日が返却期限です（{due_str}）。"
+        closing = "お手数ですが、本日中のご返却にご協力をお願いいたします。"
     else:
         overdue_days = -days_left
-        status_line = f"返却期限（{due_date.strftime('%Y年%m月%d日')}）を{overdue_days}日過ぎています。"
-        subject = f"【プラウド船橋図書館】返却期限超過のお知らせ（{overdue_days}日超過）"
+        if overdue_days <= 6:
+            subject = f"【プラウド船橋図書館】返却期限超過のお知らせ（{overdue_days}日超過）"
+            status_line = f"返却期限（{due_str}）を{overdue_days}日過ぎています。"
+            closing = "お手数ですが、早めのご返却にご協力をお願いいたします。"
+        elif overdue_days <= 13:
+            subject = f"【プラウド船橋図書館】返却のお願い（{overdue_days}日超過）"
+            status_line = f"返却期限（{due_str}）を{overdue_days}日過ぎており、他の住民の方もこの本を待っている可能性があります。"
+            closing = "恐れ入りますが、なるべく早めのご返却をお願いいたします。返却済みの場合は、アプリでステータスの変更をお願いいたします。"
+        else:
+            subject = f"【プラウド船橋図書館】重要：返却のお願い（{overdue_days}日超過）"
+            status_line = f"返却期限（{due_str}）を{overdue_days}日過ぎています。長期延滞となっております。"
+            closing = "他の住民の方が読めない状態が続いております。至急のご返却にご協力をお願いいたします。ご事情がある場合は理事会までご連絡ください。"
 
     body = f"""\
 プラウド船橋コミュニティ図書館 返却リマインダー
@@ -102,7 +132,7 @@ def build_email(to: str, title: str, author: str, isbn: str, due_date: date) -> 
 
 {status_line}
 
-お手数ですが、早めのご返却にご協力をお願いいたします。
+{closing}
 
 ──────────────────────────
 このメールはアプリで「借り中」として登録した本の
@@ -135,8 +165,9 @@ def send_email(msg: MIMEMultipart) -> bool:
 
 def main() -> None:
     con = get_con()
-    targets = fetch_targets(con)
-    logger.info("リマインド対象: %d 件", len(targets))
+    candidates = fetch_targets(con)
+    targets = [row for row in candidates if should_remind_today(row["due_date"], row.get("reminder_sent_at"))]
+    logger.info("リマインド候補: %d 件 / 本日送信対象: %d 件", len(candidates), len(targets))
 
     sent = 0
     skipped = 0

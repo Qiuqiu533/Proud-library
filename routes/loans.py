@@ -267,6 +267,51 @@ def api_admin_dashboard_data():
         return jsonify({"error": str(e)}), 500
 
 
+_EXPECTED_TABLES = [
+    "ratings", "announcements", "issues", "book_requests", "calendar_events",
+    "settings", "collections", "user_accounts", "password_reset_tokens",
+    "genre_books", "new_arrivals", "availability_cache", "staff_chat",
+    "chat_threads", "admin_users", "award_books", "applied_migrations",
+    "wish_list", "invite_codes", "audit_log", "events", "event_entries",
+    "reading_timeline", "newsletters", "plam_coverage_log", "plam_fix_log",
+    "loan_history", "my_loans",
+]
+
+
+@loans_bp.route("/api/admin/migration-status")
+def api_migration_status():
+    """マイグレーション適用状況・主要テーブルの存在確認（管理者向け診断）"""
+    if not check_password(request.headers.get("X-Password"), "board"):
+        return jsonify({"error": "unauthorized"}), 401
+    con = get_con()
+    try:
+        applied = fetchall(con, "SELECT name, applied_at FROM applied_migrations ORDER BY applied_at DESC")
+        applied_list = [{"name": r["name"], "applied_at": str(r["applied_at"])} for r in applied]
+
+        if USE_PG:
+            existing_rows = fetchall(con, """
+                SELECT table_name FROM information_schema.tables
+                WHERE table_schema='public'
+            """)
+            existing = {r["table_name"] for r in existing_rows}
+        else:
+            existing_rows = fetchall(con, "SELECT name FROM sqlite_master WHERE type='table'")
+            existing = {r["name"] for r in existing_rows}
+
+        tables = [{"name": t, "exists": t in existing} for t in _EXPECTED_TABLES]
+        missing = [t["name"] for t in tables if not t["exists"]]
+        con.close()
+        return jsonify({
+            "applied_migrations_count": len(applied_list),
+            "applied_migrations": applied_list,
+            "tables": tables,
+            "missing_tables": missing,
+        })
+    except Exception as e:
+        con.close()
+        return jsonify({"error": str(e)}), 500
+
+
 @loans_bp.route("/api/admin/db-size")
 def api_db_size():
     if not check_password(request.headers.get("X-Password"), "board"):

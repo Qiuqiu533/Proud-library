@@ -1131,3 +1131,23 @@ def test_requests_csv_formula_injection_sanitized(client):
     assert res.status_code == 200
     body = res.get_data(as_text=True)
     assert "'=cmd" in body
+
+
+# ===== マイグレーション状況確認 =====
+
+def test_migration_status_no_auth(client):
+    """認証なしのマイグレーション状況確認は 401"""
+    res = client.get("/api/admin/migration-status")
+    assert res.status_code == 401
+
+
+def test_migration_status_with_auth(client):
+    """正しい認証でマイグレーション状況が取得できる"""
+    res = client.get("/api/admin/migration-status", headers=BOARD_H)
+    assert res.status_code == 200
+    data = res.get_json()
+    assert "tables" in data
+    assert "missing_tables" in data
+    assert "applied_migrations" in data
+    names = [t["name"] for t in data["tables"]]
+    assert "my_loans" in names

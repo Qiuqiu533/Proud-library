@@ -25,8 +25,16 @@ except ImportError:
 from routes.pages import pages_bp
 from routes.auth import auth_bp
 from routes.books import books_bp
+from routes.new_arrivals import new_arrivals_bp
+from routes.reviews import reviews_bp
+from routes.book_meta import book_meta_bp
+from routes.collections import collections_bp
 from routes.awards import awards_bp
-from routes.community import community_bp
+from routes.issues import issues_bp
+from routes.calendar import calendar_bp
+from routes.lib_schedule import lib_schedule_bp
+from routes.announcements import announcements_bp
+from routes.book_requests import book_requests_bp
 from routes.user import user_bp
 from routes.loans import loans_bp
 from routes.admin import admin_bp
@@ -39,8 +47,16 @@ from routes.plam import plam_bp
 app.register_blueprint(pages_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(books_bp)
+app.register_blueprint(new_arrivals_bp)
+app.register_blueprint(reviews_bp)
+app.register_blueprint(book_meta_bp)
+app.register_blueprint(collections_bp)
 app.register_blueprint(awards_bp)
-app.register_blueprint(community_bp)
+app.register_blueprint(issues_bp)
+app.register_blueprint(calendar_bp)
+app.register_blueprint(lib_schedule_bp)
+app.register_blueprint(announcements_bp)
+app.register_blueprint(book_requests_bp)
 app.register_blueprint(user_bp)
 app.register_blueprint(loans_bp)
 app.register_blueprint(admin_bp)
