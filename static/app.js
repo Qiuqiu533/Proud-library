@@ -696,6 +696,61 @@ function _hideLoanBanner() {
   if (b) b.style.display = "none";
 }
 
+// ===== 「借り中」つけ忘れ対策バナー =====
+// 最近見た本のうち、実際は貸出中(availability_cache)なのにアプリ上で「借り中」登録していないものを検知する。
+function _dismissedForgottenKey(isbn) { const r = _curRoom(); return `dismiss_forgot_${r || 'x'}_${isbn}`; }
+async function checkForgottenLoans() {
+  const banner = document.getElementById("forgottenLoanBanner");
+  if (!banner) return;
+  let recent = [];
+  try { recent = JSON.parse(localStorage.getItem("recent_books") || "[]"); } catch { recent = []; }
+  const candidates = recent.filter(b => {
+    if (!b.isbn) return false;
+    const status = getReadStatus(b.isbn);
+    if (status === "借り中" || status === "読んだ") return false;
+    if (localStorage.getItem(_dismissedForgottenKey(b.isbn))) return false;
+    return true;
+  }).slice(0, 10);
+  if (!candidates.length) { banner.style.display = "none"; return; }
+  try {
+    const isbns = candidates.map(b => b.isbn).join(",");
+    const res = await fetch(`/api/availability/cached?isbns=${isbns}`);
+    const cache = await res.json();
+    const loanedOnes = candidates.filter(b => cache[b.isbn] === "loaned");
+    if (!loanedOnes.length) { banner.style.display = "none"; return; }
+    banner.innerHTML = loanedOnes.map(b => `
+      <div class="forgotten-loan-row" data-isbn="${b.isbn}">
+        <span>📦「${esc(b.title || b.isbn)}」が貸出中になっています。この本を借りましたか？</span>
+        <span class="forgotten-loan-actions">
+          <button class="forgotten-loan-yes" data-isbn="${b.isbn}" data-title="${esc(b.title || '')}">はい、記録する</button>
+          <button class="forgotten-loan-no" data-isbn="${b.isbn}">いいえ</button>
+        </span>
+      </div>`).join("");
+    banner.style.display = "flex";
+    banner.querySelectorAll(".forgotten-loan-yes").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const isbn = btn.dataset.isbn;
+        const due = new Date(); due.setDate(due.getDate() + 14);
+        const dueStr = due.toISOString().slice(0, 10);
+        setReadStatus(isbn, "借り中");
+        setReadMeta(isbn, "", "", dueStr);
+        setDueDate(isbn, dueStr);
+        syncMyLoan(isbn, dueStr);
+        localStorage.setItem(_dismissedForgottenKey(isbn), "1");
+        showToast("「借り中」として記録しました（返却予定日: 2週間後）", "info");
+        checkForgottenLoans();
+        loadLog(logFilter);
+      });
+    });
+    banner.querySelectorAll(".forgotten-loan-no").forEach(btn => {
+      btn.addEventListener("click", () => {
+        localStorage.setItem(_dismissedForgottenKey(btn.dataset.isbn), "1");
+        checkForgottenLoans();
+      });
+    });
+  } catch { banner.style.display = "none"; }
+}
+
 // ログイン時に旧キー（部屋番号なし）を新キーへ移行する
 function _migrateReadKeysToRoom(room) {
   if (!room || localStorage.getItem(`read_keys_migrated_${room}`)) return;
@@ -1297,6 +1352,7 @@ async function loadLog(filter = "all") {
   logFilter = filter;
   renderLogStats();
   renderReadingCharts();
+  checkForgottenLoans();
   document.querySelectorAll(".log-filter-btn").forEach(b => b.classList.toggle("active", b.dataset.status === filter));
   const grid = document.getElementById("logGrid");
   let entries = getLogEntries();
