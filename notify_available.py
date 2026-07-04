@@ -24,6 +24,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 DATABASE_URL       = os.environ["DATABASE_URL"]
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 SMTP_PASSWORD      = os.environ["BREVO_SMTP_PASSWORD"]
 FROM_EMAIL         = os.environ.get("NOTIFY_FROM_EMAIL", "noreply@proud-library.jp")
 APP_BASE_URL       = os.environ.get("APP_BASE_URL", "https://proud-library.onrender.com")
