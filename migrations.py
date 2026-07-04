@@ -1884,9 +1884,12 @@ def _recover_sync_plam_after_seed_reset():
 
 def _cleanup_award_books_duplicates():
     """award_books の重複レコード（award, award_year, title, author が完全一致）を除去する。
-    2026-07-04: マイグレーション実行に排他制御がなかったため、複数Gunicornワーカーが
-    同時に_migrate_sync_plam_to_award_booksを実行し、芥川賞・直木賞で34件の
-    重複INSERTが発生した（idが大きい方＝後からINSERTされた方を削除する）。
+    2026-07-04: 当初は複数Gunicornワーカーの同時実行によるレースコンディションを疑い
+    advisory lockと共にこのクリーンアップ処理を追加したが、後日の詳細検証（Missing/Unexpected
+    をCounter差分で確認）により、実際の原因は_AWARD_BOOKS_SEED（seeds.py）自体に混入していた
+    34件の重複データ（award_noのみ異なる同一受賞のダブり）であったと判明した。advisory lockは
+    引き続き有効な防御策として残すが、重複の根本原因はシードデータ側にあったため、
+    2026-07-05にseeds.py側も修正済み（fix(data): remove duplicated award seed entries）。
     """
     if _migration_done("cleanup_award_books_duplicates_v1"):
         return
@@ -1910,6 +1913,79 @@ def _cleanup_award_books_duplicates():
         logger.info("[migration] award_books重複除去完了: %d件削除", deleted)
     except Exception as e:
         logger.error("[migration] cleanup_award_books_duplicates error: %s", e)
+        try:
+            con.rollback()
+        except Exception:
+            pass
+    finally:
+        con.close()
+
+
+def _migrate_akutagawa_naoki_official_replace():
+    """芥川賞・直木賞をseeds.py（日本文学振興会公式データ、第129〜174回相当）で全面置換する。
+
+    2026-07-05: award_no未設定49件を調査した結果、単なる欠損ではなく年・タイトルの誤り、
+    別賞（本屋大賞等）との混同、該当記録のない架空エントリが多数混入していたことが判明した
+    （詳細はdocs/data_fixes/2026-07-akutagawa-naoki-fix.csv参照）。award_books_seed_done
+    フラグを再度上げると724件消失事故の再発になるため、芥川賞・直木賞のレコードのみを
+    対象にDELETE→再投入する専用マイグレーションとして切り出した。PLAM同期処理より後に
+    実行し、PLAM由来の重複が残っていても最終的に公式データのみへ確実に揃える。
+    """
+    if _migration_done("akutagawa_naoki_official_replace_v1"):
+        return
+    if not USE_PG:
+        return
+    seed_rows = [
+        t for t in _AWARD_BOOKS_SEED
+        if len(t) == 6 and t[0] in ("芥川賞", "直木賞")
+    ]
+    if not seed_rows:
+        logger.error("[migration] akutagawa_naoki_official_replace: seeds.pyに対象データがありません")
+        return
+    con = get_con()
+    try:
+        cur = con.cursor()
+        targets = ("芥川賞", "直木賞")
+
+        before_counts = {}
+        for award in targets:
+            cur.execute("SELECT COUNT(*) FROM award_books WHERE award = %s", (award,))
+            before_counts[award] = cur.fetchone()[0]
+
+        deleted_counts = {}
+        for award in targets:
+            cur.execute("DELETE FROM award_books WHERE award = %s", (award,))
+            deleted_counts[award] = cur.rowcount
+
+        insert_rows = [(award, no, year, title, author, status, "") for (award, no, year, title, author, status) in seed_rows]
+        cur.executemany(
+            "INSERT INTO award_books (award, award_no, award_year, title, author, status, award_category) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+            insert_rows,
+        )
+        inserted_counts = {award: sum(1 for r in seed_rows if r[0] == award) for award in targets}
+        after_counts = inserted_counts  # DELETE→INSERTなのでAfter=Insertと一致するはず
+
+        con.commit()
+        _mark_migration_done("akutagawa_naoki_official_replace_v1")
+
+        logger.info("=== Akutagawa/Naoki Official Replace ===")
+        logger.info("Before")
+        for award in targets:
+            logger.info("  %s : %d", award, before_counts[award])
+        logger.info("Delete")
+        for award in targets:
+            logger.info("  %s : %d", award, deleted_counts[award])
+        logger.info("Insert")
+        for award in targets:
+            logger.info("  %s : %d", award, inserted_counts[award])
+        logger.info("After")
+        for award in targets:
+            logger.info("  %s : %d", award, after_counts[award])
+        logger.info("Delta")
+        for award in targets:
+            logger.info("  %s : %+d", award, after_counts[award] - before_counts[award])
+    except Exception as e:
+        logger.error("[migration] akutagawa_naoki_official_replace error: %s", e)
         try:
             con.rollback()
         except Exception:
@@ -2182,6 +2258,7 @@ def _run_all_migrations_steps():
         _recover_sync_plam_after_seed_reset,  # 障害復旧（2026-07-04）: PLAM同期データの再投入
         _migrate_sync_plam_to_award_books, # PLAM CSV → award_books 同期
         _cleanup_award_books_duplicates,   # 障害復旧（2026-07-04）: 複数ワーカー同時実行による重複除去
+        _migrate_akutagawa_naoki_official_replace,  # 芥川賞・直木賞を公式データで全面置換（2026-07-05）
         _migrate_fetch_isbn_ndl,           # NDL API で isbn13 補完（バックグラウンド）
         _migrate_db_indices,               # パフォーマンス用インデックス
         _verify_tables,
