@@ -997,13 +997,17 @@ def _migrate_seed_award_books():
                 isbn13 TEXT DEFAULT '',
                 summary TEXT DEFAULT '',
                 status TEXT DEFAULT '確認済',
+                award_category TEXT DEFAULT '',
                 created_at TIMESTAMP DEFAULT NOW()
             )
         """)
         cur.execute("DELETE FROM award_books")
+        # シードタプルは6要素(award,award_no,award_year,title,author,status)または
+        # 7要素目にaward_category（部門名、なければ空文字）を持てる
+        seed_rows = [(t + ("",)) if len(t) == 6 else t for t in _AWARD_BOOKS_SEED]
         cur.executemany(
-            "INSERT INTO award_books (award, award_no, award_year, title, author, status) VALUES (%s,%s,%s,%s,%s,%s)",
-            _AWARD_BOOKS_SEED
+            "INSERT INTO award_books (award, award_no, award_year, title, author, status, award_category) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+            seed_rows
         )
         cur.execute("INSERT INTO settings(key,value) VALUES('award_books_seed_done','v4') ON CONFLICT(key) DO UPDATE SET value='v4'")
         con.commit()
@@ -1659,6 +1663,29 @@ def _migrate_award_books_plam_work_id():
         con.close()
 
 
+def _migrate_award_books_category():
+    """award_books に award_category カラムを追加する（読売文学賞等、複数部門を持つ賞への対応）。"""
+    if _migration_done("award_books_category_v1"):
+        return
+    con = get_con()
+    try:
+        if USE_PG:
+            cur = con.cursor()
+            cur.execute("ALTER TABLE award_books ADD COLUMN IF NOT EXISTS award_category TEXT DEFAULT ''")
+        else:
+            try:
+                con.execute("ALTER TABLE award_books ADD COLUMN award_category TEXT DEFAULT ''")
+            except Exception:
+                pass
+        con.commit()
+        _mark_migration_done("award_books_category_v1")
+        logger.info("[migration] award_books.award_category カラム追加完了")
+    except Exception as e:
+        logger.error("[migration] award_books_category error: %s", e)
+    finally:
+        con.close()
+
+
 def _migrate_plam_coverage_log():
     """PLAMカバレッジ履歴テーブルを追加する。"""
     if _migration_done("plam_coverage_log_v1"):
@@ -2010,6 +2037,7 @@ def _run_all_migrations():
         _migrate_resync_awards_v3,
         _migrate_resync_awards_v4,
         _migrate_seed_award_books,
+        _migrate_award_books_category,     # award_books.award_category カラム追加（部門対応）
         _migrate_title_yomi,
         _migrate_pubdate_openbd,       # 完了後に librarylife を内部で起動
         _migrate_ndc_genres,           # 重い処理は最後
