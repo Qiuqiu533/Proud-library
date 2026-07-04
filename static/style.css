@@ -1038,6 +1038,12 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .read-meta-public-toggle { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: #666; margin: 8px 0; cursor: pointer; }
 .read-meta-public-toggle input { cursor: pointer; }
 
+.forgotten-loan-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.forgotten-loan-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.forgotten-loan-yes, .forgotten-loan-no { font-size: 0.78rem; padding: 4px 10px; border-radius: 14px; cursor: pointer; border: 1px solid #5b8dd9; background: #fff; color: #3a6aaa; font-weight: 600; }
+.forgotten-loan-yes { background: #5b8dd9; color: #fff; }
+.forgotten-loan-no { border-color: #ccc; color: #888; }
+
 /* ===== お気に入りへのメモ ===== */
 .fav-memo-wrap { margin-top: 8px; position: relative; }
 .fav-memo-input { width: 100%; box-sizing: border-box; border: 1px solid #ddd; border-radius: 6px; padding: 6px 8px; font-size: 0.78rem; resize: vertical; min-height: 32px; font-family: inherit; color: #444; }
