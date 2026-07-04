@@ -2040,8 +2040,8 @@ def _run_all_migrations():
         _migrate_resync_awards_v2,     # 旧バージョン互換
         _migrate_resync_awards_v3,
         _migrate_resync_awards_v4,
+        _migrate_award_books_category,     # award_books.award_category カラム追加（部門対応）※シード投入前に必須
         _migrate_seed_award_books,
-        _migrate_award_books_category,     # award_books.award_category カラム追加（部門対応）
         _migrate_title_yomi,
         _migrate_pubdate_openbd,       # 完了後に librarylife を内部で起動
         _migrate_ndc_genres,           # 重い処理は最後
