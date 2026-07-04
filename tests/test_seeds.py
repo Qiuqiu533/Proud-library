@@ -112,8 +112,9 @@ def test_award_books_noma_must_exist():
 
 
 def test_award_books_no_duplicate_entries():
-    """award, award_no, award_year, title, author の組み合わせで重複がないか確認。"""
-    entries = [(t[0], t[1], t[2], t[3], t[4]) for t in _AWARD_BOOKS_SEED]
+    """award, award_year, title, author の組み合わせで重複がないか確認（award_noは含めない）。
+    award_no違いだけの重複（例: 直木賞2024回のNone混入）を検出するため、キーに award_no を含めない。"""
+    entries = [(t[0], t[2], t[3], t[4]) for t in _AWARD_BOOKS_SEED]
     seen = set()
     dups = []
     for e in entries:
