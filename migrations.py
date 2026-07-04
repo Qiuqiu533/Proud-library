@@ -2004,6 +2004,7 @@ def _run_all_migrations():
         _migrate_add_type_reply_columns,
         _migrate_add_staff_chat,
         _migrate_lib_schedule,
+        _migrate_my_loans,             # マイ貸出リスト（返却リマインダー用）※重い処理の前に確実に作成
         _migrate_seed_awards_master,   # シード投入
         _migrate_resync_awards_v2,     # 旧バージョン互換
         _migrate_resync_awards_v3,
@@ -2035,7 +2036,6 @@ def _run_all_migrations():
         _migrate_sync_plam_to_award_books, # PLAM CSV → award_books 同期
         _migrate_fetch_isbn_ndl,           # NDL API で isbn13 補完（バックグラウンド）
         _migrate_db_indices,               # パフォーマンス用インデックス
-        _migrate_my_loans,                 # マイ貸出リスト（返却リマインダー用）
         _verify_tables,
     ]
     for step in steps:
