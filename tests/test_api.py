@@ -1084,3 +1084,50 @@ def test_my_loans_return_no_auth(client):
     """認証なしの返却は 401"""
     res = client.patch("/api/my-loans/return", json={"isbn": "9784000000003"})
     assert res.status_code == 401
+
+
+# ===== CSVエクスポート（管理者） =====
+
+def test_requests_csv_no_auth(client):
+    """認証なしのリクエストCSVは 401"""
+    res = client.get("/api/admin/requests-csv")
+    assert res.status_code == 401
+
+
+def test_requests_csv_query_param_password_rejected(client):
+    """パスワードをクエリパラメータで渡しても認証されない（ヘッダー方式のみ有効）"""
+    res = client.get("/api/admin/requests-csv?password=test-board-pw")
+    assert res.status_code == 401
+
+
+def test_requests_csv_with_auth(client):
+    """正しいヘッダー認証でCSVが取得できる"""
+    res = client.get("/api/admin/requests-csv", headers=BOARD_H)
+    assert res.status_code == 200
+    assert res.mimetype == "text/csv"
+
+
+def test_books_csv_no_auth(client):
+    """認証なしの蔵書CSVは 401"""
+    res = client.get("/api/admin/books-csv")
+    assert res.status_code == 401
+
+
+def test_books_csv_with_auth(client):
+    """正しいヘッダー認証でCSVが取得できる"""
+    res = client.get("/api/admin/books-csv", headers=BOARD_H)
+    assert res.status_code == 200
+    assert res.mimetype == "text/csv"
+
+
+def test_requests_csv_formula_injection_sanitized(client):
+    """CSVインジェクション対策: =+-@ で始まるreasonはシングルクォートが付与される"""
+    client.post("/api/user/register", json={"room": "4-104", "password": "testpass1", "email": "t4104@example.com"})
+    client.post("/api/requests", json={
+        "title": "テスト本", "author": "著者", "reason": "=cmd|'/c calc'!A1",
+        "room": "4-104", "password": "testpass1", "type": "request"
+    })
+    res = client.get("/api/admin/requests-csv", headers=BOARD_H)
+    assert res.status_code == 200
+    body = res.get_data(as_text=True)
+    assert "'=cmd" in body

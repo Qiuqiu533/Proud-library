@@ -8,6 +8,14 @@ from services.utils import _hash_password
 loans_bp = Blueprint("loans", __name__)
 
 
+def _csv_safe(value):
+    """Excel等でのCSVインジェクション対策。=+-@ で始まる値は先頭にシングルクォートを付与して無害化する。"""
+    s = str(value) if value is not None else ""
+    if s and s[0] in ("=", "+", "-", "@"):
+        return "'" + s
+    return s
+
+
 @loans_bp.route("/api/library-info")
 def api_library_info():
     return jsonify(LIBRARY_INFO)
@@ -318,7 +326,7 @@ def api_admin_members():
 @loans_bp.route("/api/admin/requests-csv")
 def api_requests_csv():
     """リクエスト・ご要望一覧をCSVでダウンロード（管理者用）"""
-    if not check_password(request.args.get("password"), "board"):
+    if not check_password(request.headers.get("X-Password"), "board"):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     try:
@@ -329,8 +337,8 @@ def api_requests_csv():
         w = csv.writer(buf)
         w.writerow(["ID","種別","タイトル","著者","理由","部屋","ステータス","賛同数","登録日","返信"])
         for r in rows:
-            w.writerow([r["id"], r["type"], r["title"], r["author"], r["reason"],
-                        r["room"], r["status"], r["votes"], str(r["created_at"])[:10], r["reply"]])
+            w.writerow([r["id"], _csv_safe(r["type"]), _csv_safe(r["title"]), _csv_safe(r["author"]), _csv_safe(r["reason"]),
+                        _csv_safe(r["room"]), _csv_safe(r["status"]), r["votes"], str(r["created_at"])[:10], _csv_safe(r["reply"])])
         from flask import Response
         return Response("﻿" + buf.getvalue(), mimetype="text/csv; charset=utf-8",
                         headers={"Content-Disposition": "attachment; filename=requests.csv"})
@@ -342,7 +350,7 @@ def api_requests_csv():
 @loans_bp.route("/api/admin/books-csv")
 def api_books_csv():
     """蔵書一覧をCSVでダウンロード（棚卸し用）"""
-    if not check_password(request.args.get("password"), "board"):
+    if not check_password(request.headers.get("X-Password"), "board"):
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
     try:
@@ -353,7 +361,7 @@ def api_books_csv():
         w = csv.writer(buf)
         w.writerow(["ISBN","タイトル","著者","出版社","ジャンル"])
         for r in rows:
-            w.writerow([r["isbn"], r["title"], r["author"], r["publisher"], r["genre"]])
+            w.writerow([r["isbn"], _csv_safe(r["title"]), _csv_safe(r["author"]), _csv_safe(r["publisher"]), _csv_safe(r["genre"])])
         from flask import Response
         return Response("﻿" + buf.getvalue(), mimetype="text/csv; charset=utf-8",
                         headers={"Content-Disposition": "attachment; filename=books.csv"})

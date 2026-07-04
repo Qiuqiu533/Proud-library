@@ -604,23 +604,25 @@ async function syncMyLoan(isbn, due_date) {
   if (!auth) return;
   const title = (document.querySelector(".modal-header h2") || {}).textContent || "";
   try {
-    await fetch("/api/my-loans", {
+    const res = await fetch("/api/my-loans", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...auth, isbn, due_date, title }),
     });
-  } catch {}
+    if (!res.ok) console.warn("syncMyLoan failed:", res.status);
+  } catch (e) { console.warn("syncMyLoan error:", e); }
 }
 async function syncMyLoanReturn(isbn) {
   const auth = _residentAuth();
   if (!auth) return;
   try {
-    await fetch("/api/my-loans/return", {
+    const res = await fetch("/api/my-loans/return", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...auth, isbn }),
     });
-  } catch {}
+    if (!res.ok) console.warn("syncMyLoanReturn failed:", res.status);
+  } catch (e) { console.warn("syncMyLoanReturn error:", e); }
 }
 
 // ===== 読書メモを公開してタイムラインに投稿（非公開メモとの分離） =====
@@ -631,7 +633,7 @@ async function publishMemoToTimeline(isbn, status, memo) {
   try {
     const r = await fetch(`/api/book/${isbn}`);
     const b = await r.json().catch(() => ({}));
-    await fetch("/api/timeline", {
+    const res = await fetch("/api/timeline", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -639,8 +641,9 @@ async function publishMemoToTimeline(isbn, status, memo) {
         status: status || "読書中", comment: memo.slice(0, 200),
       }),
     });
-    showToast("読書タイムラインにも公開しました", "info");
-  } catch {}
+    if (res.ok) showToast("読書タイムラインにも公開しました", "info");
+    else showToast("タイムラインへの公開に失敗しました", "warn");
+  } catch (e) { console.warn("publishMemoToTimeline error:", e); showToast("タイムラインへの公開に失敗しました", "warn"); }
 }
 function getLogEntries() {
   const prefix = (() => { const r = _curRoom(); return r ? `read_${r}_` : `read_`; })();
@@ -7849,20 +7852,32 @@ async function exportReadingLogCsv() {
 async function exportRequestsCsv() {
   const pw = boardPassword;
   if (!pw) { showToast("理事会パスワードが必要です", "warn"); return; }
-  const url = `/api/admin/requests-csv?password=${encodeURIComponent(pw)}`;
-  const a = document.createElement("a");
-  a.href = url; a.download = `リクエスト一覧_${new Date().toISOString().slice(0,10)}.csv`;
-  a.click();
+  try {
+    const res = await fetch("/api/admin/requests-csv", { headers: { "X-Password": pw } });
+    if (!res.ok) { showToast("CSV取得に失敗しました", "warn"); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `リクエスト一覧_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch { showToast("CSV取得に失敗しました", "warn"); }
 }
 
 // ===== 管理者 蔵書CSVエクスポート =====
 async function exportBooksCsv() {
   const pw = boardPassword;
   if (!pw) { showToast("理事会パスワードが必要です", "warn"); return; }
-  const url = `/api/admin/books-csv?password=${encodeURIComponent(pw)}`;
-  const a = document.createElement("a");
-  a.href = url; a.download = `蔵書一覧_${new Date().toISOString().slice(0,10)}.csv`;
-  a.click();
+  try {
+    const res = await fetch("/api/admin/books-csv", { headers: { "X-Password": pw } });
+    if (!res.ok) { showToast("CSV取得に失敗しました", "warn"); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `蔵書一覧_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch { showToast("CSV取得に失敗しました", "warn"); }
 }
 
 // ===== フローティング「リクエストする」ボタン =====
