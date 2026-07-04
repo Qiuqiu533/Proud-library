@@ -979,11 +979,10 @@ def _migrate_seed_award_books():
     """award_booksテーブルに受賞作シードデータを投入する"""
     if not USE_PG:
         return
+    con = get_con()
     try:
-        con = get_con()
         flag = fetchone(con, "SELECT value FROM settings WHERE key='award_books_seed_done'")
-        if flag and flag.get("value") == "v4":
-            con.close()
+        if flag and flag.get("value") == "v5":
             return
         cur = con.cursor()
         cur.execute("""
@@ -1009,12 +1008,17 @@ def _migrate_seed_award_books():
             "INSERT INTO award_books (award, award_no, award_year, title, author, status, award_category) VALUES (%s,%s,%s,%s,%s,%s,%s)",
             seed_rows
         )
-        cur.execute("INSERT INTO settings(key,value) VALUES('award_books_seed_done','v4') ON CONFLICT(key) DO UPDATE SET value='v4'")
+        cur.execute("INSERT INTO settings(key,value) VALUES('award_books_seed_done','v5') ON CONFLICT(key) DO UPDATE SET value='v5'")
         con.commit()
-        con.close()
         logger.info(f"[award_books_seed] {len(_AWARD_BOOKS_SEED)}件投入完了")
     except Exception as e:
         logger.error(f"[award_books_seed] error: %s", e)
+        try:
+            con.rollback()
+        except Exception:
+            pass
+    finally:
+        con.close()
 
 
 def _migrate_pubdate_openbd():
