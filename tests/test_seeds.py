@@ -5,7 +5,7 @@
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from seeds import _AWARDS_SEED
+from seeds import _AWARDS_SEED, _AWARD_BOOKS_SEED
 
 # ── 正しいことが確定している受賞データ ───────────────────────────────────────
 MUST_EXIST = [
@@ -80,3 +80,44 @@ def test_years_are_reasonable():
     """受賞年が妥当な範囲内か確認（1950〜2030）。"""
     bad = [(a, y, t) for (a, y, _, __, t, au) in _AWARDS_SEED if y is not None and not (1950 <= y <= 2030)]
     assert not bad, f"受賞年が範囲外です: {bad}"
+
+
+# ── award_books（受賞作DBタブ用）シードデータのテスト ─────────────────────────
+
+NOMA_MUST_EXIST = [
+    (78, 2025, "世界99（上・下）", "村田沙耶香"),
+    (77, 2024, "列", "中村文則"),
+    (76, 2023, "恋ははかない、あるいは、プールの底のステーキ", "川上弘美"),
+    (63, 2010, "故郷のわが家", "村田喜代子"),
+]
+
+
+def test_award_books_tuple_length_consistent():
+    """_AWARD_BOOKS_SEED の全タプルが6要素で統一されているか確認。"""
+    bad = [t for t in _AWARD_BOOKS_SEED if len(t) != 6]
+    assert not bad, f"タプル長が6でないエントリがあります: {bad}"
+
+
+def test_award_books_noma_count():
+    """野間文芸賞が第63〜78回（2010〜2025年）の16件登録されているか確認。"""
+    noma = [t for t in _AWARD_BOOKS_SEED if t[0] == "野間文芸賞"]
+    assert len(noma) == 16, f"野間文芸賞の件数が想定と異なります: {len(noma)}件"
+
+
+def test_award_books_noma_must_exist():
+    """野間文芸賞の主要エントリ（講談社公式・Wikipedia照合済み）が存在するか確認。"""
+    noma_set = {(t[1], t[2], t[3], t[4]) for t in _AWARD_BOOKS_SEED if t[0] == "野間文芸賞"}
+    missing = [e for e in NOMA_MUST_EXIST if e not in noma_set]
+    assert not missing, f"野間文芸賞の必須エントリが欠落しています: {missing}"
+
+
+def test_award_books_no_duplicate_entries():
+    """award, award_no, award_year, title, author の組み合わせで重複がないか確認。"""
+    entries = [(t[0], t[1], t[2], t[3], t[4]) for t in _AWARD_BOOKS_SEED]
+    seen = set()
+    dups = []
+    for e in entries:
+        if e in seen:
+            dups.append(e)
+        seen.add(e)
+    assert not dups, f"award_booksシードに重複エントリがあります: {dups}"
