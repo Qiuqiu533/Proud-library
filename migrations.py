@@ -1882,6 +1882,42 @@ def _recover_sync_plam_after_seed_reset():
     logger.info("[recovery] award_books の復旧処理が完了しました")
 
 
+def _cleanup_award_books_duplicates():
+    """award_books の重複レコード（award, award_year, title, author が完全一致）を除去する。
+    2026-07-04: マイグレーション実行に排他制御がなかったため、複数Gunicornワーカーが
+    同時に_migrate_sync_plam_to_award_booksを実行し、芥川賞・直木賞で34件の
+    重複INSERTが発生した（idが大きい方＝後からINSERTされた方を削除する）。
+    """
+    if _migration_done("cleanup_award_books_duplicates_v1"):
+        return
+    if not USE_PG:
+        return
+    con = get_con()
+    try:
+        cur = con.cursor()
+        cur.execute("""
+            DELETE FROM award_books a
+            USING award_books b
+            WHERE a.id > b.id
+              AND a.award = b.award
+              AND a.award_year IS NOT DISTINCT FROM b.award_year
+              AND a.title = b.title
+              AND a.author = b.author
+        """)
+        deleted = cur.rowcount
+        con.commit()
+        _mark_migration_done("cleanup_award_books_duplicates_v1")
+        logger.info("[migration] award_books重複除去完了: %d件削除", deleted)
+    except Exception as e:
+        logger.error("[migration] cleanup_award_books_duplicates error: %s", e)
+        try:
+            con.rollback()
+        except Exception:
+            pass
+    finally:
+        con.close()
+
+
 def _migrate_sync_plam_to_award_books():
     """PLAM CSV (award_history.csv + works.csv) を award_books に同期する。"""
     if _migration_done("sync_plam_to_award_books_v2"):
@@ -2062,8 +2098,48 @@ def _migrate_fetch_isbn_ndl():
     threading.Thread(target=_run, daemon=True).start()
 
 
+_MIGRATION_LOCK_KEY = 837465192  # マイグレーション排他制御用の固定キー（任意の64bit整数）
+
+
 def _run_all_migrations():
-    """全マイグレーションをシングルスレッドで順次実行する（race condition防止）。"""
+    """全マイグレーションをシングルスレッドで順次実行する。
+    Postgresのアドバイザリーロックで、複数Gunicornワーカーが同時に
+    このマイグレーション処理を実行してしまうレースコンディションを防ぐ
+    （2026-07-04: ロック未実装時に複数ワーカーが同時にPLAM同期を実行し、
+    award_booksに芥川賞・直木賞で34件の重複が発生した実績あり）。
+    """
+    if USE_PG:
+        lock_con = get_con()
+        try:
+            cur = lock_con.cursor()
+            cur.execute("SELECT pg_try_advisory_lock(%s)", (_MIGRATION_LOCK_KEY,))
+            got_lock = cur.fetchone()[0]
+            if not got_lock:
+                logger.info("[migration] 他のワーカーがマイグレーション実行中のためスキップ")
+                lock_con.close()
+                return
+        except Exception as e:
+            logger.error("[migration] advisory lock取得エラー: %s", e)
+            lock_con.close()
+            return
+    else:
+        lock_con = None
+
+    try:
+        _run_all_migrations_steps()
+    finally:
+        if lock_con is not None:
+            try:
+                cur = lock_con.cursor()
+                cur.execute("SELECT pg_advisory_unlock(%s)", (_MIGRATION_LOCK_KEY,))
+                lock_con.commit()
+            except Exception as e:
+                logger.error("[migration] advisory lock解放エラー: %s", e)
+            finally:
+                lock_con.close()
+
+
+def _run_all_migrations_steps():
     steps = [
         _migrate_add_card_columns,
         _migrate_add_user_auth_columns,
@@ -2105,6 +2181,7 @@ def _run_all_migrations():
         _migrate_loan_history,             # 貸出履歴テーブル追加
         _recover_sync_plam_after_seed_reset,  # 障害復旧（2026-07-04）: PLAM同期データの再投入
         _migrate_sync_plam_to_award_books, # PLAM CSV → award_books 同期
+        _cleanup_award_books_duplicates,   # 障害復旧（2026-07-04）: 複数ワーカー同時実行による重複除去
         _migrate_fetch_isbn_ndl,           # NDL API で isbn13 補完（バックグラウンド）
         _migrate_db_indices,               # パフォーマンス用インデックス
         _verify_tables,
