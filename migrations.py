@@ -1844,6 +1844,44 @@ def _migrate_loan_history():
         con.close()
 
 
+def _recover_sync_plam_after_seed_reset():
+    """
+    障害復旧措置（2026-07-04）:
+    award_category列追加のためaward_books_seed_doneフラグをv4→v5に上げた際、
+    _migrate_seed_award_books がaward_booksを全件DELETE→seeds.py(235件)のみ再投入し、
+    sync_plam_to_award_books_v2 で過去に追加されていたPLAM由来データ（江戸川乱歩賞・
+    日本推理作家協会賞・吉川英治文学賞・日本SF大賞・このミステリーがすごい！・
+    本格ミステリ大賞・日本ホラー小説大賞など、合計724件相当）が消失した。
+
+    sync_plam_to_award_books_v2 フラグを一度だけ解除し、
+    _migrate_sync_plam_to_award_books を再実行してPLAM由来データを復元する。
+    このマイグレーション自体は1回限りで、完了後は recover_sync_plam_after_seed_reset_v1
+    フラグにより再実行されない。
+    """
+    if _migration_done("recover_sync_plam_after_seed_reset_v1"):
+        return
+    con = get_con()
+    try:
+        execute(con, "DELETE FROM applied_migrations WHERE name=?", ("sync_plam_to_award_books_v2",))
+        con.commit()
+        logger.info("[recovery] sync_plam_to_award_books_v2 フラグを解除しました")
+    except Exception as e:
+        logger.error("[recovery] フラグ解除エラー: %s", e)
+        try:
+            con.rollback()
+        except Exception:
+            pass
+        con.close()
+        return
+    con.close()
+
+    # フラグ解除後、直ちにPLAM同期処理を再実行してデータを復元する
+    _migrate_sync_plam_to_award_books()
+
+    _mark_migration_done("recover_sync_plam_after_seed_reset_v1")
+    logger.info("[recovery] award_books の復旧処理が完了しました")
+
+
 def _migrate_sync_plam_to_award_books():
     """PLAM CSV (award_history.csv + works.csv) を award_books に同期する。"""
     if _migration_done("sync_plam_to_award_books_v2"):
@@ -2065,6 +2103,7 @@ def _run_all_migrations():
         _migrate_plam_coverage_log,        # PLAMカバレッジ履歴テーブル追加
         _migrate_plam_fix_log,             # PLAMオートフィックスログテーブル追加
         _migrate_loan_history,             # 貸出履歴テーブル追加
+        _recover_sync_plam_after_seed_reset,  # 障害復旧（2026-07-04）: PLAM同期データの再投入
         _migrate_sync_plam_to_award_books, # PLAM CSV → award_books 同期
         _migrate_fetch_isbn_ndl,           # NDL API で isbn13 補完（バックグラウンド）
         _migrate_db_indices,               # パフォーマンス用インデックス
