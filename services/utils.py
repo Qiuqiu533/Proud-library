@@ -220,3 +220,9 @@ def auto_cleanup_images():
     finally:
         if con:
             con.close()
+
+
+def get_pw_from_request():
+    """X-Passwordヘッダー優先、なければリクエストボディのpasswordをfallback。空文字は認証失敗扱い。"""
+    pw = request.headers.get("X-Password", "") or (request.get_json(silent=True) or {}).get("password", "")
+    return pw

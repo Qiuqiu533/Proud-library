@@ -4689,6 +4689,42 @@ async function loadDbSize() {
   if (dbBtn) dbBtn.addEventListener("click", loadDbSize);
 }
 
+// ===== マイグレーション状況確認（管理者診断用） =====
+async function loadMigrationStatus() {
+  const display = document.getElementById("migrationStatusDisplay");
+  if (!display) return;
+  display.innerHTML = '<div class="loading">確認中…</div>';
+  try {
+    const res = await fetch(`/api/admin/migration-status`, { headers: { "X-Password": boardPassword } });
+    if (!res.ok) { display.innerHTML = '<p style="color:#e05">❌ 取得できませんでした</p>'; return; }
+    const d = await res.json();
+    const missing = d.missing_tables || [];
+    const tableRows = (d.tables || []).map(t =>
+      `<tr><td>${esc(t.name)}</td><td style="text-align:right">${t.exists ? '✅ 存在' : '❌ 未作成'}</td></tr>`
+    ).join("");
+    const appliedRows = (d.applied_migrations || []).slice(0, 15).map(m =>
+      `<tr><td>${esc(m.name)}</td><td style="text-align:right;color:#888;font-size:0.8rem">${esc(m.applied_at).slice(0,19)}</td></tr>`
+    ).join("");
+    display.innerHTML = `
+      ${missing.length
+        ? `<p style="color:#c00;font-weight:700">⚠️ 未作成のテーブルがあります: ${missing.map(esc).join(", ")}</p>
+           <p style="font-size:0.82rem;color:#888">数分待って再確認するか、それでも改善しない場合は開発者に連絡してください。</p>`
+        : `<p style="color:#2a7;font-weight:700">✅ すべての主要テーブルが作成されています（${d.tables.length}件）</p>`}
+      <table class="guide-table" style="margin-top:12px"><tr><th>テーブル</th><th style="text-align:right">状態</th></tr>${tableRows}</table>
+      <h5 style="margin:16px 0 6px;font-size:0.85rem">適用済みマイグレーション（最新15件・全${d.applied_migrations_count}件）</h5>
+      <table class="guide-table"><tr><th>名前</th><th style="text-align:right">適用日時</th></tr>${appliedRows}</table>
+      <button class="btn-board-add" id="migrationStatusBtn" style="margin-top:12px">🔄 再確認</button>`;
+    const btn = document.getElementById("migrationStatusBtn");
+    if (btn) btn.addEventListener("click", loadMigrationStatus);
+  } catch {
+    display.innerHTML = '<p style="color:#e05">❌ 取得できませんでした</p>';
+  }
+}
+document.addEventListener("DOMContentLoaded", () => {
+  const btn = document.getElementById("migrationStatusBtn");
+  if (btn) btn.addEventListener("click", loadMigrationStatus);
+});
+
 // ===== Admin QR =====
 // ===== 管理者アカウント管理 =====
 async function loadAdminUsers() {
