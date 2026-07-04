@@ -36,6 +36,9 @@ AWARD_CATEGORIES = {
 # 部門なしの賞（award_categoryは必ず空文字であるべき）
 NO_CATEGORY_AWARDS = {"芥川賞", "直木賞", "本屋大賞", "山本周五郎賞", "谷崎潤一郎賞", "三島由紀夫賞", "野間文芸賞"}
 
+# award_no（第何回）を必ず持つべき賞（公式に全件回次が確認できているもの）
+AWARD_NO_REQUIRED = {"芥川賞", "直木賞"}
+
 
 def _normalize(t):
     """6要素タプルなら7要素目に空文字を補って正規化する。"""
@@ -61,6 +64,15 @@ def check_empty_fields(rows):
             problems.append(("タイトル空欄", (award, no, year, title, author)))
         if author is None or not str(author).strip():
             problems.append(("著者空欄", (award, no, year, title, author)))
+    return problems
+
+
+def check_award_no_missing(rows):
+    problems = []
+    for r in rows:
+        award = r[0]
+        if award in AWARD_NO_REQUIRED and r[1] is None:
+            problems.append((award, r[2], r[3], r[4]))
     return problems
 
 
@@ -111,6 +123,15 @@ def main() -> int:
             print(f"   [{kind}] {e}")
     else:
         print("✓ タイトル・著者の空欄なし")
+
+    no_missing = check_award_no_missing(rows)
+    if no_missing:
+        ok = False
+        print(f"❌ award_no欠損（{'/'.join(sorted(AWARD_NO_REQUIRED))}は必須）: {len(no_missing)}件")
+        for p in no_missing:
+            print(f"   ERROR: {p[0]} {p[1]} award_no missing ({p[2]}/{p[3]})")
+    else:
+        print(f"✓ award_no欠損なし（{'/'.join(sorted(AWARD_NO_REQUIRED))}）")
 
     unknown_awards = check_award_name_spelling(rows)
     if unknown_awards:
