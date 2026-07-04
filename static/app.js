@@ -673,7 +673,7 @@ function setDueDate(isbn, due_date) {
   else localStorage.removeItem(_metaKey(isbn));
 }
 
-function checkLoanReminders() {
+async function checkLoanReminders() {
   const entries = getLogEntries().filter(e => e.status === "借り中");
   if (!entries.length) { _hideLoanBanner(); return; }
   const today = new Date(); today.setHours(0,0,0,0);
@@ -683,14 +683,34 @@ function checkLoanReminders() {
     if (!m.due_date) return;
     const due = new Date(m.due_date); due.setHours(0,0,0,0);
     const diff = Math.round((due - today) / 86400000);
-    const title = m.title || e.isbn;
-    if (diff < 0) overdue.push({ isbn: e.isbn, title, diff });
-    else if (diff <= 3) soon.push({ isbn: e.isbn, title, diff });
+    if (diff < 0) overdue.push({ isbn: e.isbn, diff });
+    else if (diff <= 3) soon.push({ isbn: e.isbn, diff });
   });
   if (!overdue.length && !soon.length) { _hideLoanBanner(); return; }
-  const lines = [];
-  overdue.forEach(b => lines.push(`<span class="loan-item loan-overdue">⚠️ 「${b.title || b.isbn}」が${Math.abs(b.diff)}日超過しています</span>`));
-  soon.forEach(b => lines.push(`<span class="loan-item loan-soon">📅 「${b.title || b.isbn}」の返却期限まであと${b.diff}日</span>`));
+
+  const allIsbns = [...overdue, ...soon].map(b => b.isbn);
+  let bookMap = {};
+  try {
+    const res = await fetch(`/api/books/batch?isbns=${allIsbns.join(",")}`);
+    const books = await res.json();
+    bookMap = Object.fromEntries(books.filter(Boolean).map(b => [b.isbn, b]));
+  } catch {}
+
+  const renderRow = (b, isOverdue) => {
+    const book = bookMap[b.isbn] || { isbn: b.isbn, title: b.isbn, isbn10: "", cover: "" };
+    const cover = _bookCoverHtml(book.isbn, book.isbn10 || "", book.cover || "", esc(book.title), "loan-item-cover");
+    const label = isOverdue
+      ? `貸出期間を${Math.abs(b.diff)}日超過しています`
+      : `返却期限まであと${b.diff}日です`;
+    return `<div class="loan-item ${isOverdue ? 'loan-overdue' : 'loan-soon'}" onclick="openModal('${book.isbn}')">
+      ${cover}
+      <div class="loan-item-body">
+        <div class="loan-item-title">${esc(book.title || book.isbn)}</div>
+        <div class="loan-item-label">${isOverdue ? "⚠️" : "📅"} ${label}</div>
+      </div>
+    </div>`;
+  };
+  const lines = [...overdue.map(b => renderRow(b, true)), ...soon.map(b => renderRow(b, false))];
   const banner = document.getElementById("loanReminderBanner");
   if (banner) { banner.innerHTML = lines.join(""); banner.style.display = "flex"; }
 }
