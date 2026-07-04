@@ -5971,7 +5971,8 @@ function _buildAwardItems(books) {
     if (b.library_isbn) byTitle[key].library_isbn = b.library_isbn;
     if (b.isbn13 && !byTitle[key].isbn13) byTitle[key].isbn13 = b.isbn13;
     if (b.in_library) byTitle[key].in_library = true;
-    const awardLabel = `${b.award}${b.award_no != null ? ` 第${b.award_no}回` : ""}（${b.award_year}年）`;
+    const categoryLabel = b.award_category ? `・${b.award_category}` : "";
+    const awardLabel = `${b.award}${b.award_no != null ? ` 第${b.award_no}回` : ""}（${b.award_year}年）${categoryLabel}`;
     if (!byTitle[key].awards_list.find(a => a.label === awardLabel)) {
       byTitle[key].awards_list.push({ label: awardLabel, year: b.award_year });
     }
