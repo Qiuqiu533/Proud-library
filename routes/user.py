@@ -1,10 +1,13 @@
 import json
+import logging
 import secrets
 import re as _re
 from flask import Blueprint, request, jsonify
 from database import get_con, execute, fetchone, fetchall, USE_PG
 from services.utils import _hash_password, _verify_password, _send_reset_email, _is_bcrypt_hash, rate_limit
 from config import INVITE_REQUIRED
+
+logger = logging.getLogger(__name__)
 
 user_bp = Blueprint("user", __name__)
 
@@ -445,9 +448,14 @@ def api_get_my_loans():
     if not authed:
         return jsonify({"error": "unauthorized"}), 401
     con = get_con()
-    items = fetchall(con, "SELECT isbn, title, author, due_date, created_at FROM my_loans WHERE room=? AND returned_at IS NULL ORDER BY due_date ASC", (room,))
-    con.close()
-    return jsonify([{**r, "due_date": str(r["due_date"])[:10] if r.get("due_date") else None} for r in items])
+    try:
+        items = fetchall(con, "SELECT isbn, title, author, due_date, created_at FROM my_loans WHERE room=? AND returned_at IS NULL ORDER BY due_date ASC", (room,))
+        con.close()
+        return jsonify([{**r, "due_date": str(r["due_date"])[:10] if r.get("due_date") else None} for r in items])
+    except Exception as e:
+        con.close()
+        logger.error("[my-loans] GET error: %s", e)
+        return jsonify({"error": "db error"}), 500
 
 
 @user_bp.route("/api/my-loans", methods=["POST"])
@@ -484,8 +492,9 @@ def api_upsert_my_loan():
         con.commit()
         con.close()
         return jsonify({"ok": True})
-    except Exception:
+    except Exception as e:
         con.close()
+        logger.error("[my-loans] POST error: %s", e)
         return jsonify({"error": "db error"}), 500
 
 
@@ -500,12 +509,17 @@ def api_return_my_loan():
     if not isbn:
         return jsonify({"error": "isbn required"}), 400
     con = get_con()
-    if USE_PG:
-        execute(con, "UPDATE my_loans SET returned_at=NOW() WHERE room=%s AND isbn=%s", (room, isbn))
-    else:
-        execute(con, "UPDATE my_loans SET returned_at=CURRENT_TIMESTAMP WHERE room=? AND isbn=?", (room, isbn))
-    con.commit(); con.close()
-    return jsonify({"ok": True})
+    try:
+        if USE_PG:
+            execute(con, "UPDATE my_loans SET returned_at=NOW() WHERE room=%s AND isbn=%s", (room, isbn))
+        else:
+            execute(con, "UPDATE my_loans SET returned_at=CURRENT_TIMESTAMP WHERE room=? AND isbn=?", (room, isbn))
+        con.commit(); con.close()
+        return jsonify({"ok": True})
+    except Exception as e:
+        con.close()
+        logger.error("[my-loans] PATCH return error: %s", e)
+        return jsonify({"error": "db error"}), 500
 
 
 @user_bp.route("/api/admin/reset-user-password", methods=["POST"])
