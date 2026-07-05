@@ -10,6 +10,7 @@
 フローに限定する。
 """
 import logging
+import re
 import unicodedata
 import time
 from difflib import SequenceMatcher
@@ -23,6 +24,19 @@ from database import get_con, db_session, execute, fetchall, fetchone, USE_PG
 
 _audit_running = False
 
+# 末尾の「（朝日文庫）」「〈3〉」「Vol.2」「【新版】」等、シリーズ名・レーベル名・
+# 巻数・版表記を除去してから比較する（genre_books側は表示用に長いタイトルを
+# 保持する設計のため、素の文字列類似度では大量に誤検知するとの指摘を受けて
+# 2026-07-06に追加）。
+_TITLE_NOISE_RE = re.compile(
+    r"[\s]*[（(【\[〈<][^（）()【】\[\]〈〉<>]*[）)】\]〉>]\s*$"
+)
+_TITLE_VOL_SUFFIX_RE = re.compile(r"[\s]*(vol\.?\s*\d+|第?\d+巻|[（(]?[上下][）)]?)\s*$", re.IGNORECASE)
+# OpenBDの著者欄は「姓,名,生没年 姓,名,生没年 ほか」のように複数人を空白区切りで
+# 連結している。生没年・「ほか」を除去してから人物単位に分割する。
+_AUTHOR_YEAR_RE = re.compile(r",?\d{4}-\d{0,4}")
+_AUTHOR_ETC_RE = re.compile(r"ほか\s*$")
+
 
 def is_audit_running():
     return _audit_running
@@ -33,16 +47,70 @@ def _norm(s):
 
 
 def _sim(a, b):
-    return SequenceMatcher(None, _norm(a), _norm(b)).ratio()
+    return SequenceMatcher(None, a, b).ratio()
+
+
+def _dense(s):
+    """空白・カンマを除去し、比較用に文字列を圧縮する。"""
+    return re.sub(r"[\s,、]", "", s or "")
+
+
+def _normalize_title_for_compare(title):
+    """タイトル末尾のシリーズ名・レーベル名・巻数・版表記を繰り返し除去する。
+    例: '悪人（上）（朝日文庫）' → '悪人'、'魔球 (講談社文庫)' → '魔球'"""
+    s = _norm(title)
+    prev = None
+    while prev != s:
+        prev = s
+        s = _TITLE_NOISE_RE.sub("", s)
+        s = _TITLE_VOL_SUFFIX_RE.sub("", s)
+    return _dense(s)
+
+
+def _title_mismatch(db_title, ob_title):
+    if not ob_title:
+        return False
+    a, b = _normalize_title_for_compare(db_title), _normalize_title_for_compare(ob_title)
+    if not a or not b:
+        return False
+    if len(a) >= 3 and (a in b or b in a):
+        return False
+    return _sim(a, b) < 0.5
+
+
+def _author_tokens(ob_author):
+    """OpenBDの著者欄（複数人・生没年付き）を人物単位のトークンに分割する。"""
+    s = _norm(ob_author)
+    s = _AUTHOR_ETC_RE.sub("", s)
+    s = _AUTHOR_YEAR_RE.sub("", s)
+    return [_dense(t) for t in s.split() if _dense(t)]
+
+
+def _author_mismatch(db_author, ob_author):
+    if not ob_author or not db_author:
+        return False
+    db_dense = _dense(_norm(db_author))
+    if not db_dense:
+        return False
+    for token in _author_tokens(ob_author):
+        if not token:
+            continue
+        if len(token) >= 2 and (token in db_dense or db_dense in token):
+            return False
+        if _sim(db_dense, token) >= 0.6:
+            return False
+    return True
 
 
 def _mismatch_fields(db_title, db_author, ob_title, ob_author):
-    """タイトル・著者のどちらが不一致かを判定する。表記ゆれ（副題・スペース等）
-    による誤検知を避けるため、閾値は緩め（0.4未満のみ「明確な不一致」とする）。"""
+    """タイトル・著者のどちらが不一致かを判定する。genre_books側はシリーズ名・
+    文庫レーベル・巻数を含む表示用タイトルを保持し、OpenBD側は複数著者を
+    生没年付きで列挙する設計のため、双方を正規化・分割してから比較する
+    （2026-07-06改修：素の文字列類似度比較では誤検知が9割超だったため）。"""
     fields = []
-    if ob_title and _sim(db_title, ob_title) < 0.4:
+    if _title_mismatch(db_title, ob_title):
         fields.append("title")
-    if ob_author and db_author and _sim(db_author, ob_author) < 0.4:
+    if _author_mismatch(db_author, ob_author):
         fields.append("author")
     return fields
 
