@@ -267,7 +267,7 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .modal-content { display: flex; flex-direction: column; gap: 18px; }
 .modal-top { display: flex; gap: 24px; align-items: flex-start; }
 .modal-cover { width: 200px; flex-shrink: 0; border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,0.18); overflow: hidden; }
-.modal-cover img { width: 100%; display: block; }
+.modal-cover img { width: 100%; height: auto; aspect-ratio: 2 / 3; object-fit: contain; object-position: center top; background: #e8e4dc; display: block; }
 .modal-cover-placeholder { width: 200px; height: 290px; background: linear-gradient(135deg, #c8d8c0, #a0b89a); display: flex; align-items: center; justify-content: center; font-size: 3rem; border-radius: 10px; }
 .modal-cover-awards { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px; }
 .modal-header h2 { font-size: 1.45rem; line-height: 1.4; margin-bottom: 8px; }
