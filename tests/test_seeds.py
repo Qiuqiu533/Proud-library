@@ -115,11 +115,12 @@ def test_award_books_noma_must_exist():
 
 def test_award_books_yomiuri_novel_rounds():
     """読売文学賞・小説賞の受賞枠（回次単位）とレコード数（行単位、共同受賞は複数行）を
-    それぞれ検証する。第5回・第10回は受賞作なしのため欠番が正しい状態。"""
+    それぞれ検証する。第5・10・13回は受賞作なしのため欠番が正しい状態。"""
     rows = [t for t in _AWARD_BOOKS_SEED if t[0] == "読売文学賞" and t[6] == "小説賞"]
     rounds = {t[1] for t in rows}
-    assert rounds == {1, 2, 3, 4, 6, 7, 8, 9}, f"想定と異なる回次構成です: {sorted(rounds)}"
-    assert len(rows) == 11, f"レコード数(行単位)が想定と異なります: {len(rows)}件"
+    expected_rounds = {1, 2, 3, 4, 6, 7, 8, 9, 11, 12, 14, 15, 16, 17, 18, 19, 20}
+    assert rounds == expected_rounds, f"想定と異なる回次構成です: {sorted(rounds)}"
+    assert len(rows) == 22, f"レコード数(行単位)が想定と異なります: {len(rows)}件"
 
 
 def test_award_books_akutagawa_naoki_award_no_required():
