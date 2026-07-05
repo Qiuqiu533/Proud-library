@@ -6,6 +6,7 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from seeds import _AWARDS_SEED, _AWARD_BOOKS_SEED
+from migrations import AWARD_BOOKS_SEEDS_MIN_ROUND
 
 # ── 正しいことが確定している受賞データ ───────────────────────────────────────
 MUST_EXIST = [
@@ -116,6 +117,19 @@ def test_award_books_akutagawa_naoki_award_no_required():
     award_no=Noneのエントリが混入したら検知する。"""
     missing = [t for t in _AWARD_BOOKS_SEED if t[0] in ("芥川賞", "直木賞") and t[1] is None]
     assert not missing, f"芥川賞・直木賞でaward_noが欠落しているエントリがあります: {missing}"
+
+
+def test_award_books_seeds_min_round_boundary():
+    """芥川賞・直木賞のseeds.py最小award_noがmigrations.AWARD_BOOKS_SEEDS_MIN_ROUNDと一致するか確認する。
+    この境界値はPLAM CSV由来の1935〜2002年データとの復元マイグレーションが前提とする境界であり、
+    ズレるとPLAM側データの復元漏れ・二重挿入につながる。"""
+    for award, expected_min in AWARD_BOOKS_SEEDS_MIN_ROUND.items():
+        rows = [t for t in _AWARD_BOOKS_SEED if t[0] == award and t[1] is not None]
+        actual_min = min(t[1] for t in rows)
+        assert actual_min == expected_min, (
+            f"{award}のseeds.py最小award_noが{actual_min}ですが、"
+            f"migrations.AWARD_BOOKS_SEEDS_MIN_ROUND={expected_min}と不一致です"
+        )
 
 
 def test_award_books_no_duplicate_entries():
