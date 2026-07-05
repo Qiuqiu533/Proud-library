@@ -2051,8 +2051,8 @@ def _migrate_restore_pre2003_akutagawa_naoki():
             cur.execute("SELECT COUNT(*) FROM award_books WHERE award = %s", (award,))
             before_counts[award] = cur.fetchone()[0]
 
-        existing_rows = fetchall(con, "SELECT award, title FROM award_books WHERE award = ANY(%s)", (list(targets),))
-        existing = {(_n(r["title"]), r["award"]) for r in existing_rows}
+        existing_rows = fetchall(con, "SELECT award, title, author FROM award_books WHERE award = ANY(%s)", (list(targets),))
+        existing = {(_n(r["title"]), _n(r["author"]), r["award"]) for r in existing_rows}
 
         # 1) seeds.py側の未反映分（共同受賞漏れ等）を追加
         seed_rows = [t for t in _AWARD_BOOKS_SEED if len(t) == 6 and t[0] in targets]
@@ -2067,7 +2067,7 @@ def _migrate_restore_pre2003_akutagawa_naoki():
                 return
         step_a_inserted = {award: 0 for award in targets}
         for (award, no, year, title, author, status) in seed_rows:
-            key = (_n(title), award)
+            key = (_n(title), _n(author), award)
             if key in existing:
                 continue
             cur.execute(
@@ -2097,7 +2097,7 @@ def _migrate_restore_pre2003_akutagawa_naoki():
                 continue
             author = (work.get("author") or "").strip()
             award_year = int(row["award_year"]) if row.get("award_year") else None
-            key = (_n(title), award_name)
+            key = (_n(title), _n(author), award_name)
             if key in existing:
                 continue
             cur.execute(
@@ -2177,12 +2177,12 @@ def _migrate_add_yomiuri_novel_award():
     con = get_con()
     try:
         cur = con.cursor()
-        existing_rows = fetchall(con, "SELECT award, title FROM award_books WHERE award = %s", ("読売文学賞",))
-        existing = {(_n(r["title"]), r["award"]) for r in existing_rows}
+        existing_rows = fetchall(con, "SELECT award, title, author FROM award_books WHERE award = %s", ("読売文学賞",))
+        existing = {(_n(r["title"]), _n(r["author"]), r["award"]) for r in existing_rows}
 
         inserted = 0
         for (award, no, year, title, author, status, category) in seed_rows:
-            key = (_n(title), award)
+            key = (_n(title), _n(author), award)
             if key in existing:
                 continue
             cur.execute(
@@ -2213,8 +2213,12 @@ def _migrate_add_noma_pre2010():
     全件とDB既存行を突き合わせ、未登録のタイトルだけをINSERTする。
     出典: kodansha.co.jp/awards/noma/b/histories（主催者公式サイト、川端康成「山の音」
     はWebSearchでも交差確認済み）。
+
+    v1: 重複判定キーが(title, award)のみだったため、第1・3・5回が全て同一タイトル
+    「（業績に対する受賞）」となり、第3回・第5回が「既存」と誤判定されてスキップされる
+    事故が発生した（2026-07-05）。v2でキーに著者名を追加して再実行し、不足分を補う。
     """
-    if _migration_done("add_noma_pre2010_v1"):
+    if _migration_done("add_noma_pre2010_v2"):
         return
     if not USE_PG:
         return
@@ -2233,12 +2237,12 @@ def _migrate_add_noma_pre2010():
     con = get_con()
     try:
         cur = con.cursor()
-        existing_rows = fetchall(con, "SELECT award, title FROM award_books WHERE award = %s", ("野間文芸賞",))
-        existing = {(_n(r["title"]), r["award"]) for r in existing_rows}
+        existing_rows = fetchall(con, "SELECT award, title, author FROM award_books WHERE award = %s", ("野間文芸賞",))
+        existing = {(_n(r["title"]), _n(r["author"]), r["award"]) for r in existing_rows}
 
         inserted = 0
         for (award, no, year, title, author, status) in seed_rows:
-            key = (_n(title), award)
+            key = (_n(title), _n(author), award)
             if key in existing:
                 continue
             cur.execute(
@@ -2249,7 +2253,7 @@ def _migrate_add_noma_pre2010():
             inserted += 1
 
         con.commit()
-        _mark_migration_done("add_noma_pre2010_v1")
+        _mark_migration_done("add_noma_pre2010_v2")
         logger.info("[add_noma_pre2010] %d件追加完了（seeds.py全%d件中）", inserted, len(seed_rows))
     except Exception as e:
         logger.error("[add_noma_pre2010] error: %s", e, exc_info=True)
@@ -2293,8 +2297,8 @@ def _migrate_sync_plam_to_award_books():
 
     con = get_con()
     try:
-        existing_rows = fetchall(con, "SELECT award, title FROM award_books")
-        existing = {(_n(r["title"]), r["award"]) for r in existing_rows}
+        existing_rows = fetchall(con, "SELECT award, title, author FROM award_books")
+        existing = {(_n(r["title"]), _n(r["author"]), r["award"]) for r in existing_rows}
         logger.info("[migration] sync_plam: 既存 %d件、history %d件", len(existing_rows), len(history))
 
         inserted = 0
@@ -2313,14 +2317,14 @@ def _migrate_sync_plam_to_award_books():
             award_year = int(row["award_year"]) if row.get("award_year") else None
             award_no = int(row["award_no"]) if row.get("award_no") else None
 
-            if (_n(title), award_name) in existing:
+            if (_n(title), _n(author), award_name) in existing:
                 continue
 
             execute(con,
                 "INSERT INTO award_books (award, award_no, award_year, title, author, isbn13, status) VALUES (?,?,?,?,?,?,?)",
                 (award_name, award_no, award_year, title, author, isbn13, "確認済"),
             )
-            existing.add((_n(title), award_name))
+            existing.add((_n(title), _n(author), award_name))
             inserted += 1
 
         con.commit()
