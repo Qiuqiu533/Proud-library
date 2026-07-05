@@ -2139,12 +2139,20 @@ def _migrate_restore_pre2003_akutagawa_naoki():
 
 
 def _migrate_add_yomiuri_novel_award():
-    """読売文学賞・小説賞（第1〜10回、1949〜1958年度）をseeds.pyから追加する。
-    award_booksに読売文学賞のレコードは1件も無い状態からの新規追加のため、
-    重複チェックのみ行うadditive insertで十分（DELETEは行わない）。
+    """読売文学賞・小説賞をseeds.pyから追加する（additive insert、DELETEなし）。
+
+    NOTE: この関数は冪等（idempotent）設計。実行のたびに_AWARD_BOOKS_SEED全件と
+    DB既存行（title正規化キー）を突き合わせ、未登録のタイトルだけをINSERTする。
+    「実行済みフラグ」は“もう一度全部やり直さない”ためのショートカットに過ぎず、
+    正しさの根拠はフラグではなく実行時のDB照合そのものにある。そのため
+    seeds.pyに新しい回次を追記した際は、対応するフラグ文字列をv2→v3のように
+    インクリメントするだけで安全に増分反映できる（DELETEも全件洗い替えも不要）。
+
+    v1: 第1〜10回（1949〜1958年度）
+    v2: 第11〜20回（1959〜1968年度）を追加。
     出典: prizesworld.com/prizes/various/yomi.htm（公式受賞記録の照合済み）。
     """
-    if _migration_done("add_yomiuri_novel_award_v1"):
+    if _migration_done("add_yomiuri_novel_award_v2"):
         return
     if not USE_PG:
         return
@@ -2179,7 +2187,7 @@ def _migrate_add_yomiuri_novel_award():
             inserted += 1
 
         con.commit()
-        _mark_migration_done("add_yomiuri_novel_award_v1")
+        _mark_migration_done("add_yomiuri_novel_award_v2")
         logger.info("[add_yomiuri_novel_award] %d件追加完了（seeds.py全%d件中）", inserted, len(seed_rows))
     except Exception as e:
         logger.error("[add_yomiuri_novel_award] error: %s", e, exc_info=True)
