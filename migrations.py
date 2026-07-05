@@ -2138,6 +2138,59 @@ def _migrate_restore_pre2003_akutagawa_naoki():
         con.close()
 
 
+def _migrate_add_yomiuri_novel_award():
+    """読売文学賞・小説賞（第1〜10回、1949〜1958年度）をseeds.pyから追加する。
+    award_booksに読売文学賞のレコードは1件も無い状態からの新規追加のため、
+    重複チェックのみ行うadditive insertで十分（DELETEは行わない）。
+    出典: prizesworld.com/prizes/various/yomi.htm（公式受賞記録の照合済み）。
+    """
+    if _migration_done("add_yomiuri_novel_award_v1"):
+        return
+    if not USE_PG:
+        return
+
+    import unicodedata
+
+    def _n(s):
+        s = unicodedata.normalize("NFKC", s or "").strip()
+        return "".join(s.split())
+
+    seed_rows = [t for t in _AWARD_BOOKS_SEED if t[0] == "読売文学賞"]
+    if not seed_rows:
+        logger.error("[add_yomiuri_novel_award] seeds.pyに読売文学賞データがありません")
+        return
+
+    con = get_con()
+    try:
+        cur = con.cursor()
+        existing_rows = fetchall(con, "SELECT award, title FROM award_books WHERE award = %s", ("読売文学賞",))
+        existing = {(_n(r["title"]), r["award"]) for r in existing_rows}
+
+        inserted = 0
+        for (award, no, year, title, author, status, category) in seed_rows:
+            key = (_n(title), award)
+            if key in existing:
+                continue
+            cur.execute(
+                "INSERT INTO award_books (award, award_no, award_year, title, author, status, award_category) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+                (award, no, year, title, author, status, category),
+            )
+            existing.add(key)
+            inserted += 1
+
+        con.commit()
+        _mark_migration_done("add_yomiuri_novel_award_v1")
+        logger.info("[add_yomiuri_novel_award] %d件追加完了（seeds.py全%d件中）", inserted, len(seed_rows))
+    except Exception as e:
+        logger.error("[add_yomiuri_novel_award] error: %s", e, exc_info=True)
+        try:
+            con.rollback()
+        except Exception:
+            pass
+    finally:
+        con.close()
+
+
 def _migrate_sync_plam_to_award_books():
     """PLAM CSV (award_history.csv + works.csv) を award_books に同期する。"""
     if _migration_done("sync_plam_to_award_books_v2"):
@@ -2404,6 +2457,7 @@ def _run_all_migrations_steps():
         _cleanup_award_books_duplicates,   # 障害復旧（2026-07-04）: 複数ワーカー同時実行による重複除去
         _migrate_akutagawa_naoki_official_replace,  # 芥川賞・直木賞を公式データで全面置換（2026-07-05）
         _migrate_restore_pre2003_akutagawa_naoki,   # 障害復旧（2026-07-05）: 1935〜2002年分をPLAM CSVから追加のみで復元
+        _migrate_add_yomiuri_novel_award,           # 読売文学賞・小説賞（第1〜10回）を新規追加（2026-07-05）
         _migrate_fetch_isbn_ndl,           # NDL API で isbn13 補完（バックグラウンド）
         _migrate_db_indices,               # パフォーマンス用インデックス
         _verify_tables,

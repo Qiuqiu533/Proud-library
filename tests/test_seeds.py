@@ -94,9 +94,10 @@ NOMA_MUST_EXIST = [
 
 
 def test_award_books_tuple_length_consistent():
-    """_AWARD_BOOKS_SEED の全タプルが6要素で統一されているか確認。"""
-    bad = [t for t in _AWARD_BOOKS_SEED if len(t) != 6]
-    assert not bad, f"タプル長が6でないエントリがあります: {bad}"
+    """_AWARD_BOOKS_SEED の全タプルが6要素（部門なし）または7要素（award_category付き、
+    読売文学賞等の部門制の賞）のいずれかで統一されているか確認。"""
+    bad = [t for t in _AWARD_BOOKS_SEED if len(t) not in (6, 7)]
+    assert not bad, f"タプル長が6・7以外のエントリがあります: {bad}"
 
 
 def test_award_books_noma_count():
