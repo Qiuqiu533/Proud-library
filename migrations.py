@@ -2154,10 +2154,11 @@ def _migrate_add_yomiuri_novel_award():
     v4: 第31〜40回（1979〜1988年度）
     v5: 第41〜50回（1989〜1998年度）
     v6: 第51〜60回（1999〜2008年度）
-    v7: 第61〜70回（2009〜2018年度）を追加。
+    v7: 第61〜70回（2009〜2018年度）
+    v8: 第71〜76回（2019〜2024年度）を追加。
     出典: award-books.com/yomiuribungaku-novel-all/（小説賞特化サイト、個別作品はWebSearchで交差確認）。
     """
-    if _migration_done("add_yomiuri_novel_award_v7"):
+    if _migration_done("add_yomiuri_novel_award_v8"):
         return
     if not USE_PG:
         return
@@ -2192,7 +2193,7 @@ def _migrate_add_yomiuri_novel_award():
             inserted += 1
 
         con.commit()
-        _mark_migration_done("add_yomiuri_novel_award_v7")
+        _mark_migration_done("add_yomiuri_novel_award_v8")
         logger.info("[add_yomiuri_novel_award] %d件追加完了（seeds.py全%d件中）", inserted, len(seed_rows))
     except Exception as e:
         logger.error("[add_yomiuri_novel_award] error: %s", e, exc_info=True)
