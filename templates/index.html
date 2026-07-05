@@ -1377,20 +1377,12 @@
         <!-- 集計・分析 -->
         <div id="asub-analysis" class="analytics-sub-panel">
         <h3 style="margin-bottom:16px">📈 集計・分析レポート</h3>
-        <p style="font-size:0.8rem;color:#888;margin-bottom:16px">出典：librarylife.net / openBD API　※蔵書数・受賞作数はリアルタイム、ジャンル別等は定期集計データ</p>
+        <p style="font-size:0.8rem;color:#888;margin-bottom:16px">出典：librarylife.net / openBD API　※全項目リアルタイム集計（アクセス時点のDBから都度算出）</p>
 
         <div class="analysis-summary-grid">
           <div class="analysis-stat-card">
             <div class="analysis-stat-num" id="statTotalBooks">—</div>
             <div class="analysis-stat-label">総蔵書数</div>
-          </div>
-          <div class="analysis-stat-card">
-            <div class="analysis-stat-num">3,648</div>
-            <div class="analysis-stat-label">出版年データあり（67%）</div>
-          </div>
-          <div class="analysis-stat-card">
-            <div class="analysis-stat-num">3,555</div>
-            <div class="analysis-stat-label">価格データあり（65%）</div>
           </div>
           <div class="analysis-stat-card">
             <div class="analysis-stat-num" id="statAwardCount">—</div>
@@ -1402,40 +1394,15 @@
           <h4>■ ジャンル別冊数</h4>
           <table class="analysis-table">
             <thead><tr><th>ジャンル</th><th>冊数</th><th>割合</th></tr></thead>
-            <tbody>
-              <tr><td>文芸小説</td><td>4,645</td><td><div class="bar-cell"><div class="bar-fill" style="width:85%"></div><span>84.9%</span></div></td></tr>
-              <tr><td>その他（要分類）</td><td>261</td><td><div class="bar-cell"><div class="bar-fill" style="width:5%"></div><span>4.8%</span></div></td></tr>
-              <tr><td>児童学習漫画</td><td>101</td><td><div class="bar-cell"><div class="bar-fill" style="width:2%"></div><span>1.8%</span></div></td></tr>
-              <tr><td>絵本・児童書</td><td>78</td><td><div class="bar-cell"><div class="bar-fill" style="width:1.4%"></div><span>1.4%</span></div></td></tr>
-              <tr><td>時代小説・歴史小説</td><td>56</td><td><div class="bar-cell"><div class="bar-fill" style="width:1%"></div><span>1.0%</span></div></td></tr>
-              <tr><td>児童文学</td><td>56</td><td><div class="bar-cell"><div class="bar-fill" style="width:1%"></div><span>1.0%</span></div></td></tr>
-              <tr><td>ミステリ・推理</td><td>54</td><td><div class="bar-cell"><div class="bar-fill" style="width:1%"></div><span>1.0%</span></div></td></tr>
-              <tr><td>実用・ハウツー</td><td>47</td><td><div class="bar-cell"><div class="bar-fill" style="width:0.9%"></div><span>0.9%</span></div></td></tr>
-              <tr><td>児童学習書</td><td>45</td><td><div class="bar-cell"><div class="bar-fill" style="width:0.8%"></div><span>0.8%</span></div></td></tr>
-              <tr><td>ファンタジー・SF</td><td>31</td><td><div class="bar-cell"><div class="bar-fill" style="width:0.6%"></div><span>0.6%</span></div></td></tr>
-              <tr><td>絵本</td><td>28</td><td><div class="bar-cell"><div class="bar-fill" style="width:0.5%"></div><span>0.5%</span></div></td></tr>
-              <tr><td>児童文学・YA</td><td>24</td><td><div class="bar-cell"><div class="bar-fill" style="width:0.4%"></div><span>0.4%</span></div></td></tr>
-              <tr><td>翻訳小説</td><td>13</td><td><div class="bar-cell"><div class="bar-fill" style="width:0.2%"></div><span>0.2%</span></div></td></tr>
-              <tr><td>エッセイ・評論</td><td>8</td><td><div class="bar-cell"><div class="bar-fill" style="width:0.1%"></div><span>0.1%</span></div></td></tr>
-              <tr><td>社会・ノンフィクション</td><td>7</td><td><div class="bar-cell"><div class="bar-fill" style="width:0.1%"></div><span>0.1%</span></div></td></tr>
-              <tr><td>英語絵本</td><td>6</td><td><div class="bar-cell"><div class="bar-fill" style="width:0.1%"></div><span>0.1%</span></div></td></tr>
-              <tr><td>科学・学術</td><td>5</td><td><div class="bar-cell"><div class="bar-fill" style="width:0.1%"></div><span>0.1%</span></div></td></tr>
-              <tr><td>恋愛・青春小説</td><td>5</td><td><div class="bar-cell"><div class="bar-fill" style="width:0.1%"></div><span>0.1%</span></div></td></tr>
-            </tbody>
+            <tbody id="analysisGenreBody"><tr><td colspan="3" class="loading">読み込み中…</td></tr></tbody>
           </table>
         </div>
 
         <div class="analysis-section">
-          <h4>■ おすすめ度分布</h4>
+          <h4>■ 住民評価の分布（★1〜10、評価が付いている本のみ）</h4>
           <table class="analysis-table">
-            <thead><tr><th>おすすめ度</th><th>冊数</th><th>割合</th></tr></thead>
-            <tbody>
-              <tr><td>★10（最高）</td><td>5</td><td><div class="bar-cell"><div class="bar-fill bar-gold" style="width:0.1%"></div><span>0.1%</span></div></td></tr>
-              <tr><td>★9</td><td>136</td><td><div class="bar-cell"><div class="bar-fill bar-gold" style="width:2.5%"></div><span>2.5%</span></div></td></tr>
-              <tr><td>★8</td><td>155</td><td><div class="bar-cell"><div class="bar-fill bar-gold" style="width:2.8%"></div><span>2.8%</span></div></td></tr>
-              <tr><td>★7</td><td>327</td><td><div class="bar-cell"><div class="bar-fill bar-gold" style="width:6%"></div><span>6.0%</span></div></td></tr>
-              <tr><td>★6</td><td>4,847</td><td><div class="bar-cell"><div class="bar-fill bar-gold" style="width:88.6%"></div><span>88.6%</span></div></td></tr>
-            </tbody>
+            <thead><tr><th>評価</th><th>冊数</th><th>割合</th></tr></thead>
+            <tbody id="analysisRatingBody"><tr><td colspan="3" class="loading">読み込み中…</td></tr></tbody>
           </table>
         </div>
 
@@ -1443,28 +1410,7 @@
           <h4>■ 出版社別冊数（上位50社）</h4>
           <table class="analysis-table">
             <thead><tr><th>出版社</th><th>冊数</th><th>割合</th></tr></thead>
-            <tbody>
-              <tr><td>講談社</td><td>615</td><td><div class="bar-cell"><div class="bar-fill bar-blue" style="width:100%"></div><span>11.2%</span></div></td></tr>
-              <tr><td>文藝春秋</td><td>515</td><td><div class="bar-cell"><div class="bar-fill bar-blue" style="width:83.7%"></div><span>9.4%</span></div></td></tr>
-              <tr><td>新潮社</td><td>423</td><td><div class="bar-cell"><div class="bar-fill bar-blue" style="width:68.8%"></div><span>7.7%</span></div></td></tr>
-              <tr><td>角川書店</td><td>325</td><td><div class="bar-cell"><div class="bar-fill bar-blue" style="width:52.8%"></div><span>5.9%</span></div></td></tr>
-              <tr><td>登録無し(ISBN無)</td><td>290</td><td><div class="bar-cell"><div class="bar-fill bar-blue" style="width:47.2%"></div><span>5.3%</span></div></td></tr>
-              <tr><td>集英社</td><td>223</td><td><div class="bar-cell"><div class="bar-fill bar-blue" style="width:36.3%"></div><span>4.1%</span></div></td></tr>
-              <tr><td>小学館</td><td>185</td><td><div class="bar-cell"><div class="bar-fill bar-blue" style="width:30.1%"></div><span>3.4%</span></div></td></tr>
-              <tr><td>朝日新聞社</td><td>174</td><td><div class="bar-cell"><div class="bar-fill bar-blue" style="width:28.3%"></div><span>3.2%</span></div></td></tr>
-              <tr><td>幻冬舎</td><td>161</td><td><div class="bar-cell"><div class="bar-fill bar-blue" style="width:26.2%"></div><span>2.9%</span></div></td></tr>
-              <tr><td>福音館書店</td><td>142</td><td><div class="bar-cell"><div class="bar-fill bar-blue" style="width:23.1%"></div><span>2.6%</span></div></td></tr>
-              <tr><td>光文社</td><td>130</td><td><div class="bar-cell"><div class="bar-fill bar-blue" style="width:21.1%"></div><span>2.4%</span></div></td></tr>
-              <tr><td>ポプラ社</td><td>118</td><td><div class="bar-cell"><div class="bar-fill bar-blue" style="width:19.2%"></div><span>2.2%</span></div></td></tr>
-              <tr><td>偕成社</td><td>108</td><td><div class="bar-cell"><div class="bar-fill bar-blue" style="width:17.6%"></div><span>2.0%</span></div></td></tr>
-              <tr><td>中央公論社</td><td>91</td><td><div class="bar-cell"><div class="bar-fill bar-blue" style="width:14.8%"></div><span>1.7%</span></div></td></tr>
-              <tr><td>双葉社</td><td>82</td><td><div class="bar-cell"><div class="bar-fill bar-blue" style="width:13.3%"></div><span>1.5%</span></div></td></tr>
-              <tr><td>PHP研究所</td><td>61</td><td><div class="bar-cell"><div class="bar-fill bar-blue" style="width:9.9%"></div><span>1.1%</span></div></td></tr>
-              <tr><td>早川書房</td><td>61</td><td><div class="bar-cell"><div class="bar-fill bar-blue" style="width:9.9%"></div><span>1.1%</span></div></td></tr>
-              <tr><td>学習研究社</td><td>60</td><td><div class="bar-cell"><div class="bar-fill bar-blue" style="width:9.8%"></div><span>1.1%</span></div></td></tr>
-              <tr><td>徳間書店</td><td>58</td><td><div class="bar-cell"><div class="bar-fill bar-blue" style="width:9.4%"></div><span>1.1%</span></div></td></tr>
-              <tr><td>岩崎書店</td><td>57</td><td><div class="bar-cell"><div class="bar-fill bar-blue" style="width:9.3%"></div><span>1.0%</span></div></td></tr>
-            </tbody>
+            <tbody id="analysisPublisherBody"><tr><td colspan="3" class="loading">読み込み中…</td></tr></tbody>
           </table>
         </div>
         </div>

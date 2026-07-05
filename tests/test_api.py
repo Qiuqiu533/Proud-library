@@ -51,8 +51,15 @@ def test_books_popular(client):
     assert isinstance(data, list)
 
 def test_stats(client):
+    """蔵書統計は実データからの動的集計。DBが空でもクラッシュせず、
+    想定キーを持つ構造で返ることを確認する（旧FULL_STATSハードコード撤去の回帰防止）。"""
     res = client.get("/api/stats")
     assert res.status_code == 200
+    data = json.loads(res.data)
+    for key in ("total", "genres", "publishers", "authors", "formats", "rating_distribution"):
+        assert key in data, f"{key} がレスポンスにありません"
+    assert isinstance(data["total"], int)
+    assert isinstance(data["genres"], list)
 
 def test_new_arrivals(client):
     res = client.get("/api/new-arrivals")
