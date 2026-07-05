@@ -113,6 +113,15 @@ def test_award_books_noma_must_exist():
     assert not missing, f"野間文芸賞の必須エントリが欠落しています: {missing}"
 
 
+def test_award_books_yomiuri_novel_rounds():
+    """読売文学賞・小説賞の受賞枠（回次単位）とレコード数（行単位、共同受賞は複数行）を
+    それぞれ検証する。第5回・第10回は受賞作なしのため欠番が正しい状態。"""
+    rows = [t for t in _AWARD_BOOKS_SEED if t[0] == "読売文学賞" and t[6] == "小説賞"]
+    rounds = {t[1] for t in rows}
+    assert rounds == {1, 2, 3, 4, 6, 7, 8, 9}, f"想定と異なる回次構成です: {sorted(rounds)}"
+    assert len(rows) == 11, f"レコード数(行単位)が想定と異なります: {len(rows)}件"
+
+
 def test_award_books_akutagawa_naoki_award_no_required():
     """芥川賞・直木賞は日本文学振興会公式サイトで全件回次(award_no)が確認できるため、
     award_no=Noneのエントリが混入したら検知する。"""
