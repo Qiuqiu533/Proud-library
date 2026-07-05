@@ -1,4 +1,4 @@
-const CACHE_NAME = 'proud-library-v17';
+const CACHE_NAME = 'proud-library-v18';
 const STATIC_ASSETS = [
   '/',
   '/static/app.js',
