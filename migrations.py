@@ -2151,11 +2151,11 @@ def _migrate_add_yomiuri_novel_award():
     v1: 第1〜10回（1949〜1958年度）
     v2: 第11〜20回（1959〜1968年度）
     v3: 第21〜30回（1969〜1978年度）
-    v4: 第31〜40回（1979〜1988年度）を追加。
-    出典: prizesworld.com/prizes/various/yomi.htm、award-books.com/yomiuribungaku-novel-all/
-    （複数部門混在ページの誤読を避けるため、小説賞に特化した一覧サイトで確認）。
+    v4: 第31〜40回（1979〜1988年度）
+    v5: 第41〜50回（1989〜1998年度）を追加。
+    出典: award-books.com/yomiuribungaku-novel-all/（小説賞特化サイト、個別作品はWebSearchで交差確認）。
     """
-    if _migration_done("add_yomiuri_novel_award_v4"):
+    if _migration_done("add_yomiuri_novel_award_v5"):
         return
     if not USE_PG:
         return
@@ -2190,7 +2190,7 @@ def _migrate_add_yomiuri_novel_award():
             inserted += 1
 
         con.commit()
-        _mark_migration_done("add_yomiuri_novel_award_v4")
+        _mark_migration_done("add_yomiuri_novel_award_v5")
         logger.info("[add_yomiuri_novel_award] %d件追加完了（seeds.py全%d件中）", inserted, len(seed_rows))
     except Exception as e:
         logger.error("[add_yomiuri_novel_award] error: %s", e, exc_info=True)
