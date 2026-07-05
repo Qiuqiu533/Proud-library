@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 from config import (
     get_admin_password, get_board_password, OPENBD_API,
-    _KANA_ROWS, FULL_STATS, check_password,
+    _KANA_ROWS, check_password,
 )
 from database import get_con, execute, fetchone, fetchall, USE_PG
 from services.utils import rate_limit, _hira_to_kata, _kata_to_hira
@@ -212,7 +212,45 @@ def api_books_by_genre():
 
 @books_bp.route("/api/stats")
 def api_stats():
-    return jsonify(FULL_STATS)
+    """蔵書統計を実データから動的集計する（旧FULL_STATSは librarylife同期で増減する
+    蔵書件数に対して固定値のまま乖離していたため廃止）。"""
+    con = get_con()
+    total_row = fetchone(con, "SELECT COUNT(*) AS cnt FROM genre_books")
+    total = total_row["cnt"] if total_row else 0
+
+    genre_rows = fetchall(con, "SELECT genre, COUNT(*) AS cnt FROM genre_books GROUP BY genre ORDER BY cnt DESC")
+    publisher_rows = fetchall(con, """
+        SELECT publisher, COUNT(*) AS cnt FROM genre_books
+        WHERE publisher IS NOT NULL AND publisher != ''
+        GROUP BY publisher ORDER BY cnt DESC LIMIT 50
+    """)
+    author_rows = fetchall(con, """
+        SELECT author, COUNT(*) AS cnt FROM genre_books
+        WHERE author IS NOT NULL AND author != ''
+        GROUP BY author ORDER BY cnt DESC LIMIT 50
+    """)
+    format_rows = fetchall(con, "SELECT format, COUNT(*) AS cnt FROM genre_books GROUP BY format ORDER BY cnt DESC")
+
+    if USE_PG:
+        rating_rows = fetchall(con, """
+            SELECT ROUND(score::numeric) AS star, COUNT(*) AS cnt
+            FROM ratings WHERE votes > 0 GROUP BY ROUND(score::numeric) ORDER BY star DESC
+        """)
+    else:
+        rating_rows = fetchall(con, """
+            SELECT ROUND(score) AS star, COUNT(*) AS cnt
+            FROM ratings WHERE votes > 0 GROUP BY ROUND(score) ORDER BY star DESC
+        """)
+    con.close()
+
+    return jsonify({
+        "total": total,
+        "genres": [[r["genre"] or "未分類", r["cnt"]] for r in genre_rows],
+        "publishers": [[r["publisher"], r["cnt"]] for r in publisher_rows],
+        "authors": [[r["author"], r["cnt"]] for r in author_rows],
+        "formats": [[r["format"] or "不明", r["cnt"]] for r in format_rows],
+        "rating_distribution": [[int(r["star"]), r["cnt"]] for r in rating_rows if r["star"] is not None],
+    })
 
 
 @books_bp.route("/api/books/popular")

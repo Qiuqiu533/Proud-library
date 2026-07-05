@@ -3353,6 +3353,7 @@ function _initAnalyticsSubTabs() {
       if (panel) panel.classList.add("active");
       if (btn.dataset.asub === "stats") loadStats();
       if (btn.dataset.asub === "opsstats") loadOpsStats();
+      if (btn.dataset.asub === "analysis") loadAnalysisReport();
     };
   });
 }
@@ -3645,6 +3646,38 @@ async function loadStats() {
   drawBarChart("authChart", data.authors.map(a=>a[0]), data.authors.map(a=>a[1]));
   drawBarChart("genreChart", data.genres.map(g=>g[0]), data.genres.map(g=>g[1]));
   drawPieChart("fmtChart", data.formats.map(f=>f[0]), data.formats.map(f=>f[1]));
+}
+
+function _renderAnalysisBarRows(tbodyId, rows, barClass) {
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+  if (!rows || rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" class="loading">データがありません</td></tr>';
+    return;
+  }
+  const total = rows.reduce((s, r) => s + r[1], 0) || 1;
+  const max = Math.max(...rows.map(r => r[1]));
+  tbody.innerHTML = rows.map(([label, count]) => {
+    const pct = (count / total * 100);
+    const widthPct = (count / max * 100);
+    return `<tr><td>${esc(String(label))}</td><td>${count.toLocaleString()}</td>
+      <td><div class="bar-cell"><div class="bar-fill${barClass ? " " + barClass : ""}" style="width:${widthPct}%"></div><span>${pct.toFixed(1)}%</span></div></td></tr>`;
+  }).join("");
+}
+
+async function loadAnalysisReport() {
+  try {
+    const res = await fetch("/api/stats");
+    const data = await res.json();
+    if (data.error) return;
+    _renderAnalysisBarRows("analysisGenreBody", data.genres, "");
+    _renderAnalysisBarRows("analysisPublisherBody", data.publishers, "bar-blue");
+    const ratingRows = (data.rating_distribution || []).map(([star, cnt]) => [`★${star}`, cnt]);
+    _renderAnalysisBarRows("analysisRatingBody", ratingRows, "bar-gold");
+  } catch (e) {
+    const el = document.getElementById("analysisGenreBody");
+    if (el) el.innerHTML = `<tr><td colspan="3" class="loading">読み込みエラー: ${e.message}</td></tr>`;
+  }
 }
 
 function drawBarChart(id, labels, values) {
