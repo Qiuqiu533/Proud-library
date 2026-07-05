@@ -2206,19 +2206,23 @@ def _migrate_add_yomiuri_novel_award():
 
 
 def _migrate_add_noma_pre2010():
-    """野間文芸賞・第1〜20回（1941〜1967年度）をseeds.pyから追加する
+    """野間文芸賞・第1〜62回（1941〜2009年度）をseeds.pyから追加する
     （additive insert、DELETEなし）。既存の第63〜78回（2010〜2025年度）には触れない。
 
     _migrate_add_yomiuri_novel_award と同じ冪等設計: 実行のたびに_AWARD_BOOKS_SEED
-    全件とDB既存行を突き合わせ、未登録のタイトルだけをINSERTする。
+    全件とDB既存行を突き合わせ、未登録のタイトルだけをINSERTする（award名でのみ
+    フィルタしているため、seeds.pyに新しい回次を追加した場合はフラグを上げて
+    再実行すれば既存分はスキップされ、新規分だけ追加される）。
     出典: kodansha.co.jp/awards/noma/b/histories（主催者公式サイト、川端康成「山の音」
     はWebSearchでも交差確認済み）。
 
     v1: 重複判定キーが(title, award)のみだったため、第1・3・5回が全て同一タイトル
     「（業績に対する受賞）」となり、第3回・第5回が「既存」と誤判定されてスキップされる
-    事故が発生した（2026-07-05）。v2でキーに著者名を追加して再実行し、不足分を補う。
+    事故が発生した（2026-07-05）。v2でキーに著者名を追加して再実行し、不足分を補った。
+    v3: 第21〜62回（1968〜2009年度）をseeds.pyに追加したため再実行し、新規分を追加する
+    （2026-07-05）。出典は award-books.com/nomabungei-all/ でもクロス確認済み。
     """
-    if _migration_done("add_noma_pre2010_v2"):
+    if _migration_done("add_noma_pre2010_v3"):
         return
     if not USE_PG:
         return
@@ -2253,7 +2257,7 @@ def _migrate_add_noma_pre2010():
             inserted += 1
 
         con.commit()
-        _mark_migration_done("add_noma_pre2010_v2")
+        _mark_migration_done("add_noma_pre2010_v3")
         logger.info("[add_noma_pre2010] %d件追加完了（seeds.py全%d件中）", inserted, len(seed_rows))
     except Exception as e:
         logger.error("[add_noma_pre2010] error: %s", e, exc_info=True)
@@ -2532,7 +2536,7 @@ def _run_all_migrations_steps():
         _migrate_akutagawa_naoki_official_replace,  # 芥川賞・直木賞を公式データで全面置換（2026-07-05）
         _migrate_restore_pre2003_akutagawa_naoki,   # 障害復旧（2026-07-05）: 1935〜2002年分をPLAM CSVから追加のみで復元
         _migrate_add_yomiuri_novel_award,           # 読売文学賞・小説賞（第1〜10回）を新規追加（2026-07-05）
-        _migrate_add_noma_pre2010,                  # 野間文芸賞・第1〜20回（1941〜1967年度）を新規追加（2026-07-05）
+        _migrate_add_noma_pre2010,                  # 野間文芸賞・第1〜62回（1941〜2009年度）を新規追加（2026-07-05）
         _migrate_fetch_isbn_ndl,           # NDL API で isbn13 補完（バックグラウンド）
         _migrate_db_indices,               # パフォーマンス用インデックス
         _verify_tables,
