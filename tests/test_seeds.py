@@ -100,10 +100,17 @@ def test_award_books_tuple_length_consistent():
     assert not bad, f"タプル長が6・7以外のエントリがあります: {bad}"
 
 
-def test_award_books_noma_count():
-    """野間文芸賞が第63〜78回（2010〜2025年）の16件登録されているか確認。"""
-    noma = [t for t in _AWARD_BOOKS_SEED if t[0] == "野間文芸賞"]
-    assert len(noma) == 16, f"野間文芸賞の件数が想定と異なります: {len(noma)}件"
+def test_award_books_noma_rounds():
+    """野間文芸賞の受賞枠（回次単位）とレコード数（行単位、共同受賞は複数行）をそれぞれ検証する。
+    第2・4・8回は受賞作なしのため欠番が正しい状態。第21〜62回（1968〜2009年度）は未収録。"""
+    rows = [t for t in _AWARD_BOOKS_SEED if t[0] == "野間文芸賞"]
+    rounds = {t[1] for t in rows}
+    expected_rounds = {
+        1, 3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+        63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78,
+    }
+    assert rounds == expected_rounds, f"想定と異なる回次構成です: {sorted(rounds)}"
+    assert len(rows) == 37, f"レコード数(行単位)が想定と異なります: {len(rows)}件"
 
 
 def test_award_books_noma_must_exist():
