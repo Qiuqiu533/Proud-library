@@ -2665,6 +2665,7 @@ def _run_all_migrations_steps():
         _migrate_resync_awards_v5,                  # 上記4賞の蔵書バッジ再マッチング（2026-07-05）
         _migrate_resync_awards_v6,                  # 上下巻タイトルの表記揺れ修正後の再マッチング（2026-07-05）
         _migrate_fetch_isbn_ndl,           # NDL API で isbn13 補完（バックグラウンド）
+        _migrate_integrity_audit,          # ISBN整合性監査テーブル追加（2026-07-05）
         _migrate_db_indices,               # パフォーマンス用インデックス
         _verify_tables,
     ]
@@ -2718,6 +2719,76 @@ def _migrate_my_loans():
         logger.info("[migration] my_loans テーブル追加完了")
     except Exception as e:
         logger.error(f"[migration] my_loans error: %s", e)
+    finally:
+        con.close()
+
+
+def _migrate_integrity_audit():
+    """ISBN整合性監査（genre_books vs OpenBD）用テーブルを追加する。
+
+    2026-07-05: ISBN 9784488029364 が genre_books では「すごい科学論文」（誤り）
+    のまま登録されており、librarylife.net・OpenBDでは「カフェーの帰り道」
+    （正しい）と判明した事故を受けて追加。「未登録のみ追加」の通常同期では
+    このような既存データの破損を検知・修復できないため、別途の監査・修復の
+    仕組みを用意する。
+    - integrity_findings: 検出結果（isbn単位、resolved=falseが未対応）
+    - integrity_log: 修復履歴（誰が・いつ・何を・なぜ変更したか）
+    """
+    if _migration_done("integrity_audit_v1"):
+        return
+    con = get_con()
+    try:
+        if USE_PG:
+            cur = con.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS integrity_findings (
+                    id SERIAL PRIMARY KEY,
+                    isbn TEXT NOT NULL UNIQUE,
+                    db_title TEXT, db_author TEXT, db_publisher TEXT,
+                    openbd_title TEXT, openbd_author TEXT, openbd_publisher TEXT,
+                    mismatch_fields TEXT,
+                    checked_at TIMESTAMPTZ DEFAULT NOW(),
+                    resolved BOOLEAN DEFAULT FALSE
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS integrity_log (
+                    id SERIAL PRIMARY KEY,
+                    isbn TEXT NOT NULL,
+                    field TEXT NOT NULL,
+                    before_value TEXT, after_value TEXT,
+                    operator TEXT, reason TEXT,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_integrity_findings_unresolved ON integrity_findings(resolved) WHERE resolved = FALSE")
+        else:
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS integrity_findings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    isbn TEXT NOT NULL UNIQUE,
+                    db_title TEXT, db_author TEXT, db_publisher TEXT,
+                    openbd_title TEXT, openbd_author TEXT, openbd_publisher TEXT,
+                    mismatch_fields TEXT,
+                    checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    resolved BOOLEAN DEFAULT 0
+                )
+            """)
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS integrity_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    isbn TEXT NOT NULL,
+                    field TEXT NOT NULL,
+                    before_value TEXT, after_value TEXT,
+                    operator TEXT, reason TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+        con.commit()
+        _mark_migration_done("integrity_audit_v1")
+        logger.info("[migration] integrity_findings/integrity_log テーブル追加完了")
+    except Exception as e:
+        logger.error(f"[migration] integrity_audit error: %s", e)
     finally:
         con.close()
 
