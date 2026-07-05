@@ -20,6 +20,10 @@ from collections import Counter, defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from seeds import _AWARD_BOOKS_SEED  # noqa: E402
+from migrations import AWARD_BOOKS_SEEDS_MIN_ROUND  # noqa: E402
+
+_BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_PLAM_AWARD_MAP = {"AKU": "芥川賞", "NAO": "直木賞"}
 
 # ── 正規化済み賞名一覧（表記ゆれ検出用） ────────────────────────────────
 KNOWN_AWARD_NAMES = {
@@ -94,6 +98,58 @@ def check_award_category_spelling(rows):
     return problems
 
 
+def load_plam_records():
+    """PLAM CSV(award_history.csv + works.csv)から芥川賞・直木賞の(award, award_no)一覧を読む。"""
+    import csv
+    plam_dir = os.path.join(_BASE, "data", "plam")
+    works = {r["work_id"]: r for r in csv.DictReader(open(os.path.join(plam_dir, "works.csv"), encoding="utf-8"))}
+    history = list(csv.DictReader(open(os.path.join(plam_dir, "award_history.csv"), encoding="utf-8")))
+    records = []
+    for row in history:
+        award_name = _PLAM_AWARD_MAP.get(row["award_id"])
+        if not award_name:
+            continue
+        if row["work_id"] not in works:
+            continue
+        award_no = int(row["award_no"]) if row.get("award_no") else None
+        records.append((award_name, award_no))
+    return records
+
+
+def check_plam_seeds_boundary_and_counts(rows):
+    """PLAM(1935〜)とseeds.py(公式確認済み区間)の境界・件数整合を動的に検証する。
+    件数の期待値をハードコードせず、PLAM CSVとseeds.pyの実データから都度計算する。"""
+    problems = []
+    plam_records = load_plam_records()
+
+    for award, min_round in AWARD_BOOKS_SEEDS_MIN_ROUND.items():
+        # PLAM CSVは1935〜最新までの全回次を含む（それ自体は問題ではない）。
+        # 実際のDB投入時はaward_no<min_roundの行のみ additive insert される（migrations.py参照）。
+        # ここで保証すべき唯一の不変条件は「seeds.py側にmin_round未満の行が無いこと」。
+        plam_for_award = [r for r in plam_records if r[0] == award and r[1] is not None]
+        seeds_for_award = [r for r in rows if r[0] == award and r[1] is not None]
+
+        seeds_under = [r for r in seeds_for_award if r[1] < min_round]
+        if seeds_under:
+            problems.append(f"{award}: seeds.py側にaward_no<{min_round}の記録が{len(seeds_under)}件混入（境界侵犯）")
+
+        # AWARD_BOOKS_SEEDS_MIN_ROUND定数がseeds.pyの実際の最小award_noとズレていないか検証。
+        # ズレる = 誰かがseeds.pyのデータ範囲を変えたのに定数を更新し忘れた合図。
+        if seeds_for_award:
+            actual_min = min(r[1] for r in seeds_for_award)
+            if actual_min != min_round:
+                problems.append(
+                    f"{award}: AWARD_BOOKS_SEEDS_MIN_ROUND={min_round}だがseeds.py実際の最小award_no={actual_min}（定数の更新漏れ）"
+                )
+
+        # 動的件数サマリ（参考表示。DBの実件数と突き合わせる場合はこの値を期待値として使う）
+        plam_count = len([r for r in plam_for_award if r[1] < min_round])
+        seeds_count = len(seeds_for_award)
+        print(f"  {award}: PLAM(<{min_round}) {plam_count}件 + seeds(>={min_round}) {seeds_count}件 = 期待値 {plam_count + seeds_count}件")
+
+    return problems
+
+
 def year_category_summary(rows):
     """(award, year, category) ごとの件数を集計する。"""
     counter = Counter((r[0], r[2], r[6]) for r in rows)
@@ -147,6 +203,16 @@ def main() -> int:
             print(f"   {p}")
     else:
         print("✓ award_category表記OK")
+
+    print("\n--- PLAM/seeds 境界・動的件数チェック（芥川賞・直木賞） ---")
+    boundary_problems = check_plam_seeds_boundary_and_counts(rows)
+    if boundary_problems:
+        ok = False
+        print(f"❌ 境界侵犯: {len(boundary_problems)}件")
+        for p in boundary_problems:
+            print(f"   {p}")
+    else:
+        print("✓ PLAM/seeds境界OK（件数はハードコードではなく上記の動的計算値）")
 
     print("\n--- 年×部門 件数集計（異常値の目視確認用） ---")
     for (award, year, category), count in year_category_summary(rows).items():
