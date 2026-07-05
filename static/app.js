@@ -2819,6 +2819,110 @@ document.querySelectorAll(".board-tab").forEach(btn => {
     }
   });
 
+  function _escI(s) { return (s || "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+  function _renderIntegrityFindings(findings) {
+    const list = document.getElementById("integrityFindingsList");
+    if (!list) return;
+    if (!findings.length) {
+      list.innerHTML = '<p style="font-size:0.82rem;color:#888">未解決の不一致はありません。</p>';
+      return;
+    }
+    list.innerHTML = findings.map(f => {
+      const fields = (f.mismatch_fields || "").split(",").filter(Boolean);
+      const fieldRow = (key, label, dbVal, obVal) => {
+        if (!fields.includes(key)) return "";
+        return `
+          <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+            <label style="font-size:0.8rem;display:flex;align-items:center;gap:4px;flex-shrink:0">
+              <input type="checkbox" class="integrity-field-cb" data-field="${key}" checked /> ${label}を修正
+            </label>
+            <span style="font-size:0.78rem;color:#c0392b;text-decoration:line-through">${_escI(dbVal)}</span>
+            <span style="font-size:0.78rem;color:#888">→</span>
+            <span style="font-size:0.78rem;color:#2a7a4a;font-weight:700">${_escI(obVal)}</span>
+          </div>`;
+      };
+      return `<div class="integrity-finding-card" data-isbn="${f.isbn}" style="background:#fff;border:1.5px solid #eee;border-radius:10px;padding:10px 12px">
+        <div style="font-size:0.8rem;color:#888">ISBN: ${f.isbn}</div>
+        ${fieldRow("title", "タイトル", f.db_title, f.openbd_title)}
+        ${fieldRow("author", "著者", f.db_author, f.openbd_author)}
+        ${fieldRow("publisher", "出版社", f.db_publisher, f.openbd_publisher)}
+        <button class="btn-secondary integrity-repair-btn" style="margin-top:8px;padding:6px 12px;font-size:0.8rem">この内容で修復する</button>
+        <span class="integrity-repair-msg" style="font-size:0.78rem;margin-left:8px;color:#555"></span>
+      </div>`;
+    }).join("");
+
+    list.querySelectorAll(".integrity-repair-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const card = btn.closest(".integrity-finding-card");
+        const isbn = card.dataset.isbn;
+        const fieldsToFix = Array.from(card.querySelectorAll(".integrity-field-cb:checked")).map(cb => cb.dataset.field);
+        const msgEl = card.querySelector(".integrity-repair-msg");
+        if (!fieldsToFix.length) { msgEl.textContent = "修正する項目を選んでください"; msgEl.style.color = "#e05"; return; }
+        btn.disabled = true;
+        msgEl.style.color = "#888"; msgEl.textContent = "修復中…";
+        try {
+          const operator = boardSenderName || "管理者";
+          const res = await adminFetch("/api/admin/integrity-audit/repair", {
+            method: "POST",
+            body: JSON.stringify({ isbn, fields: fieldsToFix, operator })
+          });
+          const data = await res.json();
+          if (res.ok) {
+            msgEl.style.color = "#2a7a4a"; msgEl.textContent = "修復しました";
+            card.style.opacity = "0.5";
+            setTimeout(() => card.remove(), 800);
+          } else {
+            msgEl.style.color = "#e05"; msgEl.textContent = data.error || "修復に失敗しました";
+            btn.disabled = false;
+          }
+        } catch (e) {
+          msgEl.style.color = "#e05"; msgEl.textContent = "通信エラーが発生しました";
+          btn.disabled = false;
+        }
+      });
+    });
+  }
+
+  async function _loadIntegrityFindings() {
+    try {
+      const res = await adminFetch("/api/admin/integrity-audit/findings");
+      const data = await res.json();
+      _renderIntegrityFindings(Array.isArray(data) ? data : []);
+    } catch (e) { /* noop */ }
+  }
+
+  document.getElementById("integrityAuditStartBtn")?.addEventListener("click", async () => {
+    const btn = document.getElementById("integrityAuditStartBtn");
+    const msg = document.getElementById("integrityAuditMsg");
+    btn.disabled = true;
+    msg.style.color = "#888";
+    msg.textContent = "監査を開始しています…";
+    try {
+      const res = await adminFetch("/api/admin/integrity-audit/start", { method: "POST" });
+      const data = await res.json();
+      if (res.status === 409) {
+        msg.style.color = "#e08a00";
+        msg.textContent = "既に監査実行中です。しばらくお待ちください。";
+      } else if (res.ok && data.status === "started") {
+        msg.style.color = "#2a7a4a";
+        msg.textContent = "監査を開始しました。完了まで数分かかります（完了後、このタブを開き直すと結果が表示されます）。";
+      } else {
+        msg.style.color = "#e05";
+        msg.textContent = "監査の開始に失敗しました。";
+      }
+    } catch (e) {
+      msg.style.color = "#e05";
+      msg.textContent = "通信エラーが発生しました。";
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  if (document.getElementById("integrityFindingsList")) {
+    _loadIntegrityFindings();
+  }
+
   document.getElementById("arrivalLookupBtn")?.addEventListener("click", async () => {
     const isbn = document.getElementById("arrivalIsbn").value.trim().replace(/-/g, "");
     const msg = document.getElementById("arrivalMsg");

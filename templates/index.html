@@ -1276,6 +1276,17 @@
           <button class="btn-secondary" id="syncCatalogNowBtn">🔄 蔵書同期を今すぐ実行</button>
           <p id="syncCatalogMsg" style="font-size:0.82rem;min-height:1.2em;margin-top:6px;color:#555"></p>
         </div>
+
+        <div style="margin-bottom:16px;padding:14px;background:#fff8e8;border-radius:12px;border:1.5px solid #e8d5a0">
+          <h4 style="margin-bottom:6px;font-size:0.95rem">🔍 ISBN整合性監査</h4>
+          <p style="font-size:0.82rem;color:#6b5f3d;margin-bottom:10px">
+            蔵書データ（ISBN・タイトル・著者）がOpenBD（公的書誌データ）と食い違っていないか確認します。自動修復はせず、内容を確認してから個別に修復します。
+          </p>
+          <button class="btn-secondary" id="integrityAuditStartBtn">🔍 監査を実行</button>
+          <p id="integrityAuditMsg" style="font-size:0.82rem;min-height:1.2em;margin-top:6px;color:#555"></p>
+          <div id="integrityFindingsList" style="margin-top:10px;display:flex;flex-direction:column;gap:10px"></div>
+        </div>
+
         <div class="board-section-header">
           <h3>新着図書を登録</h3>
         </div>

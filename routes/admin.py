@@ -163,3 +163,63 @@ def api_sync_catalog_status():
         "running": is_genre_classify_running(),
         "last_update": get_setting("genre_last_update", ""),
     })
+
+
+@admin_bp.route("/api/admin/integrity-audit/start", methods=["POST"])
+def api_integrity_audit_start():
+    """genre_books全件をOpenBDと突き合わせ、ISBN不一致（誤ったタイトル・著者が
+    登録されているケース）を検出する。自動修復はせず、検出のみ行う
+    （2026-07-05: ISBN 9784488029364の誤登録事故を受けて追加）。"""
+    pw = request.headers.get("X-Password", "")
+    if not check_password(pw, "board"):
+        return jsonify({"error": "unauthorized"}), 401
+    from services.integrity import run_integrity_audit, is_audit_running
+    if is_audit_running():
+        return jsonify({"status": "already_running"}), 409
+    body = request.get_json(silent=True) or {}
+    limit = body.get("limit")
+    run_integrity_audit(force=True, limit=limit)
+    return jsonify({"status": "started"})
+
+
+@admin_bp.route("/api/admin/integrity-audit/status")
+def api_integrity_audit_status():
+    pw = request.headers.get("X-Password", "")
+    if not check_password(pw, "board"):
+        return jsonify({"error": "unauthorized"}), 401
+    from services.integrity import is_audit_running
+    con = get_con()
+    row = fetchone(con, "SELECT COUNT(*) as cnt FROM integrity_findings WHERE resolved=%s" if USE_PG
+                    else "SELECT COUNT(*) as cnt FROM integrity_findings WHERE resolved=0", (False,) if USE_PG else ())
+    con.close()
+    return jsonify({"running": is_audit_running(), "unresolved_count": row["cnt"] if row else 0})
+
+
+@admin_bp.route("/api/admin/integrity-audit/findings")
+def api_integrity_audit_findings():
+    pw = request.headers.get("X-Password", "")
+    if not check_password(pw, "board"):
+        return jsonify({"error": "unauthorized"}), 401
+    con = get_con()
+    rows = fetchall(con, "SELECT * FROM integrity_findings WHERE resolved=%s ORDER BY checked_at DESC LIMIT 200" if USE_PG
+                     else "SELECT * FROM integrity_findings WHERE resolved=0 ORDER BY checked_at DESC LIMIT 200",
+                     (False,) if USE_PG else ())
+    con.close()
+    return jsonify([dict(r) for r in rows])
+
+
+@admin_bp.route("/api/admin/integrity-audit/repair", methods=["POST"])
+def api_integrity_audit_repair():
+    """管理者が承認したフィールドのみOpenBDの値で上書きする。自動実行はしない。"""
+    pw = request.headers.get("X-Password", "")
+    if not check_password(pw, "board"):
+        return jsonify({"error": "unauthorized"}), 401
+    body = request.get_json(silent=True) or {}
+    isbn = (body.get("isbn") or "").strip()
+    fields = body.get("fields") or []
+    operator = (body.get("operator") or "").strip() or "不明"
+    if not isbn or not fields:
+        return jsonify({"error": "isbn and fields are required"}), 400
+    from services.integrity import repair_finding
+    result, code = repair_finding(isbn, fields, operator)
+    return jsonify(result), code
