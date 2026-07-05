@@ -123,9 +123,10 @@ def test_award_books_yomiuri_novel_rounds():
         21, 22, 24, 25, 26, 27, 28, 29, 30,
         31, 33, 34, 36, 37, 38, 39, 40,
         41, 42, 43, 44, 46, 47, 49, 50,
+        51, 52, 53, 54, 55, 57, 59, 60,
     }
     assert rounds == expected_rounds, f"想定と異なる回次構成です: {sorted(rounds)}"
-    assert len(rows) == 58, f"レコード数(行単位)が想定と異なります: {len(rows)}件"
+    assert len(rows) == 69, f"レコード数(行単位)が想定と異なります: {len(rows)}件"
 
 
 def test_award_books_akutagawa_naoki_award_no_required():
