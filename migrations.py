@@ -2365,6 +2365,34 @@ def _migrate_resync_awards_v5():
         logger.error(f"awards resync v5 error: {e}", exc_info=True)
 
 
+def _migrate_resync_awards_v6():
+    """上下巻タイトルの表記揺れ（award_booksの「（上・下）」 vs 蔵書側の「<上>」「<下>」）
+    により上下巻作品のバッジ付けが漏れていた不具合の修正後、全件再マッチング (v6)。
+    （例: 村田沙耶香「世界99」野間文芸賞2025が未反映だった。2026-07-05発覚）"""
+    try:
+        con = get_con()
+        done = fetchone(con, "SELECT value FROM settings WHERE key='awards_resync_done_v6'")
+        if done and done.get("value") == "v1":
+            con.close()
+            return
+        rows = fetchall(con, "SELECT isbn, title, author FROM genre_books")
+        con.close()
+        updated = 0
+        for r in rows:
+            con = get_con()
+            _sync_awards_from_master(con, r["isbn"], r["title"], r["author"])
+            con.commit()
+            con.close()
+            updated += 1
+        con = get_con()
+        execute(con, "INSERT INTO settings(key,value) VALUES('awards_resync_done_v6','v1') ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value")
+        con.commit()
+        con.close()
+        logger.info(f"awards resync v6: {updated}冊全件マッチング完了")
+    except Exception as e:
+        logger.error(f"awards resync v6 error: {e}", exc_info=True)
+
+
 def _migrate_sync_plam_to_award_books():
     """PLAM CSV (award_history.csv + works.csv) を award_books に同期する。"""
     if _migration_done("sync_plam_to_award_books_v2"):
@@ -2635,6 +2663,7 @@ def _run_all_migrations_steps():
         _migrate_add_noma_pre2010,                  # 野間文芸賞・第1〜62回（1941〜2009年度）を新規追加（2026-07-05）
         _migrate_seed_awards_master_from_award_books,  # 読売文学賞・野間文芸賞・谷崎潤一郎賞・三島由紀夫賞をawards_masterへ追加（2026-07-05）
         _migrate_resync_awards_v5,                  # 上記4賞の蔵書バッジ再マッチング（2026-07-05）
+        _migrate_resync_awards_v6,                  # 上下巻タイトルの表記揺れ修正後の再マッチング（2026-07-05）
         _migrate_fetch_isbn_ndl,           # NDL API で isbn13 補完（バックグラウンド）
         _migrate_db_indices,               # パフォーマンス用インデックス
         _verify_tables,

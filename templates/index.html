@@ -23,7 +23,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v={{ static_version }}">
 </head>
 <body>
 
@@ -1268,6 +1268,14 @@
 
       <!-- 新着登録 -->
       <div id="btab-newarrival" class="board-tab-panel">
+        <div style="margin-bottom:16px;padding:14px;background:#eef6f0;border-radius:12px;border:1.5px solid #b8ddc4">
+          <h4 style="margin-bottom:6px;font-size:0.95rem">🔄 蔵書同期</h4>
+          <p style="font-size:0.82rem;color:#556b5a;margin-bottom:10px">
+            新刊は通常週1回まとめて検索に反映されますが、入荷直後にすぐ反映したい場合はこちらから今すぐ同期できます（数分かかります）。
+          </p>
+          <button class="btn-secondary" id="syncCatalogNowBtn">🔄 蔵書同期を今すぐ実行</button>
+          <p id="syncCatalogMsg" style="font-size:0.82rem;min-height:1.2em;margin-top:6px;color:#555"></p>
+        </div>
         <div class="board-section-header">
           <h3>新着図書を登録</h3>
         </div>
@@ -2846,8 +2854,8 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="/static/app.js"></script>
-  <script src="/static/extras.js"></script>
+  <script src="/static/app.js?v={{ static_version }}"></script>
+  <script src="/static/extras.js?v={{ static_version }}"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/static/sw.js');

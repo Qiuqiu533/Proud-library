@@ -1,18 +1,19 @@
 from flask import Blueprint, render_template, Response
 from services.utils import auto_cleanup_images
+from config import STATIC_VERSION
 
 pages_bp = Blueprint("pages", __name__)
 
 
 @pages_bp.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", static_version=STATIC_VERSION)
 
 
 @pages_bp.route("/reset-password")
 def reset_password_page():
     """パスワードリセットページ（メールリンクから遷移）"""
-    return render_template("index.html")
+    return render_template("index.html", static_version=STATIC_VERSION)
 
 
 @pages_bp.route("/robots.txt")

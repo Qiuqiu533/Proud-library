@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from config import get_board_password, check_password
+from config import get_board_password, check_password, get_setting
 from database import get_con, execute, fetchone, fetchall, USE_PG
 
 admin_bp = Blueprint("admin", __name__)
@@ -135,3 +135,31 @@ def api_backup_status():
     except Exception:
         pass
     return jsonify({"last_backup": None})
+
+
+@admin_bp.route("/api/admin/sync-catalog-now", methods=["POST"])
+def api_sync_catalog_now():
+    """新刊の蔵書ジャンル分類（genre_books同期）を管理者が即時実行する。
+    通常は週1回のバックグラウンド更新のみだが、新刊追加直後に検索できない
+    という声を受けて手動トリガーを追加した（2026-07-05）。"""
+    pw = request.headers.get("X-Password", "")
+    if not check_password(pw, "board"):
+        return jsonify({"error": "unauthorized"}), 401
+    from services.books import _auto_classify_new_books, is_genre_classify_running
+    if is_genre_classify_running():
+        return jsonify({"status": "already_running"}), 409
+    _auto_classify_new_books(force=True)
+    return jsonify({"status": "started"})
+
+
+@admin_bp.route("/api/admin/sync-catalog-status")
+def api_sync_catalog_status():
+    """蔵書同期の実行中フラグと最終実行時刻を返す（管理画面のポーリング用）"""
+    pw = request.headers.get("X-Password", "")
+    if not check_password(pw, "board"):
+        return jsonify({"error": "unauthorized"}), 401
+    from services.books import is_genre_classify_running
+    return jsonify({
+        "running": is_genre_classify_running(),
+        "last_update": get_setting("genre_last_update", ""),
+    })

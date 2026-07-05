@@ -525,24 +525,34 @@ def _classify_genre(ndc, title="", description=""):
     return "その他"
 
 
-def _auto_classify_new_books():
-    """バックグラウンド：新しい本を自動検出してジャンル分類（週1回）"""
+_genre_classify_running = False
+
+
+def _auto_classify_new_books(force=False):
+    """バックグラウンド：新しい本を自動検出してジャンル分類（通常は週1回、
+    force=Trueの場合は管理画面からの手動実行として間隔チェックをスキップする）"""
     import time, datetime, threading
     from config import get_setting
 
     def _run():
+        global _genre_classify_running
+        if _genre_classify_running:
+            logger.info("ジャンル自動更新: 既に実行中のためスキップ")
+            return
+        _genre_classify_running = True
         try:
-            last = get_setting("genre_last_update", "")
-            if last:
-                try:
-                    last_dt = datetime.datetime.fromisoformat(last)
-                    if (datetime.datetime.now() - last_dt).days < 7:
-                        logger.info("ジャンル自動更新: 前回から7日未満のためスキップ")
-                        return
-                except Exception:
-                    pass
+            if not force:
+                last = get_setting("genre_last_update", "")
+                if last:
+                    try:
+                        last_dt = datetime.datetime.fromisoformat(last)
+                        if (datetime.datetime.now() - last_dt).days < 7:
+                            logger.info("ジャンル自動更新: 前回から7日未満のためスキップ")
+                            return
+                    except Exception:
+                        pass
 
-            logger.info("ジャンル自動更新: 開始...")
+            logger.info("ジャンル自動更新: 開始...(force=%s)", force)
             con = get_con()
             rows = fetchall(con, "SELECT isbn FROM genre_books")
             con.close()
@@ -626,5 +636,11 @@ def _auto_classify_new_books():
             logger.info(f"ジャンル自動更新: 完了 ({classified}冊追加)")
         except Exception as e:
             logger.info(f"ジャンル自動更新エラー: {e}")
+        finally:
+            _genre_classify_running = False
 
     threading.Thread(target=_run, daemon=True).start()
+
+
+def is_genre_classify_running():
+    return _genre_classify_running

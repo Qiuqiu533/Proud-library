@@ -19,6 +19,24 @@ def _normalize_pubdate(s: str | None) -> str:
     return ""
 
 
+import re
+
+_VOLUME_SUFFIX_RE = re.compile(r"[\s]*[（(<]\s*(上|下|上・下|上巻|下巻|上下)\s*[）)>]\s*$")
+
+
+def _strip_volume_suffix(s: str) -> str:
+    """タイトル末尾の巻数表記を除去する（例: '世界99（上・下）'→'世界99'、
+    '世界99 <上>'→'世界99'）。award_booksは1作品1レコード規約で「（上・下）」
+    表記に統一する一方、蔵書側（librarylife由来）は巻ごとに別レコードで
+    「<上>」「<下>」等の別表記を使うため、素の類似度比較だけでは
+    上下巻作品が一致しない（2026-07-05発覚: 「世界99」で確認）。"""
+    prev = None
+    while prev != s:
+        prev = s
+        s = _VOLUME_SUFFIX_RE.sub("", s)
+    return s
+
+
 def _sync_awards_from_master(con: Any, isbn: str, title: str, author: str) -> None:
     """awards_masterを参照して genre_books.awards を自動設定する"""
     if not USE_PG:
@@ -39,6 +57,13 @@ def _sync_awards_from_master(con: Any, isbn: str, title: str, author: str) -> No
             nt, na = _norm(title), _norm(author)
             ts = _sim(mt, nt)
             title_ok = ts >= 0.82 or (len(mt) >= 6 and mt in nt) or (len(mt) >= 6 and nt in mt)
+            if not title_ok:
+                mt2, nt2 = _strip_volume_suffix(mt), _strip_volume_suffix(nt)
+                if mt2 and nt2 and len(mt2) >= 3 and (mt2 != mt or nt2 != nt):
+                    ts2 = SequenceMatcher(None, mt2, nt2).ratio()
+                    if ts2 >= 0.82 or (len(mt2) >= 6 and mt2 in nt2) or (len(mt2) >= 6 and nt2 in mt2):
+                        title_ok = True
+                        ts = ts2
             if title_ok:
                 as_ = _sim(ma, na) if ma else 0.5
                 if ts * 0.7 + as_ * 0.3 >= 0.65:
