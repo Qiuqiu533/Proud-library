@@ -864,7 +864,7 @@ function renderCard(book, opts = {}) {
   }
 
   div.addEventListener("click", () => {
-    saveRecentBook(book.isbn, book.title, book.cover || "");
+    saveRecentBook(book.isbn, book.title, book.cover || "", book.isbn10 || "");
     openModal(book.isbn, book);
   });
   availObserver.observe(div);
@@ -1031,12 +1031,12 @@ async function loadGenreCounts() {
 
 
 // ===== 最近見た本 =====
-function saveRecentBook(isbn, title, cover) {
+function saveRecentBook(isbn, title, cover, isbn10) {
   if (!isbn) return;
   let recent = [];
   try { recent = JSON.parse(localStorage.getItem("recent_books") || "[]"); } catch {}
   recent = recent.filter(b => b.isbn !== isbn);
-  recent.unshift({ isbn, title: title || "", cover: cover || "" });
+  recent.unshift({ isbn, title: title || "", cover: cover || "", isbn10: isbn10 || "" });
   localStorage.setItem("recent_books", JSON.stringify(recent.slice(0, 30)));
   renderRecentBooks();
 }
@@ -2271,6 +2271,15 @@ function updateStarUI(n) {
   document.querySelectorAll(".star-opt").forEach((el, i) => el.classList.toggle("active", i < n));
 }
 
+function _scrollToBookResults() {
+  const target = document.getElementById("bookGrid");
+  if (!target) return;
+  const header = document.querySelector(".sticky-header");
+  const headerH = header ? header.offsetHeight : 0;
+  const y = target.getBoundingClientRect().top + window.pageYOffset - headerH - 8;
+  window.scrollTo({ top: Math.max(y, 0), behavior: "smooth" });
+}
+
 function switchToBooksAndSearch(keyword) {
   // 蔵書タブが非アクティブなら切り替えてから検索
   const booksBtn = document.querySelector('.tab-btn[data-tab="books"]');
@@ -2282,6 +2291,7 @@ function switchToBooksAndSearch(keyword) {
     document.getElementById("tab-books").classList.add("active");
   }
   loadBooks(keyword);
+  _scrollToBookResults();
 }
 
 // ===== Events =====
