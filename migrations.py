@@ -2149,10 +2149,11 @@ def _migrate_add_yomiuri_novel_award():
     インクリメントするだけで安全に増分反映できる（DELETEも全件洗い替えも不要）。
 
     v1: 第1〜10回（1949〜1958年度）
-    v2: 第11〜20回（1959〜1968年度）を追加。
+    v2: 第11〜20回（1959〜1968年度）
+    v3: 第21〜30回（1969〜1978年度）を追加。
     出典: prizesworld.com/prizes/various/yomi.htm（公式受賞記録の照合済み）。
     """
-    if _migration_done("add_yomiuri_novel_award_v2"):
+    if _migration_done("add_yomiuri_novel_award_v3"):
         return
     if not USE_PG:
         return
@@ -2187,7 +2188,7 @@ def _migrate_add_yomiuri_novel_award():
             inserted += 1
 
         con.commit()
-        _mark_migration_done("add_yomiuri_novel_award_v2")
+        _mark_migration_done("add_yomiuri_novel_award_v3")
         logger.info("[add_yomiuri_novel_award] %d件追加完了（seeds.py全%d件中）", inserted, len(seed_rows))
     except Exception as e:
         logger.error("[add_yomiuri_novel_award] error: %s", e, exc_info=True)
