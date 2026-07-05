@@ -4,6 +4,12 @@ logger = logging.getLogger(__name__)
 import os
 import json
 
+# static/app.js・static/style.css を変更した回はこの値も一緒にインクリメントする。
+# style.css/app.js は Cache-Control: immutable（1年）で配信されるため、URLに
+# ?v= を付けてクエリ文字列ごと変えることで、Service Workerのキャッシュ更新を
+# 待たずに新しいCSS/JSを確実に配信する（2026-07-05追加）。
+STATIC_VERSION = "19"
+
 # ── ジャンル別蔵書データ（Excelから事前生成）──────────────────────────────
 _GENRE_MAP_PATH = os.path.join(os.path.dirname(__file__), "static", "genre_map.json")
 try:

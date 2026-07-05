@@ -2792,6 +2792,33 @@ document.querySelectorAll(".board-tab").forEach(btn => {
   const dateEl = document.getElementById("arrivalDate");
   if (dateEl) dateEl.value = new Date().toISOString().slice(0, 10);
 
+  document.getElementById("syncCatalogNowBtn")?.addEventListener("click", async () => {
+    const btn = document.getElementById("syncCatalogNowBtn");
+    const msg = document.getElementById("syncCatalogMsg");
+    btn.disabled = true;
+    msg.style.color = "#888";
+    msg.textContent = "同期を開始しています…";
+    try {
+      const res = await adminFetch("/api/admin/sync-catalog-now", { method: "POST" });
+      const data = await res.json();
+      if (res.status === 409) {
+        msg.style.color = "#e08a00";
+        msg.textContent = "既に同期実行中です。しばらくお待ちください。";
+      } else if (res.ok && data.status === "started") {
+        msg.style.color = "#2a7a4a";
+        msg.textContent = "同期を開始しました。完了まで数分かかります（このページを閉じても処理は継続します）。";
+      } else {
+        msg.style.color = "#e05";
+        msg.textContent = "同期の開始に失敗しました。";
+      }
+    } catch (e) {
+      msg.style.color = "#e05";
+      msg.textContent = "通信エラーが発生しました。";
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
   document.getElementById("arrivalLookupBtn")?.addEventListener("click", async () => {
     const isbn = document.getElementById("arrivalIsbn").value.trim().replace(/-/g, "");
     const msg = document.getElementById("arrivalMsg");
