@@ -5946,6 +5946,22 @@ async function saveBookDesc() {
 let _currentAward = "";
 let _allAwardBooks = [];
 
+function _otherWorksByAuthor(author, excludeTitle) {
+  const _normTitle = t => (t || "").replace(/\s/g, "").toLowerCase();
+  if (!author || !_allAwardBooks || _allAwardBooks.length === 0) return [];
+  const excludeKey = _normTitle(excludeTitle);
+  const seen = new Set([excludeKey]);
+  const others = [];
+  for (const b of _allAwardBooks) {
+    if (b.author !== author) continue;
+    const key = _normTitle(b.title);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    others.push(b.title);
+  }
+  return others;
+}
+
 function filterAwardBooks() {
   const q = (document.getElementById("awardSearch")?.value || "").trim().toLowerCase();
   const books = q
@@ -5998,6 +6014,10 @@ function _awardCardHtml(b) {
   const awardBadges = b.awards_list.map(a =>
     `<span style="display:inline-block;font-size:0.7rem;background:#fff8e1;color:#b45309;border:1px solid #f6c744;border-radius:10px;padding:2px 8px;margin:2px 4px 2px 0;white-space:nowrap">🏆 ${esc(a.label)}</span>`
   ).join("");
+  const otherWorks = _otherWorksByAuthor(b.author, b.title);
+  const otherWorksHtml = otherWorks.length > 0
+    ? `<div style="font-size:0.76rem;color:#888;margin-top:4px">✍️ ${esc(b.author)}さんの他の受賞作（${otherWorks.length}件）: ${otherWorks.slice(0, 3).map(esc).join("・")}${otherWorks.length > 3 ? " ほか" : ""}</div>`
+    : "";
   const alreadyRead = isbn ? getReadStatus(isbn) === "読んだ" : false;
   const readBtnHtml = isbn
     ? `<button id="awdread-${isbn}" onclick="event.stopPropagation();toggleAwardRead('${isbn}',this)"
@@ -6013,6 +6033,7 @@ function _awardCardHtml(b) {
       <div style="font-size:0.97rem;font-weight:700;color:${clickable ? "#1a5c3a" : "#222"};line-height:1.3;margin-bottom:2px">${esc(b.title)}</div>
       <div style="font-size:0.83rem;color:#666;margin-bottom:4px">${esc(b.author)}</div>
       <div style="line-height:1.8">${awardBadges}</div>
+      ${otherWorksHtml}
       ${readBtnHtml}
     </div>
     <div style="flex-shrink:0;padding-top:2px">
