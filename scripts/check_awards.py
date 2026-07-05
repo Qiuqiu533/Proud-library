@@ -49,6 +49,25 @@ def _normalize(t):
     return t if len(t) == 7 else (t + ("",))
 
 
+def check_title_reused_across_rounds(rows):
+    """同一賞内で(title, author)が異なるaward_noに複数回出現していないか警告する。
+    2026-07-05: WebFetchが長文ページを誤要約し、既に確定済みの受賞作（別回次）を
+    別の回次の受賞作として再利用（ハルシネーション）する事故が実際に発生した。
+    同一人物が同一賞で複数回受賞すること自体はあり得るため、これはハードエラーに
+    せず警告に留める（人間が個別に事実確認する）。"""
+    from collections import defaultdict
+    seen = defaultdict(set)
+    warnings = []
+    for r in rows:
+        key = (r[0], r[3], r[4])  # (award, title, author)
+        if r[1] is not None:
+            seen[key].add(r[1])
+    for (award, title, author), nos in seen.items():
+        if len(nos) > 1:
+            warnings.append((award, title, author, sorted(nos)))
+    return warnings
+
+
 def check_duplicates(rows):
     entries = [(r[0], r[1], r[2], r[3], r[4]) for r in rows]
     seen = set()
@@ -170,6 +189,14 @@ def main() -> int:
             print(f"   {d}")
     else:
         print("✓ 重複なし")
+
+    reused = check_title_reused_across_rounds(rows)
+    if reused:
+        print(f"⚠️  同一作品が複数回次に出現（要目視確認・フェッチ誤再利用の疑いあり）: {len(reused)}件")
+        for award, title, author, nos in reused:
+            print(f"   {award} {title!r}/{author!r} -> award_no値: {nos}")
+    else:
+        print("✓ 同一作品の複数回次出現なし")
 
     empties = check_empty_fields(rows)
     if empties:
