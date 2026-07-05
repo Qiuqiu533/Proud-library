@@ -2269,6 +2269,102 @@ def _migrate_add_noma_pre2010():
         con.close()
 
 
+_AWARDS_MASTER_FROM_AWARD_BOOKS = ("読売文学賞", "野間文芸賞", "谷崎潤一郎賞", "三島由紀夫賞")
+
+
+def _migrate_seed_awards_master_from_award_books():
+    """award_books（受賞作タブ用データ）から awards_master（蔵書バッジ用データ）へ
+    additive insertする。
+
+    awards_master と award_books は元々別管理（awards_masterは_AWARDS_SEED由来、
+    award_booksはこのセッションで整備してきた_AWARD_BOOKS_SEED由来）で、
+    読売文学賞・野間文芸賞は awards_master に存在しないため「受賞作タブには
+    あるのに蔵書の受賞バッジ・フィルターには出ない」状態だった（2026-07-05発覚）。
+    また谷崎潤一郎賞・三島由紀夫賞もUIのピルは存在するのに awards_master に
+    データが無く、既に死んでいたピルだったことも判明した。
+
+    完全統合（awards_masterをaward_booksから全面生成）は本屋大賞のノミネート情報
+    ・ミステリ系の賞（乱歩賞等）がaward_books側に無いため、データ欠落のリスクが
+    あり見送った。この4賞（award_books側にのみ確認済みデータがある賞）に限定して
+    追加投入する。
+    """
+    if _migration_done("seed_awards_master_from_award_books_v1"):
+        return
+    if not USE_PG:
+        return
+
+    import unicodedata
+
+    def _n(s):
+        s = unicodedata.normalize("NFKC", s or "").strip()
+        return "".join(s.split())
+
+    seed_rows = [t for t in _AWARD_BOOKS_SEED if t[0] in _AWARDS_MASTER_FROM_AWARD_BOOKS]
+    if not seed_rows:
+        logger.error("[seed_awards_master_from_award_books] 対象の受賞データがありません")
+        return
+
+    con = get_con()
+    try:
+        cur = con.cursor()
+        existing_rows = fetchall(
+            con, "SELECT award, year, title, author FROM awards_master WHERE award = ANY(%s)",
+            (list(_AWARDS_MASTER_FROM_AWARD_BOOKS),)
+        )
+        existing = {(r["award"], r["year"], _n(r["title"]), _n(r["author"])) for r in existing_rows}
+
+        inserted = 0
+        for row in seed_rows:
+            award, no, year, title, author, status = row[0], row[1], row[2], row[3], row[4], row[5]
+            key = (award, year, _n(title), _n(author))
+            if key in existing:
+                continue
+            cur.execute(
+                "INSERT INTO awards_master (award, year, rank, type, title, author) VALUES (%s,%s,%s,%s,%s,%s)",
+                (award, year, None, "受賞", title, author),
+            )
+            existing.add(key)
+            inserted += 1
+
+        con.commit()
+        _mark_migration_done("seed_awards_master_from_award_books_v1")
+        logger.info("[seed_awards_master_from_award_books] %d件追加完了（対象%d件中）", inserted, len(seed_rows))
+    except Exception as e:
+        logger.error("[seed_awards_master_from_award_books] error: %s", e, exc_info=True)
+        try:
+            con.rollback()
+        except Exception:
+            pass
+    finally:
+        con.close()
+
+
+def _migrate_resync_awards_v5():
+    """読売文学賞・野間文芸賞・谷崎潤一郎賞・三島由紀夫賞のawards_master追加後の全件再マッチング (v5)"""
+    try:
+        con = get_con()
+        done = fetchone(con, "SELECT value FROM settings WHERE key='awards_resync_done_v5'")
+        if done and done.get("value") == "v1":
+            con.close()
+            return
+        rows = fetchall(con, "SELECT isbn, title, author FROM genre_books")
+        con.close()
+        updated = 0
+        for r in rows:
+            con = get_con()
+            _sync_awards_from_master(con, r["isbn"], r["title"], r["author"])
+            con.commit()
+            con.close()
+            updated += 1
+        con = get_con()
+        execute(con, "INSERT INTO settings(key,value) VALUES('awards_resync_done_v5','v1') ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value")
+        con.commit()
+        con.close()
+        logger.info(f"awards resync v5: {updated}冊全件マッチング完了")
+    except Exception as e:
+        logger.error(f"awards resync v5 error: {e}", exc_info=True)
+
+
 def _migrate_sync_plam_to_award_books():
     """PLAM CSV (award_history.csv + works.csv) を award_books に同期する。"""
     if _migration_done("sync_plam_to_award_books_v2"):
@@ -2537,6 +2633,8 @@ def _run_all_migrations_steps():
         _migrate_restore_pre2003_akutagawa_naoki,   # 障害復旧（2026-07-05）: 1935〜2002年分をPLAM CSVから追加のみで復元
         _migrate_add_yomiuri_novel_award,           # 読売文学賞・小説賞（第1〜10回）を新規追加（2026-07-05）
         _migrate_add_noma_pre2010,                  # 野間文芸賞・第1〜62回（1941〜2009年度）を新規追加（2026-07-05）
+        _migrate_seed_awards_master_from_award_books,  # 読売文学賞・野間文芸賞・谷崎潤一郎賞・三島由紀夫賞をawards_masterへ追加（2026-07-05）
+        _migrate_resync_awards_v5,                  # 上記4賞の蔵書バッジ再マッチング（2026-07-05）
         _migrate_fetch_isbn_ndl,           # NDL API で isbn13 補完（バックグラウンド）
         _migrate_db_indices,               # パフォーマンス用インデックス
         _verify_tables,

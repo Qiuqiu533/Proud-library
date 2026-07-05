@@ -6,7 +6,7 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from seeds import _AWARDS_SEED, _AWARD_BOOKS_SEED
-from migrations import AWARD_BOOKS_SEEDS_MIN_ROUND
+from migrations import AWARD_BOOKS_SEEDS_MIN_ROUND, _AWARDS_MASTER_FROM_AWARD_BOOKS
 
 # ── 正しいことが確定している受賞データ ───────────────────────────────────────
 MUST_EXIST = [
@@ -164,6 +164,19 @@ def test_award_books_seeds_min_round_boundary():
             f"{award}のseeds.py最小award_noが{actual_min}ですが、"
             f"migrations.AWARD_BOOKS_SEEDS_MIN_ROUND={expected_min}と不一致です"
         )
+
+
+def test_awards_master_from_award_books_source_data_exists():
+    """awards_master追加投入migration(_migrate_seed_awards_master_from_award_books)が
+    参照する4賞（読売文学賞・野間文芸賞・谷崎潤一郎賞・三島由紀夫賞）が_AWARD_BOOKS_SEEDに
+    存在し、それぞれ最低限のデータ量があることを確認する（回帰防止）。"""
+    for award in _AWARDS_MASTER_FROM_AWARD_BOOKS:
+        rows = [t for t in _AWARD_BOOKS_SEED if t[0] == award]
+        assert len(rows) > 0, f"{award}のデータが_AWARD_BOOKS_SEEDにありません"
+        for t in rows:
+            assert len(t) in (6, 7), f"{award}のタプル長が想定外です: {t}"
+            assert t[2] is not None, f"{award}にaward_year(None)のエントリがあります: {t}"
+            assert t[3], f"{award}にtitleが空のエントリがあります: {t}"
 
 
 def test_award_books_no_duplicate_entries():
