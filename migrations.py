@@ -6,6 +6,12 @@ import psycopg2.errors
 
 logger = logging.getLogger(__name__)
 
+# 芥川賞・直木賞: seeds.py（日本文学振興会公式データ）が担保する最小回次。
+# これより前（award_no < この値）はPLAM CSVのみが唯一のデータソースとなる。
+# 境界を年ではなく回次で管理する理由: 上半期/下半期発表年のズレで年ベースの
+# 境界判定は誤爆する（2026-07-05に実証済み）。
+AWARD_BOOKS_SEEDS_MIN_ROUND = {"芥川賞": 129, "直木賞": 129}
+
 from database import get_con, execute, fetchone, fetchall, USE_PG
 from config import GENRE_MAP, OPENBD_API
 from seeds import _AWARDS_SEED, _AWARD_BOOKS_SEED
@@ -1994,6 +2000,144 @@ def _migrate_akutagawa_naoki_official_replace():
         con.close()
 
 
+def _migrate_restore_pre2003_akutagawa_naoki():
+    """akutagawa_naoki_official_replace_v1 が award='芥川賞'/'直木賞' を年で絞らず
+    全件DELETEしたため、1935〜2002年（第1〜128回相当）の正当な受賞データ
+    （PLAM CSV由来、confidence=OFFICIAL）約280件を誤って削除してしまった。
+
+    このマイグレーションはDELETEを一切行わない。手順は以下の2段階の追加のみ:
+      1) seeds.py の芥川賞・直木賞のうち、まだDBにないもの（第129回の共同受賞漏れ等）を追加
+      2) PLAM CSV(award_history.csv)の芥川賞・直木賞のうち award_no < 129
+         （seeds.pyでカバーしている最小回次より前＝1935〜2002年相当）をDBへ追加
+      award_no >= 129 のPLAM行は、タイトル表記ゆれ（例:「4TEEN フォーティーン」）で
+      重複判定をすり抜けるリスクがあるため、回次のハードカットオフで確実に除外する。
+    事前に award_books の全件バックアップテーブルを作成してから実行する。
+    """
+    if _migration_done("restore_pre2003_akutagawa_naoki_v1"):
+        return
+    if not USE_PG:
+        return
+
+    import csv
+    import unicodedata
+    import os
+
+    def _n(s):
+        s = unicodedata.normalize("NFKC", s or "").strip()
+        return "".join(s.split())
+
+    AWARD_MAP = {"AKU": "芥川賞", "NAO": "直木賞"}
+    base = os.path.join(os.path.dirname(__file__), "data", "plam")
+    try:
+        works = {r["work_id"]: r for r in csv.DictReader(open(os.path.join(base, "works.csv"), encoding="utf-8"))}
+        history = list(csv.DictReader(open(os.path.join(base, "award_history.csv"), encoding="utf-8")))
+    except Exception as e:
+        logger.error("[restore_pre2003] CSV読み込みエラー: %s", e)
+        return
+
+    targets = ("芥川賞", "直木賞")
+    con = get_con()
+    try:
+        cur = con.cursor()
+
+        # バックアップ（初回のみ。既に存在すれば作成しない）
+        cur.execute("SELECT to_regclass('public.award_books_backup_20260705')")
+        if cur.fetchone()[0] is None:
+            cur.execute("CREATE TABLE award_books_backup_20260705 AS SELECT * FROM award_books")
+            logger.info("[restore_pre2003] award_books_backup_20260705 を作成しました")
+
+        before_counts = {}
+        for award in targets:
+            cur.execute("SELECT COUNT(*) FROM award_books WHERE award = %s", (award,))
+            before_counts[award] = cur.fetchone()[0]
+
+        existing_rows = fetchall(con, "SELECT award, title FROM award_books WHERE award = ANY(%s)", (list(targets),))
+        existing = {(_n(r["title"]), r["award"]) for r in existing_rows}
+
+        # 1) seeds.py側の未反映分（共同受賞漏れ等）を追加
+        seed_rows = [t for t in _AWARD_BOOKS_SEED if len(t) == 6 and t[0] in targets]
+        min_round = dict(AWARD_BOOKS_SEEDS_MIN_ROUND)
+        for award in targets:
+            actual_min = min(t[1] for t in seed_rows if t[0] == award and t[1] is not None)
+            if actual_min != min_round[award]:
+                logger.error(
+                    "[restore_pre2003] 境界不整合: %s のseeds.py最小round=%d だが AWARD_BOOKS_SEEDS_MIN_ROUND=%d",
+                    award, actual_min, min_round[award],
+                )
+                return
+        step_a_inserted = {award: 0 for award in targets}
+        for (award, no, year, title, author, status) in seed_rows:
+            key = (_n(title), award)
+            if key in existing:
+                continue
+            cur.execute(
+                "INSERT INTO award_books (award, award_no, award_year, title, author, status, award_category) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+                (award, no, year, title, author, status, ""),
+            )
+            existing.add(key)
+            step_a_inserted[award] += 1
+
+        # 2) PLAM CSVから award_no < min_round のもの（1935〜2002年相当）のみ追加
+        step_b_inserted = {award: 0 for award in targets}
+        step_b_skipped_boundary = 0
+        for row in history:
+            award_name = AWARD_MAP.get(row["award_id"])
+            if award_name not in targets:
+                continue
+            award_no = int(row["award_no"]) if row.get("award_no") else None
+            if award_no is None or award_no >= min_round[award_name]:
+                if award_no is not None and award_no >= min_round[award_name]:
+                    step_b_skipped_boundary += 1
+                continue
+            work = works.get(row["work_id"])
+            if not work:
+                continue
+            title = (work.get("canonical_title") or work.get("title") or "").strip()
+            if not title:
+                continue
+            author = (work.get("author") or "").strip()
+            award_year = int(row["award_year"]) if row.get("award_year") else None
+            key = (_n(title), award_name)
+            if key in existing:
+                continue
+            cur.execute(
+                "INSERT INTO award_books (award, award_no, award_year, title, author, status, award_category) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+                (award_name, award_no, award_year, title, author, "確認済", ""),
+            )
+            existing.add(key)
+            step_b_inserted[award_name] += 1
+
+        after_counts = {}
+        for award in targets:
+            cur.execute("SELECT COUNT(*) FROM award_books WHERE award = %s", (award,))
+            after_counts[award] = cur.fetchone()[0]
+
+        con.commit()
+        _mark_migration_done("restore_pre2003_akutagawa_naoki_v1")
+
+        logger.info("=== Restore Pre-2003 Akutagawa/Naoki (PLAM) ===")
+        logger.info("Before")
+        for award in targets:
+            logger.info("  %s : %d", award, before_counts[award])
+        logger.info("Step1 seeds.py additive insert")
+        for award in targets:
+            logger.info("  %s : %d", award, step_a_inserted[award])
+        logger.info("Step2 PLAM pre-min_round additive insert (境界外スキップ %d件)", step_b_skipped_boundary)
+        for award in targets:
+            logger.info("  %s : %d", award, step_b_inserted[award])
+        logger.info("After")
+        for award in targets:
+            logger.info("  %s : %d", award, after_counts[award])
+    except Exception as e:
+        logger.error("[restore_pre2003] error: %s", e, exc_info=True)
+        try:
+            con.rollback()
+        except Exception:
+            pass
+    finally:
+        con.close()
+
+
 def _migrate_sync_plam_to_award_books():
     """PLAM CSV (award_history.csv + works.csv) を award_books に同期する。"""
     if _migration_done("sync_plam_to_award_books_v2"):
@@ -2259,6 +2403,7 @@ def _run_all_migrations_steps():
         _migrate_sync_plam_to_award_books, # PLAM CSV → award_books 同期
         _cleanup_award_books_duplicates,   # 障害復旧（2026-07-04）: 複数ワーカー同時実行による重複除去
         _migrate_akutagawa_naoki_official_replace,  # 芥川賞・直木賞を公式データで全面置換（2026-07-05）
+        _migrate_restore_pre2003_akutagawa_naoki,   # 障害復旧（2026-07-05）: 1935〜2002年分をPLAM CSVから追加のみで復元
         _migrate_fetch_isbn_ndl,           # NDL API で isbn13 補完（バックグラウンド）
         _migrate_db_indices,               # パフォーマンス用インデックス
         _verify_tables,
