@@ -352,6 +352,18 @@ def repair_finding(isbn, fields, operator):
         return {"error": str(e)}, 500
 
 
+_bulk_repair_running = False
+_bulk_repair_last_result = None
+
+
+def is_bulk_repair_running():
+    return _bulk_repair_running
+
+
+def get_bulk_repair_last_result():
+    return _bulk_repair_last_result
+
+
 def bulk_repair_by_level(level, operator):
     """指定した重要度（通常はcritical）の未解決findingsを一括修復する。
 
@@ -361,29 +373,51 @@ def bulk_repair_by_level(level, operator):
     異なり、対象件数が多い場合の運用負荷を下げる目的。
     critical判定の対象フィールドは常にtitle・author・publisherの3つとする
     （critical = title mismatch かつ author mismatch を意味するため）。
+
+    2026-07-07: 191件を同期処理（1リクエスト内でループ）した結果、
+    処理途中で500エラーが発生（21件成功後にタイムアウトと推測）した事故を
+    受けて、run_integrity_auditと同じくバックグラウンドスレッドで実行する
+    方式に変更した。進捗はダッシュボードのresolved_count/critical_countで
+    リアルタイムに確認できる。
     """
-    con = get_con()
-    try:
-        rows = fetchall(
-            con,
-            "SELECT * FROM integrity_findings WHERE resolved=%s" if USE_PG else "SELECT * FROM integrity_findings WHERE resolved=0",
-            (False,) if USE_PG else ()
-        )
-        con.close()
-    except Exception as e:
-        logger.error(f"一括修復: 対象取得エラー {e}", exc_info=True)
-        return {"error": str(e)}, 500
+    import threading
+    global _bulk_repair_running, _bulk_repair_last_result
 
-    targets = [r for r in rows if severity_info(r.get("mismatch_fields", ""))["level"] == level]
-    repaired = 0
-    errors = []
-    for r in targets:
-        fields = [f for f in ("title", "author", "publisher")]
-        result, code = repair_finding(r["isbn"], fields, operator)
-        if code == 200:
-            repaired += 1
-        else:
-            errors.append({"isbn": r["isbn"], "error": result.get("error")})
+    def _run():
+        global _bulk_repair_running, _bulk_repair_last_result
+        if _bulk_repair_running:
+            logger.info("一括修復: 既に実行中のためスキップ")
+            return
+        _bulk_repair_running = True
+        try:
+            con = get_con()
+            try:
+                rows = fetchall(
+                    con,
+                    "SELECT * FROM integrity_findings WHERE resolved=%s" if USE_PG else "SELECT * FROM integrity_findings WHERE resolved=0",
+                    (False,) if USE_PG else ()
+                )
+            finally:
+                con.close()
 
-    logger.info(f"一括修復({level}): {repaired}/{len(targets)}件完了、エラー{len(errors)}件")
-    return {"ok": True, "target_count": len(targets), "repaired": repaired, "errors": errors}, 200
+            targets = [r for r in rows if severity_info(r.get("mismatch_fields", ""))["level"] == level]
+            repaired = 0
+            errors = []
+            for r in targets:
+                fields = ["title", "author", "publisher"]
+                result, code = repair_finding(r["isbn"], fields, operator)
+                if code == 200:
+                    repaired += 1
+                else:
+                    errors.append({"isbn": r["isbn"], "error": result.get("error")})
+
+            _bulk_repair_last_result = {"target_count": len(targets), "repaired": repaired, "errors": errors}
+            logger.info(f"一括修復({level}): {repaired}/{len(targets)}件完了、エラー{len(errors)}件")
+        except Exception as e:
+            logger.error(f"一括修復エラー: {e}", exc_info=True)
+            _bulk_repair_last_result = {"error": str(e)}
+        finally:
+            _bulk_repair_running = False
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"status": "started"}, 200

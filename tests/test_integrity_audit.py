@@ -125,12 +125,28 @@ def _cleanup_bulk_repair_fixture():
 
 
 def test_bulk_repair_by_level_only_touches_specified_level():
-    """bulk_repair_by_levelはcriticalのみを対象にし、infoレベルには触れない。"""
+    """bulk_repair_by_levelはcriticalのみを対象にし、infoレベルには触れない。
+    2026-07-07: 191件の同期一括処理でタイムアウトによる500エラーが発生した
+    事故を受けてバックグラウンドスレッド実行に変更したため、完了をポーリングで待つ。"""
+    import time
+    from services.integrity import is_bulk_repair_running, get_bulk_repair_last_result
+
     _seed_bulk_repair_fixture()
     try:
         result, code = bulk_repair_by_level("critical", "テスト太郎")
         assert code == 200
-        assert result["repaired"] == 1
+        assert result["status"] == "started"
+
+        for _ in range(50):
+            if not is_bulk_repair_running():
+                break
+            time.sleep(0.1)
+        else:
+            raise AssertionError("一括修復がタイムアウトしました")
+
+        last = get_bulk_repair_last_result()
+        assert last is not None
+        assert last["repaired"] == 1
 
         con = get_con()
         repaired_row = fetchone(con, "SELECT * FROM genre_books WHERE isbn=?", (_TEST_ISBN_CRITICAL,))
