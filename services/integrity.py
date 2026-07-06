@@ -191,6 +191,7 @@ def run_integrity_audit(force=False, limit=None):
                         _clear_finding(r["isbn"])
                 time.sleep(0.5)
 
+            _save_audit_time(checked, found)
             logger.info(f"整合性監査: 完了（{checked}件チェック、{found}件の不一致を検出）")
         except Exception as e:
             logger.error(f"整合性監査エラー: {e}", exc_info=True)
@@ -198,6 +199,71 @@ def run_integrity_audit(force=False, limit=None):
             _audit_running = False
 
     threading.Thread(target=_run, daemon=True).start()
+
+
+def _save_audit_time(checked, found):
+    import datetime
+    now = datetime.datetime.now().isoformat()
+    try:
+        con = get_con()
+        if USE_PG:
+            execute(con,
+                "INSERT INTO settings (key,value) VALUES (?,?) "
+                "ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value",
+                ("integrity_audit_last_run", now))
+        else:
+            execute(con,
+                "INSERT OR REPLACE INTO settings (key,value) VALUES (?,?)",
+                ("integrity_audit_last_run", now))
+        con.commit(); con.close()
+    except Exception as e:
+        logger.error(f"_save_audit_time error: %s", e)
+
+
+def dashboard_summary():
+    """データ健全性ダッシュボード用の集計値をまとめて返す。"""
+    from config import get_setting
+    con = get_con()
+    try:
+        unresolved = fetchall(
+            con,
+            "SELECT mismatch_fields FROM integrity_findings WHERE resolved=%s" if USE_PG
+            else "SELECT mismatch_fields FROM integrity_findings WHERE resolved=0",
+            (False,) if USE_PG else ()
+        )
+        counts = {"critical": 0, "warning": 0, "info": 0}
+        for r in unresolved:
+            level = severity_info(r["mismatch_fields"])["level"]
+            counts[level] = counts.get(level, 0) + 1
+
+        total_row = fetchone(con, "SELECT COUNT(*) as cnt FROM genre_books")
+        total_books = total_row["cnt"] if total_row else 0
+
+        resolved_row = fetchall(con, "SELECT DISTINCT isbn FROM integrity_log")
+        resolved_count = len(resolved_row)
+    finally:
+        con.close()
+
+    total_unresolved = sum(counts.values())
+    # 健全性スコア: 全蔵書に対する「未解決かつ本物の可能性が高い(critical)」件数の割合から算出。
+    # warning/infoは表記ゆれ等を含むため軽い重み付けに留める。
+    if total_books:
+        penalty = (counts["critical"] * 1.0 + counts["warning"] * 0.3 + counts["info"] * 0.05) / total_books
+        health_score = max(0.0, round(100 - penalty * 100, 1))
+    else:
+        health_score = 100.0
+
+    return {
+        "health_score": health_score,
+        "total_books": total_books,
+        "unresolved_total": total_unresolved,
+        "critical_count": counts["critical"],
+        "warning_count": counts["warning"],
+        "info_count": counts["info"],
+        "resolved_count": resolved_count,
+        "last_audit_at": get_setting("integrity_audit_last_run", ""),
+        "audit_running": _audit_running,
+    }
 
 
 def _save_finding(isbn, db_title, db_author, db_publisher, ob_title, ob_author, ob_publisher, fields):
@@ -284,3 +350,40 @@ def repair_finding(isbn, fields, operator):
             pass
         con.close()
         return {"error": str(e)}, 500
+
+
+def bulk_repair_by_level(level, operator):
+    """指定した重要度（通常はcritical）の未解決findingsを一括修復する。
+
+    2026-07-06〜07: ランダムサンプル検証（計45件超）でcriticalカテゴリの
+    精度がほぼ100%と確認できたため、管理者の明示的な一括承認操作を前提に
+    まとめて修復できるようにした。1件ずつの手動承認（repair_finding）と
+    異なり、対象件数が多い場合の運用負荷を下げる目的。
+    critical判定の対象フィールドは常にtitle・author・publisherの3つとする
+    （critical = title mismatch かつ author mismatch を意味するため）。
+    """
+    con = get_con()
+    try:
+        rows = fetchall(
+            con,
+            "SELECT * FROM integrity_findings WHERE resolved=%s" if USE_PG else "SELECT * FROM integrity_findings WHERE resolved=0",
+            (False,) if USE_PG else ()
+        )
+        con.close()
+    except Exception as e:
+        logger.error(f"一括修復: 対象取得エラー {e}", exc_info=True)
+        return {"error": str(e)}, 500
+
+    targets = [r for r in rows if severity_info(r.get("mismatch_fields", ""))["level"] == level]
+    repaired = 0
+    errors = []
+    for r in targets:
+        fields = [f for f in ("title", "author", "publisher")]
+        result, code = repair_finding(r["isbn"], fields, operator)
+        if code == 200:
+            repaired += 1
+        else:
+            errors.append({"isbn": r["isbn"], "error": result.get("error")})
+
+    logger.info(f"一括修復({level}): {repaired}/{len(targets)}件完了、エラー{len(errors)}件")
+    return {"ok": True, "target_count": len(targets), "repaired": repaired, "errors": errors}, 200

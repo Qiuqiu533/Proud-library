@@ -2938,6 +2938,36 @@ document.querySelectorAll(".board-tab").forEach(btn => {
     }
   });
 
+  document.getElementById("integrityBulkRepairBtn")?.addEventListener("click", async () => {
+    const btn = document.getElementById("integrityBulkRepairBtn");
+    const msg = document.getElementById("integrityAuditMsg");
+    if (!confirm("Critical判定（タイトル・著者とも不一致）の未解決分をすべて、OpenBDのデータで一括修復します。\nこの操作は元に戻せません（修復履歴は記録されます）。よろしいですか？")) return;
+    btn.disabled = true;
+    msg.style.color = "#888";
+    msg.textContent = "一括修復を実行しています…（件数によっては数十秒かかります）";
+    try {
+      const operator = boardSenderName || "管理者";
+      const res = await adminFetch("/api/admin/integrity-audit/bulk-repair", {
+        method: "POST",
+        body: JSON.stringify({ level: "critical", operator })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        msg.style.color = "#2a7a4a";
+        msg.textContent = `完了: ${data.target_count}件中${data.repaired}件を修復しました${data.errors && data.errors.length ? `（失敗${data.errors.length}件）` : ""}。`;
+        _loadIntegrityFindings();
+      } else {
+        msg.style.color = "#e05";
+        msg.textContent = data.error || "一括修復に失敗しました。";
+      }
+    } catch (e) {
+      msg.style.color = "#e05";
+      msg.textContent = "通信エラーが発生しました。";
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
   if (document.getElementById("integrityFindingsList")) {
     _loadIntegrityFindings();
   }
@@ -3258,16 +3288,18 @@ async function loadDashboard() {
 
   const pw = boardPassword;
   try {
-    const [dashRes, awardsRes, backupRes] = await Promise.all([
+    const [dashRes, awardsRes, backupRes, integrityRes] = await Promise.all([
       fetch(`/api/admin/dashboard-data`, { headers: { "X-Password": pw } }),
       fetch(`/api/award-books/awards`),
       fetch(`/api/admin/backup-status`, { headers: { "X-Password": pw } }),
+      fetch(`/api/admin/integrity-audit/dashboard`, { headers: { "X-Password": pw } }),
     ]);
     if (!dashRes.ok) throw new Error("dashboard-data fetch failed");
     const d = await dashRes.json();
     const awardsData = awardsRes.ok ? await awardsRes.json() : [];
     const awardCount = awardsData.reduce((s, a) => s + (a.count || 0), 0);
     const backupData = backupRes && backupRes.ok ? await backupRes.json() : {};
+    const integrity = integrityRes && integrityRes.ok ? await integrityRes.json() : null;
     const backupHtml = backupData.last_backup
       ? `✅ 最終バックアップ: ${backupData.last_backup}`
       : `⚠️ バックアップ未確認（<a href="https://github.com/Qiuqiu533/Proud-library/actions/workflows/backup.yml" target="_blank">GitHub Actions</a>で確認）`;
@@ -3361,6 +3393,35 @@ async function loadDashboard() {
           <div class="dash-card-action">管理 →</div>
         </div>
       </div>
+
+      <!-- データ健全性 -->
+      <div class="dash-section-title">🩺 データ健全性
+        <button class="dash-more-btn" onclick="switchBoardTab('newarrival')">監査結果を見る →</button>
+      </div>
+      ${integrity ? `
+      <div class="dash-card-row">
+        <div class="dash-card ${integrity.health_score >= 95 ? "dash-card-blue" : integrity.health_score >= 85 ? "dash-alert-red" : "dash-alert-red"}">
+          <div class="dash-card-num">${integrity.health_score}%</div>
+          <div class="dash-card-label">健全性スコア</div>
+        </div>
+        <div class="dash-card ${integrity.critical_count > 0 ? "dash-alert-red" : "dash-alert-green"} dash-clickable" onclick="switchBoardTab('newarrival')">
+          <div class="dash-card-num">🔴 ${integrity.critical_count}</div>
+          <div class="dash-card-label">Critical<br>（別の本の可能性大）</div>
+          <div class="dash-card-action">確認 →</div>
+        </div>
+        <div class="dash-card dash-card-gold dash-clickable" onclick="switchBoardTab('newarrival')">
+          <div class="dash-card-num">🟡 ${integrity.warning_count}</div>
+          <div class="dash-card-label">Warning<br>（タイトルのみ不一致）</div>
+        </div>
+        <div class="dash-card dash-card-teal dash-clickable" onclick="switchBoardTab('newarrival')">
+          <div class="dash-card-num">🔵 ${integrity.info_count}</div>
+          <div class="dash-card-label">Info<br>（表記ゆれの可能性）</div>
+        </div>
+      </div>
+      <div class="dash-db-bar-label" style="margin:6px 2px 16px">
+        <span>修復済み: ${integrity.resolved_count}件 ｜ 総蔵書: ${integrity.total_books.toLocaleString()}冊</span>
+        <span style="color:#888">最終監査: ${integrity.last_audit_at ? new Date(integrity.last_audit_at).toLocaleString("ja-JP",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}) : "未実施"}${integrity.audit_running ? "（実行中…）" : ""}</span>
+      </div>` : `<div class="dash-empty">取得できませんでした</div>`}
 
       <!-- DB使用量 -->
       <div class="dash-section-title">🗄️ DB使用量（Neon 無料枠 512MB）</div>
@@ -4881,6 +4942,7 @@ async function loadDbSize() {
   const dbBtn = document.getElementById("dbSizeBtn");
   if (dbBtn) dbBtn.addEventListener("click", loadDbSize);
 }
+document.getElementById("dbSizeBtn")?.addEventListener("click", loadDbSize);
 
 // ===== マイグレーション状況確認（管理者診断用） =====
 async function loadMigrationStatus() {
