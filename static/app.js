@@ -2821,6 +2821,12 @@ document.querySelectorAll(".board-tab").forEach(btn => {
 
   function _escI(s) { return (s || "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
+  const INTEGRITY_LEVEL_META = {
+    critical: { emoji: "🔴", label: "Critical（タイトル・著者とも不一致＝別の本の可能性が高い）", color: "#c0392b" },
+    warning:  { emoji: "🟡", label: "Warning（タイトルのみ不一致）", color: "#b8860b" },
+    info:     { emoji: "🔵", label: "Info（著者のみ不一致＝表記ゆれの可能性）", color: "#3a6aaa" },
+  };
+
   function _renderIntegrityFindings(findings) {
     const list = document.getElementById("integrityFindingsList");
     if (!list) return;
@@ -2828,12 +2834,15 @@ document.querySelectorAll(".board-tab").forEach(btn => {
       list.innerHTML = '<p style="font-size:0.82rem;color:#888">未解決の不一致はありません。</p>';
       return;
     }
-    list.innerHTML = findings.map(f => {
+    const groups = { critical: [], warning: [], info: [] };
+    findings.forEach(f => { (groups[f.level] || groups.info).push(f); });
+
+    const renderCard = f => {
       const fields = (f.mismatch_fields || "").split(",").filter(Boolean);
       const fieldRow = (key, label, dbVal, obVal) => {
         if (!fields.includes(key)) return "";
         return `
-          <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+          <div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap">
             <label style="font-size:0.8rem;display:flex;align-items:center;gap:4px;flex-shrink:0">
               <input type="checkbox" class="integrity-field-cb" data-field="${key}" checked /> ${label}を修正
             </label>
@@ -2843,12 +2852,22 @@ document.querySelectorAll(".board-tab").forEach(btn => {
           </div>`;
       };
       return `<div class="integrity-finding-card" data-isbn="${f.isbn}" style="background:#fff;border:1.5px solid #eee;border-radius:10px;padding:10px 12px">
-        <div style="font-size:0.8rem;color:#888">ISBN: ${f.isbn}</div>
+        <div style="font-size:0.8rem;color:#888">ISBN: ${f.isbn}　優先度スコア: ${f.score}</div>
         ${fieldRow("title", "タイトル", f.db_title, f.openbd_title)}
         ${fieldRow("author", "著者", f.db_author, f.openbd_author)}
-        ${fieldRow("publisher", "出版社", f.db_publisher, f.openbd_publisher)}
+        <div style="font-size:0.76rem;color:#aaa;margin-top:4px">出版社（参考）: ${_escI(f.db_publisher)} → ${_escI(f.openbd_publisher)}</div>
         <button class="btn-secondary integrity-repair-btn" style="margin-top:8px;padding:6px 12px;font-size:0.8rem">この内容で修復する</button>
         <span class="integrity-repair-msg" style="font-size:0.78rem;margin-left:8px;color:#555"></span>
+      </div>`;
+    };
+
+    list.innerHTML = ["critical", "warning", "info"].map(level => {
+      const items = groups[level];
+      if (!items.length) return "";
+      const meta = INTEGRITY_LEVEL_META[level];
+      return `<div class="integrity-severity-group">
+        <h5 style="font-size:0.88rem;color:${meta.color};margin:10px 0 6px">${meta.emoji} ${meta.label}（${items.length}件）</h5>
+        <div style="display:flex;flex-direction:column;gap:8px">${items.map(renderCard).join("")}</div>
       </div>`;
     }).join("");
 

@@ -7,7 +7,7 @@ services.integrity の不一致判定ロジックの回帰テスト。
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from services.integrity import _mismatch_fields
+from services.integrity import _mismatch_fields, severity_info
 
 
 def test_mismatch_fields_detects_completely_different_book():
@@ -57,3 +57,35 @@ def test_mismatch_fields_allows_openbd_multi_contributor_author():
         "スノーモンキー", "岩合,光昭,1950- 岩合,日出子,1944-"
     )
     assert fields == []
+
+
+def test_mismatch_fields_allows_short_title_containment():
+    """2文字タイトル（例:「無明」「地球」）でも、副題・シリーズ名を含む長い
+    タイトルとの包含関係で一致と判定する（2026-07-06: 実データで検出漏れ判明）。"""
+    fields = _mismatch_fields("無明", "今野 敏", "無明　警視庁強行犯係・樋口顕", "今野敏")
+    assert "title" not in fields
+
+
+def test_mismatch_fields_case_insensitive_title():
+    """英数字部分の大文字小文字差だけでは不一致と判定しない。"""
+    fields = _mismatch_fields("1Q84 BOOK 2", "村上 春樹", "1Q84 book 2", "村上,春樹,1949-")
+    assert "title" not in fields
+
+
+def test_severity_info_critical_for_title_and_author_mismatch():
+    """タイトル・著者とも不一致は実データ検証でほぼ100%本物の異常だったため
+    Critical（最優先）とする。"""
+    info = severity_info(["title", "author"])
+    assert info["level"] == "critical"
+    assert info["score"] == 100
+
+
+def test_severity_info_warning_for_title_only():
+    info = severity_info(["title"])
+    assert info["level"] == "warning"
+
+
+def test_severity_info_info_for_author_only():
+    """著者のみ不一致は実データ検証でほぼ100%表記ゆれだったためInfo（参考情報）とする。"""
+    info = severity_info(["author"])
+    assert info["level"] == "info"
