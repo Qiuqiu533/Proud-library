@@ -7,7 +7,8 @@ services.integrity の不一致判定ロジックの回帰テスト。
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from services.integrity import _mismatch_fields, severity_info
+from services.integrity import _mismatch_fields, severity_info, bulk_repair_by_level, dashboard_summary
+from database import get_con, execute, fetchone
 
 
 def test_mismatch_fields_detects_completely_different_book():
@@ -89,3 +90,67 @@ def test_severity_info_info_for_author_only():
     """著者のみ不一致は実データ検証でほぼ100%表記ゆれだったためInfo（参考情報）とする。"""
     info = severity_info(["author"])
     assert info["level"] == "info"
+
+
+_TEST_ISBN_CRITICAL = "9999900000001"
+_TEST_ISBN_INFO = "9999900000002"
+
+
+def _seed_bulk_repair_fixture():
+    con = get_con()
+    execute(con, "INSERT OR REPLACE INTO genre_books (isbn, title, author, publisher, genre, format) VALUES (?,?,?,?,?,?)",
+            (_TEST_ISBN_CRITICAL, "すごい科学論文", "池谷 裕二", "新潮社", "その他", "その他"))
+    execute(con, "INSERT OR REPLACE INTO genre_books (isbn, title, author, publisher, genre, format) VALUES (?,?,?,?,?,?)",
+            (_TEST_ISBN_INFO, "同じタイトル", "田中太郎", "出版社A", "その他", "その他"))
+    execute(con, """INSERT OR REPLACE INTO integrity_findings
+        (isbn, db_title, db_author, db_publisher, openbd_title, openbd_author, openbd_publisher, mismatch_fields, resolved)
+        VALUES (?,?,?,?,?,?,?,?,0)""",
+        (_TEST_ISBN_CRITICAL, "すごい科学論文", "池谷 裕二", "新潮社", "カフェーの帰り道", "嶋津,輝,1969-", "東京創元社", "title,author"))
+    execute(con, """INSERT OR REPLACE INTO integrity_findings
+        (isbn, db_title, db_author, db_publisher, openbd_title, openbd_author, openbd_publisher, mismatch_fields, resolved)
+        VALUES (?,?,?,?,?,?,?,?,0)""",
+        (_TEST_ISBN_INFO, "同じタイトル", "田中太郎", "出版社A", "同じタイトル", "全然違う人", "出版社A", "author"))
+    con.commit()
+    con.close()
+
+
+def _cleanup_bulk_repair_fixture():
+    con = get_con()
+    for isbn in (_TEST_ISBN_CRITICAL, _TEST_ISBN_INFO):
+        execute(con, "DELETE FROM genre_books WHERE isbn=?", (isbn,))
+        execute(con, "DELETE FROM integrity_findings WHERE isbn=?", (isbn,))
+        execute(con, "DELETE FROM integrity_log WHERE isbn=?", (isbn,))
+    con.commit()
+    con.close()
+
+
+def test_bulk_repair_by_level_only_touches_specified_level():
+    """bulk_repair_by_levelはcriticalのみを対象にし、infoレベルには触れない。"""
+    _seed_bulk_repair_fixture()
+    try:
+        result, code = bulk_repair_by_level("critical", "テスト太郎")
+        assert code == 200
+        assert result["repaired"] == 1
+
+        con = get_con()
+        repaired_row = fetchone(con, "SELECT * FROM genre_books WHERE isbn=?", (_TEST_ISBN_CRITICAL,))
+        untouched_row = fetchone(con, "SELECT * FROM genre_books WHERE isbn=?", (_TEST_ISBN_INFO,))
+        con.close()
+        assert repaired_row["title"] == "カフェーの帰り道"
+        assert repaired_row["author"] == "嶋津,輝,1969-"
+        assert untouched_row["title"] == "同じタイトル"
+        assert untouched_row["author"] == "田中太郎"
+    finally:
+        _cleanup_bulk_repair_fixture()
+
+
+def test_dashboard_summary_reflects_unresolved_counts():
+    _seed_bulk_repair_fixture()
+    try:
+        summary = dashboard_summary()
+        assert summary["critical_count"] >= 1
+        assert summary["info_count"] >= 1
+        assert 0 <= summary["health_score"] <= 100
+        assert "total_books" in summary
+    finally:
+        _cleanup_bulk_repair_fixture()

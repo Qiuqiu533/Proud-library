@@ -232,3 +232,31 @@ def api_integrity_audit_repair():
     from services.integrity import repair_finding
     result, code = repair_finding(isbn, fields, operator)
     return jsonify(result), code
+
+
+@admin_bp.route("/api/admin/integrity-audit/bulk-repair", methods=["POST"])
+def api_integrity_audit_bulk_repair():
+    """指定した重要度（通常はcritical）の未解決findingsを一括修復する。
+    ランダムサンプル検証で精度がほぼ100%と確認できたcriticalカテゴリのみを
+    想定した運用向け機能（2026-07-07追加）。"""
+    pw = request.headers.get("X-Password", "")
+    if not check_password(pw, "board"):
+        return jsonify({"error": "unauthorized"}), 401
+    body = request.get_json(silent=True) or {}
+    level = (body.get("level") or "critical").strip()
+    operator = (body.get("operator") or "").strip() or "不明"
+    if level not in ("critical", "warning", "info"):
+        return jsonify({"error": "invalid level"}), 400
+    from services.integrity import bulk_repair_by_level
+    result, code = bulk_repair_by_level(level, operator)
+    return jsonify(result), code
+
+
+@admin_bp.route("/api/admin/integrity-audit/dashboard")
+def api_integrity_audit_dashboard():
+    """データ健全性ダッシュボード用の集計値を返す。"""
+    pw = request.headers.get("X-Password", "")
+    if not check_password(pw, "board"):
+        return jsonify({"error": "unauthorized"}), 401
+    from services.integrity import dashboard_summary
+    return jsonify(dashboard_summary())
