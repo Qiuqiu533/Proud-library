@@ -247,9 +247,21 @@ def api_integrity_audit_bulk_repair():
     operator = (body.get("operator") or "").strip() or "不明"
     if level not in ("critical", "warning", "info"):
         return jsonify({"error": "invalid level"}), 400
-    from services.integrity import bulk_repair_by_level
+    from services.integrity import bulk_repair_by_level, is_bulk_repair_running
+    if is_bulk_repair_running():
+        return jsonify({"status": "already_running"}), 409
     result, code = bulk_repair_by_level(level, operator)
     return jsonify(result), code
+
+
+@admin_bp.route("/api/admin/integrity-audit/bulk-repair-status")
+def api_integrity_audit_bulk_repair_status():
+    """一括修復の実行中フラグと直近の結果を返す（ポーリング用）"""
+    pw = request.headers.get("X-Password", "")
+    if not check_password(pw, "board"):
+        return jsonify({"error": "unauthorized"}), 401
+    from services.integrity import is_bulk_repair_running, get_bulk_repair_last_result
+    return jsonify({"running": is_bulk_repair_running(), "last_result": get_bulk_repair_last_result()})
 
 
 @admin_bp.route("/api/admin/integrity-audit/dashboard")

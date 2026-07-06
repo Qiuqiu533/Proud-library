@@ -2938,13 +2938,39 @@ document.querySelectorAll(".board-tab").forEach(btn => {
     }
   });
 
+  async function _pollBulkRepairStatus() {
+    const msg = document.getElementById("integrityAuditMsg");
+    const btn = document.getElementById("integrityBulkRepairBtn");
+    try {
+      const res = await adminFetch("/api/admin/integrity-audit/bulk-repair-status");
+      const data = await res.json();
+      if (data.running) {
+        msg.style.color = "#888";
+        msg.textContent = "一括修復を実行中…（このタブを閉じても処理は継続します。しばらくしてから再度開いてご確認ください）";
+        setTimeout(_pollBulkRepairStatus, 5000);
+        return;
+      }
+      const last = data.last_result;
+      if (last && last.error) {
+        msg.style.color = "#e05";
+        msg.textContent = `エラー: ${last.error}`;
+      } else if (last) {
+        msg.style.color = "#2a7a4a";
+        msg.textContent = `完了: ${last.target_count}件中${last.repaired}件を修復しました${last.errors && last.errors.length ? `（失敗${last.errors.length}件）` : ""}。`;
+        _loadIntegrityFindings();
+      }
+    } catch (e) { /* noop */ } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
   document.getElementById("integrityBulkRepairBtn")?.addEventListener("click", async () => {
     const btn = document.getElementById("integrityBulkRepairBtn");
     const msg = document.getElementById("integrityAuditMsg");
     if (!confirm("Critical判定（タイトル・著者とも不一致）の未解決分をすべて、OpenBDのデータで一括修復します。\nこの操作は元に戻せません（修復履歴は記録されます）。よろしいですか？")) return;
     btn.disabled = true;
     msg.style.color = "#888";
-    msg.textContent = "一括修復を実行しています…（件数によっては数十秒かかります）";
+    msg.textContent = "一括修復を開始しています…";
     try {
       const operator = boardSenderName || "管理者";
       const res = await adminFetch("/api/admin/integrity-audit/bulk-repair", {
@@ -2952,18 +2978,20 @@ document.querySelectorAll(".board-tab").forEach(btn => {
         body: JSON.stringify({ level: "critical", operator })
       });
       const data = await res.json();
-      if (res.ok) {
-        msg.style.color = "#2a7a4a";
-        msg.textContent = `完了: ${data.target_count}件中${data.repaired}件を修復しました${data.errors && data.errors.length ? `（失敗${data.errors.length}件）` : ""}。`;
-        _loadIntegrityFindings();
+      if (res.status === 409) {
+        msg.style.color = "#e08a00";
+        msg.textContent = "既に一括修復実行中です。しばらくお待ちください。";
+        btn.disabled = false;
+      } else if (res.ok && data.status === "started") {
+        _pollBulkRepairStatus();
       } else {
         msg.style.color = "#e05";
-        msg.textContent = data.error || "一括修復に失敗しました。";
+        msg.textContent = data.error || "一括修復の開始に失敗しました。";
+        btn.disabled = false;
       }
     } catch (e) {
       msg.style.color = "#e05";
       msg.textContent = "通信エラーが発生しました。";
-    } finally {
       btn.disabled = false;
     }
   });
