@@ -51,8 +51,9 @@ def _sim(a, b):
 
 
 def _dense(s):
-    """空白・カンマを除去し、比較用に文字列を圧縮する。"""
-    return re.sub(r"[\s,、]", "", s or "")
+    """空白・カンマを除去し、大文字小文字を統一して比較用に文字列を圧縮する
+    （例: '1Q84 BOOK 2' と '1Q84...book2...' のような大文字小文字差を吸収）。"""
+    return re.sub(r"[\s,、]", "", (s or "").lower())
 
 
 def _normalize_title_for_compare(title):
@@ -73,7 +74,7 @@ def _title_mismatch(db_title, ob_title):
     a, b = _normalize_title_for_compare(db_title), _normalize_title_for_compare(ob_title)
     if not a or not b:
         return False
-    if len(a) >= 3 and (a in b or b in a):
+    if len(a) >= 2 and (a in b or b in a):
         return False
     return _sim(a, b) < 0.5
 
@@ -113,6 +114,30 @@ def _mismatch_fields(db_title, db_author, ob_title, ob_author):
     if _author_mismatch(db_author, ob_author):
         fields.append("author")
     return fields
+
+
+def severity_info(mismatch_fields):
+    """実データ検証の結果、タイトル・著者とも不一致はほぼ100%が本物の誤登録、
+    著者のみ不一致はほぼ100%が表記ゆれ（誤検知）だったため（2026-07-06）、
+    mismatch_fieldsの組み合わせから重要度を判定する。修復優先度スコアは
+    タイトル不一致+50・著者不一致+30・OpenBD取得成功+20・ISBN一致+10を基準に、
+    ここまで監査に到達している時点でOpenBD取得・ISBN一致は常に真なので
+    base=30固定とする。"""
+    fields = set(mismatch_fields) if isinstance(mismatch_fields, (list, set)) else set(
+        (mismatch_fields or "").split(","))
+    fields.discard("")
+    base = 30
+    score = base + (50 if "title" in fields else 0) + (30 if "author" in fields else 0)
+    score = min(score, 100)
+    if "title" in fields and "author" in fields:
+        level = "critical"
+    elif "title" in fields:
+        level = "warning"
+    elif "author" in fields:
+        level = "info"
+    else:
+        level = "info"
+    return {"level": level, "score": score}
 
 
 def run_integrity_audit(force=False, limit=None):

@@ -197,15 +197,24 @@ def api_integrity_audit_status():
 
 @admin_bp.route("/api/admin/integrity-audit/findings")
 def api_integrity_audit_findings():
+    """未解決の検出結果を、修復優先度スコアの高い順（タイトル・著者とも不一致
+    ＝本物の異常の可能性が高いものを最優先）に返す（2026-07-06）。"""
     pw = request.headers.get("X-Password", "")
     if not check_password(pw, "board"):
         return jsonify({"error": "unauthorized"}), 401
+    from services.integrity import severity_info
     con = get_con()
-    rows = fetchall(con, "SELECT * FROM integrity_findings WHERE resolved=%s ORDER BY checked_at DESC LIMIT 200" if USE_PG
-                     else "SELECT * FROM integrity_findings WHERE resolved=0 ORDER BY checked_at DESC LIMIT 200",
+    rows = fetchall(con, "SELECT * FROM integrity_findings WHERE resolved=%s ORDER BY checked_at DESC LIMIT 500" if USE_PG
+                     else "SELECT * FROM integrity_findings WHERE resolved=0 ORDER BY checked_at DESC LIMIT 500",
                      (False,) if USE_PG else ())
     con.close()
-    return jsonify([dict(r) for r in rows])
+    result = []
+    for r in rows:
+        d = dict(r)
+        d.update(severity_info(d.get("mismatch_fields", "")))
+        result.append(d)
+    result.sort(key=lambda d: d["score"], reverse=True)
+    return jsonify(result[:200])
 
 
 @admin_bp.route("/api/admin/integrity-audit/repair", methods=["POST"])
