@@ -10,8 +10,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: PostgreSQLクライアントをインストール
-        run: sudo apt-get install -y postgresql-client
+      - name: PostgreSQLクライアントをインストール（PGDG公式リポジトリから最新版）
+        # 2026-07: Ubuntuランナー標準のpostgresql-client（v16系）がNeon側の
+        # PostgreSQLバージョンより古く、pg_dumpが失敗する事象が3回連続で発生
+        # （7/5・7/4・6/28）。PostgreSQL公式のAPTリポジトリ（PGDG）から
+        # 常に最新のクライアントを導入し、client >= server を保証する。
+        run: |
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-17
 
       - name: pg_dumpでバックアップ取得
         env:
@@ -19,6 +26,7 @@ jobs:
         run: |
           TIMESTAMP=$(date +%Y%m%d_%H%M%S)
           FILENAME="proud_library_backup_${TIMESTAMP}.sql"
+          pg_dump --version
           pg_dump "$DATABASE_URL" \
             --no-password \
             --clean \
