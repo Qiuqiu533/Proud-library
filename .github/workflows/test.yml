@@ -15,7 +15,12 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        # 2026-07-07: pytestはrequirements-dev.txt側にのみ記載されており、
+        # ここでインストールされていなかったため、CI作成以来pytestステップが
+        # 一度も成功していなかった（"No module named pytest"相当のエラー）。
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
       - name: 受賞データ品質チェック
         run: python3 scripts/check_awards.py
       - name: pytest
