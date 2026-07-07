@@ -25,9 +25,15 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
+          export PATH="/usr/lib/postgresql/18/bin:$PATH"
           TIMESTAMP=$(date +%Y%m%d_%H%M%S)
           FILENAME="proud_library_backup_${TIMESTAMP}.sql"
+          echo "--- 使用中のpg_dumpの確認 ---"
+          which pg_dump
           pg_dump --version
+          which psql || true
+          psql --version || true
+          echo "-----------------------------"
           pg_dump "$DATABASE_URL" \
             --no-password \
             --clean \
