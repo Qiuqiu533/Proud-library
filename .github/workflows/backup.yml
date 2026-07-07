@@ -12,13 +12,14 @@ jobs:
     steps:
       - name: PostgreSQLクライアントをインストール（PGDG公式リポジトリから最新版）
         # 2026-07: Ubuntuランナー標準のpostgresql-client（v16系）がNeon側の
-        # PostgreSQLバージョンより古く、pg_dumpが失敗する事象が3回連続で発生
-        # （7/5・7/4・6/28）。PostgreSQL公式のAPTリポジトリ（PGDG）から
-        # 常に最新のクライアントを導入し、client >= server を保証する。
+        # PostgreSQLバージョンより古く、pg_dumpが失敗する事象が発生
+        # （7/5・7/4・6/28）。一度postgresql-client-17へ修正したが、
+        # 実際のNeonサーバーはPostgreSQL 18で、依然client(16.14) < server(18.4)
+        # のまま失敗した（2026-07-07判明）。postgresql-client-18を明示指定する。
         run: |
           sudo apt-get install -y postgresql-common
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
-          sudo apt-get install -y postgresql-client-17
+          sudo apt-get install -y postgresql-client-18
 
       - name: pg_dumpでバックアップ取得
         env:
