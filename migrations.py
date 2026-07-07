@@ -1133,16 +1133,26 @@ def _verify_tables():
 
 
 def _migrate_ratings_user_votes():
-    """ratings テーブルに user_votes カラムを追加（部屋別スコア管理・重複投票防止）。"""
+    """ratings テーブルに user_votes カラムを追加（部屋別スコア管理・重複投票防止）。
+
+    2026-07-07: 以前はif not USE_PG: returnでSQLite環境を素通りし、
+    カラムを追加しないまま完了フラグだけ立てていたため、CI（SQLite）で
+    「no such column: user_votes」エラーが発生していた。SQLiteは
+    ADD COLUMN IF NOT EXISTSに対応していないため、例外を握りつぶす形で
+    追加する。
+    """
     if _migration_done("ratings_user_votes_v1"):
-        return
-    if not USE_PG:
-        _mark_migration_done("ratings_user_votes_v1")
         return
     con = get_con()
     try:
         cur = con.cursor()
-        cur.execute("ALTER TABLE ratings ADD COLUMN IF NOT EXISTS user_votes TEXT DEFAULT '{}'")
+        if USE_PG:
+            cur.execute("ALTER TABLE ratings ADD COLUMN IF NOT EXISTS user_votes TEXT DEFAULT '{}'")
+        else:
+            try:
+                cur.execute("ALTER TABLE ratings ADD COLUMN user_votes TEXT DEFAULT '{}'")
+            except Exception:
+                pass
         con.commit()
         _mark_migration_done("ratings_user_votes_v1")
         logger.info("[migration] ratings.user_votes カラム追加完了")
