@@ -7,7 +7,10 @@ services.integrity の不一致判定ロジックの回帰テスト。
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from services.integrity import _mismatch_fields, severity_info, bulk_repair_by_level, dashboard_summary
+from services.integrity import (
+    _mismatch_fields, severity_info, bulk_repair_by_level, dashboard_summary,
+    backfill_clear_stale_ai_reviews,
+)
 from database import get_con, execute, fetchone
 
 
@@ -156,6 +159,61 @@ def test_bulk_repair_by_level_only_touches_specified_level():
         assert repaired_row["author"] == "嶋津,輝,1969-"
         assert untouched_row["title"] == "同じタイトル"
         assert untouched_row["author"] == "田中太郎"
+    finally:
+        _cleanup_bulk_repair_fixture()
+
+
+def test_backfill_clear_stale_ai_reviews_clears_only_repaired_books():
+    """title/authorがintegrity_logで修復済みの本だけAI書評フィールドをクリアし、
+    ai_review_content処理済みのものは対象から除外する（二重処理防止）。
+    2026-07-08: 194件の同期処理でgunicornワーカーがタイムアウト→SIGKILLされ
+    500エラーになった事故を受けてバックグラウンドスレッド実行に変更したため、
+    完了をポーリングで待つ。"""
+    import time
+    from services.integrity import is_backfill_ai_clear_running, get_backfill_ai_clear_last_result
+
+    con = get_con()
+    execute(con, "INSERT OR REPLACE INTO genre_books (isbn, title, author, publisher, genre, format, description, ai_summary) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (_TEST_ISBN_CRITICAL, "カフェーの帰り道", "嶋津,輝,1969-", "東京創元社", "その他", "その他",
+             "すごい科学論文の説明文", "すごい科学論文の要約"))
+    execute(con, "INSERT OR REPLACE INTO genre_books (isbn, title, author, publisher, genre, format, description, ai_summary) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (_TEST_ISBN_INFO, "同じタイトル", "田中太郎", "出版社A", "その他", "その他",
+             "既に処理済みの説明文", "既に処理済みの要約"))
+    execute(con, "INSERT INTO integrity_log (isbn, field, before_value, after_value, operator, reason) VALUES (?,?,?,?,?,?)",
+            (_TEST_ISBN_CRITICAL, "title", "すごい科学論文", "カフェーの帰り道", "テスト太郎", "テスト修復"))
+    execute(con, "INSERT INTO integrity_log (isbn, field, before_value, after_value, operator, reason) VALUES (?,?,?,?,?,?)",
+            (_TEST_ISBN_INFO, "title", "旧タイトル", "同じタイトル", "テスト太郎", "テスト修復"))
+    execute(con, "INSERT INTO integrity_log (isbn, field, before_value, after_value, operator, reason) VALUES (?,?,?,?,?,?)",
+            (_TEST_ISBN_INFO, "ai_review_content", "(旧タイトルに基づく内容)", "(クリア・再生成待ち)", "テスト太郎", "既に処理済み"))
+    con.commit()
+    con.close()
+
+    try:
+        result, code = backfill_clear_stale_ai_reviews("テスト太郎")
+        assert code == 200
+        assert result["status"] == "started"
+
+        for _ in range(50):
+            if not is_backfill_ai_clear_running():
+                break
+            time.sleep(0.1)
+        else:
+            raise AssertionError("backfill_clear_stale_ai_reviewsがタイムアウトしました")
+
+        last = get_backfill_ai_clear_last_result()
+        assert last is not None
+        assert last["cleared"] == 1
+
+        con = get_con()
+        cleared_row = fetchone(con, "SELECT * FROM genre_books WHERE isbn=?", (_TEST_ISBN_CRITICAL,))
+        untouched_row = fetchone(con, "SELECT * FROM genre_books WHERE isbn=?", (_TEST_ISBN_INFO,))
+        con.close()
+        assert cleared_row["description"] is None
+        assert cleared_row["ai_summary"] is None
+        assert untouched_row["description"] == "既に処理済みの説明文"
+        assert untouched_row["ai_summary"] == "既に処理済みの要約"
     finally:
         _cleanup_bulk_repair_fixture()
 
