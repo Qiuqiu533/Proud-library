@@ -240,10 +240,6 @@ def init_db():
             con.execute("ALTER TABLE announcements ADD COLUMN event_date TEXT DEFAULT ''")
         except Exception:
             pass
-        try:
-            con.execute("ALTER TABLE genre_books ADD COLUMN description TEXT DEFAULT ''")
-        except Exception:
-            pass
         con.execute("""
             CREATE TABLE IF NOT EXISTS issues (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -334,6 +330,10 @@ def init_db():
                 awards TEXT DEFAULT '[]'
             )
         """)
+        try:
+            con.execute("ALTER TABLE genre_books ADD COLUMN description TEXT DEFAULT ''")
+        except Exception:
+            pass
         con.execute("""
             CREATE TABLE IF NOT EXISTS new_arrivals (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,

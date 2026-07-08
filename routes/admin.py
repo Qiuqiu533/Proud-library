@@ -296,3 +296,38 @@ def api_integrity_audit_dashboard():
         return jsonify({"error": "unauthorized"}), 401
     from services.integrity import dashboard_summary
     return jsonify(dashboard_summary())
+
+
+@admin_bp.route("/api/admin/ai-review/estimate")
+def api_ai_review_estimate():
+    """未生成のAI書評の対象件数と概算コストを返す（OpenAI APIは呼ばない）。"""
+    pw = request.headers.get("X-Password", "")
+    if not check_password(pw, "board"):
+        return jsonify({"error": "unauthorized"}), 401
+    limit = request.args.get("limit", 100, type=int)
+    from services.ai_review_generator import estimate_regeneration
+    return jsonify(estimate_regeneration(limit))
+
+
+@admin_bp.route("/api/admin/ai-review/regenerate", methods=["POST"])
+def api_ai_review_regenerate():
+    """AI書評の半自動再生成を開始する（Phase 1: 手動起動・1ジョブ最大100件）。"""
+    pw = request.headers.get("X-Password", "")
+    if not check_password(pw, "board"):
+        return jsonify({"error": "unauthorized"}), 401
+    body = request.get_json(silent=True) or {}
+    limit = body.get("limit", 100)
+    operator = (body.get("operator") or "").strip() or "不明"
+    from services.ai_review_generator import start_regeneration
+    result, code = start_regeneration(limit, operator)
+    return jsonify(result), code
+
+
+@admin_bp.route("/api/admin/ai-review/regenerate-status")
+def api_ai_review_regenerate_status():
+    """AI書評再生成の実行中フラグと直近の結果を返す（ポーリング用）"""
+    pw = request.headers.get("X-Password", "")
+    if not check_password(pw, "board"):
+        return jsonify({"error": "unauthorized"}), 401
+    from services.ai_review_generator import is_regeneration_running, get_regeneration_last_result
+    return jsonify({"running": is_regeneration_running(), "last_result": get_regeneration_last_result()})

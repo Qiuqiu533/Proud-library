@@ -3000,6 +3000,86 @@ document.querySelectorAll(".board-tab").forEach(btn => {
     _loadIntegrityFindings();
   }
 
+  async function _pollAiReviewRegenStatus() {
+    const msg = document.getElementById("aiReviewRegenMsg");
+    const btn = document.getElementById("aiReviewRegenBtn");
+    try {
+      const res = await adminFetch("/api/admin/ai-review/regenerate-status");
+      const data = await res.json();
+      if (data.running) {
+        msg.style.color = "#888";
+        msg.textContent = "AI書評を再生成中…（このタブを閉じても処理は継続します。しばらくしてから再度開いてご確認ください）";
+        setTimeout(_pollAiReviewRegenStatus, 5000);
+        return;
+      }
+      const last = data.last_result;
+      if (last && last.error) {
+        msg.style.color = "#e05";
+        msg.textContent = `エラー: ${last.error}`;
+      } else if (last) {
+        msg.style.color = "#2a7a4a";
+        msg.textContent = `完了: ${last.target_count}件中${last.success}件を生成しました（情報不足でスキップ${last.skipped}件${last.errors && last.errors.length ? `、失敗${last.errors.length}件` : ""}）。`;
+      }
+    } catch (e) { /* noop */ } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  document.getElementById("aiReviewRegenBtn")?.addEventListener("click", async () => {
+    const btn = document.getElementById("aiReviewRegenBtn");
+    const msg = document.getElementById("aiReviewRegenMsg");
+    btn.disabled = true;
+    msg.style.color = "#888";
+    msg.textContent = "対象件数・概算コストを確認しています…";
+    try {
+      const estRes = await adminFetch("/api/admin/ai-review/estimate?limit=100");
+      const est = await estRes.json();
+      if (!estRes.ok) {
+        msg.style.color = "#e05";
+        msg.textContent = est.error || "概算の取得に失敗しました。";
+        btn.disabled = false;
+        return;
+      }
+      if (est.target_count === 0) {
+        msg.style.color = "#2a7a4a";
+        msg.textContent = "未生成のAI書評はありません。";
+        btn.disabled = false;
+        return;
+      }
+      const confirmMsg =
+        `未生成のAI書評 ${est.target_count}件（最大100件/回）を再生成します。\n` +
+        `概算コスト: 約${est.estimated_cost_jpy}円（${est.note}）\n\n` +
+        `OpenAI APIの実際の課金が発生します。よろしいですか？`;
+      if (!confirm(confirmMsg)) {
+        msg.textContent = "";
+        btn.disabled = false;
+        return;
+      }
+      msg.textContent = "AI書評の再生成を開始しています…";
+      const operator = boardSenderName || "管理者";
+      const res = await adminFetch("/api/admin/ai-review/regenerate", {
+        method: "POST",
+        body: JSON.stringify({ limit: 100, operator })
+      });
+      const data = await res.json();
+      if (res.status === 409) {
+        msg.style.color = "#e08a00";
+        msg.textContent = "既にAI書評再生成を実行中です。しばらくお待ちください。";
+        btn.disabled = false;
+      } else if (res.ok && data.status === "started") {
+        _pollAiReviewRegenStatus();
+      } else {
+        msg.style.color = "#e05";
+        msg.textContent = data.error || "AI書評再生成の開始に失敗しました。";
+        btn.disabled = false;
+      }
+    } catch (e) {
+      msg.style.color = "#e05";
+      msg.textContent = "通信エラーが発生しました。";
+      btn.disabled = false;
+    }
+  });
+
   document.getElementById("arrivalLookupBtn")?.addEventListener("click", async () => {
     const isbn = document.getElementById("arrivalIsbn").value.trim().replace(/-/g, "");
     const msg = document.getElementById("arrivalMsg");
