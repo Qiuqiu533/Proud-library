@@ -1637,6 +1637,47 @@ def _migrate_ai_review_columns():
         con.close()
 
 
+def _migrate_ai_review_metadata_columns():
+    """genre_books に manual_review / manual_review_date / ai_review_date /
+    ai_review_score / ai_model カラムを追加する。
+
+    2026-07-08: services/books.py・services/integrity.pyがこれらのカラムを
+    SELECT/UPDATEしているにもかかわらず、マイグレーションが一度も存在せず、
+    本番PostgreSQLには過去に手動で追加された形跡があるが、SQLite（テスト・
+    ローカル）側には存在しなかったため「no such column」で失敗していた。
+    """
+    if _migration_done("ai_review_metadata_columns_v1"):
+        return
+    con = get_con()
+    try:
+        if USE_PG:
+            cur = con.cursor()
+            cur.execute("ALTER TABLE genre_books ADD COLUMN IF NOT EXISTS manual_review BOOLEAN DEFAULT FALSE")
+            cur.execute("ALTER TABLE genre_books ADD COLUMN IF NOT EXISTS manual_review_date TIMESTAMP")
+            cur.execute("ALTER TABLE genre_books ADD COLUMN IF NOT EXISTS ai_review_date TIMESTAMP")
+            cur.execute("ALTER TABLE genre_books ADD COLUMN IF NOT EXISTS ai_review_score INTEGER")
+            cur.execute("ALTER TABLE genre_books ADD COLUMN IF NOT EXISTS ai_model TEXT")
+        else:
+            for col_sql in (
+                "ALTER TABLE genre_books ADD COLUMN manual_review INTEGER DEFAULT 0",
+                "ALTER TABLE genre_books ADD COLUMN manual_review_date TEXT",
+                "ALTER TABLE genre_books ADD COLUMN ai_review_date TEXT",
+                "ALTER TABLE genre_books ADD COLUMN ai_review_score INTEGER",
+                "ALTER TABLE genre_books ADD COLUMN ai_model TEXT",
+            ):
+                try:
+                    con.execute(col_sql)
+                except Exception:
+                    pass
+        con.commit()
+        _mark_migration_done("ai_review_metadata_columns_v1")
+        logger.info("[migration] genre_books.manual_review系/ai_review系カラム追加完了")
+    except Exception as e:
+        logger.error("[migration] ai_review_metadata_columns error: %s", e)
+    finally:
+        con.close()
+
+
 def _migrate_ndc_column():
     """genre_books に ndc カラムを追加する。"""
     if _migration_done("ndc_column_v1"):
@@ -2659,6 +2700,7 @@ def _run_all_migrations_steps():
         _migrate_helpful_count,            # helpful_count カラム追加
         _migrate_helpful_votes,            # helpful_votes テーブル追加
         _migrate_ai_review_columns,        # ai_summary/ai_tags カラム追加
+        _migrate_ai_review_metadata_columns,  # manual_review系/ai_review系カラム追加（2026-07-08）
         _migrate_ndc_column,               # ndc カラム追加
         _migrate_award_books_plam_work_id, # award_books.plam_work_id カラム追加
         _migrate_plam_coverage_log,        # PLAMカバレッジ履歴テーブル追加
