@@ -278,6 +278,16 @@ def api_integrity_audit_backfill_ai_clear():
     return jsonify(result), code
 
 
+@admin_bp.route("/api/admin/integrity-audit/backfill-ai-clear-status")
+def api_integrity_audit_backfill_ai_clear_status():
+    """AI書評遡及クリアの実行中フラグと直近の結果を返す（ポーリング用）"""
+    pw = request.headers.get("X-Password", "")
+    if not check_password(pw, "board"):
+        return jsonify({"error": "unauthorized"}), 401
+    from services.integrity import is_backfill_ai_clear_running, get_backfill_ai_clear_last_result
+    return jsonify({"running": is_backfill_ai_clear_running(), "last_result": get_backfill_ai_clear_last_result()})
+
+
 @admin_bp.route("/api/admin/integrity-audit/dashboard")
 def api_integrity_audit_dashboard():
     """データ健全性ダッシュボード用の集計値を返す。"""
