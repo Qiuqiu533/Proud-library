@@ -264,6 +264,20 @@ def api_integrity_audit_bulk_repair_status():
     return jsonify({"running": is_bulk_repair_running(), "last_result": get_bulk_repair_last_result()})
 
 
+@admin_bp.route("/api/admin/integrity-audit/backfill-ai-clear", methods=["POST"])
+def api_integrity_audit_backfill_ai_clear():
+    """title/authorが過去に修復された本のうち、旧書誌情報のままのAI書評・説明文を
+    一括クリアする（2026-07-07: repair_finding修正前の修復分向けの一回限りの遡及処理）。"""
+    pw = request.headers.get("X-Password", "")
+    if not check_password(pw, "board"):
+        return jsonify({"error": "unauthorized"}), 401
+    body = request.get_json(silent=True) or {}
+    operator = (body.get("operator") or "").strip() or "不明"
+    from services.integrity import backfill_clear_stale_ai_reviews
+    result, code = backfill_clear_stale_ai_reviews(operator)
+    return jsonify(result), code
+
+
 @admin_bp.route("/api/admin/integrity-audit/dashboard")
 def api_integrity_audit_dashboard():
     """データ健全性ダッシュボード用の集計値を返す。"""

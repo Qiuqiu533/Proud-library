@@ -338,6 +338,23 @@ def repair_finding(isbn, fields, operator):
                 f"INSERT INTO integrity_log (isbn, field, before_value, after_value, operator, reason) VALUES ({ph},{ph},{ph},{ph},{ph},{ph})",
                 (isbn, f, before_val, after_val, operator, "管理者承認による整合性修復")
             )
+
+        # タイトル・著者が変わった場合、旧書誌情報を元に生成されたAI書評・説明文は
+        # 内容が別の本のままになり誤情報になるため、あわせてクリアして再生成待ちにする
+        # （2026-07-07: 「カフェーの帰り道」でタイトルは修復済みなのにai_summaryが
+        # 「すごい科学論文」の内容のまま表示される事故が発覚したため追加）。
+        if "title" in updates or "author" in updates:
+            clear_cols = ["description", "ai_summary", "ai_tags", "ai_review_date",
+                           "ai_review_score", "ai_model", "manual_review", "manual_review_date"]
+            clear_values = [None, None, "[]", None, None, None, False, None]
+            clear_set = ", ".join(f"{c}={ph}" for c in clear_cols)
+            cur.execute(f"UPDATE genre_books SET {clear_set} WHERE isbn={ph}", tuple(clear_values) + (isbn,))
+            cur.execute(
+                f"INSERT INTO integrity_log (isbn, field, before_value, after_value, operator, reason) VALUES ({ph},{ph},{ph},{ph},{ph},{ph})",
+                (isbn, "ai_review_content", "(旧タイトルに基づく内容)", "(クリア・再生成待ち)", operator,
+                 "タイトル/著者修復に伴い、旧書誌情報に基づくAI書評・説明文をクリア")
+            )
+
         cur.execute(f"UPDATE integrity_findings SET resolved={'TRUE' if USE_PG else '1'} WHERE isbn={ph}", (isbn,))
         con.commit()
         con.close()
@@ -421,3 +438,47 @@ def bulk_repair_by_level(level, operator):
 
     threading.Thread(target=_run, daemon=True).start()
     return {"status": "started"}, 200
+
+
+def backfill_clear_stale_ai_reviews(operator):
+    """title/authorが過去に修復された本のうち、AI書評・説明文が旧書誌情報のまま
+    残っているものを一括でクリアする（2026-07-07: repair_finding修正前に修復した
+    194件が対象。修正後の新規修復はrepair_finding内で自動的にクリアされる）。"""
+    con = get_con()
+    try:
+        rows = fetchall(
+            con,
+            "SELECT DISTINCT isbn FROM integrity_log WHERE field IN (%s,%s) AND isbn NOT IN "
+            "(SELECT isbn FROM integrity_log WHERE field=%s)" if USE_PG else
+            "SELECT DISTINCT isbn FROM integrity_log WHERE field IN (?,?) AND isbn NOT IN "
+            "(SELECT isbn FROM integrity_log WHERE field=?)",
+            ("title", "author", "ai_review_content")
+        )
+        isbns = [r["isbn"] for r in rows]
+        cleared = 0
+        ph = "%s" if USE_PG else "?"
+        clear_cols = ["description", "ai_summary", "ai_tags", "ai_review_date",
+                      "ai_review_score", "ai_model", "manual_review", "manual_review_date"]
+        clear_values = [None, None, "[]", None, None, None, False, None]
+        clear_set = ", ".join(f"{c}={ph}" for c in clear_cols)
+        cur = con.cursor()
+        for isbn in isbns:
+            cur.execute(f"UPDATE genre_books SET {clear_set} WHERE isbn={ph}", tuple(clear_values) + (isbn,))
+            cur.execute(
+                f"INSERT INTO integrity_log (isbn, field, before_value, after_value, operator, reason) VALUES ({ph},{ph},{ph},{ph},{ph},{ph})",
+                (isbn, "ai_review_content", "(旧タイトルに基づく内容)", "(クリア・再生成待ち)", operator,
+                 "過去の修復分の遡及クリア（backfill）")
+            )
+            cleared += 1
+        con.commit()
+        logger.info(f"backfill_clear_stale_ai_reviews: {cleared}件クリア完了")
+        return {"ok": True, "target_count": len(isbns), "cleared": cleared}, 200
+    except Exception as e:
+        logger.error(f"backfill_clear_stale_ai_reviews error: {e}", exc_info=True)
+        try:
+            con.rollback()
+        except Exception:
+            pass
+        return {"error": str(e)}, 500
+    finally:
+        con.close()
