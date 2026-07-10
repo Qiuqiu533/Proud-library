@@ -36,6 +36,7 @@ _EST_OUTPUT_TOKENS_PER_BOOK = 500  # 書評400〜600字+JSON構造の概算
 _JOB_MAX_LIMIT = 100  # 1ジョブあたりの上限（安全装置）
 _MIN_LEN_DEFAULT = 100
 _MIN_SCORE_DEFAULT = 70
+_MIN_CONFIDENCE = 60  # これ未満のconfidenceは創作の疑いが強いため生成を破棄する
 
 FEW_SHOT_EXAMPLE = """
 【見本】
@@ -90,29 +91,78 @@ def fetch_wikipedia_author(author: str) -> str:
 
 
 def fetch_openbd_meta(isbn: str) -> dict:
-    """OpenBDから書誌情報を取得する"""
+    """OpenBDから書誌情報を取得する。
+
+    2026-07-09: 「風姿花伝」（世阿弥の古典、馬場あき子は現代語訳・注釈者）を
+    「馬場あき子によるミステリ・推理小説」と完全に事実と異なる内容で生成する
+    ハルシネーション事故が発生。genre_books.authorだけでは「原著者」なのか
+    「現代語訳・注釈者」なのか判別できないため、OpenBDのシリーズ名
+    （例:「古典を読む」）と原著の内容紹介文（CollateralDetail）が取得できる
+    場合はそれもプロンプトへ渡し、事実に基づかない創作を減らす。
+    """
     try:
         res = requests.get(f"https://api.openbd.jp/v1/get?isbn={isbn}", timeout=10)
         data = res.json()
         if data and data[0]:
             summary = data[0].get("summary", {})
+            onix = data[0].get("onix", {})
+            descriptive = onix.get("DescriptiveDetail", {}) if isinstance(onix, dict) else {}
+
+            series = ""
+            try:
+                elements = descriptive.get("Collection", {}).get("TitleDetail", {}).get("TitleElement", [])
+                if isinstance(elements, dict):
+                    elements = [elements]
+                for el in elements:
+                    t = (el.get("TitleText") or {}).get("content", "")
+                    if t:
+                        series = t
+                        break
+            except Exception:
+                pass
+
+            blurb = ""
+            try:
+                collateral = onix.get("CollateralDetail", {}) if isinstance(onix, dict) else {}
+                for tc in collateral.get("TextContent", []) or []:
+                    text = (tc.get("Text") or "").strip()
+                    if text:
+                        blurb = text
+                        break
+            except Exception:
+                pass
+
             return {
                 "title": summary.get("title", ""),
                 "author": summary.get("author", ""),
                 "publisher": summary.get("publisher", ""),
                 "pubdate": summary.get("pubdate", ""),
+                "series": series,
+                "blurb": blurb,
             }
     except Exception:
         pass
     return {}
 
 
-def call_openai_review(title: str, author: str, publisher: str, genre: str, wiki_info: str) -> dict | None:
-    """OpenAI APIで書評を1回生成する。戻り値: dict または情報不足でNone。"""
+def call_openai_review(title: str, author: str, publisher: str, genre: str, wiki_info: str,
+                        series: str = "", blurb: str = "") -> dict | None:
+    """OpenAI APIで書評を1回生成する。戻り値: dict または情報不足でNone。
+
+    2026-07-09: 「風姿花伝」（世阿弥の古典、馬場あき子は現代語訳・注釈者）を
+    「馬場あき子によるミステリ・推理小説」という完全な虚偽内容で生成する事故が
+    発生。タイトル・著者名だけの乏しい情報でもLLMは「それらしい創作」を
+    自信満々に補完してしまう傾向があるため、(1)シリーズ名等の追加手がかりを
+    渡す、(2)古典・翻訳・注釈書は創作してはいけない旨を明記する、
+    (3)自己採点だけでなくconfidence（確信度）を出力させ、低い場合は
+    具体的な筋書きを書かせず一般的な位置づけの説明に留める、という3段構えで
+    対策する。"""
     if not OPENAI_API_KEY:
         raise ValueError("OPENAI_API_KEY が設定されていません")
 
     wiki_section = f"\n著者情報（Wikipedia）: {wiki_info}" if wiki_info else ""
+    series_section = f"\nシリーズ名: {series}" if series else ""
+    blurb_section = f"\n出版社による紹介文: {blurb}" if blurb else ""
 
     prompt = f"""{FEW_SHOT_EXAMPLE}
 上の見本を参考に、以下の書籍の書評をJSON形式で出力してください。
@@ -120,19 +170,22 @@ def call_openai_review(title: str, author: str, publisher: str, genre: str, wiki
 書名: {title}
 著者: {author or "不明"}{wiki_section}
 出版社: {publisher or "不明"}
-ジャンル: {genre or "その他"}
+ジャンル: {genre or "その他"}{series_section}{blurb_section}
 
 【必須ルール】
-1. 提供された情報（書名・著者・出版社・著者情報）に基づいてのみ書く。知らない・確認できない内容は絶対に書かない
+1. 提供された情報（書名・著者・出版社・著者情報・シリーズ名・紹介文）に基づいてのみ書く。知らない・確認できない内容は絶対に書かない
 2. 書名から内容を推測・想像して書くことは禁止。書名はあくまで参考情報
-3. 書評の文字数は得られた情報量に応じて150〜500字で調整してよい（情報が少なければ短くてよい）
-4. 書ける範囲で以下の要素を含める（情報がなければ省略可）:
+3. 「著者」欄は原著者とは限らない（古典の現代語訳者・注釈者・編者・翻訳者の場合がある）。著者欄の人物が実際に何を書いたか確信できない場合、その人物が創作した物語であるかのように書いてはいけない
+4. 古典・翻訳作品・全集・評論・研究書・注釈書である可能性がある場合（シリーズ名に「古典」「文学全集」等が含まれる、出版年が古い、等）、具体的な物語の筋書きを創作してはいけない。その場合は作品の位置づけ・ジャンル・歴史的背景など確認できる範囲の情報のみを書く
+5. 書評の文字数は得られた情報量に応じて150〜500字で調整してよい（情報が少なければ短くてよい）
+6. 書ける範囲で以下の要素を含める（情報がなければ省略可）:
    ① 書籍の概要・テーマ（確認できる事実のみ）
    ② 著者について（著者情報がある場合のみ）
    ③ 対象読者（ジャンルから明らかな範囲のみ）
-5. 1文は60字以内に収める（長い文は2文に分ける）
-6. 特定の政治・宗教・思想的立場を推奨・批判しない
-7. 最後に自己採点スコア（0〜100点）を付ける（基準：事実のみ記載=+40、読者に有益な情報=+30、読みやすい文体=+30）
+7. 1文は60字以内に収める（長い文は2文に分ける）
+8. 特定の政治・宗教・思想的立場を推奨・批判しない
+9. confidence（この内容がどの程度事実に基づいていると確信できるか、0〜100）を出力する。書名・著者だけから内容を推測した部分が多い場合はconfidenceを50以下にする
+10. 自己採点スコア（0〜100点）を付ける（基準：事実のみ記載=+40、読者に有益な情報=+30、読みやすい文体=+30）
 
 出力はJSON形式のみ（説明文は不要）:
 {{
@@ -140,7 +193,8 @@ def call_openai_review(title: str, author: str, publisher: str, genre: str, wiki
   "review": "書評本文（400〜600字）",
   "summary": "一言紹介（50字以内）",
   "tags": ["タグ1", "タグ2", "タグ3"],
-  "score": 採点スコア（0〜100の整数）
+  "score": 採点スコア（0〜100の整数）,
+  "confidence": 確信度（0〜100の整数）
 }}"""
 
     headers = {
@@ -168,20 +222,29 @@ def call_openai_review(title: str, author: str, publisher: str, genre: str, wiki
     if data.get("status") == "情報不足":
         return None
 
+    confidence = int(data.get("confidence", 100))
+    if confidence < _MIN_CONFIDENCE:
+        # 確信度が低い＝具体的な内容の大半が推測の可能性が高いため、
+        # 創作された筋書きを保存せず「情報不足」として扱う（安全側に倒す）
+        logger.info(f"AI書評: confidence={confidence}が閾値未満のため生成を破棄")
+        return None
+
     return {
         "review": data.get("review", ""),
         "summary": data.get("summary", ""),
         "tags": data.get("tags", []),
         "score": int(data.get("score", 0)),
+        "confidence": confidence,
     }
 
 
 def generate_with_retry(title: str, author: str, publisher: str, genre: str, wiki_info: str,
-                         min_score: int = _MIN_SCORE_DEFAULT) -> dict | None:
-    """スコアがmin_score未満なら1回だけ再生成する（最大2回試行）。"""
+                         min_score: int = _MIN_SCORE_DEFAULT, series: str = "", blurb: str = "") -> dict | None:
+    """スコアがmin_score未満なら1回だけ再生成する（最大2回試行）。confidence不足
+    （ハルシネーション疑い）の場合はcall_openai_review内でNoneが返る。"""
     result = None
     for attempt in range(1, 3):
-        result = call_openai_review(title, author, publisher, genre, wiki_info)
+        result = call_openai_review(title, author, publisher, genre, wiki_info, series, blurb)
         if result is None:
             return None
         if result["score"] >= min_score or attempt == 2:
@@ -204,17 +267,19 @@ def regenerate_one(isbn: str, book: dict, min_score: int = _MIN_SCORE_DEFAULT) -
     meta = fetch_openbd_meta(isbn)
     if meta.get("publisher") and not publisher:
         publisher = meta["publisher"]
+    series = meta.get("series", "")
+    blurb = meta.get("blurb", "")
 
     wiki_info = fetch_wikipedia_author(author)
 
     try:
-        result = generate_with_retry(title, author, publisher, genre, wiki_info, min_score)
+        result = generate_with_retry(title, author, publisher, genre, wiki_info, min_score, series, blurb)
     except Exception as e:
         logger.error(f"AI書評生成エラー {isbn}: {e}", exc_info=True)
         return {"ok": False, "error": str(e)}
 
     if result is None:
-        return {"ok": False, "reason": "情報不足"}
+        return {"ok": False, "reason": "情報不足またはconfidence不足"}
 
     con = get_con()
     try:
@@ -294,8 +359,20 @@ def get_regeneration_last_result():
     return _regen_last_result
 
 
-def start_regeneration(limit: int, operator: str):
-    """管理画面からの半自動再生成を開始する（Phase 1: 手動起動・件数上限あり）。"""
+def _fetch_book(isbn: str) -> dict | None:
+    con = get_con()
+    try:
+        ph = "%s" if USE_PG else "?"
+        return fetchone(con, f"SELECT isbn, title, author, publisher, genre, description FROM genre_books WHERE isbn={ph}", (isbn,))
+    finally:
+        con.close()
+
+
+def start_regeneration(limit: int, operator: str, isbn: str = ""):
+    """管理画面からの半自動再生成を開始する（Phase 1: 手動起動・件数上限あり）。
+
+    isbnを指定した場合、その1冊だけを対象に強制再生成する（未生成分の条件を
+    無視する）。プロンプト改善の検証用の内部オプションでUIには露出しない。"""
     global _regen_running, _regen_last_result
 
     if not OPENAI_API_KEY:
@@ -310,7 +387,11 @@ def start_regeneration(limit: int, operator: str):
         global _regen_running, _regen_last_result
         _regen_running = True
         try:
-            targets = _fetch_regeneration_targets(limit)
+            if isbn:
+                book = _fetch_book(isbn)
+                targets = [book] if book else []
+            else:
+                targets = _fetch_regeneration_targets(limit)
             success = 0
             skipped = 0
             errors = []
@@ -319,7 +400,7 @@ def start_regeneration(limit: int, operator: str):
                 result = regenerate_one(isbn, book)
                 if result.get("ok"):
                     success += 1
-                elif result.get("reason") == "情報不足":
+                elif result.get("reason"):
                     skipped += 1
                 else:
                     errors.append({"isbn": isbn, "error": result.get("error")})
