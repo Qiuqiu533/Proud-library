@@ -98,23 +98,27 @@ def main():
         meta = fetch_openbd_meta(isbn)
         if meta.get("publisher") and not publisher:
             publisher = meta["publisher"]
+        series = meta.get("series", "")
+        blurb = meta.get("blurb", "")
+        if series:
+            print(f"  📚 シリーズ: {series}")
 
         wiki_info = fetch_wikipedia_author(author)
         if wiki_info:
             print(f"  📖 Wikipedia: {wiki_info[:60]}...")
 
         try:
-            result = generate_with_retry(title, author, publisher, genre, wiki_info, args.min_score)
+            result = generate_with_retry(title, author, publisher, genre, wiki_info, args.min_score, series, blurb)
 
             if result is None:
-                print(f"  ⚠️ 情報不足のためスキップ")
+                print(f"  ⚠️ 情報不足またはconfidence不足のためスキップ")
                 skipped += 1
                 continue
 
             print(f"  → {result['review'][:80]}...")
             print(f"  一言: {result['summary']}")
             print(f"  タグ: {', '.join(result['tags'])}")
-            print(f"  自己採点: {result['score']}/100")
+            print(f"  自己採点: {result['score']}/100  confidence: {result.get('confidence', '?')}")
 
             if not args.dry_run:
                 con = get_con()
