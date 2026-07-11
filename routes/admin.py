@@ -333,3 +333,13 @@ def api_ai_review_regenerate_status():
         return jsonify({"error": "unauthorized"}), 401
     from services.ai_review_generator import is_regeneration_running, get_regeneration_last_result
     return jsonify({"running": is_regeneration_running(), "last_result": get_regeneration_last_result()})
+
+
+@admin_bp.route("/api/admin/ai-review/confidence-stats")
+def api_ai_review_confidence_stats():
+    """AI書評のconfidence分布（平均・min/max・帯域別件数）を返す。"""
+    pw = request.headers.get("X-Password", "")
+    if not check_password(pw, "board"):
+        return jsonify({"error": "unauthorized"}), 401
+    from services.ai_review_generator import confidence_distribution
+    return jsonify(confidence_distribution())

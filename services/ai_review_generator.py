@@ -10,6 +10,7 @@ Phase 2（新規登録・ISBN修復時にキューへ追加するだけ）、Pha
 完全自動実行・月間予算上限）は将来の拡張として見送り。
 """
 from __future__ import annotations
+import hashlib
 import json
 import logging
 import os
@@ -37,6 +38,29 @@ _JOB_MAX_LIMIT = 100  # 1ジョブあたりの上限（安全装置）
 _MIN_LEN_DEFAULT = 100
 _MIN_SCORE_DEFAULT = 70
 _MIN_CONFIDENCE = 60  # これ未満のconfidenceは創作の疑いが強いため生成を破棄する
+
+OPENING_PATTERNS = [
+    "「『{title}』は、」のように書名を主語にして始める",
+    "「{title}という作品は、」のように書名を作品名として紹介する形で始める",
+    "「本作『{title}』では、」のように本作という語で始める",
+    "「この作品は、」のように書名を繰り返さず始める",
+    "「{title}は、〜を描いた作品です。」のように簡潔な定義文で始める",
+    "「読者に〜を問いかける作品として、{title}は」のように読者への問いかけから始める",
+    "「{author}による『{title}』は、」のように著者名を主語にして始める",
+]
+
+
+def _opening_pattern_for_isbn(isbn: str) -> str:
+    """ISBNから決定的に書き出しパターンを選ぶ（同じ本は毎回同じ書き出しになる）。
+
+    2026-07-11: 35冊検証で「『Xは、Yによる〜』」という書き出しが74%を占める
+    テンプレート化が判明。本文の構成・安全性ルールは変えず、書き出しの
+    指示だけを複数用意してISBNのハッシュ値で決定的に選択することで、
+    多様性を確保しつつ再生成のたびに結果がぶれないようにする。
+    """
+    idx = int(hashlib.md5(isbn.encode("utf-8")).hexdigest(), 16) % len(OPENING_PATTERNS)
+    return OPENING_PATTERNS[idx]
+
 
 FEW_SHOT_EXAMPLE = """
 【見本】
@@ -146,7 +170,7 @@ def fetch_openbd_meta(isbn: str) -> dict:
 
 
 def call_openai_review(title: str, author: str, publisher: str, genre: str, wiki_info: str,
-                        series: str = "", blurb: str = "") -> dict | None:
+                        series: str = "", blurb: str = "", isbn: str = "") -> dict | None:
     """OpenAI APIで書評を1回生成する。戻り値: dict または情報不足でNone。
 
     2026-07-09: 「風姿花伝」（世阿弥の古典、馬場あき子は現代語訳・注釈者）を
@@ -163,6 +187,9 @@ def call_openai_review(title: str, author: str, publisher: str, genre: str, wiki
     wiki_section = f"\n著者情報（Wikipedia）: {wiki_info}" if wiki_info else ""
     series_section = f"\nシリーズ名: {series}" if series else ""
     blurb_section = f"\n出版社による紹介文: {blurb}" if blurb else ""
+    opening_instruction = (_opening_pattern_for_isbn(isbn).format(title=title, author=author or "不明")
+                            if isbn else "")
+    opening_section = f"\n11. 書評の書き出しは、{opening_instruction}" if opening_instruction else ""
 
     prompt = f"""{FEW_SHOT_EXAMPLE}
 上の見本を参考に、以下の書籍の書評をJSON形式で出力してください。
@@ -185,7 +212,7 @@ def call_openai_review(title: str, author: str, publisher: str, genre: str, wiki
 7. 1文は60字以内に収める（長い文は2文に分ける）
 8. 特定の政治・宗教・思想的立場を推奨・批判しない
 9. confidence（この内容がどの程度事実に基づいていると確信できるか、0〜100）を出力する。書名・著者だけから内容を推測した部分が多い場合はconfidenceを50以下にする
-10. 自己採点スコア（0〜100点）を付ける（基準：事実のみ記載=+40、読者に有益な情報=+30、読みやすい文体=+30）
+10. 自己採点スコア（0〜100点）を付ける（基準：事実のみ記載=+40、読者に有益な情報=+30、読みやすい文体=+30）{opening_section}
 
 出力はJSON形式のみ（説明文は不要）:
 {{
@@ -239,12 +266,13 @@ def call_openai_review(title: str, author: str, publisher: str, genre: str, wiki
 
 
 def generate_with_retry(title: str, author: str, publisher: str, genre: str, wiki_info: str,
-                         min_score: int = _MIN_SCORE_DEFAULT, series: str = "", blurb: str = "") -> dict | None:
+                         min_score: int = _MIN_SCORE_DEFAULT, series: str = "", blurb: str = "",
+                         isbn: str = "") -> dict | None:
     """スコアがmin_score未満なら1回だけ再生成する（最大2回試行）。confidence不足
     （ハルシネーション疑い）の場合はcall_openai_review内でNoneが返る。"""
     result = None
     for attempt in range(1, 3):
-        result = call_openai_review(title, author, publisher, genre, wiki_info, series, blurb)
+        result = call_openai_review(title, author, publisher, genre, wiki_info, series, blurb, isbn)
         if result is None:
             return None
         if result["score"] >= min_score or attempt == 2:
@@ -273,7 +301,7 @@ def regenerate_one(isbn: str, book: dict, min_score: int = _MIN_SCORE_DEFAULT) -
     wiki_info = fetch_wikipedia_author(author)
 
     try:
-        result = generate_with_retry(title, author, publisher, genre, wiki_info, min_score, series, blurb)
+        result = generate_with_retry(title, author, publisher, genre, wiki_info, min_score, series, blurb, isbn)
     except Exception as e:
         logger.error(f"AI書評生成エラー {isbn}: {e}", exc_info=True)
         return {"ok": False, "error": str(e)}
@@ -345,6 +373,51 @@ def estimate_regeneration(limit: int = _JOB_MAX_LIMIT) -> dict:
         "estimated_cost_usd": round(cost_usd, 4),
         "estimated_cost_jpy": round(cost_usd * _USD_TO_JPY),
         "note": "概算値です。実際の料金はOpenAI公式の最新料金・実際のトークン数により変動します。",
+    }
+
+
+def confidence_distribution() -> dict:
+    """ai_review_confidenceが保存されている本の分布・平均・min/maxを返す。
+
+    2026-07-11: 35冊検証で「confidenceの分布を見たい」という要望に応えられ
+    なかった反省から、ai_review_confidence列の保存と合わせて追加した集計。
+    """
+    con = get_con()
+    try:
+        rows = fetchall(
+            con,
+            "SELECT ai_review_confidence FROM genre_books WHERE ai_review_confidence IS NOT NULL",
+        )
+    finally:
+        con.close()
+
+    values = [r["ai_review_confidence"] for r in rows if r.get("ai_review_confidence") is not None]
+    total = len(values)
+    if total == 0:
+        return {
+            "total_count": 0, "average": None, "min": None, "max": None,
+            "buckets": {"60-64": 0, "65-69": 0, "70-79": 0, "80-89": 0, "90-100": 0},
+        }
+
+    buckets = {"60-64": 0, "65-69": 0, "70-79": 0, "80-89": 0, "90-100": 0}
+    for v in values:
+        if v < 65:
+            buckets["60-64"] += 1
+        elif v < 70:
+            buckets["65-69"] += 1
+        elif v < 80:
+            buckets["70-79"] += 1
+        elif v < 90:
+            buckets["80-89"] += 1
+        else:
+            buckets["90-100"] += 1
+
+    return {
+        "total_count": total,
+        "average": round(sum(values) / total, 1),
+        "min": min(values),
+        "max": max(values),
+        "buckets": buckets,
     }
 
 

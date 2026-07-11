@@ -94,7 +94,7 @@ def test_regenerate_one_persists_confidence(monkeypatch):
 
     _seed_book(description=None)
 
-    def _fake_generate_with_retry(title, author, publisher, genre, wiki_info, min_score=70, series="", blurb=""):
+    def _fake_generate_with_retry(title, author, publisher, genre, wiki_info, min_score=70, series="", blurb="", isbn=""):
         return {"review": "テストレビュー", "summary": "テスト一言", "tags": ["タグ1"], "score": 85, "confidence": 72}
 
     monkeypatch.setattr(ai_review_generator, "generate_with_retry", _fake_generate_with_retry)
@@ -145,3 +145,49 @@ def test_start_regeneration_with_isbn_targets_only_that_book(monkeypatch):
         assert last["success"] == 1
     finally:
         _cleanup()
+
+
+def test_opening_pattern_for_isbn_is_deterministic():
+    """同じISBNは常に同じ書き出しパターンを返す（再生成しても結果がぶれない）。"""
+    p1 = ai_review_generator._opening_pattern_for_isbn("9784000044677")
+    p2 = ai_review_generator._opening_pattern_for_isbn("9784000044677")
+    assert p1 == p2
+    assert p1 in ai_review_generator.OPENING_PATTERNS
+
+
+def test_opening_pattern_varies_across_isbns():
+    """異なるISBNでは（十分な数を試せば）異なる書き出しパターンが選ばれる。"""
+    patterns = {ai_review_generator._opening_pattern_for_isbn(f"999990000{i:04d}") for i in range(20)}
+    assert len(patterns) > 1
+
+
+def test_confidence_distribution_empty_when_no_data():
+    """confidenceが1件も保存されていない場合はtotal_count=0を返す。"""
+    result = ai_review_generator.confidence_distribution()
+    assert "total_count" in result
+    assert "buckets" in result
+
+
+def test_confidence_distribution_buckets_and_average():
+    """保存済みconfidence値が正しい帯域に分類され、平均が計算される。"""
+    con = get_con()
+    isbns = ["9999900000201", "9999900000202", "9999900000203"]
+    confidences = [62, 75, 95]
+    for isbn, conf in zip(isbns, confidences):
+        execute(con, "INSERT OR REPLACE INTO genre_books (isbn, title, author, publisher, genre, format, ai_review_confidence) "
+                "VALUES (?,?,?,?,?,?,?)",
+                (isbn, "テスト本", "テスト著者", "テスト出版社", "その他", "その他", conf))
+    con.commit()
+    con.close()
+    try:
+        result = ai_review_generator.confidence_distribution()
+        assert result["total_count"] >= 3
+        assert result["buckets"]["60-64"] >= 1
+        assert result["buckets"]["70-79"] >= 1
+        assert result["buckets"]["90-100"] >= 1
+    finally:
+        con = get_con()
+        for isbn in isbns:
+            execute(con, "DELETE FROM genre_books WHERE isbn=?", (isbn,))
+        con.commit()
+        con.close()

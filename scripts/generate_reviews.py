@@ -108,7 +108,7 @@ def main():
             print(f"  📖 Wikipedia: {wiki_info[:60]}...")
 
         try:
-            result = generate_with_retry(title, author, publisher, genre, wiki_info, args.min_score, series, blurb)
+            result = generate_with_retry(title, author, publisher, genre, wiki_info, args.min_score, series, blurb, isbn)
 
             if result is None:
                 print(f"  ⚠️ 情報不足またはconfidence不足のためスキップ")
