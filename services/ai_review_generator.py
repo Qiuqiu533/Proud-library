@@ -368,11 +368,11 @@ def _fetch_book(isbn: str) -> dict | None:
         con.close()
 
 
-def start_regeneration(limit: int, operator: str, isbn: str = ""):
+def start_regeneration(limit: int, operator: str, isbn: str = "", isbns: list | None = None):
     """管理画面からの半自動再生成を開始する（Phase 1: 手動起動・件数上限あり）。
 
-    isbnを指定した場合、その1冊だけを対象に強制再生成する（未生成分の条件を
-    無視する）。プロンプト改善の検証用の内部オプションでUIには露出しない。"""
+    isbn/isbnsを指定した場合、その書籍だけを対象に強制再生成する（未生成分の
+    条件を無視する）。プロンプト改善の検証用の内部オプションでUIには露出しない。"""
     global _regen_running, _regen_last_result
 
     if not OPENAI_API_KEY:
@@ -383,15 +383,15 @@ def start_regeneration(limit: int, operator: str, isbn: str = ""):
 
     limit = min(int(limit or _JOB_MAX_LIMIT), _JOB_MAX_LIMIT)
 
-    target_isbn = isbn
+    target_isbns = list(isbns) if isbns else ([isbn] if isbn else [])
+    target_isbns = target_isbns[:_JOB_MAX_LIMIT]
 
     def _run():
         global _regen_running, _regen_last_result
         _regen_running = True
         try:
-            if target_isbn:
-                book = _fetch_book(target_isbn)
-                targets = [book] if book else []
+            if target_isbns:
+                targets = [b for b in (_fetch_book(i) for i in target_isbns) if b]
             else:
                 targets = _fetch_regeneration_targets(limit)
             success = 0

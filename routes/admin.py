@@ -319,8 +319,9 @@ def api_ai_review_regenerate():
     limit = body.get("limit", 100)
     operator = (body.get("operator") or "").strip() or "不明"
     isbn = (body.get("isbn") or "").strip()
+    isbns = body.get("isbns") or []
     from services.ai_review_generator import start_regeneration
-    result, code = start_regeneration(limit, operator, isbn)
+    result, code = start_regeneration(limit, operator, isbn, isbns)
     return jsonify(result), code
 
 
