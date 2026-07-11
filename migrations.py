@@ -1678,6 +1678,35 @@ def _migrate_ai_review_metadata_columns():
         con.close()
 
 
+def _migrate_ai_review_confidence_column():
+    """genre_books に ai_review_confidence カラムを追加する。
+
+    2026-07-11: 35冊のAI書評再生成検証で「confidenceの分布を見たい」と
+    要望があったが、confidenceは生成時の足切り判定にのみ使い保存していな
+    かったため事後集計ができなかった。以後は生成のたびに保存し、閾値の
+    妥当性検証（60〜69が多いか、90以上ばかりか等）に使えるようにする。
+    """
+    if _migration_done("ai_review_confidence_column_v1"):
+        return
+    con = get_con()
+    try:
+        if USE_PG:
+            cur = con.cursor()
+            cur.execute("ALTER TABLE genre_books ADD COLUMN IF NOT EXISTS ai_review_confidence INTEGER")
+        else:
+            try:
+                con.execute("ALTER TABLE genre_books ADD COLUMN ai_review_confidence INTEGER")
+            except Exception:
+                pass
+        con.commit()
+        _mark_migration_done("ai_review_confidence_column_v1")
+        logger.info("[migration] genre_books.ai_review_confidence カラム追加完了")
+    except Exception as e:
+        logger.error("[migration] ai_review_confidence_column error: %s", e)
+    finally:
+        con.close()
+
+
 def _migrate_ndc_column():
     """genre_books に ndc カラムを追加する。"""
     if _migration_done("ndc_column_v1"):
@@ -2701,6 +2730,7 @@ def _run_all_migrations_steps():
         _migrate_helpful_votes,            # helpful_votes テーブル追加
         _migrate_ai_review_columns,        # ai_summary/ai_tags カラム追加
         _migrate_ai_review_metadata_columns,  # manual_review系/ai_review系カラム追加（2026-07-08）
+        _migrate_ai_review_confidence_column,  # ai_review_confidenceカラム追加（2026-07-11）
         _migrate_ndc_column,               # ndc カラム追加
         _migrate_award_books_plam_work_id, # award_books.plam_work_id カラム追加
         _migrate_plam_coverage_log,        # PLAMカバレッジ履歴テーブル追加

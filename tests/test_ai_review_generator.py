@@ -86,6 +86,31 @@ def test_start_regeneration_rejects_concurrent_run(monkeypatch):
         ai_review_generator._regen_running = False
 
 
+def test_regenerate_one_persists_confidence(monkeypatch):
+    """2026-07-11: confidenceは生成時の足切り判定にのみ使い保存していなかった
+    ため、35冊検証で分布を事後集計できなかった。ai_review_confidence列に
+    保存されることを確認する回帰テスト。"""
+    from database import fetchone
+
+    _seed_book(description=None)
+
+    def _fake_generate_with_retry(title, author, publisher, genre, wiki_info, min_score=70, series="", blurb=""):
+        return {"review": "テストレビュー", "summary": "テスト一言", "tags": ["タグ1"], "score": 85, "confidence": 72}
+
+    monkeypatch.setattr(ai_review_generator, "generate_with_retry", _fake_generate_with_retry)
+    try:
+        result = ai_review_generator.regenerate_one(_TEST_ISBN, {"title": "テスト対象本", "author": "テスト著者", "publisher": "", "genre": ""})
+        assert result == {"ok": True}
+
+        con = get_con()
+        row = fetchone(con, "SELECT ai_review_confidence, ai_review_score FROM genre_books WHERE isbn=?", (_TEST_ISBN,))
+        con.close()
+        assert row["ai_review_confidence"] == 72
+        assert row["ai_review_score"] == 85
+    finally:
+        _cleanup()
+
+
 def test_start_regeneration_with_isbn_targets_only_that_book(monkeypatch):
     """isbn指定時はその1冊だけを対象にする（未生成分の条件を無視する）。
     2026-07-09: _run()内のループ変数isbnが引数isbnをシャドーイングし、
