@@ -84,3 +84,39 @@ def test_start_regeneration_rejects_concurrent_run(monkeypatch):
         assert code == 409
     finally:
         ai_review_generator._regen_running = False
+
+
+def test_start_regeneration_with_isbn_targets_only_that_book(monkeypatch):
+    """isbn指定時はその1冊だけを対象にする（未生成分の条件を無視する）。
+    2026-07-09: _run()内のループ変数isbnが引数isbnをシャドーイングし、
+    `if isbn:` 判定で UnboundLocalError が発生するバグがあったための回帰テスト。"""
+    import time as time_module
+
+    _seed_book(description="x" * 200)  # 通常の未生成分クエリからは除外される状態
+    calls = []
+
+    def _fake_regenerate_one(isbn, book, min_score=70):
+        calls.append(isbn)
+        return {"ok": True}
+
+    monkeypatch.setattr(ai_review_generator, "OPENAI_API_KEY", "dummy-key")
+    monkeypatch.setattr(ai_review_generator, "regenerate_one", _fake_regenerate_one)
+    try:
+        result, code = ai_review_generator.start_regeneration(100, "テスト太郎", isbn=_TEST_ISBN)
+        assert code == 200
+
+        for _ in range(50):
+            if not ai_review_generator.is_regeneration_running():
+                break
+            time_module.sleep(0.1)
+        else:
+            raise AssertionError("isbn指定の再生成がタイムアウトしました")
+
+        last = ai_review_generator.get_regeneration_last_result()
+        assert last is not None
+        assert "error" not in last
+        assert calls == [_TEST_ISBN]
+        assert last["target_count"] == 1
+        assert last["success"] == 1
+    finally:
+        _cleanup()

@@ -19,7 +19,7 @@ import datetime
 
 import requests
 
-from database import get_con, execute, fetchall, USE_PG
+from database import get_con, execute, fetchall, fetchone, USE_PG
 
 logger = logging.getLogger(__name__)
 
@@ -383,12 +383,14 @@ def start_regeneration(limit: int, operator: str, isbn: str = ""):
 
     limit = min(int(limit or _JOB_MAX_LIMIT), _JOB_MAX_LIMIT)
 
+    target_isbn = isbn
+
     def _run():
         global _regen_running, _regen_last_result
         _regen_running = True
         try:
-            if isbn:
-                book = _fetch_book(isbn)
+            if target_isbn:
+                book = _fetch_book(target_isbn)
                 targets = [book] if book else []
             else:
                 targets = _fetch_regeneration_targets(limit)
@@ -396,14 +398,14 @@ def start_regeneration(limit: int, operator: str, isbn: str = ""):
             skipped = 0
             errors = []
             for book in targets:
-                isbn = book["isbn"]
-                result = regenerate_one(isbn, book)
+                book_isbn = book["isbn"]
+                result = regenerate_one(book_isbn, book)
                 if result.get("ok"):
                     success += 1
                 elif result.get("reason"):
                     skipped += 1
                 else:
-                    errors.append({"isbn": isbn, "error": result.get("error")})
+                    errors.append({"isbn": book_isbn, "error": result.get("error")})
                 time.sleep(0.5)
             _regen_last_result = {
                 "target_count": len(targets),
