@@ -128,10 +128,10 @@ def main():
                 cur.execute(
                     f"""UPDATE genre_books
                         SET description={PH}, ai_review_date={PH}, ai_review_score={PH},
-                            ai_model={PH}, ai_summary={PH}, ai_tags={PH}
+                            ai_review_confidence={PH}, ai_model={PH}, ai_summary={PH}, ai_tags={PH}
                         WHERE isbn={PH}""",
-                    (result["review"], today, result["score"], "gpt-4o-mini",
-                     result["summary"], tags_json, isbn),
+                    (result["review"], today, result["score"], result.get("confidence"),
+                     "gpt-4o-mini", result["summary"], tags_json, isbn),
                 )
                 con.commit()
                 con.close()

@@ -177,7 +177,7 @@ def fetch_book_detail(isbn, hint_title=""):
             return c1 == c2 or c1 in t2 or c2 in t1 or c1 in c2 or c2 in c1
 
         try:
-            cached = fetchone(dc, f"SELECT title, author, description, manual_review, manual_review_date, ai_review_date, ai_review_score, ai_model, helpful_count, ai_summary, ai_tags FROM genre_books WHERE isbn={ph}", (isbn,))
+            cached = fetchone(dc, f"SELECT title, author, description, manual_review, manual_review_date, ai_review_date, ai_review_score, ai_review_confidence, ai_model, helpful_count, ai_summary, ai_tags FROM genre_books WHERE isbn={ph}", (isbn,))
         except Exception:
             # 古いDBでカラムが足りない場合は最小セットでフォールバック
             try:
@@ -190,7 +190,7 @@ def fetch_book_detail(isbn, hint_title=""):
                 cached = None
 
         if (not cached or not cached.get("description")) and lib_title:
-            _title_cols = "title, author, description, manual_review, manual_review_date, ai_review_date, ai_review_score, ai_model, ai_summary, ai_tags"
+            _title_cols = "title, author, description, manual_review, manual_review_date, ai_review_date, ai_review_score, ai_review_confidence, ai_model, ai_summary, ai_tags"
             try:
                 cached = fetchone(dc, f"SELECT {_title_cols} FROM genre_books WHERE title={ph}", (lib_title,))
             except Exception:
@@ -214,11 +214,14 @@ def fetch_book_detail(isbn, hint_title=""):
         elif cached and not cached.get("manual_review") and result.get("description"):
             ai_d = cached.get("ai_review_date")
             ai_s = cached.get("ai_review_score")
+            ai_c = cached.get("ai_review_confidence")
             ai_m = cached.get("ai_model")
             if ai_d:
                 result["ai_review_date"] = str(ai_d)
             if ai_s:
                 result["ai_review_score"] = int(ai_s)
+            if ai_c:
+                result["ai_review_confidence"] = int(ai_c)
             if ai_m:
                 result["ai_model"] = ai_m
         if cached and result.get("description"):

@@ -290,9 +290,10 @@ def regenerate_one(isbn: str, book: dict, min_score: int = _MIN_SCORE_DEFAULT) -
             con,
             f"""UPDATE genre_books
                 SET description={ph}, ai_review_date={ph}, ai_review_score={ph},
-                    ai_model={ph}, ai_summary={ph}, ai_tags={ph}
+                    ai_review_confidence={ph}, ai_model={ph}, ai_summary={ph}, ai_tags={ph}
                 WHERE isbn={ph}""",
-            (result["review"], today, result["score"], MODEL, result["summary"], tags_json, isbn),
+            (result["review"], today, result["score"], result.get("confidence"),
+             MODEL, result["summary"], tags_json, isbn),
         )
         con.commit()
         return {"ok": True}
