@@ -3000,6 +3000,28 @@ document.querySelectorAll(".board-tab").forEach(btn => {
     _loadIntegrityFindings();
   }
 
+  async function _loadAiReviewConfidenceStats() {
+    const box = document.getElementById("aiReviewConfidenceStats");
+    if (!box) return;
+    try {
+      const res = await adminFetch("/api/admin/ai-review/confidence-stats");
+      const s = await res.json();
+      if (!res.ok || !s.total_count) {
+        box.textContent = "";
+        return;
+      }
+      const b = s.buckets || {};
+      box.innerHTML =
+        `confidence: 平均${s.average}（min${s.min}〜max${s.max}、${s.total_count}件）<br>` +
+        `60-64: ${b["60-64"] || 0}件 / 65-69: ${b["65-69"] || 0}件 / 70-79: ${b["70-79"] || 0}件 / ` +
+        `80-89: ${b["80-89"] || 0}件 / 90-100: ${b["90-100"] || 0}件`;
+    } catch (e) { /* noop */ }
+  }
+
+  if (document.getElementById("aiReviewConfidenceStats")) {
+    _loadAiReviewConfidenceStats();
+  }
+
   async function _pollAiReviewRegenStatus() {
     const msg = document.getElementById("aiReviewRegenMsg");
     const btn = document.getElementById("aiReviewRegenBtn");
@@ -3019,6 +3041,7 @@ document.querySelectorAll(".board-tab").forEach(btn => {
       } else if (last) {
         msg.style.color = "#2a7a4a";
         msg.textContent = `完了: ${last.target_count}件中${last.success}件を生成しました（情報不足でスキップ${last.skipped}件${last.errors && last.errors.length ? `、失敗${last.errors.length}件` : ""}）。`;
+        _loadAiReviewConfidenceStats();
       }
     } catch (e) { /* noop */ } finally {
       if (btn) btn.disabled = false;
