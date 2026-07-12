@@ -671,15 +671,17 @@ def run_ndc_backfill(operator: str, limit: int = 100000):
         try:
             con = get_con()
             try:
+                # 2026-07-12: LIKE '978%' のようにSQL文中へワイルドカードを直接
+                # 埋め込むと、PostgreSQL接続時にpsycopg2の%sプレースホルダ解釈と
+                # 衝突し本番でのみ例外（tuple index out of range）が発生した。
+                # ワイルドカードをパラメータとして渡すことで回避する。
+                ph = "%s" if USE_PG else "?"
                 rows = fetchall(
                     con,
-                    "SELECT isbn, title, genre FROM genre_books WHERE (ndc IS NULL OR ndc = '') "
-                    "AND (isbn LIKE '978%' OR isbn LIKE '979%') "
-                    "ORDER BY isbn LIMIT %s" if USE_PG else
-                    "SELECT isbn, title, genre FROM genre_books WHERE (ndc IS NULL OR ndc = '') "
-                    "AND (isbn LIKE '978%' OR isbn LIKE '979%') "
-                    "ORDER BY isbn LIMIT ?",
-                    (limit,),
+                    f"SELECT isbn, title, genre FROM genre_books WHERE (ndc IS NULL OR ndc = '') "
+                    f"AND (isbn LIKE {ph} OR isbn LIKE {ph}) "
+                    f"ORDER BY isbn LIMIT {ph}",
+                    ("978%", "979%", limit),
                 )
             finally:
                 con.close()
@@ -704,15 +706,33 @@ def run_ndc_backfill(operator: str, limit: int = 100000):
                 try:
                     resp = requests.get(OPENBD_API, params={"isbn": ",".join(isbns)}, timeout=60)
                     items = resp.json()
-                    for isbn, item in zip(isbns, items):
+                    if not isinstance(items, list):
+                        logger.error(f"NDC補完: OpenBDレスポンスがリストでない: {type(items)} {str(items)[:300]}")
+                        items = []
+                    # OpenBDが要求件数より少ない/多い配列を返すケースに備え、
+                    # zipではなくindexで安全に対応させる（2026-07-12: 本番で
+                    # "tuple index out of range" が発生した原因調査を兼ねる）。
+                    for idx, isbn in enumerate(isbns):
+                        item = items[idx] if idx < len(items) else None
                         if not item:
                             continue
-                        found_isbns.add(isbn)
-                        subjects = item.get("onix", {}).get("DescriptiveDetail", {}).get("Subject", [])
-                        ndc = next((s.get("SubjectCode", "") for s in subjects
-                                    if s.get("SubjectSchemeIdentifier") == "78"), "")
-                        if ndc:
-                            ndc_map[isbn] = ndc
+                        try:
+                            found_isbns.add(isbn)
+                            subjects = item.get("onix", {}).get("DescriptiveDetail", {}).get("Subject", [])
+                            if isinstance(subjects, dict):
+                                subjects = [subjects]
+                            if not isinstance(subjects, list):
+                                subjects = []
+                            ndc = ""
+                            for s in subjects:
+                                if isinstance(s, dict) and s.get("SubjectSchemeIdentifier") == "78":
+                                    ndc = s.get("SubjectCode", "")
+                                    break
+                            if ndc:
+                                ndc_map[isbn] = ndc
+                        except Exception as e:
+                            logger.error(f"NDC補完: ISBN {isbn} のパースエラー: {e} / item={str(item)[:300]}",
+                                         exc_info=True)
                 except Exception as e:
                     logger.error(f"NDC補完: OpenBDバッチエラー: {e}", exc_info=True)
                     for isbn in isbns:
@@ -729,15 +749,19 @@ def run_ndc_backfill(operator: str, limit: int = 100000):
                         if not ndc:
                             counts["no_ndc_in_openbd"] += 1
                             continue
-                        book = book_map[isbn]
-                        old_genre = book.get("genre") or "その他"
-                        new_genre = _classify_genre(ndc, book.get("title", ""), "")
-                        ph = "%s" if USE_PG else "?"
-                        execute(bcon, f"UPDATE genre_books SET ndc={ph}, genre={ph} WHERE isbn={ph}",
-                                (ndc, new_genre, isbn))
-                        counts["success"] += 1
-                        if new_genre != old_genre:
-                            counts["genre_changed"] += 1
+                        try:
+                            book = book_map[isbn]
+                            old_genre = book.get("genre") or "その他"
+                            new_genre = _classify_genre(ndc, book.get("title", ""), "")
+                            ph = "%s" if USE_PG else "?"
+                            execute(bcon, f"UPDATE genre_books SET ndc={ph}, genre={ph} WHERE isbn={ph}",
+                                    (ndc, new_genre, isbn))
+                            counts["success"] += 1
+                            if new_genre != old_genre:
+                                counts["genre_changed"] += 1
+                        except Exception as e:
+                            logger.error(f"NDC補完: ISBN {isbn} のDB更新エラー: {e}", exc_info=True)
+                            counts["api_error"] += 1
                     bcon.commit()
                 time.sleep(0.5)
 
