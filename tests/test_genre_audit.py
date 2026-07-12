@@ -40,6 +40,24 @@ def test_classify_genre_maps_770s_range():
         assert _classify_genre(ndc, "テスト", "") == "エッセイ・評論"
 
 
+def test_classify_genre_keyword_philosophy_maps_to_essay():
+    """2026-07-12: NDC非依存のキーワード分類拡充（CiNii Books・版元ドットコムとも
+    NDCを取得できないことが確認できたため、キーワードによる補助分類を強化）。"""
+    for title in ["ニーチェ入門", "禅と日本文化", "実存主義とは何か"]:
+        assert _classify_genre("", title, "") == "エッセイ・評論"
+
+
+def test_classify_genre_keyword_social_science_maps_to_nonfiction():
+    for title in ["日本経済の未来", "現代政治入門", "社会問題を考える"]:
+        assert _classify_genre("", title, "") == "社会・ノンフィクション"
+
+
+def test_classify_genre_keyword_business_still_maps_to_practical():
+    """新規追加の社会科学キーワードが既存のビジネス書分類（実用・ハウツー）を
+    上書きしないことを確認する。"""
+    assert _classify_genre("", "起業家のための経営戦略", "") == "実用・ハウツー"
+
+
 def test_audit_genre_ndc_mismatches_detects_stale_genre():
     """ndcは正しいのにgenreが古い（現在のマッピングと矛盾する）本を検出する。"""
     con = get_con()
