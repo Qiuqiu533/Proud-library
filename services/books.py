@@ -528,6 +528,43 @@ def _classify_genre(ndc, title="", description=""):
     return "その他"
 
 
+def audit_genre_ndc_mismatches(limit: int = 200) -> list[dict]:
+    """genre_books.ndcが保存されている本のうち、現在のNDC_TO_GENREマッピングで
+    再計算した場合に現在のgenreと異なる結果になるものを検出する。
+
+    2026-07-12: 「風姿花伝」（NDC773・能楽）がNDC_TO_GENREに未対応だったため
+    「ミステリ・推理」に誤分類されていた事故を受けて追加。自動修復はせず、
+    検出のみ行い管理者が確認できるようにする（ISBN整合性監査と同じ方針:
+    自動上書きすると逆に壊すリスクがあるため）。
+    """
+    con = get_con()
+    try:
+        rows = fetchall(
+            con,
+            "SELECT isbn, title, genre, ndc FROM genre_books "
+            "WHERE ndc IS NOT NULL AND ndc != '' ORDER BY isbn LIMIT %s" if USE_PG else
+            "SELECT isbn, title, genre, ndc FROM genre_books "
+            "WHERE ndc IS NOT NULL AND ndc != '' ORDER BY isbn LIMIT ?",
+            (limit,),
+        )
+    finally:
+        con.close()
+
+    mismatches = []
+    for r in rows:
+        current_genre = r.get("genre") or "その他"
+        suggested_genre = _classify_genre(r.get("ndc", ""), r.get("title", ""), "")
+        if suggested_genre != current_genre:
+            mismatches.append({
+                "isbn": r["isbn"],
+                "title": r.get("title", ""),
+                "ndc": r.get("ndc", ""),
+                "current_genre": current_genre,
+                "suggested_genre": suggested_genre,
+            })
+    return mismatches
+
+
 _genre_classify_running = False
 
 

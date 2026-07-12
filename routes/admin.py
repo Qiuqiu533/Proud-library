@@ -343,3 +343,44 @@ def api_ai_review_confidence_stats():
         return jsonify({"error": "unauthorized"}), 401
     from services.ai_review_generator import confidence_distribution
     return jsonify(confidence_distribution())
+
+
+@admin_bp.route("/api/admin/genre-audit")
+def api_genre_audit():
+    """NDCと現在のgenreが矛盾している本を検出する（自動修復はしない）。"""
+    pw = request.headers.get("X-Password", "")
+    if not check_password(pw, "board"):
+        return jsonify({"error": "unauthorized"}), 401
+    limit = request.args.get("limit", 200, type=int)
+    from services.books import audit_genre_ndc_mismatches
+    mismatches = audit_genre_ndc_mismatches(limit)
+    return jsonify({"count": len(mismatches), "mismatches": mismatches})
+
+
+@admin_bp.route("/api/admin/genre-fix", methods=["POST"])
+def api_genre_fix():
+    """特定ISBNのgenre（・ndc）を管理者が確認のうえ手動修正する。"""
+    pw = request.headers.get("X-Password", "")
+    if not check_password(pw, "board"):
+        return jsonify({"error": "unauthorized"}), 401
+    body = request.get_json(silent=True) or {}
+    isbn = (body.get("isbn") or "").strip()
+    genre = (body.get("genre") or "").strip()
+    ndc = (body.get("ndc") or "").strip()
+    if not isbn or not genre:
+        return jsonify({"error": "isbn and genre are required"}), 400
+    con = get_con()
+    try:
+        if ndc:
+            execute(con, "UPDATE genre_books SET genre=%s, ndc=%s WHERE isbn=%s" if USE_PG else
+                    "UPDATE genre_books SET genre=?, ndc=? WHERE isbn=?", (genre, ndc, isbn))
+        else:
+            execute(con, "UPDATE genre_books SET genre=%s WHERE isbn=%s" if USE_PG else
+                    "UPDATE genre_books SET genre=? WHERE isbn=?", (genre, isbn))
+        con.commit()
+        return jsonify({"ok": True})
+    except Exception as e:
+        con.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        con.close()
