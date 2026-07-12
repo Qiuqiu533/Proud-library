@@ -50,6 +50,43 @@ OPENING_PATTERNS = [
 ]
 
 
+def _format_pubdate(pubdate: str) -> str:
+    """OpenBDのpubdate（例: "201609"）を "2016年" 形式に整形する。"""
+    if not pubdate or len(pubdate) < 4:
+        return ""
+    return f"{pubdate[:4]}年"
+
+
+def _format_awards(awards_raw) -> str:
+    """genre_books.awardsカラム（JSON文字列 or リスト）を人間可読な文字列に整形する。
+
+    2026-07-11: award_books由来の自前データは公式情報で照合済みの高信頼データ
+    のため、書誌情報拡充の中でも特に効果が大きい（推測に頼らず断定的に書ける）。
+    """
+    if not awards_raw:
+        return ""
+    try:
+        awards = json.loads(awards_raw) if isinstance(awards_raw, str) else awards_raw
+    except Exception:
+        return ""
+    if not isinstance(awards, list) or not awards:
+        return ""
+    parts = []
+    for a in awards:
+        if not isinstance(a, dict):
+            continue
+        year = a.get("year", "")
+        name = a.get("award", "")
+        rank = a.get("rank")
+        if not name:
+            continue
+        label = f"{year}年{name}" if year else name
+        if rank:
+            label += f"（{rank}位）"
+        parts.append(label)
+    return "、".join(parts)
+
+
 def _opening_pattern_for_isbn(isbn: str) -> str:
     """ISBNから決定的に書き出しパターンを選ぶ（同じ本は毎回同じ書き出しになる）。
 
@@ -170,7 +207,8 @@ def fetch_openbd_meta(isbn: str) -> dict:
 
 
 def call_openai_review(title: str, author: str, publisher: str, genre: str, wiki_info: str,
-                        series: str = "", blurb: str = "", isbn: str = "") -> dict | None:
+                        series: str = "", blurb: str = "", isbn: str = "",
+                        pubdate: str = "", awards_text: str = "") -> dict | None:
     """OpenAI APIで書評を1回生成する。戻り値: dict または情報不足でNone。
 
     2026-07-09: 「風姿花伝」（世阿弥の古典、馬場あき子は現代語訳・注釈者）を
@@ -187,9 +225,13 @@ def call_openai_review(title: str, author: str, publisher: str, genre: str, wiki
     wiki_section = f"\n著者情報（Wikipedia）: {wiki_info}" if wiki_info else ""
     series_section = f"\nシリーズ名: {series}" if series else ""
     blurb_section = f"\n出版社による紹介文: {blurb}" if blurb else ""
+    pubdate_section = f"\n初版年: {pubdate}" if pubdate else ""
+    awards_section = f"\n受賞歴: {awards_text}" if awards_text else ""
     opening_instruction = (_opening_pattern_for_isbn(isbn).format(title=title, author=author or "不明")
                             if isbn else "")
-    opening_section = f"\n11. 書評の書き出しは、{opening_instruction}" if opening_instruction else ""
+    opening_section = f"\n12. 書評の書き出しは、{opening_instruction}" if opening_instruction else ""
+    awards_rule = ("\n11. 受賞歴が提供されている場合、それは事前に検証済みの確実な事実である。"
+                    "書評に含めてよく、確信度を下げる要因にしない。" if awards_text else "")
 
     prompt = f"""{FEW_SHOT_EXAMPLE}
 上の見本を参考に、以下の書籍の書評をJSON形式で出力してください。
@@ -197,10 +239,10 @@ def call_openai_review(title: str, author: str, publisher: str, genre: str, wiki
 書名: {title}
 著者: {author or "不明"}{wiki_section}
 出版社: {publisher or "不明"}
-ジャンル: {genre or "その他"}{series_section}{blurb_section}
+ジャンル: {genre or "その他"}{series_section}{blurb_section}{pubdate_section}{awards_section}
 
 【必須ルール】
-1. 提供された情報（書名・著者・出版社・著者情報・シリーズ名・紹介文）に基づいてのみ書く。知らない・確認できない内容は絶対に書かない
+1. 提供された情報（書名・著者・出版社・著者情報・シリーズ名・紹介文・初版年・受賞歴）に基づいてのみ書く。知らない・確認できない内容は絶対に書かない
 2. 書名から内容を推測・想像して書くことは禁止。書名はあくまで参考情報
 3. 「著者」欄は原著者とは限らない（古典の現代語訳者・注釈者・編者・翻訳者の場合がある）。著者欄の人物が実際に何を書いたか確信できない場合、その人物が創作した物語であるかのように書いてはいけない
 4. 古典・翻訳作品・全集・評論・研究書・注釈書である可能性がある場合（シリーズ名に「古典」「文学全集」等が含まれる、出版年が古い、等）、具体的な物語の筋書きを創作してはいけない。その場合は作品の位置づけ・ジャンル・歴史的背景など確認できる範囲の情報のみを書く
@@ -212,7 +254,7 @@ def call_openai_review(title: str, author: str, publisher: str, genre: str, wiki
 7. 1文は60字以内に収める（長い文は2文に分ける）
 8. 特定の政治・宗教・思想的立場を推奨・批判しない
 9. confidence（この内容がどの程度事実に基づいていると確信できるか、0〜100）を出力する。書名・著者だけから内容を推測した部分が多い場合はconfidenceを50以下にする
-10. 自己採点スコア（0〜100点）を付ける（基準：事実のみ記載=+40、読者に有益な情報=+30、読みやすい文体=+30）{opening_section}
+10. 自己採点スコア（0〜100点）を付ける（基準：事実のみ記載=+40、読者に有益な情報=+30、読みやすい文体=+30）{awards_rule}{opening_section}
 
 出力はJSON形式のみ（説明文は不要）:
 {{
@@ -267,12 +309,13 @@ def call_openai_review(title: str, author: str, publisher: str, genre: str, wiki
 
 def generate_with_retry(title: str, author: str, publisher: str, genre: str, wiki_info: str,
                          min_score: int = _MIN_SCORE_DEFAULT, series: str = "", blurb: str = "",
-                         isbn: str = "") -> dict | None:
+                         isbn: str = "", pubdate: str = "", awards_text: str = "") -> dict | None:
     """スコアがmin_score未満なら1回だけ再生成する（最大2回試行）。confidence不足
     （ハルシネーション疑い）の場合はcall_openai_review内でNoneが返る。"""
     result = None
     for attempt in range(1, 3):
-        result = call_openai_review(title, author, publisher, genre, wiki_info, series, blurb, isbn)
+        result = call_openai_review(title, author, publisher, genre, wiki_info, series, blurb, isbn,
+                                     pubdate, awards_text)
         if result is None:
             return None
         if result["score"] >= min_score or attempt == 2:
@@ -297,11 +340,14 @@ def regenerate_one(isbn: str, book: dict, min_score: int = _MIN_SCORE_DEFAULT) -
         publisher = meta["publisher"]
     series = meta.get("series", "")
     blurb = meta.get("blurb", "")
+    pubdate = _format_pubdate(meta.get("pubdate", ""))
+    awards_text = _format_awards(book.get("awards"))
 
     wiki_info = fetch_wikipedia_author(author)
 
     try:
-        result = generate_with_retry(title, author, publisher, genre, wiki_info, min_score, series, blurb, isbn)
+        result = generate_with_retry(title, author, publisher, genre, wiki_info, min_score, series, blurb, isbn,
+                                      pubdate, awards_text)
     except Exception as e:
         logger.error(f"AI書評生成エラー {isbn}: {e}", exc_info=True)
         return {"ok": False, "error": str(e)}
@@ -342,7 +388,7 @@ def _fetch_regeneration_targets(limit: int, min_len: int = _MIN_LEN_DEFAULT) -> 
         ph = "%s" if USE_PG else "?"
         rows = fetchall(
             con,
-            f"""SELECT isbn, title, author, publisher, genre, description
+            f"""SELECT isbn, title, author, publisher, genre, description, awards
                 FROM genre_books
                 WHERE (manual_review IS NULL OR manual_review = {"FALSE" if USE_PG else "0"})
                   AND (description IS NULL OR LENGTH(description) < {ph})
@@ -437,7 +483,7 @@ def _fetch_book(isbn: str) -> dict | None:
     con = get_con()
     try:
         ph = "%s" if USE_PG else "?"
-        return fetchone(con, f"SELECT isbn, title, author, publisher, genre, description FROM genre_books WHERE isbn={ph}", (isbn,))
+        return fetchone(con, f"SELECT isbn, title, author, publisher, genre, description, awards FROM genre_books WHERE isbn={ph}", (isbn,))
     finally:
         con.close()
 
