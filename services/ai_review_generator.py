@@ -21,6 +21,7 @@ import datetime
 import requests
 
 from database import get_con, execute, fetchall, fetchone, USE_PG
+from services.ai_review_validator import validate_review
 
 logger = logging.getLogger(__name__)
 
@@ -354,6 +355,13 @@ def regenerate_one(isbn: str, book: dict, min_score: int = _MIN_SCORE_DEFAULT) -
 
     if result is None:
         return {"ok": False, "reason": "情報不足またはconfidence不足"}
+
+    validation = validate_review(title, genre, result["review"])
+    if not validation["passed"]:
+        logger.warning(f"AI書評品質チェックNG {isbn}: {validation['errors']}")
+        return {"ok": False, "reason": f"品質チェックNG: {'; '.join(validation['errors'])}"}
+    if validation["warnings"]:
+        logger.info(f"AI書評品質チェック警告 {isbn}: {validation['warnings']}")
 
     con = get_con()
     try:
