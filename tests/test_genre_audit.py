@@ -286,13 +286,27 @@ class _FakeNdlResponse:
 
 
 def test_fetch_ndc_from_ndl_extracts_ndc_from_response(monkeypatch):
-    """2026-07-12: NDLサーチ併用によるNDC補完の回帰テスト。scripts/fetch_ndc_ndl.py
-    と同じくndc9/形式を正規表現で抽出する。"""
+    """2026-07-12: NDLサーチ併用によるNDC補完の回帰テスト。当初はscripts/
+    fetch_ndc_ndl.py と同じ "ndc9/XXX" 形式を前提にしていたが、実際にNDL
+    SRU APIへ問い合わせたところ本番で0件成功が続き、実データを確認した結果
+    現在のレスポンスは `NDC8">773<`（NDC8ラベル＋タグ内テキスト、二重
+    エスケープされていることが多い）という形式に変わっていたと判明した。"""
     def _fake_get(url, params=None, timeout=None):
-        return _FakeNdlResponse('<rdf:value rdf:resource="ndc9/913.6"/>')
+        return _FakeNdlResponse(
+            '&lt;dc:subject rdf:datatype="http://ndl.go.jp/dcndl/terms/NDC8"&gt;913.6&lt;/dc:subject&gt;'
+        )
 
     monkeypatch.setattr(books_module.requests, "get", _fake_get)
     assert fetch_ndc_from_ndl("9789900000701") == "913.6"
+
+
+def test_fetch_ndc_from_ndl_extracts_ndc_from_unescaped_response(monkeypatch):
+    """二重エスケープされていない（生の&gt;/&lt;ではなく通常の>/<の）レスポンスにも対応する。"""
+    def _fake_get(url, params=None, timeout=None):
+        return _FakeNdlResponse('<dc:subject rdf:datatype="...NDC8">773</dc:subject>')
+
+    monkeypatch.setattr(books_module.requests, "get", _fake_get)
+    assert fetch_ndc_from_ndl("9789900000704") == "773"
 
 
 def test_fetch_ndc_from_ndl_returns_empty_when_not_found(monkeypatch):

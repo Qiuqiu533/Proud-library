@@ -782,8 +782,13 @@ def fetch_ndc_from_ndl(isbn: str) -> str:
 
     OpenBDにはNDCが登録されていない本でも、NDLには登録されている場合がある
     （2026-07-12: 全件実行の結果、残り約2,308件のうち約1,789件がこのケースと
-    判明）。SRUのレスポンスはXMLだがJSON解析するほどの構造化は不要なため、
-    scripts/fetch_ndc_ndl.py と同じく正規表現でNDC（ndc9/形式）を抽出する。
+    判明）。
+
+    2026-07-12: scripts/fetch_ndc_ndl.py は "ndc9/XXX" 形式のRDFリンクを
+    前提にNDCを抽出していたが、実際にNDL SRU APIを直接確認したところ
+    現在のレスポンスは `<dc:subject rdf:datatype=".../NDC8">773</dc:subject>`
+    という形式（NDC8ラベル＋タグ内テキスト）に変わっており、旧パターンでは
+    一切マッチせず本番で0件成功が続いていた。新しい形式に合わせて抽出する。
     """
     try:
         resp = requests.get(NDL_SRU_API, params={
@@ -794,7 +799,9 @@ def fetch_ndc_from_ndl(isbn: str) -> str:
             "query": f'isbn="{isbn}"',
         }, timeout=15)
         decoded = resp.text
-        m = _re.search(r"ndc9/([0-9.]+)", decoded)
+        # NDLレスポンス内のXMLは二重エスケープされていることがあるため、
+        # エスケープ済み（&gt;）・非エスケープ（>）の両方に対応する。
+        m = _re.search(r'NDC8["\']?\s*(?:&gt;|>)\s*([0-9.]+)\s*(?:&lt;|<)', decoded)
         return m.group(1) if m else ""
     except Exception:
         return ""
