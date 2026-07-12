@@ -410,25 +410,30 @@ def _fetch_regeneration_targets(limit: int, min_len: int = _MIN_LEN_DEFAULT) -> 
         con.close()
 
 
-def estimate_regeneration(limit: int = _JOB_MAX_LIMIT) -> dict:
-    """未生成（description NULL or 短い）対象件数と概算コストを返す。
-    OpenAI APIは呼び出さない（無料の見積りのみ）。"""
-    limit = min(limit, _JOB_MAX_LIMIT)
-    targets = _fetch_regeneration_targets(limit)
-    count = len(targets)
+def _estimate_cost_for_count(count: int) -> dict:
+    """指定件数分のOpenAI API概算コストを返す（OpenAI APIは呼び出さない無料の見積り）。"""
     input_tokens = count * _EST_INPUT_TOKENS_PER_BOOK
     output_tokens = count * _EST_OUTPUT_TOKENS_PER_BOOK
     cost_usd = (input_tokens / 1_000_000 * _PRICE_PER_1M_INPUT_USD
                 + output_tokens / 1_000_000 * _PRICE_PER_1M_OUTPUT_USD)
     return {
         "target_count": count,
-        "job_limit": limit,
         "estimated_input_tokens": input_tokens,
         "estimated_output_tokens": output_tokens,
         "estimated_cost_usd": round(cost_usd, 4),
         "estimated_cost_jpy": round(cost_usd * _USD_TO_JPY),
         "note": "概算値です。実際の料金はOpenAI公式の最新料金・実際のトークン数により変動します。",
     }
+
+
+def estimate_regeneration(limit: int = _JOB_MAX_LIMIT) -> dict:
+    """未生成（description NULL or 短い）対象件数と概算コストを返す。
+    OpenAI APIは呼び出さない（無料の見積りのみ）。"""
+    limit = min(limit, _JOB_MAX_LIMIT)
+    targets = _fetch_regeneration_targets(limit)
+    result = _estimate_cost_for_count(len(targets))
+    result["job_limit"] = limit
+    return result
 
 
 def confidence_distribution() -> dict:
@@ -500,9 +505,24 @@ def quality_tier_summary() -> dict:
     return {"total_count": sum(counts.values()), "counts": counts}
 
 
+def _tier_reason(tier: str, confidence: int | None) -> str:
+    """ai_quality_tierがmedium/lowになった理由を人間可読な文字列で返す。
+
+    2026-07-13: AI書評品質改善Phase 3-1（低品質レビュー再生成機能）。
+    管理画面で「なぜ要確認になったか」を一目で判断できるようにする。
+    """
+    if tier == "low":
+        return "confidence低い（60未満）"
+    if confidence is None:
+        return "confidence未評価"
+    if confidence <= 74:
+        return "confidenceグレーゾーン（60〜74）"
+    return "Validation警告あり（confidenceは高いが要確認）"
+
+
 def list_books_needing_review(limit: int = 100) -> list[dict]:
     """ai_quality_tierが medium/low の本を一覧する（管理画面での目視確認・
-    将来の一括再生成候補の抽出用）。"""
+    一括再生成候補の抽出用）。理由（reason）付きで返す。"""
     con = get_con()
     try:
         ph = "%s" if USE_PG else "?"
@@ -515,9 +535,16 @@ def list_books_needing_review(limit: int = 100) -> list[dict]:
                 LIMIT {ph}""",
             (limit,),
         )
+        total_row = fetchone(
+            con, "SELECT COUNT(*) AS c FROM genre_books WHERE ai_quality_tier IN ('medium', 'low')")
     finally:
         con.close()
-    return [dict(r) for r in rows]
+    books = []
+    for r in rows:
+        d = dict(r)
+        d["reason"] = _tier_reason(d.get("ai_quality_tier"), d.get("ai_review_confidence"))
+        books.append(d)
+    return books, (total_row["c"] if total_row else len(books))
 
 
 _regen_running = False

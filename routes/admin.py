@@ -357,13 +357,19 @@ def api_ai_review_quality_tiers():
 
 @admin_bp.route("/api/admin/ai-review/needs-review")
 def api_ai_review_needs_review():
-    """総合品質ティアがmedium/lowの本を一覧する（目視確認・将来の再生成候補）。"""
+    """総合品質ティアがmedium/lowの本を一覧する（目視確認・一括再生成候補）。
+    理由（reason）・全体件数（total_count）・概算再生成コストも合わせて返す。"""
     pw = request.headers.get("X-Password", "")
     if not check_password(pw, "board"):
         return jsonify({"error": "unauthorized"}), 401
     limit = request.args.get("limit", 100, type=int)
-    from services.ai_review_generator import list_books_needing_review
-    return jsonify({"books": list_books_needing_review(limit)})
+    from services.ai_review_generator import list_books_needing_review, _estimate_cost_for_count
+    books, total_count = list_books_needing_review(limit)
+    return jsonify({
+        "books": books,
+        "total_count": total_count,
+        "estimate": _estimate_cost_for_count(len(books)),
+    })
 
 
 @admin_bp.route("/api/admin/data-quality")
