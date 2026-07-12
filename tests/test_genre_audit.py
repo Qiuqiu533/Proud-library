@@ -40,6 +40,22 @@ def test_classify_genre_maps_770s_range():
         assert _classify_genre(ndc, "テスト", "") == "エッセイ・評論"
 
 
+def test_classify_genre_maps_7788_to_picture_book_not_essay():
+    """2026-07-13: NDCマッピング監査Phase 2。NDC778.8（特撮・アニメのテレビ絵本
+    シリーズ）が770番台の一括マッピングで「エッセイ・評論」に誤分類されていた
+    事故（「天装戦隊ゴセイジャー」「仮面ライダーフォーゼ」等）の回帰テスト。"""
+    genre = _classify_genre("778.8", "天装戦隊ゴセイジャー1 ちきゅうを まもれ!", "")
+    assert genre == "絵本・児童書"
+    assert genre != "エッセイ・評論"
+
+
+def test_classify_genre_other_778_779_still_maps_to_essay():
+    """778.8以外の778/779番台（映画評論・芸能人自伝等）は従来通り
+    エッセイ・評論のままであることを確認する（過剰修正の回帰防止）。"""
+    for ndc in ["778.77", "778.21", "778.253", "779.14", "779"]:
+        assert _classify_genre(ndc, "テスト", "") == "エッセイ・評論"
+
+
 def test_classify_genre_keyword_philosophy_maps_to_essay():
     """2026-07-12: NDC非依存のキーワード分類拡充（CiNii Books・版元ドットコムとも
     NDCを取得できないことが確認できたため、キーワードによる補助分類を強化）。"""
