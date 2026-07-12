@@ -1707,6 +1707,35 @@ def _migrate_ai_review_confidence_column():
         con.close()
 
 
+def _migrate_ai_quality_tier_column():
+    """genre_books に ai_quality_tier カラムを追加する。
+
+    2026-07-12: AI書評品質改善Phase 2-2。confidence単独では品質判定が粗いため、
+    Validation Gate（services/ai_review_validator.py）の警告件数と組み合わせた
+    総合ティア（high/medium/low）を保存し、管理画面で「要確認」データを
+    抽出・将来の一括再生成に使えるようにする。
+    """
+    if _migration_done("ai_quality_tier_column_v1"):
+        return
+    con = get_con()
+    try:
+        if USE_PG:
+            cur = con.cursor()
+            cur.execute("ALTER TABLE genre_books ADD COLUMN IF NOT EXISTS ai_quality_tier TEXT")
+        else:
+            try:
+                con.execute("ALTER TABLE genre_books ADD COLUMN ai_quality_tier TEXT")
+            except Exception:
+                pass
+        con.commit()
+        _mark_migration_done("ai_quality_tier_column_v1")
+        logger.info("[migration] genre_books.ai_quality_tier カラム追加完了")
+    except Exception as e:
+        logger.error("[migration] ai_quality_tier_column error: %s", e)
+    finally:
+        con.close()
+
+
 def _migrate_ndc_column():
     """genre_books に ndc カラムを追加する。"""
     if _migration_done("ndc_column_v1"):
@@ -2731,6 +2760,7 @@ def _run_all_migrations_steps():
         _migrate_ai_review_columns,        # ai_summary/ai_tags カラム追加
         _migrate_ai_review_metadata_columns,  # manual_review系/ai_review系カラム追加（2026-07-08）
         _migrate_ai_review_confidence_column,  # ai_review_confidenceカラム追加（2026-07-11）
+        _migrate_ai_quality_tier_column,   # ai_quality_tierカラム追加（2026-07-12）
         _migrate_ndc_column,               # ndc カラム追加
         _migrate_award_books_plam_work_id, # award_books.plam_work_id カラム追加
         _migrate_plam_coverage_log,        # PLAMカバレッジ履歴テーブル追加

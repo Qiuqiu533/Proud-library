@@ -223,6 +223,76 @@ def test_confidence_distribution_buckets_and_average():
         con.close()
 
 
+def test_regenerate_one_persists_quality_tier(monkeypatch):
+    """2026-07-12: AI書評品質改善Phase 2-2。confidenceとValidation警告を
+    組み合わせた総合ティアがai_quality_tier列に保存されることを確認する。"""
+    from database import fetchone
+
+    _seed_book(description=None)
+
+    def _fake_generate_with_retry(title, author, publisher, genre, wiki_info, min_score=70, series="", blurb="",
+                                   isbn="", pubdate="", awards_text=""):
+        return {"review": "テストレビュー本文です。" * 5, "summary": "テスト一言", "tags": ["タグ1"], "score": 85, "confidence": 90}
+
+    monkeypatch.setattr(ai_review_generator, "generate_with_retry", _fake_generate_with_retry)
+    try:
+        result = ai_review_generator.regenerate_one(_TEST_ISBN, {"title": "テスト対象本", "author": "テスト著者", "publisher": "", "genre": ""})
+        assert result == {"ok": True}
+
+        con = get_con()
+        row = fetchone(con, "SELECT ai_quality_tier FROM genre_books WHERE isbn=?", (_TEST_ISBN,))
+        con.close()
+        assert row["ai_quality_tier"] == "high"
+    finally:
+        _cleanup()
+
+
+def test_quality_tier_summary_counts_by_tier():
+    con = get_con()
+    isbns = ["9999900000211", "9999900000212", "9999900000213"]
+    tiers = ["high", "medium", "low"]
+    for isbn, tier in zip(isbns, tiers):
+        execute(con, "INSERT OR REPLACE INTO genre_books (isbn, title, author, publisher, genre, format, ai_quality_tier) "
+                "VALUES (?,?,?,?,?,?,?)",
+                (isbn, "テスト本", "テスト著者", "テスト出版社", "その他", "その他", tier))
+    con.commit()
+    con.close()
+    try:
+        result = ai_review_generator.quality_tier_summary()
+        assert result["counts"]["high"] >= 1
+        assert result["counts"]["medium"] >= 1
+        assert result["counts"]["low"] >= 1
+    finally:
+        con = get_con()
+        for isbn in isbns:
+            execute(con, "DELETE FROM genre_books WHERE isbn=?", (isbn,))
+        con.commit()
+        con.close()
+
+
+def test_list_books_needing_review_excludes_high_tier():
+    con = get_con()
+    isbns = ["9999900000221", "9999900000222"]
+    tiers = ["high", "medium"]
+    for isbn, tier in zip(isbns, tiers):
+        execute(con, "INSERT OR REPLACE INTO genre_books (isbn, title, author, publisher, genre, format, ai_quality_tier) "
+                "VALUES (?,?,?,?,?,?,?)",
+                (isbn, "テスト本", "テスト著者", "テスト出版社", "その他", "その他", tier))
+    con.commit()
+    con.close()
+    try:
+        results = ai_review_generator.list_books_needing_review(limit=200)
+        result_isbns = {b["isbn"] for b in results}
+        assert "9999900000222" in result_isbns
+        assert "9999900000221" not in result_isbns
+    finally:
+        con = get_con()
+        for isbn in isbns:
+            execute(con, "DELETE FROM genre_books WHERE isbn=?", (isbn,))
+        con.commit()
+        con.close()
+
+
 def test_format_pubdate_extracts_year():
     assert ai_review_generator._format_pubdate("201609") == "2016年"
     assert ai_review_generator._format_pubdate("") == ""
