@@ -102,6 +102,31 @@ def test_data_quality_summary_counts_missing_ndc():
         _cleanup()
 
 
+def test_data_quality_summary_counts_invalid_isbn():
+    """978/979始まりの13桁でないISBN（librarylife.netの仮ISBN等）を
+    invalid_isbn_countとして別集計する。"""
+    isbn_invalid = "00"
+    isbn_valid = "9789900000601"
+    con = get_con()
+    execute(con, "INSERT OR REPLACE INTO genre_books (isbn, title, author, publisher, genre, format) "
+            "VALUES (?,?,?,?,?,?)",
+            (isbn_invalid, "仮ISBNテスト本", "テスト著者", "テスト出版社", "その他", "その他"))
+    execute(con, "INSERT OR REPLACE INTO genre_books (isbn, title, author, publisher, genre, format) "
+            "VALUES (?,?,?,?,?,?)",
+            (isbn_valid, "有効ISBNテスト本", "テスト著者", "テスト出版社", "その他", "その他"))
+    con.commit()
+    con.close()
+    try:
+        summary = data_quality_summary()
+        assert summary["invalid_isbn_count"] >= 1
+    finally:
+        con = get_con()
+        for isbn in (isbn_invalid, isbn_valid):
+            execute(con, "DELETE FROM genre_books WHERE isbn=?", (isbn,))
+        con.commit()
+        con.close()
+
+
 def test_list_books_missing_ndc_returns_only_missing():
     con = get_con()
     execute(con, "INSERT OR REPLACE INTO genre_books (isbn, title, author, publisher, genre, format) "
@@ -134,9 +159,9 @@ def test_run_ndc_backfill_classifies_results_by_reason(monkeypatch):
     OpenBDにNDCなしを理由別に正しく集計し、成功分のみndc/genreを更新する。"""
     import time as time_module
 
-    isbn_success = "9999900000401"   # NDC取得できジャンルも変わる
-    isbn_no_data = "9999900000402"   # OpenBDに該当データなし
-    isbn_no_ndc = "9999900000403"    # OpenBDにデータはあるがNDCなし
+    isbn_success = "9789900000401"   # NDC取得できジャンルも変わる（有効なISBN-13形式）
+    isbn_no_data = "9789900000402"   # OpenBDに該当データなし（有効なISBN-13形式）
+    isbn_no_ndc = "9789900000403"    # OpenBDにデータはあるがNDCなし（有効なISBN-13形式）
 
     con = get_con()
     for isbn in (isbn_success, isbn_no_data, isbn_no_ndc):
@@ -192,6 +217,54 @@ def test_run_ndc_backfill_classifies_results_by_reason(monkeypatch):
     finally:
         con = get_con()
         for isbn in (isbn_success, isbn_no_data, isbn_no_ndc):
+            execute(con, "DELETE FROM genre_books WHERE isbn=?", (isbn,))
+        con.commit()
+        con.close()
+
+
+def test_run_ndc_backfill_skips_invalid_isbns(monkeypatch):
+    """2026-07-12: 本番でlimit=200の試験実行を行った際、昇順ソートの先頭に
+    librarylife.netの仮ISBN（"00"等、978/979始まりの13桁でない）が集中し、
+    全件がno_data_in_openbdになった。仮ISBNはOpenBDに存在しえないため、
+    NDC補完の対象から除外する回帰テスト。"""
+    import time as time_module
+
+    isbn_invalid = "00"  # 実際に本番で観測された仮ISBNのパターン
+    isbn_valid = "9789900000501"
+
+    con = get_con()
+    execute(con, "INSERT OR REPLACE INTO genre_books (isbn, title, author, publisher, genre, format) "
+            "VALUES (?,?,?,?,?,?)",
+            (isbn_invalid, "仮ISBNテスト本", "テスト著者", "テスト出版社", "その他", "その他"))
+    execute(con, "INSERT OR REPLACE INTO genre_books (isbn, title, author, publisher, genre, format) "
+            "VALUES (?,?,?,?,?,?)",
+            (isbn_valid, "有効ISBNテスト本", "テスト著者", "テスト出版社", "その他", "その他"))
+    con.commit()
+    con.close()
+
+    called_isbns = []
+
+    def _fake_get(url, params=None, timeout=None):
+        isbns = params["isbn"].split(",")
+        called_isbns.extend(isbns)
+        return _FakeResponse([None for _ in isbns])
+
+    monkeypatch.setattr(books_module.requests, "get", _fake_get)
+    try:
+        result, code = run_ndc_backfill("テスト太郎")
+        assert code == 200
+
+        for _ in range(50):
+            if not is_ndc_backfill_running():
+                break
+            time_module.sleep(0.1)
+        else:
+            raise AssertionError("NDC補完がタイムアウトしました")
+
+        assert isbn_invalid not in called_isbns
+    finally:
+        con = get_con()
+        for isbn in (isbn_invalid, isbn_valid):
             execute(con, "DELETE FROM genre_books WHERE isbn=?", (isbn,))
         con.commit()
         con.close()
