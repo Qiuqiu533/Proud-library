@@ -71,3 +71,29 @@ def validate_review(title: str, genre: str, review_text: str) -> dict:
                 )
 
     return {"passed": len(errors) == 0, "errors": errors, "warnings": warnings}
+
+
+# confidenceのグレーゾーン（60〜74）は無条件で「medium」とし、75以上でも
+# Validation警告があれば「medium」に格下げする。confidence未評価（None）は
+# 判定材料がないため安全側で「medium」扱いとする。
+_CONFIDENCE_LOW_MAX = 59
+_CONFIDENCE_GRAY_MAX = 74
+
+
+def compute_quality_tier(confidence: int | None, warning_count: int) -> str:
+    """confidence（AI自己申告値）とValidation警告件数を組み合わせた総合品質ティアを返す。
+
+    "high": そのまま採用して問題ない
+    "medium": 要確認（管理画面での目視確認・将来の一括再生成候補）
+    "low": 原則破棄・再生成対象（confidence 60未満はcall_openai_review側で
+           既に生成破棄されるため、主に移行前の既存データ向けの分類）
+    """
+    if confidence is None:
+        return "medium"
+    if confidence <= _CONFIDENCE_LOW_MAX:
+        return "low"
+    if confidence <= _CONFIDENCE_GRAY_MAX:
+        return "medium"
+    if warning_count > 0:
+        return "medium"
+    return "high"

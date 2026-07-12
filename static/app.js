@@ -3022,6 +3022,27 @@ document.querySelectorAll(".board-tab").forEach(btn => {
     _loadAiReviewConfidenceStats();
   }
 
+  async function _loadAiReviewQualityTiers() {
+    const box = document.getElementById("aiReviewQualityTiers");
+    if (!box) return;
+    try {
+      const res = await adminFetch("/api/admin/ai-review/quality-tiers");
+      const s = await res.json();
+      if (!res.ok || !s.total_count) {
+        box.textContent = "";
+        return;
+      }
+      const c = s.counts || {};
+      box.innerHTML =
+        `品質ティア（${s.total_count}件）: ` +
+        `高${c.high || 0}件 / 要確認${c.medium || 0}件 / 低${c.low || 0}件`;
+    } catch (e) { /* noop */ }
+  }
+
+  if (document.getElementById("aiReviewQualityTiers")) {
+    _loadAiReviewQualityTiers();
+  }
+
   async function _loadDataQualityStats() {
     const box = document.getElementById("dataQualityStats");
     if (!box) return;

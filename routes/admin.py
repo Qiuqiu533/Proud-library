@@ -345,6 +345,27 @@ def api_ai_review_confidence_stats():
     return jsonify(confidence_distribution())
 
 
+@admin_bp.route("/api/admin/ai-review/quality-tiers")
+def api_ai_review_quality_tiers():
+    """AI書評の総合品質ティア（high/medium/low）別の件数を返す。"""
+    pw = request.headers.get("X-Password", "")
+    if not check_password(pw, "board"):
+        return jsonify({"error": "unauthorized"}), 401
+    from services.ai_review_generator import quality_tier_summary
+    return jsonify(quality_tier_summary())
+
+
+@admin_bp.route("/api/admin/ai-review/needs-review")
+def api_ai_review_needs_review():
+    """総合品質ティアがmedium/lowの本を一覧する（目視確認・将来の再生成候補）。"""
+    pw = request.headers.get("X-Password", "")
+    if not check_password(pw, "board"):
+        return jsonify({"error": "unauthorized"}), 401
+    limit = request.args.get("limit", 100, type=int)
+    from services.ai_review_generator import list_books_needing_review
+    return jsonify({"books": list_books_needing_review(limit)})
+
+
 @admin_bp.route("/api/admin/data-quality")
 def api_data_quality():
     """genre×NDCのデータ品質サマリー（NDC未取得件数・未対応NDC件数等）を返す。"""

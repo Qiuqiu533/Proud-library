@@ -7,7 +7,7 @@ services.ai_review_validator の回帰テスト。
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from services.ai_review_validator import validate_review
+from services.ai_review_validator import validate_review, compute_quality_tier
 
 
 def test_validate_review_passes_normal_review():
@@ -41,3 +41,26 @@ def test_validate_review_warns_on_too_long_text():
     result = validate_review("テスト本", "エッセイ・評論", long_text)
     assert result["passed"] is True
     assert any("長すぎる" in w for w in result["warnings"])
+
+
+def test_compute_quality_tier_low_when_confidence_below_60():
+    assert compute_quality_tier(55, 0) == "low"
+
+
+def test_compute_quality_tier_medium_in_gray_zone_regardless_of_warnings():
+    """2026-07-12: confidence60〜74のグレーゾーンは警告の有無に関わらずmedium。"""
+    assert compute_quality_tier(65, 0) == "medium"
+    assert compute_quality_tier(74, 1) == "medium"
+
+
+def test_compute_quality_tier_medium_when_high_confidence_but_has_warnings():
+    """confidenceが高くてもValidation警告があればmediumへ格下げする。"""
+    assert compute_quality_tier(90, 1) == "medium"
+
+
+def test_compute_quality_tier_high_when_confidence_high_and_no_warnings():
+    assert compute_quality_tier(90, 0) == "high"
+
+
+def test_compute_quality_tier_medium_when_confidence_unknown():
+    assert compute_quality_tier(None, 0) == "medium"

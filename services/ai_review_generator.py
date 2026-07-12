@@ -21,7 +21,7 @@ import datetime
 import requests
 
 from database import get_con, execute, fetchall, fetchone, USE_PG
-from services.ai_review_validator import validate_review
+from services.ai_review_validator import validate_review, compute_quality_tier
 
 logger = logging.getLogger(__name__)
 
@@ -362,6 +362,7 @@ def regenerate_one(isbn: str, book: dict, min_score: int = _MIN_SCORE_DEFAULT) -
         return {"ok": False, "reason": f"品質チェックNG: {'; '.join(validation['errors'])}"}
     if validation["warnings"]:
         logger.info(f"AI書評品質チェック警告 {isbn}: {validation['warnings']}")
+    quality_tier = compute_quality_tier(result.get("confidence"), len(validation["warnings"]))
 
     con = get_con()
     try:
@@ -372,10 +373,10 @@ def regenerate_one(isbn: str, book: dict, min_score: int = _MIN_SCORE_DEFAULT) -
             con,
             f"""UPDATE genre_books
                 SET description={ph}, ai_review_date={ph}, ai_review_score={ph},
-                    ai_review_confidence={ph}, ai_model={ph}, ai_summary={ph}, ai_tags={ph}
+                    ai_review_confidence={ph}, ai_quality_tier={ph}, ai_model={ph}, ai_summary={ph}, ai_tags={ph}
                 WHERE isbn={ph}""",
             (result["review"], today, result["score"], result.get("confidence"),
-             MODEL, result["summary"], tags_json, isbn),
+             quality_tier, MODEL, result["summary"], tags_json, isbn),
         )
         con.commit()
         return {"ok": True}
@@ -473,6 +474,50 @@ def confidence_distribution() -> dict:
         "max": max(values),
         "buckets": buckets,
     }
+
+
+def quality_tier_summary() -> dict:
+    """ai_quality_tierが保存されている本のティア別件数を返す。
+
+    2026-07-12: AI書評品質改善Phase 2-2。confidence単独の分布集計
+    （confidence_distribution）に加え、Validation警告も加味した総合ティア
+    （high/medium/low）別の件数を管理画面で確認できるようにする。
+    """
+    con = get_con()
+    try:
+        rows = fetchall(
+            con,
+            "SELECT ai_quality_tier FROM genre_books WHERE ai_quality_tier IS NOT NULL",
+        )
+    finally:
+        con.close()
+
+    counts = {"high": 0, "medium": 0, "low": 0}
+    for r in rows:
+        tier = r.get("ai_quality_tier")
+        if tier in counts:
+            counts[tier] += 1
+    return {"total_count": sum(counts.values()), "counts": counts}
+
+
+def list_books_needing_review(limit: int = 100) -> list[dict]:
+    """ai_quality_tierが medium/low の本を一覧する（管理画面での目視確認・
+    将来の一括再生成候補の抽出用）。"""
+    con = get_con()
+    try:
+        ph = "%s" if USE_PG else "?"
+        rows = fetchall(
+            con,
+            f"""SELECT isbn, title, genre, ai_review_confidence, ai_quality_tier
+                FROM genre_books
+                WHERE ai_quality_tier IN ('medium', 'low')
+                ORDER BY CASE ai_quality_tier WHEN 'low' THEN 0 ELSE 1 END, isbn
+                LIMIT {ph}""",
+            (limit,),
+        )
+    finally:
+        con.close()
+    return [dict(r) for r in rows]
 
 
 _regen_running = False
