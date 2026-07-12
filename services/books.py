@@ -509,7 +509,7 @@ def _classify_genre(ndc, title="", description=""):
     # 1. NDCコードで判定（最優先・長いコードから順にマッチ）
     n = str(ndc or "").strip()
     if n:
-        for length in (4, 3, 2):
+        for length in (5, 4, 3, 2):
             prefix = n[:length]
             if prefix in NDC_TO_GENRE:
                 return NDC_TO_GENRE[prefix]
