@@ -275,16 +275,47 @@ def test_list_books_needing_review_excludes_high_tier():
     isbns = ["9999900000221", "9999900000222"]
     tiers = ["high", "medium"]
     for isbn, tier in zip(isbns, tiers):
-        execute(con, "INSERT OR REPLACE INTO genre_books (isbn, title, author, publisher, genre, format, ai_quality_tier) "
-                "VALUES (?,?,?,?,?,?,?)",
-                (isbn, "テスト本", "テスト著者", "テスト出版社", "その他", "その他", tier))
+        execute(con, "INSERT OR REPLACE INTO genre_books (isbn, title, author, publisher, genre, format, ai_quality_tier, ai_review_confidence) "
+                "VALUES (?,?,?,?,?,?,?,?)",
+                (isbn, "テスト本", "テスト著者", "テスト出版社", "その他", "その他", tier, 65))
     con.commit()
     con.close()
     try:
-        results = ai_review_generator.list_books_needing_review(limit=200)
+        results, total_count = ai_review_generator.list_books_needing_review(limit=200)
         result_isbns = {b["isbn"] for b in results}
         assert "9999900000222" in result_isbns
         assert "9999900000221" not in result_isbns
+        assert total_count >= 1
+    finally:
+        con = get_con()
+        for isbn in isbns:
+            execute(con, "DELETE FROM genre_books WHERE isbn=?", (isbn,))
+        con.commit()
+        con.close()
+
+
+def test_list_books_needing_review_includes_reason():
+    """2026-07-13: Phase 3-1。管理画面で「なぜ要確認になったか」を判断できるよう
+    reason文字列が付与されることを確認する。"""
+    con = get_con()
+    isbns = ["9999900000231", "9999900000232", "9999900000233"]
+    rows = [
+        ("9999900000231", "low", None),      # confidence自体がlow相当（<60）
+        ("9999900000232", "medium", 65),      # グレーゾーン
+        ("9999900000233", "medium", 90),      # Validation警告あり
+    ]
+    for isbn, tier, conf in rows:
+        execute(con, "INSERT OR REPLACE INTO genre_books (isbn, title, author, publisher, genre, format, ai_quality_tier, ai_review_confidence) "
+                "VALUES (?,?,?,?,?,?,?,?)",
+                (isbn, "テスト本", "テスト著者", "テスト出版社", "その他", "その他", tier, conf))
+    con.commit()
+    con.close()
+    try:
+        results, _ = ai_review_generator.list_books_needing_review(limit=200)
+        by_isbn = {b["isbn"]: b["reason"] for b in results}
+        assert "confidence低い" in by_isbn["9999900000231"]
+        assert "グレーゾーン" in by_isbn["9999900000232"]
+        assert "Validation警告" in by_isbn["9999900000233"]
     finally:
         con = get_con()
         for isbn in isbns:
