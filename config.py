@@ -8,7 +8,7 @@ import json
 # style.css/app.js は Cache-Control: immutable（1年）で配信されるため、URLに
 # ?v= を付けてクエリ文字列ごと変えることで、Service Workerのキャッシュ更新を
 # 待たずに新しいCSS/JSを確実に配信する（2026-07-05追加）。
-STATIC_VERSION = "28"
+STATIC_VERSION = "29"
 
 # ── ジャンル別蔵書データ（Excelから事前生成）──────────────────────────────
 _GENRE_MAP_PATH = os.path.join(os.path.dirname(__file__), "static", "genre_map.json")
@@ -23,6 +23,7 @@ LIBRARY_CODE = "0011"
 LIBRARYLIFE_BASE = "https://www.librarylife.net"
 OPENBD_API = "https://api.openbd.jp/v1/get"
 NDL_THUMB = "https://ndlsearch.ndl.go.jp/thumbnail/{isbn}.jpg"
+NDL_SRU_API = "https://iss.ndl.go.jp/api/sru"
 
 LIBRARY_INFO = {
     "name": "プラウド船橋コミュニティ図書館",

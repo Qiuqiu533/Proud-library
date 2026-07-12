@@ -391,6 +391,30 @@ def api_ndc_backfill_status():
     return jsonify({"running": is_ndc_backfill_running(), "last_result": get_ndc_backfill_last_result()})
 
 
+@admin_bp.route("/api/admin/ndc-backfill-ndl", methods=["POST"])
+def api_ndc_backfill_ndl():
+    """OpenBDで取得できなかったNDCをNDLサーチにフォールバックして補完する（バックグラウンド実行）。"""
+    pw = request.headers.get("X-Password", "")
+    if not check_password(pw, "board"):
+        return jsonify({"error": "unauthorized"}), 401
+    body = request.get_json(silent=True) or {}
+    operator = (body.get("operator") or "").strip() or "不明"
+    limit = body.get("limit", 100000)
+    from services.books import run_ndl_backfill
+    result, code = run_ndl_backfill(operator, limit)
+    return jsonify(result), code
+
+
+@admin_bp.route("/api/admin/ndc-backfill-ndl-status")
+def api_ndc_backfill_ndl_status():
+    """NDL補完バッチの実行中フラグと直近の結果を返す（ポーリング用）"""
+    pw = request.headers.get("X-Password", "")
+    if not check_password(pw, "board"):
+        return jsonify({"error": "unauthorized"}), 401
+    from services.books import is_ndl_backfill_running, get_ndl_backfill_last_result
+    return jsonify({"running": is_ndl_backfill_running(), "last_result": get_ndl_backfill_last_result()})
+
+
 @admin_bp.route("/api/admin/genre-audit")
 def api_genre_audit():
     """NDCと現在のgenreが矛盾している本を検出する（自動修復はしない）。"""
