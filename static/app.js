@@ -3042,6 +3042,67 @@ document.querySelectorAll(".board-tab").forEach(btn => {
     _loadDataQualityStats();
   }
 
+  async function _pollNdcBackfillStatus() {
+    const msg = document.getElementById("ndcBackfillMsg");
+    const btn = document.getElementById("ndcBackfillBtn");
+    try {
+      const res = await adminFetch("/api/admin/ndc-backfill-status");
+      const data = await res.json();
+      if (data.running) {
+        msg.style.color = "#888";
+        msg.textContent = "NDC補完を実行中…（このタブを閉じても処理は継続します。しばらくしてから再度開いてご確認ください）";
+        setTimeout(_pollNdcBackfillStatus, 8000);
+        return;
+      }
+      const last = data.last_result;
+      if (last && last.error) {
+        msg.style.color = "#e05";
+        msg.textContent = `エラー: ${last.error}`;
+      } else if (last) {
+        msg.style.color = "#2a7a4a";
+        msg.textContent =
+          `完了: ${last.target_count}件中 取得成功${last.success}件（うちジャンル変更${last.genre_changed}件） / ` +
+          `OpenBDにデータなし${last.no_data_in_openbd}件 / OpenBDにNDCなし${last.no_ndc_in_openbd}件 / ` +
+          `APIエラー${last.api_error}件`;
+        _loadDataQualityStats();
+      }
+    } catch (e) { /* noop */ } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  document.getElementById("ndcBackfillBtn")?.addEventListener("click", async () => {
+    const btn = document.getElementById("ndcBackfillBtn");
+    const msg = document.getElementById("ndcBackfillMsg");
+    if (!confirm("NDC未取得の本にOpenBDからNDCを取得し、ジャンルを再分類します。件数によっては数分〜十数分かかります。よろしいですか？")) return;
+    btn.disabled = true;
+    msg.style.color = "#888";
+    msg.textContent = "NDC補完を開始しています…";
+    try {
+      const operator = boardSenderName || "管理者";
+      const res = await adminFetch("/api/admin/ndc-backfill", {
+        method: "POST",
+        body: JSON.stringify({ operator })
+      });
+      const data = await res.json();
+      if (res.status === 409) {
+        msg.style.color = "#e08a00";
+        msg.textContent = "既にNDC補完実行中です。しばらくお待ちください。";
+        btn.disabled = false;
+      } else if (res.ok && data.status === "started") {
+        _pollNdcBackfillStatus();
+      } else {
+        msg.style.color = "#e05";
+        msg.textContent = data.error || "NDC補完の開始に失敗しました。";
+        btn.disabled = false;
+      }
+    } catch (e) {
+      msg.style.color = "#e05";
+      msg.textContent = "通信エラーが発生しました。";
+      btn.disabled = false;
+    }
+  });
+
   async function _pollAiReviewRegenStatus() {
     const msg = document.getElementById("aiReviewRegenMsg");
     const btn = document.getElementById("aiReviewRegenBtn");

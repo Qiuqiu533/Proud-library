@@ -624,6 +624,122 @@ def list_books_missing_ndc(limit: int = 100) -> list[dict]:
         con.close()
 
 
+_ndc_backfill_running = False
+_ndc_backfill_last_result = None
+
+
+def is_ndc_backfill_running() -> bool:
+    return _ndc_backfill_running
+
+
+def get_ndc_backfill_last_result():
+    return _ndc_backfill_last_result
+
+
+def run_ndc_backfill(operator: str, limit: int = 100000):
+    """NDC未取得の本にOpenBDからNDCを取得し、genreを再分類する（バックグラウンド実行）。
+
+    2026-07-12: 5,156冊中2,369件（46%）がNDC未取得で、genre×NDC監査
+    （audit_genre_ndc_mismatches）の対象外になっていることが判明。「風姿花伝」
+    「歴史探偵忘れ残りの記」の2件がこのパターンで誤分類を見逃していたため、
+    NDCを補完して監査の対象範囲を広げる。
+
+    結果は理由別に分類して記録する（取得成功／OpenBDにデータなし／
+    OpenBDにNDCなし／APIエラー）。これにより「2,369件のうち実際に補完可能
+    なのは何件か」を後から判断できるようにする。
+
+    genreの更新は_auto_classify_new_books（新規本の自動分類）と同じく
+    確認なしで直接適用する（NDCという客観的な事実データの補完であり、
+    既存の書誌情報を上書きする整合性監査とは性質が異なるため）。
+    """
+    import time
+    global _ndc_backfill_running, _ndc_backfill_last_result
+
+    if _ndc_backfill_running:
+        return {"error": "既に実行中です"}, 409
+
+    def _run():
+        global _ndc_backfill_running, _ndc_backfill_last_result
+        _ndc_backfill_running = True
+        try:
+            con = get_con()
+            try:
+                rows = fetchall(
+                    con,
+                    "SELECT isbn, title, genre FROM genre_books WHERE (ndc IS NULL OR ndc = '') "
+                    "ORDER BY isbn LIMIT %s" if USE_PG else
+                    "SELECT isbn, title, genre FROM genre_books WHERE (ndc IS NULL OR ndc = '') "
+                    "ORDER BY isbn LIMIT ?",
+                    (limit,),
+                )
+            finally:
+                con.close()
+
+            targets = [r for r in rows if r["isbn"]]
+            counts = {
+                "success": 0, "genre_changed": 0, "no_data_in_openbd": 0,
+                "no_ndc_in_openbd": 0, "api_error": 0,
+            }
+            batch_size = 500
+
+            for i in range(0, len(targets), batch_size):
+                batch = targets[i:i + batch_size]
+                isbns = [b["isbn"] for b in batch]
+                book_map = {b["isbn"]: b for b in batch}
+                ndc_map = {}
+                found_isbns = set()
+                try:
+                    resp = requests.get(OPENBD_API, params={"isbn": ",".join(isbns)}, timeout=60)
+                    items = resp.json()
+                    for isbn, item in zip(isbns, items):
+                        if not item:
+                            continue
+                        found_isbns.add(isbn)
+                        subjects = item.get("onix", {}).get("DescriptiveDetail", {}).get("Subject", [])
+                        ndc = next((s.get("SubjectCode", "") for s in subjects
+                                    if s.get("SubjectSchemeIdentifier") == "78"), "")
+                        if ndc:
+                            ndc_map[isbn] = ndc
+                except Exception as e:
+                    logger.error(f"NDC補完: OpenBDバッチエラー: {e}", exc_info=True)
+                    for isbn in isbns:
+                        counts["api_error"] += 1
+                    time.sleep(1)
+                    continue
+
+                with db_session() as bcon:
+                    for isbn in isbns:
+                        if isbn not in found_isbns:
+                            counts["no_data_in_openbd"] += 1
+                            continue
+                        ndc = ndc_map.get(isbn, "")
+                        if not ndc:
+                            counts["no_ndc_in_openbd"] += 1
+                            continue
+                        book = book_map[isbn]
+                        old_genre = book.get("genre") or "その他"
+                        new_genre = _classify_genre(ndc, book.get("title", ""), "")
+                        ph = "%s" if USE_PG else "?"
+                        execute(bcon, f"UPDATE genre_books SET ndc={ph}, genre={ph} WHERE isbn={ph}",
+                                (ndc, new_genre, isbn))
+                        counts["success"] += 1
+                        if new_genre != old_genre:
+                            counts["genre_changed"] += 1
+                    bcon.commit()
+                time.sleep(0.5)
+
+            _ndc_backfill_last_result = {"target_count": len(targets), **counts, "operator": operator}
+            logger.info(f"NDC補完: {counts}")
+        except Exception as e:
+            logger.error(f"NDC補完エラー: {e}", exc_info=True)
+            _ndc_backfill_last_result = {"error": str(e)}
+        finally:
+            _ndc_backfill_running = False
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"status": "started"}, 200
+
+
 _genre_classify_running = False
 
 
