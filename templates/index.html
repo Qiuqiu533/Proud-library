@@ -1299,6 +1299,18 @@
           <div id="aiReviewQualityTiers" style="margin-top:4px;font-size:0.82rem;color:#3d4a6b"></div>
         </div>
 
+        <div style="margin-bottom:16px;padding:14px;background:#fff8ec;border-radius:12px;border:1.5px solid #eed9b8">
+          <h4 style="margin-bottom:6px;font-size:0.95rem">🔍 要確認レビューの再生成</h4>
+          <p style="font-size:0.82rem;color:#6b5a3d;margin-bottom:10px">
+            品質ティアがmedium/lowの本を一覧し、選択した分だけ再生成します（既存の書評は上書きされます）。
+          </p>
+          <button class="btn-secondary" id="needsReviewLoadBtn">🔍 要確認レビュー一覧を取得</button>
+          <p id="needsReviewMsg" style="font-size:0.82rem;min-height:1.2em;margin-top:6px;color:#555"></p>
+          <div id="needsReviewList" style="max-height:320px;overflow-y:auto;margin-top:8px"></div>
+          <div id="needsReviewSelection" style="font-size:0.82rem;margin-top:8px;color:#3d4a6b"></div>
+          <button class="btn-secondary" id="needsReviewRegenBtn" style="margin-top:8px;display:none">選択した本を再生成</button>
+        </div>
+
         <div style="margin-bottom:16px;padding:14px;background:#fdf3f3;border-radius:12px;border:1.5px solid #eec4c4">
           <h4 style="margin-bottom:6px;font-size:0.95rem">📊 ジャンル分類のデータ品質</h4>
           <p style="font-size:0.82rem;color:#6b3d3d;margin-bottom:10px">
