@@ -3694,11 +3694,15 @@ async function loadDashboard() {
 
   const pw = boardPassword;
   try {
-    const [dashRes, awardsRes, backupRes, integrityRes] = await Promise.all([
+    const [dashRes, awardsRes, backupRes, integrityRes, confRes, tierRes, dataQualRes, genreAuditRes] = await Promise.all([
       fetch(`/api/admin/dashboard-data`, { headers: { "X-Password": pw } }),
       fetch(`/api/award-books/awards`),
       fetch(`/api/admin/backup-status`, { headers: { "X-Password": pw } }),
       fetch(`/api/admin/integrity-audit/dashboard`, { headers: { "X-Password": pw } }),
+      fetch(`/api/admin/ai-review/confidence-stats`, { headers: { "X-Password": pw } }),
+      fetch(`/api/admin/ai-review/quality-tiers`, { headers: { "X-Password": pw } }),
+      fetch(`/api/admin/data-quality`, { headers: { "X-Password": pw } }),
+      fetch(`/api/admin/genre-audit?limit=500`, { headers: { "X-Password": pw } }),
     ]);
     if (!dashRes.ok) throw new Error("dashboard-data fetch failed");
     const d = await dashRes.json();
@@ -3706,6 +3710,10 @@ async function loadDashboard() {
     const awardCount = awardsData.reduce((s, a) => s + (a.count || 0), 0);
     const backupData = backupRes && backupRes.ok ? await backupRes.json() : {};
     const integrity = integrityRes && integrityRes.ok ? await integrityRes.json() : null;
+    const confStats = confRes && confRes.ok ? await confRes.json() : null;
+    const tierStats = tierRes && tierRes.ok ? await tierRes.json() : null;
+    const dataQuality = dataQualRes && dataQualRes.ok ? await dataQualRes.json() : null;
+    const genreAudit = genreAuditRes && genreAuditRes.ok ? await genreAuditRes.json() : null;
     const backupHtml = backupData.last_backup
       ? `✅ 最終バックアップ: ${backupData.last_backup}`
       : `⚠️ バックアップ未確認（<a href="https://github.com/Qiuqiu533/Proud-library/actions/workflows/backup.yml" target="_blank">GitHub Actions</a>で確認）`;
@@ -3827,6 +3835,52 @@ async function loadDashboard() {
       <div class="dash-db-bar-label" style="margin:6px 2px 16px">
         <span>修復済み: ${integrity.resolved_count}件 ｜ 総蔵書: ${integrity.total_books.toLocaleString()}冊</span>
         <span style="color:#888">最終監査: ${integrity.last_audit_at ? new Date(integrity.last_audit_at).toLocaleString("ja-JP",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}) : "未実施"}${integrity.audit_running ? "（実行中…）" : ""}</span>
+      </div>` : `<div class="dash-empty">取得できませんでした</div>`}
+
+      <!-- AI書評品質 -->
+      <div class="dash-section-title">🤖 AI書評品質
+        <button class="dash-more-btn" onclick="switchBoardTab('newarrival')">詳細 →</button>
+      </div>
+      ${confStats && confStats.total_count ? `
+      <div class="dash-card-row">
+        <div class="dash-card dash-card-blue">
+          <div class="dash-card-num">${totalBooks ? Math.round(confStats.total_count / totalBooks * 100) : 0}%</div>
+          <div class="dash-card-label">AI書評生成率<br>（${confStats.total_count.toLocaleString()}/${totalBooks.toLocaleString()}冊）</div>
+        </div>
+        <div class="dash-card dash-card-teal">
+          <div class="dash-card-num">${confStats.average}</div>
+          <div class="dash-card-label">平均confidence<br>（min${confStats.min}〜max${confStats.max}）</div>
+        </div>
+        <div class="dash-card ${(tierStats && (tierStats.counts.medium + tierStats.counts.low) > 0) ? "dash-alert-red" : "dash-alert-green"} dash-clickable" onclick="switchBoardTab('newarrival')">
+          <div class="dash-card-num">${tierStats ? tierStats.counts.medium + tierStats.counts.low : "-"}</div>
+          <div class="dash-card-label">要確認レビュー<br>（medium+low）</div>
+          <div class="dash-card-action">再生成 →</div>
+        </div>
+      </div>
+      ${tierStats && tierStats.total_count ? `
+      <div class="dash-db-bar-label" style="margin:6px 2px 16px">
+        <span>品質ティア: 🟢high ${tierStats.counts.high}件 ／ 🟡medium ${tierStats.counts.medium}件 ／ 🔴low ${tierStats.counts.low}件</span>
+      </div>` : ""}` : `<div class="dash-empty">AI書評データがありません</div>`}
+
+      <!-- ジャンル分類品質 -->
+      <div class="dash-section-title">📖 ジャンル分類品質
+        <button class="dash-more-btn" onclick="switchBoardTab('newarrival')">詳細 →</button>
+      </div>
+      ${dataQuality ? `
+      <div class="dash-card-row">
+        <div class="dash-card dash-card-blue">
+          <div class="dash-card-num">${dataQuality.ndc_present_count + dataQuality.ndc_missing_count ? Math.round(dataQuality.ndc_present_count / (dataQuality.ndc_present_count + dataQuality.ndc_missing_count) * 100) : 0}%</div>
+          <div class="dash-card-label">NDC取得率<br>（${dataQuality.ndc_present_count.toLocaleString()}/${(dataQuality.ndc_present_count + dataQuality.ndc_missing_count).toLocaleString()}冊）</div>
+        </div>
+        <div class="dash-card dash-card-gold">
+          <div class="dash-card-num">${dataQuality.ndc_unmapped_count}</div>
+          <div class="dash-card-label">NDC未対応コード<br>（要マッピング追加）</div>
+        </div>
+        <div class="dash-card ${genreAudit && genreAudit.count > 0 ? "dash-alert-red" : "dash-alert-green"} dash-clickable" onclick="switchBoardTab('newarrival')">
+          <div class="dash-card-num">${genreAudit ? genreAudit.count : "-"}</div>
+          <div class="dash-card-label">ジャンル監査<br>不一致件数</div>
+          <div class="dash-card-action">確認 →</div>
+        </div>
       </div>` : `<div class="dash-empty">取得できませんでした</div>`}
 
       <!-- DB使用量 -->
