@@ -12,6 +12,7 @@ import services.books as books_module
 from services.books import (
     _classify_genre, audit_genre_ndc_mismatches, data_quality_summary, list_books_missing_ndc,
     run_ndc_backfill, is_ndc_backfill_running, get_ndc_backfill_last_result,
+    fetch_ndc_from_ndl, run_ndl_backfill, is_ndl_backfill_running, get_ndl_backfill_last_result,
 )
 
 _TEST_ISBN_MISMATCH = "9999900000301"
@@ -277,3 +278,93 @@ def test_run_ndc_backfill_rejects_concurrent_run(monkeypatch):
         assert code == 409
     finally:
         books_module._ndc_backfill_running = False
+
+
+class _FakeNdlResponse:
+    def __init__(self, text):
+        self.text = text
+
+
+def test_fetch_ndc_from_ndl_extracts_ndc_from_response(monkeypatch):
+    """2026-07-12: NDLサーチ併用によるNDC補完の回帰テスト。scripts/fetch_ndc_ndl.py
+    と同じくndc9/形式を正規表現で抽出する。"""
+    def _fake_get(url, params=None, timeout=None):
+        return _FakeNdlResponse('<rdf:value rdf:resource="ndc9/913.6"/>')
+
+    monkeypatch.setattr(books_module.requests, "get", _fake_get)
+    assert fetch_ndc_from_ndl("9789900000701") == "913.6"
+
+
+def test_fetch_ndc_from_ndl_returns_empty_when_not_found(monkeypatch):
+    def _fake_get(url, params=None, timeout=None):
+        return _FakeNdlResponse("<no-ndc-here/>")
+
+    monkeypatch.setattr(books_module.requests, "get", _fake_get)
+    assert fetch_ndc_from_ndl("9789900000702") == ""
+
+
+def test_fetch_ndc_from_ndl_returns_empty_on_exception(monkeypatch):
+    def _fake_get(url, params=None, timeout=None):
+        raise Exception("network error")
+
+    monkeypatch.setattr(books_module.requests, "get", _fake_get)
+    assert fetch_ndc_from_ndl("9789900000703") == ""
+
+
+def test_run_ndl_backfill_updates_ndc_and_genre(monkeypatch):
+    """OpenBDで取得できなかった本にNDLで補完し、genreも再分類する回帰テスト。"""
+    import time as time_module
+
+    isbn_success = "9789900000801"
+    isbn_no_ndc = "9789900000802"
+
+    con = get_con()
+    for isbn in (isbn_success, isbn_no_ndc):
+        execute(con, "INSERT OR REPLACE INTO genre_books (isbn, title, author, publisher, genre, format) "
+                "VALUES (?,?,?,?,?,?)",
+                (isbn, "テスト本", "テスト著者", "テスト出版社", "その他", "その他"))
+    con.commit()
+    con.close()
+
+    def _fake_fetch_ndc(isbn):
+        return "913" if isbn == isbn_success else ""
+
+    monkeypatch.setattr(books_module, "fetch_ndc_from_ndl", _fake_fetch_ndc)
+    try:
+        result, code = run_ndl_backfill("テスト太郎")
+        assert code == 200
+        assert result["status"] == "started"
+
+        for _ in range(50):
+            if not is_ndl_backfill_running():
+                break
+            time_module.sleep(0.1)
+        else:
+            raise AssertionError("NDL補完がタイムアウトしました")
+
+        last = get_ndl_backfill_last_result()
+        assert last is not None
+        assert "error" not in last
+        assert last["success"] >= 1
+        assert last["no_ndc_in_ndl"] >= 1
+
+        con = get_con()
+        row = fetchone(con, "SELECT ndc, genre FROM genre_books WHERE isbn=?", (isbn_success,))
+        con.close()
+        assert row["ndc"] == "913"
+        assert row["genre"] == "文芸小説"
+    finally:
+        con = get_con()
+        for isbn in (isbn_success, isbn_no_ndc):
+            execute(con, "DELETE FROM genre_books WHERE isbn=?", (isbn,))
+        con.commit()
+        con.close()
+
+
+def test_run_ndl_backfill_rejects_concurrent_run(monkeypatch):
+    monkeypatch.setattr(books_module, "_ndl_backfill_running", True)
+    try:
+        result, code = run_ndl_backfill("テスト太郎")
+        assert code == 409
+    finally:
+        books_module._ndl_backfill_running = False

@@ -3103,6 +3103,66 @@ document.querySelectorAll(".board-tab").forEach(btn => {
     }
   });
 
+  async function _pollNdlBackfillStatus() {
+    const msg = document.getElementById("ndlBackfillMsg");
+    const btn = document.getElementById("ndlBackfillBtn");
+    try {
+      const res = await adminFetch("/api/admin/ndc-backfill-ndl-status");
+      const data = await res.json();
+      if (data.running) {
+        msg.style.color = "#888";
+        msg.textContent = "NDL補完を実行中…（1件ずつ問い合わせるため数分かかることがあります。このタブを閉じても処理は継続します）";
+        setTimeout(_pollNdlBackfillStatus, 8000);
+        return;
+      }
+      const last = data.last_result;
+      if (last && last.error) {
+        msg.style.color = "#e05";
+        msg.textContent = `エラー: ${last.error}`;
+      } else if (last) {
+        msg.style.color = "#2a7a4a";
+        msg.textContent =
+          `完了: ${last.target_count}件中 取得成功${last.success}件（うちジャンル変更${last.genre_changed}件） / ` +
+          `NDLにもNDCなし${last.no_ndc_in_ndl}件 / APIエラー${last.api_error}件`;
+        _loadDataQualityStats();
+      }
+    } catch (e) { /* noop */ } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  document.getElementById("ndlBackfillBtn")?.addEventListener("click", async () => {
+    const btn = document.getElementById("ndlBackfillBtn");
+    const msg = document.getElementById("ndlBackfillMsg");
+    if (!confirm("OpenBDでNDCが見つからなかった本を対象に、NDL（国立国会図書館サーチ）へ1件ずつ問い合わせてNDCを取得します。件数によっては数分かかります。よろしいですか？")) return;
+    btn.disabled = true;
+    msg.style.color = "#888";
+    msg.textContent = "NDL補完を開始しています…";
+    try {
+      const operator = boardSenderName || "管理者";
+      const res = await adminFetch("/api/admin/ndc-backfill-ndl", {
+        method: "POST",
+        body: JSON.stringify({ operator })
+      });
+      const data = await res.json();
+      if (res.status === 409) {
+        msg.style.color = "#e08a00";
+        msg.textContent = "既にNDL補完実行中です。しばらくお待ちください。";
+        btn.disabled = false;
+      } else if (res.ok && data.status === "started") {
+        _pollNdlBackfillStatus();
+      } else {
+        msg.style.color = "#e05";
+        msg.textContent = data.error || "NDL補完の開始に失敗しました。";
+        btn.disabled = false;
+      }
+    } catch (e) {
+      msg.style.color = "#e05";
+      msg.textContent = "通信エラーが発生しました。";
+      btn.disabled = false;
+    }
+  });
+
   async function _pollAiReviewRegenStatus() {
     const msg = document.getElementById("aiReviewRegenMsg");
     const btn = document.getElementById("aiReviewRegenBtn");

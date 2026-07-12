@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 import requests
 
 from config import (
-    LIBRARYLIFE_BASE, LIBRARY_CODE, OPENBD_API, NDL_THUMB,
+    LIBRARYLIFE_BASE, LIBRARY_CODE, OPENBD_API, NDL_THUMB, NDL_SRU_API,
     _KANA_ROWS, KEYWORD_GENRE, NDC_TO_GENRE,
 )
 from database import get_con, db_session, execute, fetchone, fetchall, USE_PG
@@ -772,6 +772,124 @@ def run_ndc_backfill(operator: str, limit: int = 100000):
             _ndc_backfill_last_result = {"error": str(e)}
         finally:
             _ndc_backfill_running = False
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"status": "started"}, 200
+
+
+def fetch_ndc_from_ndl(isbn: str) -> str:
+    """NDL（国立国会図書館サーチ）SRU APIからNDCコードを取得する。
+
+    OpenBDにはNDCが登録されていない本でも、NDLには登録されている場合がある
+    （2026-07-12: 全件実行の結果、残り約2,308件のうち約1,789件がこのケースと
+    判明）。SRUのレスポンスはXMLだがJSON解析するほどの構造化は不要なため、
+    scripts/fetch_ndc_ndl.py と同じく正規表現でNDC（ndc9/形式）を抽出する。
+    """
+    try:
+        resp = requests.get(NDL_SRU_API, params={
+            "operation": "searchRetrieve",
+            "version": "1.2",
+            "recordSchema": "dcndl",
+            "maximumRecords": "1",
+            "query": f'isbn="{isbn}"',
+        }, timeout=15)
+        decoded = resp.text
+        m = _re.search(r"ndc9/([0-9.]+)", decoded)
+        return m.group(1) if m else ""
+    except Exception:
+        return ""
+
+
+_ndl_backfill_running = False
+_ndl_backfill_last_result = None
+
+
+def is_ndl_backfill_running() -> bool:
+    return _ndl_backfill_running
+
+
+def get_ndl_backfill_last_result():
+    return _ndl_backfill_last_result
+
+
+def run_ndl_backfill(operator: str, limit: int = 100000, workers: int = 10):
+    """OpenBDで取得できなかったNDCをNDLサーチにフォールバックして補完する
+    （バックグラウンド実行）。
+
+    2026-07-12: NDC補完バッチ（OpenBD版）を全件実行した結果、残存2,308件の
+    うち約1,789件はOpenBD自体にNDCが登録されておらず、OpenBDだけではこれ
+    以上の改善が見込めないと判明。NDLは個別ISBNクエリのみ対応（OpenBDの
+    ようなバッチ取得不可）のため、ThreadPoolExecutorで並列化する。
+    """
+    global _ndl_backfill_running, _ndl_backfill_last_result
+
+    if _ndl_backfill_running:
+        return {"error": "既に実行中です"}, 409
+
+    def _run():
+        global _ndl_backfill_running, _ndl_backfill_last_result
+        _ndl_backfill_running = True
+        try:
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+
+            con = get_con()
+            try:
+                ph = "%s" if USE_PG else "?"
+                rows = fetchall(
+                    con,
+                    f"SELECT isbn, title, genre FROM genre_books WHERE (ndc IS NULL OR ndc = '') "
+                    f"AND (isbn LIKE {ph} OR isbn LIKE {ph}) "
+                    f"ORDER BY isbn LIMIT {ph}",
+                    ("978%", "979%", limit),
+                )
+            finally:
+                con.close()
+
+            targets = [r for r in rows if r["isbn"] and len(r["isbn"]) == 13]
+            counts = {"success": 0, "genre_changed": 0, "no_ndc_in_ndl": 0, "api_error": 0}
+            ndc_results = {}
+
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                futures = {executor.submit(fetch_ndc_from_ndl, r["isbn"]): r["isbn"] for r in targets}
+                for future in as_completed(futures):
+                    isbn = futures[future]
+                    try:
+                        ndc_results[isbn] = future.result()
+                    except Exception as e:
+                        logger.error(f"NDL補完: ISBN {isbn} の取得エラー: {e}", exc_info=True)
+                        ndc_results[isbn] = None
+
+            with db_session() as bcon:
+                for r in targets:
+                    isbn = r["isbn"]
+                    ndc = ndc_results.get(isbn)
+                    if ndc is None:
+                        counts["api_error"] += 1
+                        continue
+                    if not ndc:
+                        counts["no_ndc_in_ndl"] += 1
+                        continue
+                    try:
+                        old_genre = r.get("genre") or "その他"
+                        new_genre = _classify_genre(ndc, r.get("title", ""), "")
+                        ph = "%s" if USE_PG else "?"
+                        execute(bcon, f"UPDATE genre_books SET ndc={ph}, genre={ph} WHERE isbn={ph}",
+                                (ndc, new_genre, isbn))
+                        counts["success"] += 1
+                        if new_genre != old_genre:
+                            counts["genre_changed"] += 1
+                    except Exception as e:
+                        logger.error(f"NDL補完: ISBN {isbn} のDB更新エラー: {e}", exc_info=True)
+                        counts["api_error"] += 1
+                bcon.commit()
+
+            _ndl_backfill_last_result = {"target_count": len(targets), **counts, "operator": operator}
+            logger.info(f"NDL補完: {counts}")
+        except Exception as e:
+            logger.error(f"NDL補完エラー: {e}", exc_info=True)
+            _ndl_backfill_last_result = {"error": str(e)}
+        finally:
+            _ndl_backfill_running = False
 
     threading.Thread(target=_run, daemon=True).start()
     return {"status": "started"}, 200
