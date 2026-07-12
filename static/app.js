@@ -3022,6 +3022,26 @@ document.querySelectorAll(".board-tab").forEach(btn => {
     _loadAiReviewConfidenceStats();
   }
 
+  async function _loadDataQualityStats() {
+    const box = document.getElementById("dataQualityStats");
+    if (!box) return;
+    try {
+      const res = await adminFetch("/api/admin/data-quality");
+      const s = await res.json();
+      if (!res.ok) {
+        box.textContent = "";
+        return;
+      }
+      box.innerHTML =
+        `蔵書数: ${s.total_books}件 / NDC取得済み: ${s.ndc_present_count}件 / ` +
+        `<b>NDC未取得: ${s.ndc_missing_count}件</b> / 未対応NDC: ${s.ndc_unmapped_count}件`;
+    } catch (e) { /* noop */ }
+  }
+
+  if (document.getElementById("dataQualityStats")) {
+    _loadDataQualityStats();
+  }
+
   async function _pollAiReviewRegenStatus() {
     const msg = document.getElementById("aiReviewRegenMsg");
     const btn = document.getElementById("aiReviewRegenBtn");

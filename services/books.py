@@ -565,6 +565,65 @@ def audit_genre_ndc_mismatches(limit: int = 200) -> list[dict]:
     return mismatches
 
 
+def _ndc_has_known_mapping(ndc: str) -> bool:
+    """NDC_TO_GENREに明示的な対応がある（キーワード判定等の推測に頼らない）かどうか。"""
+    from config import NDC_TO_GENRE
+    n = str(ndc or "").strip()
+    if not n:
+        return False
+    for length in (4, 3, 2):
+        if n[:length] in NDC_TO_GENRE:
+            return True
+    return False
+
+
+def data_quality_summary() -> dict:
+    """genre×NDCのデータ品質サマリーを返す。
+
+    2026-07-12: 「風姿花伝」「歴史探偵忘れ残りの記」の2件が、いずれもndc列が
+    空だったためaudit_genre_ndc_mismatches()の対象外（監査の死角）になって
+    いたことが実データで判明。「NDCが無い本は監査できない」という監査の
+    限界そのものを可視化し、早期発見できるようにする。
+    """
+    con = get_con()
+    try:
+        total = fetchone(con, "SELECT COUNT(*) as cnt FROM genre_books")["cnt"]
+        ndc_missing = fetchone(
+            con,
+            "SELECT COUNT(*) as cnt FROM genre_books WHERE ndc IS NULL OR ndc = ''"
+        )["cnt"]
+        ndc_rows = fetchall(con, "SELECT ndc FROM genre_books WHERE ndc IS NOT NULL AND ndc != ''")
+    finally:
+        con.close()
+
+    ndc_unmapped = sum(1 for r in ndc_rows if not _ndc_has_known_mapping(r.get("ndc", "")))
+
+    return {
+        "total_books": total,
+        "ndc_missing_count": ndc_missing,
+        "ndc_present_count": total - ndc_missing,
+        "ndc_unmapped_count": ndc_unmapped,
+        "note": "ndc_missing_countの本はgenre×NDC監査（audit_genre_ndc_mismatches）の対象外です。",
+    }
+
+
+def list_books_missing_ndc(limit: int = 100) -> list[dict]:
+    """ndcが未取得の本の一覧を返す（NDC欠落の可視化用）。"""
+    con = get_con()
+    try:
+        rows = fetchall(
+            con,
+            "SELECT isbn, title, genre FROM genre_books WHERE ndc IS NULL OR ndc = '' "
+            "ORDER BY isbn LIMIT %s" if USE_PG else
+            "SELECT isbn, title, genre FROM genre_books WHERE ndc IS NULL OR ndc = '' "
+            "ORDER BY isbn LIMIT ?",
+            (limit,),
+        )
+        return rows
+    finally:
+        con.close()
+
+
 _genre_classify_running = False
 
 

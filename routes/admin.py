@@ -345,6 +345,28 @@ def api_ai_review_confidence_stats():
     return jsonify(confidence_distribution())
 
 
+@admin_bp.route("/api/admin/data-quality")
+def api_data_quality():
+    """genre×NDCのデータ品質サマリー（NDC未取得件数・未対応NDC件数等）を返す。"""
+    pw = request.headers.get("X-Password", "")
+    if not check_password(pw, "board"):
+        return jsonify({"error": "unauthorized"}), 401
+    from services.books import data_quality_summary
+    return jsonify(data_quality_summary())
+
+
+@admin_bp.route("/api/admin/books-missing-ndc")
+def api_books_missing_ndc():
+    """NDC未取得の本の一覧を返す。"""
+    pw = request.headers.get("X-Password", "")
+    if not check_password(pw, "board"):
+        return jsonify({"error": "unauthorized"}), 401
+    limit = request.args.get("limit", 100, type=int)
+    from services.books import list_books_missing_ndc
+    books = list_books_missing_ndc(limit)
+    return jsonify({"count": len(books), "books": books})
+
+
 @admin_bp.route("/api/admin/genre-audit")
 def api_genre_audit():
     """NDCと現在のgenreが矛盾している本を検出する（自動修復はしない）。"""

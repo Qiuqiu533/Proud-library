@@ -8,7 +8,9 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from database import get_con, execute
-from services.books import _classify_genre, audit_genre_ndc_mismatches
+from services.books import (
+    _classify_genre, audit_genre_ndc_mismatches, data_quality_summary, list_books_missing_ndc,
+)
 
 _TEST_ISBN_MISMATCH = "9999900000301"
 _TEST_ISBN_MATCH = "9999900000302"
@@ -71,5 +73,47 @@ def test_audit_genre_ndc_mismatches_ignores_books_without_ndc():
         mismatches = audit_genre_ndc_mismatches(limit=1000)
         isbns = {m["isbn"] for m in mismatches}
         assert _TEST_ISBN_MISMATCH not in isbns
+    finally:
+        _cleanup()
+
+
+def test_data_quality_summary_counts_missing_ndc():
+    """2026-07-12: 「風姿花伝」「歴史探偵忘れ残りの記」がいずれもndc空のため
+    audit_genre_ndc_mismatchesの対象外だった（監査の死角）。この死角を
+    可視化するdata_quality_summary()の回帰テスト。"""
+    con = get_con()
+    execute(con, "INSERT OR REPLACE INTO genre_books (isbn, title, author, publisher, genre, format) "
+            "VALUES (?,?,?,?,?,?)",
+            (_TEST_ISBN_MISMATCH, "NDC欠落テスト本", "テスト著者", "テスト出版社", "その他", "その他"))
+    execute(con, "INSERT OR REPLACE INTO genre_books (isbn, title, author, publisher, genre, format, ndc) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (_TEST_ISBN_MATCH, "NDC取得済みテスト本", "テスト著者", "テスト出版社", "文芸小説", "その他", "913"))
+    con.commit()
+    con.close()
+    try:
+        summary = data_quality_summary()
+        assert summary["total_books"] >= 2
+        assert summary["ndc_missing_count"] >= 1
+        assert summary["ndc_present_count"] >= 1
+        assert "ndc_unmapped_count" in summary
+    finally:
+        _cleanup()
+
+
+def test_list_books_missing_ndc_returns_only_missing():
+    con = get_con()
+    execute(con, "INSERT OR REPLACE INTO genre_books (isbn, title, author, publisher, genre, format) "
+            "VALUES (?,?,?,?,?,?)",
+            (_TEST_ISBN_MISMATCH, "NDC欠落テスト本", "テスト著者", "テスト出版社", "その他", "その他"))
+    execute(con, "INSERT OR REPLACE INTO genre_books (isbn, title, author, publisher, genre, format, ndc) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (_TEST_ISBN_MATCH, "NDC取得済みテスト本", "テスト著者", "テスト出版社", "文芸小説", "その他", "913"))
+    con.commit()
+    con.close()
+    try:
+        books = list_books_missing_ndc(limit=100000)
+        isbns = {b["isbn"] for b in books}
+        assert _TEST_ISBN_MISMATCH in isbns
+        assert _TEST_ISBN_MATCH not in isbns
     finally:
         _cleanup()
