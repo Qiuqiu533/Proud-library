@@ -593,17 +593,24 @@ def data_quality_summary() -> dict:
             "SELECT COUNT(*) as cnt FROM genre_books WHERE ndc IS NULL OR ndc = ''"
         )["cnt"]
         ndc_rows = fetchall(con, "SELECT ndc FROM genre_books WHERE ndc IS NOT NULL AND ndc != ''")
+        isbn_rows = fetchall(con, "SELECT isbn FROM genre_books")
     finally:
         con.close()
 
     ndc_unmapped = sum(1 for r in ndc_rows if not _ndc_has_known_mapping(r.get("ndc", "")))
+    invalid_isbn = sum(
+        1 for r in isbn_rows
+        if not (r.get("isbn") and len(r["isbn"]) == 13 and r["isbn"].startswith(("978", "979")))
+    )
 
     return {
         "total_books": total,
         "ndc_missing_count": ndc_missing,
         "ndc_present_count": total - ndc_missing,
         "ndc_unmapped_count": ndc_unmapped,
-        "note": "ndc_missing_countの本はgenre×NDC監査（audit_genre_ndc_mismatches）の対象外です。",
+        "invalid_isbn_count": invalid_isbn,
+        "note": "ndc_missing_countの本はgenre×NDC監査（audit_genre_ndc_mismatches）の対象外です。"
+                "invalid_isbn_countは978/979始まりの13桁ISBNでない本（librarylife.netの仮ISBN等）で、NDC補完の対象外です。",
     }
 
 
@@ -667,15 +674,21 @@ def run_ndc_backfill(operator: str, limit: int = 100000):
                 rows = fetchall(
                     con,
                     "SELECT isbn, title, genre FROM genre_books WHERE (ndc IS NULL OR ndc = '') "
+                    "AND (isbn LIKE '978%' OR isbn LIKE '979%') "
                     "ORDER BY isbn LIMIT %s" if USE_PG else
                     "SELECT isbn, title, genre FROM genre_books WHERE (ndc IS NULL OR ndc = '') "
+                    "AND (isbn LIKE '978%' OR isbn LIKE '979%') "
                     "ORDER BY isbn LIMIT ?",
                     (limit,),
                 )
             finally:
                 con.close()
 
-            targets = [r for r in rows if r["isbn"]]
+            # 有効なISBN-13（978/979始まり）のみを対象にする。librarylife.netの
+            # 仮ISBN・不正なISBNはOpenBDに存在しえないため、NDC補完の対象外とする
+            # （2026-07-12: limit=200の試験実行で全件がno_data_in_openbdになり、
+            # 昇順ソートの先頭に仮ISBNが集中していたことが判明したため対応）。
+            targets = [r for r in rows if r["isbn"] and len(r["isbn"]) == 13]
             counts = {
                 "success": 0, "genre_changed": 0, "no_data_in_openbd": 0,
                 "no_ndc_in_openbd": 0, "api_error": 0,

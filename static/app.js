@@ -3034,7 +3034,7 @@ document.querySelectorAll(".board-tab").forEach(btn => {
       }
       box.innerHTML =
         `蔵書数: ${s.total_books}件 / NDC取得済み: ${s.ndc_present_count}件 / ` +
-        `<b>NDC未取得: ${s.ndc_missing_count}件</b> / 未対応NDC: ${s.ndc_unmapped_count}件`;
+        `<b>NDC未取得: ${s.ndc_missing_count}件</b> / 未対応NDC: ${s.ndc_unmapped_count}件 / 無効ISBN: ${s.invalid_isbn_count}件`;
     } catch (e) { /* noop */ }
   }
 
