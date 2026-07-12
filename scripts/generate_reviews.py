@@ -31,6 +31,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from services.ai_review_generator import (
     OPENAI_API_KEY, fetch_wikipedia_author, fetch_openbd_meta, generate_with_retry,
+    _format_pubdate, _format_awards,
 )
 from database import get_con, USE_PG
 
@@ -55,11 +56,11 @@ def main():
 
     if args.isbn:
         cur.execute(
-            f"SELECT isbn, title, author, publisher, genre, description FROM genre_books WHERE isbn={PH}",
+            f"SELECT isbn, title, author, publisher, genre, description, awards FROM genre_books WHERE isbn={PH}",
             (args.isbn,)
         )
     elif args.regen:
-        cur.execute(f"""SELECT isbn, title, author, publisher, genre, description
+        cur.execute(f"""SELECT isbn, title, author, publisher, genre, description, awards
                 FROM genre_books
                 WHERE (manual_review IS NULL OR manual_review = {"FALSE" if USE_PG else "0"})
                   AND ai_review_date IS NOT NULL
@@ -67,7 +68,7 @@ def main():
                 ORDER BY isbn
                 LIMIT {args.limit}""")
     else:
-        cur.execute(f"""SELECT isbn, title, author, publisher, genre, description
+        cur.execute(f"""SELECT isbn, title, author, publisher, genre, description, awards
                 FROM genre_books
                 WHERE (manual_review IS NULL OR manual_review = {"FALSE" if USE_PG else "0"})
                   AND (description IS NULL OR LENGTH(description) < {args.min_len})
@@ -100,15 +101,20 @@ def main():
             publisher = meta["publisher"]
         series = meta.get("series", "")
         blurb = meta.get("blurb", "")
+        pubdate = _format_pubdate(meta.get("pubdate", ""))
+        awards_text = _format_awards(book.get("awards"))
         if series:
             print(f"  📚 シリーズ: {series}")
+        if awards_text:
+            print(f"  🏆 受賞歴: {awards_text}")
 
         wiki_info = fetch_wikipedia_author(author)
         if wiki_info:
             print(f"  📖 Wikipedia: {wiki_info[:60]}...")
 
         try:
-            result = generate_with_retry(title, author, publisher, genre, wiki_info, args.min_score, series, blurb, isbn)
+            result = generate_with_retry(title, author, publisher, genre, wiki_info, args.min_score, series, blurb,
+                                          isbn, pubdate, awards_text)
 
             if result is None:
                 print(f"  ⚠️ 情報不足またはconfidence不足のためスキップ")

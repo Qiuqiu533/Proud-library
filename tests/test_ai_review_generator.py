@@ -94,7 +94,8 @@ def test_regenerate_one_persists_confidence(monkeypatch):
 
     _seed_book(description=None)
 
-    def _fake_generate_with_retry(title, author, publisher, genre, wiki_info, min_score=70, series="", blurb="", isbn=""):
+    def _fake_generate_with_retry(title, author, publisher, genre, wiki_info, min_score=70, series="", blurb="",
+                                   isbn="", pubdate="", awards_text=""):
         return {"review": "テストレビュー", "summary": "テスト一言", "tags": ["タグ1"], "score": 85, "confidence": 72}
 
     monkeypatch.setattr(ai_review_generator, "generate_with_retry", _fake_generate_with_retry)
@@ -191,3 +192,34 @@ def test_confidence_distribution_buckets_and_average():
             execute(con, "DELETE FROM genre_books WHERE isbn=?", (isbn,))
         con.commit()
         con.close()
+
+
+def test_format_pubdate_extracts_year():
+    assert ai_review_generator._format_pubdate("201609") == "2016年"
+    assert ai_review_generator._format_pubdate("") == ""
+    assert ai_review_generator._format_pubdate("20") == ""
+
+
+def test_format_awards_formats_json_list():
+    """2026-07-11: 書誌情報拡充で追加。award_books由来の受賞歴（自前の検証済み
+    データ）をプロンプトへ渡すための整形関数。"""
+    import json as json_module
+    awards_json = json_module.dumps([
+        {"award": "本屋大賞", "year": 2017, "rank": 1},
+        {"award": "直木賞", "year": 2017},
+    ], ensure_ascii=False)
+    result = ai_review_generator._format_awards(awards_json)
+    assert "2017年本屋大賞（1位）" in result
+    assert "2017年直木賞" in result
+
+
+def test_format_awards_handles_empty_and_invalid():
+    assert ai_review_generator._format_awards(None) == ""
+    assert ai_review_generator._format_awards("") == ""
+    assert ai_review_generator._format_awards("[]") == ""
+    assert ai_review_generator._format_awards("not json") == ""
+
+
+def test_format_awards_accepts_list_directly():
+    result = ai_review_generator._format_awards([{"award": "芥川賞", "year": 2020}])
+    assert result == "2020年芥川賞"
