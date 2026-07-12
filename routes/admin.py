@@ -375,8 +375,9 @@ def api_ndc_backfill():
         return jsonify({"error": "unauthorized"}), 401
     body = request.get_json(silent=True) or {}
     operator = (body.get("operator") or "").strip() or "不明"
+    limit = body.get("limit", 100000)
     from services.books import run_ndc_backfill
-    result, code = run_ndc_backfill(operator)
+    result, code = run_ndc_backfill(operator, limit)
     return jsonify(result), code
 
 
