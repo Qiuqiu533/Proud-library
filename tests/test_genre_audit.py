@@ -7,9 +7,11 @@ services.books の genre/NDC 整合性監査の回帰テスト。
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from database import get_con, execute
+from database import get_con, execute, fetchone
+import services.books as books_module
 from services.books import (
     _classify_genre, audit_genre_ndc_mismatches, data_quality_summary, list_books_missing_ndc,
+    run_ndc_backfill, is_ndc_backfill_running, get_ndc_backfill_last_result,
 )
 
 _TEST_ISBN_MISMATCH = "9999900000301"
@@ -117,3 +119,88 @@ def test_list_books_missing_ndc_returns_only_missing():
         assert _TEST_ISBN_MATCH not in isbns
     finally:
         _cleanup()
+
+
+class _FakeResponse:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def json(self):
+        return self._payload
+
+
+def test_run_ndc_backfill_classifies_results_by_reason(monkeypatch):
+    """2026-07-12: NDC補完バッチの回帰テスト。取得成功・OpenBDにデータなし・
+    OpenBDにNDCなしを理由別に正しく集計し、成功分のみndc/genreを更新する。"""
+    import time as time_module
+
+    isbn_success = "9999900000401"   # NDC取得できジャンルも変わる
+    isbn_no_data = "9999900000402"   # OpenBDに該当データなし
+    isbn_no_ndc = "9999900000403"    # OpenBDにデータはあるがNDCなし
+
+    con = get_con()
+    for isbn in (isbn_success, isbn_no_data, isbn_no_ndc):
+        execute(con, "INSERT OR REPLACE INTO genre_books (isbn, title, author, publisher, genre, format) "
+                "VALUES (?,?,?,?,?,?)",
+                (isbn, "テスト本", "テスト著者", "テスト出版社", "その他", "その他"))
+    con.commit()
+    con.close()
+
+    def _fake_get(url, params=None, timeout=None):
+        isbns = params["isbn"].split(",")
+        payload = []
+        for isbn in isbns:
+            if isbn == isbn_success:
+                payload.append({
+                    "onix": {"DescriptiveDetail": {"Subject": [
+                        {"SubjectSchemeIdentifier": "78", "SubjectCode": "913"}
+                    ]}}
+                })
+            elif isbn == isbn_no_ndc:
+                payload.append({"onix": {"DescriptiveDetail": {}}})
+            else:
+                payload.append(None)
+        return _FakeResponse(payload)
+
+    monkeypatch.setattr(books_module.requests, "get", _fake_get)
+    try:
+        result, code = run_ndc_backfill("テスト太郎")
+        assert code == 200
+        assert result["status"] == "started"
+
+        for _ in range(50):
+            if not is_ndc_backfill_running():
+                break
+            time_module.sleep(0.1)
+        else:
+            raise AssertionError("NDC補完がタイムアウトしました")
+
+        last = get_ndc_backfill_last_result()
+        assert last is not None
+        assert "error" not in last
+        assert last["success"] >= 1
+        assert last["no_data_in_openbd"] >= 1
+        assert last["no_ndc_in_openbd"] >= 1
+
+        con = get_con()
+        row = fetchone(con, "SELECT ndc, genre FROM genre_books WHERE isbn=?", (isbn_success,))
+        no_data_row = fetchone(con, "SELECT ndc FROM genre_books WHERE isbn=?", (isbn_no_data,))
+        con.close()
+        assert row["ndc"] == "913"
+        assert row["genre"] == "文芸小説"
+        assert no_data_row["ndc"] in (None, "")
+    finally:
+        con = get_con()
+        for isbn in (isbn_success, isbn_no_data, isbn_no_ndc):
+            execute(con, "DELETE FROM genre_books WHERE isbn=?", (isbn,))
+        con.commit()
+        con.close()
+
+
+def test_run_ndc_backfill_rejects_concurrent_run(monkeypatch):
+    monkeypatch.setattr(books_module, "_ndc_backfill_running", True)
+    try:
+        result, code = run_ndc_backfill("テスト太郎")
+        assert code == 409
+    finally:
+        books_module._ndc_backfill_running = False
