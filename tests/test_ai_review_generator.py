@@ -96,7 +96,7 @@ def test_regenerate_one_persists_confidence(monkeypatch):
 
     def _fake_generate_with_retry(title, author, publisher, genre, wiki_info, min_score=70, series="", blurb="",
                                    isbn="", pubdate="", awards_text=""):
-        return {"review": "テストレビュー", "summary": "テスト一言", "tags": ["タグ1"], "score": 85, "confidence": 72}
+        return {"review": "テストレビュー本文です。" * 5, "summary": "テスト一言", "tags": ["タグ1"], "score": 85, "confidence": 72}
 
     monkeypatch.setattr(ai_review_generator, "generate_with_retry", _fake_generate_with_retry)
     try:
@@ -108,6 +108,35 @@ def test_regenerate_one_persists_confidence(monkeypatch):
         con.close()
         assert row["ai_review_confidence"] == 72
         assert row["ai_review_score"] == 85
+    finally:
+        _cleanup()
+
+
+def test_regenerate_one_discards_result_failing_quality_check(monkeypatch):
+    """2026-07-12: 生成後の品質チェック（ジャンル不整合検出）により、
+    「風姿花伝」クラスの誤生成が保存されずreasonで破棄されることを確認する。"""
+    from database import fetchone
+
+    _seed_book(description="既存の説明文")
+
+    def _fake_generate_with_retry(title, author, publisher, genre, wiki_info, min_score=70, series="", blurb="",
+                                   isbn="", pubdate="", awards_text=""):
+        return {
+            "review": "本作はミステリ小説として、巧妙な謎解きが楽しめる一冊です。" * 2,
+            "summary": "テスト一言", "tags": ["タグ1"], "score": 85, "confidence": 90,
+        }
+
+    monkeypatch.setattr(ai_review_generator, "generate_with_retry", _fake_generate_with_retry)
+    try:
+        result = ai_review_generator.regenerate_one(
+            _TEST_ISBN, {"title": "風姿花伝", "author": "世阿弥", "publisher": "", "genre": "エッセイ・評論"})
+        assert result["ok"] is False
+        assert "品質チェックNG" in result["reason"]
+
+        con = get_con()
+        row = fetchone(con, "SELECT description FROM genre_books WHERE isbn=?", (_TEST_ISBN,))
+        con.close()
+        assert row["description"] == "既存の説明文"
     finally:
         _cleanup()
 
