@@ -58,6 +58,13 @@ def test_classify_genre_keyword_business_still_maps_to_practical():
     assert _classify_genre("", "起業家のための経営戦略", "") == "実用・ハウツー"
 
 
+def test_classify_genre_keyword_kant_does_not_false_positive_on_countryside():
+    """2026-07-12: 実データ検証で「カント」が「カントリーキッチン」等に部分一致し
+    誤分類する事故を発見・修正した回帰テスト。"哲学者カント"用のキーワードは除外済み。"""
+    genre = _classify_genre("", "はじめてのトールペインティング (カントリーキッチン)", "")
+    assert genre != "エッセイ・評論"
+
+
 def test_audit_genre_ndc_mismatches_detects_stale_genre():
     """ndcは正しいのにgenreが古い（現在のマッピングと矛盾する）本を検出する。"""
     con = get_con()
