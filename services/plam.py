@@ -273,6 +273,16 @@ def _build_reason(
     def _cluster_label(cluster_id: str) -> str:
         return CLUSTER_LABEL_JA.get(cluster_id, cluster_id)
 
+    # 2026-07-16: v1.2 Phase3（Bridge Works活用）。Bridge Workの場合は
+    # 「何と何をつないでいる作品か」を具体的なジャンル名で示す（単に
+    # 「複数のジャンルにまたがる」だけでは利用者に価値が伝わらないため）。
+    def _bridge_suffix() -> str:
+        bridged = sorted(w_clusters - {"unknown"})
+        if len(bridged) >= 2:
+            label = "×".join(_cluster_label(c) for c in bridged)
+            return f" {label}をつなぐ話題作（Bridge Work）でもあります。"
+        return " 複数のジャンルにまたがる話題作（Bridge Work）でもあります。"
+
     if shared_awards:
         names = sorted(
             [master.get(a, {}).get("award_name", a) for a in shared_awards],
@@ -287,7 +297,7 @@ def _build_reason(
             listed = "」「".join(names)
             base = f"「{listed}」など、共通する受賞歴が{len(names)}件ある作品です。"
         if is_bridge:
-            return base + " 複数のジャンルにまたがる話題作（Bridge Work）でもあります。"
+            return base + _bridge_suffix()
         return base
 
     if is_bridge:
