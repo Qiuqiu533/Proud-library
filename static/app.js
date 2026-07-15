@@ -2184,7 +2184,9 @@ async function _loadPlamInfo(isbn, title, author) {
     // 既存のPLAMセクションがあれば置き換えない（再描画防止）
     if (document.getElementById("modal-plam-section")) return;
 
-    const CLUSTER_LABEL = { literary:"Literary", mystery:"Mystery", sf:"SF", horror:"Horror", career:"Career", debut:"Debut" };
+    // 2026-07-16: v1.2 Phase2（推薦理由の強化）。クラスタIDを英語のまま表示
+    // していたのを日本語ラベルに統一（PLAMネットワークページの表記と揃える）。
+    const CLUSTER_LABEL = { literary:"文学", mystery:"ミステリ", sf:"SF", horror:"ホラー", career:"キャリア", debut:"新人・デビュー作", unknown:"未分類" };
 
     const clusterDots = data.clusters.map(c =>
       `<span class="plam-cluster-dot" style="background:${c.color}">${CLUSTER_LABEL[c.id] || c.id}</span>`
@@ -2199,7 +2201,7 @@ async function _loadPlamInfo(isbn, title, author) {
     ).join("");
 
     const bridgeBadge = data.is_bridge
-      ? `<span class="plam-bridge-badge">🌉 Bridge Work — ${data.clusters.map(c => CLUSTER_LABEL[c.id] || c.id).join(" × ")}</span>` : "";
+      ? `<span class="plam-bridge-badge">🌉 ジャンル横断の話題作 — ${data.clusters.map(c => CLUSTER_LABEL[c.id] || c.id).join(" × ")}</span>` : "";
 
     const plamUrl = `/plam?work_id=${encodeURIComponent(data.work_id)}`;
     const plamHtml = `<div class="modal-section" id="modal-plam-section">
