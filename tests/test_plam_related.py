@@ -137,3 +137,16 @@ def test_build_reason_cluster_label_is_japanese_not_raw_id(monkeypatch):
         assert "文学" in reason
     finally:
         plam_module._awards_master.cache_clear()
+
+
+def test_build_reason_bridge_work_names_bridged_clusters(monkeypatch):
+    """2026-07-16: v1.2 Phase3（Bridge Works活用）。Bridge Workの場合、
+    単に「複数のジャンルにまたがる」ではなく、何と何をつないでいるかを
+    具体的なジャンル名（日本語ラベル）で示すことを確認する。"""
+    _seed_awards_master(monkeypatch, [{"award_id": "AKU", "award_name": "芥川賞", "weight": "100"}])
+    try:
+        reason = plam_module._build_reason({"AKU"}, True, set(), {"literary", "mystery"})
+        assert "文学×ミステリ" in reason or "ミステリ×文学" in reason
+        assert "Bridge Work" in reason
+    finally:
+        plam_module._awards_master.cache_clear()

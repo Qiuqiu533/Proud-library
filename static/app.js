@@ -2200,8 +2200,14 @@ async function _loadPlamInfo(isbn, title, author) {
       </div>`
     ).join("");
 
+    // 2026-07-16: v1.2 Phase3（Bridge Works活用）。🌉マークだけでは意味が
+    // 伝わりにくいため、何と何をつないでいるかに加え簡単な説明文を添える。
+    const bridgeClusterLabel = data.clusters.map(c => CLUSTER_LABEL[c.id] || c.id).join(" × ");
     const bridgeBadge = data.is_bridge
-      ? `<span class="plam-bridge-badge">🌉 ジャンル横断の話題作 — ${data.clusters.map(c => CLUSTER_LABEL[c.id] || c.id).join(" × ")}</span>` : "";
+      ? `<div class="plam-bridge-box">
+          <span class="plam-bridge-badge">🌉 ジャンル横断の話題作 — ${bridgeClusterLabel}</span>
+          <p class="plam-bridge-desc">複数のジャンルをつなぐ作品です。異なる興味を持つ読者にもおすすめできます。</p>
+        </div>` : "";
 
     const plamUrl = `/plam?work_id=${encodeURIComponent(data.work_id)}`;
     const plamHtml = `<div class="modal-section" id="modal-plam-section">
