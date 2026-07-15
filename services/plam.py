@@ -336,10 +336,13 @@ def get_related_works(work_id: str, limit: int = 6) -> list[dict]:
     except Exception:
         db_books = {}
 
-    result = []
+    # 2026-07-14: v1.2 Phase1。純粋なスコア順だと、蔵書に無い作品ばかりが上位を
+    # 占め利用者がクリックできない推薦になってしまう（実測でin_library率0%の
+    # ケースを複数確認）。「この図書館で借りられる本」を優先し、不足分のみ
+    # 蔵書外の候補で補う2段階選定にする。スコア順自体は各グループ内で維持。
+    in_lib_candidates: list[dict] = []
+    other_candidates: list[dict] = []
     for score, wid, meta in scored:
-        if len(result) >= limit:
-            break
         work = wid_to_work.get(wid)
         if not work:
             continue
@@ -354,13 +357,14 @@ def get_related_works(work_id: str, limit: int = 6) -> list[dict]:
             continue
         top_aid = max(w_rows, key=lambda r: int(master.get(r["award_id"], {}).get("weight", 0) or 0))["award_id"]
         cluster = cluster_m.get(top_aid, "unknown")
+        in_library = db_match is not None
 
-        result.append({
+        entry = {
             "work_id":     wid,
             "title":       title,
             "author":      author,
             "isbn":        db_match["isbn"] if db_match else None,
-            "in_library":  db_match is not None,
+            "in_library":  in_library,
             "top_award":   master.get(top_aid, {}).get("award_name", top_aid),
             "cluster":     cluster,
             "color":       CLUSTER_COLORS.get(cluster, "#ccc"),
@@ -368,7 +372,16 @@ def get_related_works(work_id: str, limit: int = 6) -> list[dict]:
             "shared_count": meta["shared_count"],
             "is_bridge":   meta["is_bridge"],
             "reason":      meta["reason"],
-        })
+        }
+        (in_lib_candidates if in_library else other_candidates).append(entry)
+
+        # 両バケツとも上限に達したら以降の走査は不要（蔵書外は最大limit件見れば十分）
+        if len(in_lib_candidates) >= limit and len(other_candidates) >= limit:
+            break
+
+    result = in_lib_candidates[:limit]
+    if len(result) < limit:
+        result += other_candidates[:limit - len(result)]
 
     return result
 
