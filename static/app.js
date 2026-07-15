@@ -2233,7 +2233,7 @@ async function _loadPlamRelated(workId) {
     const current = document.getElementById("modal-plam-related-placeholder");
     if (!current) return;
 
-    const cards = items.map(w => {
+    const renderCard = (w) => {
       const clickable = w.in_library && w.isbn;
       const inner = `
         <div class="plam-rel-dot" style="background:${w.color}"></div>
@@ -2243,12 +2243,24 @@ async function _loadPlamRelated(workId) {
       return clickable
         ? `<div class="plam-rel-card plam-rel-card--link" onclick="openModal('${w.isbn}')" role="button" tabindex="0" aria-label="${esc(w.title)}">${inner}</div>`
         : `<div class="plam-rel-card">${inner}</div>`;
-    }).join("");
+    };
 
-    current.outerHTML = `<div class="plam-related-section">
-      <div class="plam-related-label">📚 同じ評価軸の作品</div>
-      <div class="plam-related-grid">${cards}</div>
-    </div>`;
+    // 2026-07-14: v1.2 Phase1。蔵書内（クリックして借りられる）作品と
+    // 蔵書外の候補を分けて表示し、利用者がどちらか一目でわかるようにする。
+    const inLibrary = items.filter(w => w.in_library);
+    const others = items.filter(w => !w.in_library);
+
+    const sections = [];
+    if (inLibrary.length) {
+      sections.push(`<div class="plam-related-label">📚 この図書館で借りられます</div>
+        <div class="plam-related-grid">${inLibrary.map(renderCard).join("")}</div>`);
+    }
+    if (others.length) {
+      sections.push(`<div class="plam-related-label" style="margin-top:${inLibrary.length ? "14px" : "0"}">${inLibrary.length ? "他にもおすすめ（蔵書外）" : "📚 同じ評価軸の作品（蔵書外）"}</div>
+        <div class="plam-related-grid">${others.map(renderCard).join("")}</div>`);
+    }
+
+    current.outerHTML = `<div class="plam-related-section">${sections.join("")}</div>`;
   } catch(e) {}
 }
 
