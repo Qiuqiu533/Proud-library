@@ -91,3 +91,49 @@ def test_related_works_falls_back_to_non_library_when_insufficient(monkeypatch):
         assert all(r["in_library"] is False for r in result)
     finally:
         _cleanup_caches()
+
+
+def _seed_awards_master(monkeypatch, awards):
+    """_build_reasonのテスト用にawards_master.csvだけを差し替える。"""
+    def _fake_read(filename):
+        if filename == "awards_master.csv":
+            return awards
+        return []
+    monkeypatch.setattr(plam_module, "_read", _fake_read)
+    plam_module._awards_master.cache_clear()
+
+
+def test_build_reason_single_shared_award_is_concrete(monkeypatch):
+    """2026-07-16: v1.2 Phase2。「評価傾向が近い」という曖昧な表現ではなく、
+    「同じ「○○賞」を受賞した作品です」という具体的な事実ベースの文言にする。"""
+    _seed_awards_master(monkeypatch, [{"award_id": "AKU", "award_name": "芥川賞", "weight": "100"}])
+    try:
+        reason = plam_module._build_reason({"AKU"}, False, set(), set())
+        assert reason == "同じ「芥川賞」を受賞した作品です。"
+    finally:
+        plam_module._awards_master.cache_clear()
+
+
+def test_build_reason_multiple_shared_awards_shows_count(monkeypatch):
+    _seed_awards_master(monkeypatch, [
+        {"award_id": "AKU", "award_name": "芥川賞", "weight": "100"},
+        {"award_id": "NAO", "award_name": "直木賞", "weight": "95"},
+    ])
+    try:
+        reason = plam_module._build_reason({"AKU", "NAO"}, False, set(), set())
+        assert "共通する受賞歴が2件ある作品です" in reason
+        assert "芥川賞" in reason and "直木賞" in reason
+    finally:
+        plam_module._awards_master.cache_clear()
+
+
+def test_build_reason_cluster_label_is_japanese_not_raw_id(monkeypatch):
+    """クラスタIDが生の英語（例: "literary"）のまま文章に埋め込まれない
+    （日本語ラベルに変換される）ことを確認する回帰テスト。"""
+    _seed_awards_master(monkeypatch, [])
+    try:
+        reason = plam_module._build_reason(set(), False, {"literary"}, {"literary", "mystery"})
+        assert "literary" not in reason
+        assert "文学" in reason
+    finally:
+        plam_module._awards_master.cache_clear()

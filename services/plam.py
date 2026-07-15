@@ -18,6 +18,19 @@ CLUSTER_COLORS = {
     "unknown":  "#cccccc",
 }
 
+# 2026-07-16: v1.2 Phase2（推薦理由の強化）。クラスタIDは内部識別子（英語）
+# のため、推薦理由の文章に生で埋め込むと「literaryクラスタ」のような不自然な
+# 日本語になってしまう。ユーザー向けの文章にはこちらの日本語ラベルを使う。
+CLUSTER_LABEL_JA = {
+    "mystery": "ミステリ",
+    "literary": "文学",
+    "sf": "SF",
+    "horror": "ホラー",
+    "career": "キャリア",
+    "debut": "新人・デビュー作",
+    "unknown": "未分類",
+}
+
 
 def _read(filename: str) -> list[dict]:
     path = PLAM_DIR / filename
@@ -249,8 +262,16 @@ def _build_reason(
     my_clusters: set[str],
     w_clusters: set[str],
 ) -> str:
-    """推薦理由テキストを生成する（司書の言葉を意識した自然な日本語）。"""
+    """推薦理由テキストを生成する（司書の言葉を意識した自然な日本語）。
+
+    2026-07-16: v1.2 Phase2（推薦理由の強化）。「評価傾向が近い」という抽象的な
+    言い回しを、「同じ賞を受賞した」という具体的な事実ベースの表現に変更し、
+    利用者が理由を一目で理解できるようにする。クラスタIDも日本語ラベルに変換する。
+    """
     master = _awards_master()
+
+    def _cluster_label(cluster_id: str) -> str:
+        return CLUSTER_LABEL_JA.get(cluster_id, cluster_id)
 
     if shared_awards:
         names = sorted(
@@ -261,24 +282,24 @@ def _build_reason(
             ).get("weight", 0) or 0),
         )
         if len(names) == 1:
-            base = f"「{names[0]}」の評価傾向が近い作品です。"
+            base = f"同じ「{names[0]}」を受賞した作品です。"
         else:
-            listed = "」と「".join(names)
-            base = f"「{listed}」の両方で高く評価された作品群に近い位置付けです。"
+            listed = "」「".join(names)
+            base = f"「{listed}」など、共通する受賞歴が{len(names)}件ある作品です。"
         if is_bridge:
-            return base + " クラスタを横断するBridge Workでもあります。"
+            return base + " 複数のジャンルにまたがる話題作（Bridge Work）でもあります。"
         return base
 
     if is_bridge:
         cross = (my_clusters & w_clusters) - {"unknown"}
         if cross:
-            label = "・".join(sorted(cross))
-            return f"{label}クラスタを横断する、評価軸の広いBridge Workです。"
-        return "複数のジャンルにまたがるBridge Workです。"
+            label = "・".join(_cluster_label(c) for c in sorted(cross))
+            return f"{label}の両方で評価された、ジャンルを横断する話題作（Bridge Work）です。"
+        return "複数のジャンルにまたがる話題作（Bridge Work）です。"
 
     cross = (my_clusters & w_clusters) - {"unknown"}
     if cross:
-        return f"同じ{list(cross)[0]}クラスタで評価された作品です。"
+        return f"同じ{_cluster_label(sorted(cross)[0])}カテゴリーで評価された作品です。"
 
     return ""
 
