@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, render_template, request
-from services.plam import get_award_network, get_bridge_works, get_book_plam_info, get_related_works, get_my_plam, get_plam_embedding
+from services.plam import get_award_network, get_bridge_works, get_bridge_recommendations, get_book_plam_info, get_related_works, get_my_plam, get_plam_embedding
 from database import get_con
 from config import check_password
 
@@ -22,6 +22,13 @@ def api_plam_bridge_works():
     """クラスタ横断作品（Bridge Works）一覧"""
     limit = 50
     return jsonify(get_bridge_works(limit=limit))
+
+
+@plam_bp.route("/api/plam/bridge-recommend")
+def api_plam_bridge_recommend():
+    """蔵書内のBridge Works（ジャンル横断作品）を発見コーナー向けに返す"""
+    limit = min(int(request.args.get("limit", 3)), 10)
+    return jsonify(get_bridge_recommendations(limit=limit))
 
 
 @plam_bp.route("/api/plam/related")

@@ -4704,6 +4704,7 @@ document.getElementById("submitCal").addEventListener("click", async () => {
 checkAuth();
 loadBooks();
 loadPopularBooks();
+loadBridgeRecommendations();
 loadCollections();
 loadHomeEvents();
 loadTopNew();
@@ -6190,6 +6191,35 @@ async function loadPopularBooks() {
         </div>
         <div class="mini-card-title">${esc(b.title)}</div>
         <div style="font-size:0.72rem;margin-top:2px" aria-hidden="true">${scoreLabel}</div>
+      </div>`;
+    }).join("");
+    row.querySelectorAll(".mini-card").forEach(el => {
+      el.addEventListener("click", () => openModal(el.dataset.isbn));
+    });
+  } catch {}
+}
+
+// 2026-07-16: v1.2 Phase4。Bridge Works（ジャンル横断作品）を起点に、
+// 「純文学しか読まない人にミステリーへの入口を」提示する発見コーナー。
+async function loadBridgeRecommendations() {
+  const sec = document.getElementById("bridgeRecSection");
+  const row = document.getElementById("bridgeRecRow");
+  if (!sec || !row) return;
+  try {
+    const res = await fetch("/api/plam/bridge-recommend?limit=3");
+    if (!res.ok) return;
+    const items = await res.json();
+    if (!items.length) return;
+    sec.style.display = "block";
+    row.innerHTML = items.map(b => {
+      const labels = (b.cluster_labels || []).join(" × ");
+      return `<div class="mini-card" data-isbn="${b.isbn}" role="button" tabindex="0" aria-label="${esc(b.title)}">
+        <div class="mini-card-cover">
+          <span class="rank-badge" style="background:#3d6b8c" aria-hidden="true">🌉</span>
+          ${_bookCoverHtml(b.isbn, "", "", esc(b.title))}
+        </div>
+        <div class="mini-card-title">${esc(b.title)}</div>
+        <div style="font-size:0.72rem;margin-top:2px;color:#3d6b8c">${esc(labels)}</div>
       </div>`;
     }).join("");
     row.querySelectorAll(".mini-card").forEach(el => {
