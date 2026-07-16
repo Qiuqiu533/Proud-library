@@ -61,6 +61,45 @@ def test_genre_info_unknown_genre(client):
     data = json.loads(res.data)
     assert data["found"] is False
 
+def test_genre_info_returns_award_and_popular_books(client):
+    """2026-07-16: v1.3 Phase2。ジャンル内の受賞作・人気作をまとめて返す。
+    受賞数が多い本ほどfirst_booksで優先され、評価×お気に入りが高い本ほど
+    popular_booksで優先されることを確認する。"""
+    from database import get_con, execute
+
+    con = get_con()
+    execute(con, "INSERT OR REPLACE INTO genre_books (isbn, title, author, publisher, genre, format, awards) "
+            "VALUES (?,?,?,?,?,?,?)",
+            ("9999900000921", "二冠受賞作", "著者A", "テスト出版社", "文芸小説", "その他",
+             json.dumps([{"award": "芥川賞", "year": 2024}, {"award": "野間文芸賞", "year": 2024}], ensure_ascii=False)))
+    execute(con, "INSERT OR REPLACE INTO genre_books (isbn, title, author, publisher, genre, format, awards) "
+            "VALUES (?,?,?,?,?,?,?)",
+            ("9999900000922", "一冠受賞作", "著者B", "テスト出版社", "文芸小説", "その他",
+             json.dumps([{"award": "直木賞", "year": 2023}], ensure_ascii=False)))
+    execute(con, "INSERT OR REPLACE INTO genre_books (isbn, title, author, publisher, genre, format) "
+            "VALUES (?,?,?,?,?,?)",
+            ("9999900000923", "人気の本", "著者C", "テスト出版社", "文芸小説", "その他"))
+    execute(con, "INSERT OR REPLACE INTO ratings (isbn, score, votes) VALUES (?,?,?)",
+            ("9999900000923", 4.5, 10))
+    con.commit()
+    con.close()
+    try:
+        res = client.get("/api/genres/info?genre=文芸小説")
+        assert res.status_code == 200
+        data = json.loads(res.data)
+        first_titles = [b["title"] for b in data["first_books"]]
+        assert first_titles[0] == "二冠受賞作"  # 受賞数2件が最優先
+        assert "一冠受賞作" in first_titles
+        popular_titles = [b["title"] for b in data["popular_books"]]
+        assert "人気の本" in popular_titles
+    finally:
+        con = get_con()
+        execute(con, "DELETE FROM genre_books WHERE isbn IN (?,?,?)",
+                ("9999900000921", "9999900000922", "9999900000923"))
+        execute(con, "DELETE FROM ratings WHERE isbn=?", ("9999900000923",))
+        con.commit()
+        con.close()
+
 def test_books_popular(client):
     res = client.get("/api/books/popular")
     assert res.status_code == 200
