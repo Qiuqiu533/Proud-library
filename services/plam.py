@@ -110,15 +110,20 @@ def get_bridge_works(limit: int = 50) -> list[dict]:
     return result[:limit]
 
 
-def get_bridge_recommendations(limit: int = 3) -> list[dict]:
+def get_bridge_recommendations(limit: int = 3, cluster: str | None = None) -> list[dict]:
     """蔵書内にあるcross_cluster Bridge Worksを、ジャンル横断発見コーナー向けに返す。
 
     2026-07-16: v1.2 Phase4。「純文学しか読まない人にミステリーへの入口を、
     ミステリーファンに純文学への入口を」提示する読書の幅を広げる導線。
     Phase1と同じ方針で、蔵書に無い本を勧めても意味が無いため蔵書内のみに絞る。
     award_count（受賞数）が多い順に優先し、話題性の高い橋渡し作品を出す。
+
+    v1.3 Phase1（ジャンルページのBridge Worksコーナー）向けに、cluster指定で
+    「そのジャンルに関係するBridge Worksだけ」に絞り込めるようにした。
     """
     rows = [r for r in _read("bridge_works.csv") if r.get("bridge_type") == "cross_cluster"]
+    if cluster:
+        rows = [r for r in rows if cluster in (r.get("clusters", "").split())]
 
     try:
         from database import get_con, fetchall as db_fetchall

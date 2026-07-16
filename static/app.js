@@ -951,6 +951,8 @@ async function loadBooks(keyword = "", page = 1) {
   const grid = document.getElementById("bookGrid");
   grid.innerHTML = _skeletonGrid(12);
   document.getElementById("totalCount").textContent = "";
+  const giBox = document.getElementById("genreInfoBox");
+  if (giBox) giBox.style.display = "none";
   const ppSel = document.getElementById("perPageSelect");
 
   let data;
@@ -1175,6 +1177,59 @@ async function loadBooksByGenre(genre, page = 1) {
   renderPagination("paginationTop",    data.total, page, p => loadBooksByGenre(genre, p));
   renderPagination("paginationBottom", data.total, page, p => loadBooksByGenre(genre, p));
   applyAvailCache(data.books.map(b => b.isbn).filter(Boolean));
+  if (page === 1) _loadGenreInfo(genre);
+}
+
+// 2026-07-16: v1.3 Phase1（ジャンルから本を発見する体験の強化）。
+// ジャンル選択時に紹介文（特徴・おすすめの読者・初めて読むなら）と、
+// 関連するBridge Works（他ジャンルへの入口）を先頭に表示する。
+async function _loadGenreInfo(genre) {
+  const box = document.getElementById("genreInfoBox");
+  if (!box) return;
+  box.dataset.genre = genre;
+  try {
+    const res = await fetch(`/api/genres/info?genre=${encodeURIComponent(genre)}`);
+    const info = await res.json();
+    if (box.dataset.genre !== genre) return; // 別ジャンルに切り替わっていたら描画しない
+    if (!info.found) { box.style.display = "none"; return; }
+
+    let bridgeHtml = "";
+    if (info.cluster) {
+      try {
+        const bRes = await fetch(`/api/plam/bridge-recommend?cluster=${encodeURIComponent(info.cluster)}&limit=3`);
+        const items = bRes.ok ? await bRes.json() : [];
+        if (box.dataset.genre !== genre) return;
+        if (items.length) {
+          const cards = items.map(w => `
+            <div class="mini-card" data-isbn="${w.isbn}" role="button" tabindex="0" aria-label="${esc(w.title)}">
+              <div class="mini-card-cover">
+                <span class="rank-badge" style="background:#3d6b8c" aria-hidden="true">🌉</span>
+                ${_bookCoverHtml(w.isbn, "", "", esc(w.title))}
+              </div>
+              <div class="mini-card-title">${esc(w.title)}</div>
+              <div style="font-size:0.72rem;margin-top:2px;color:#3d6b8c">${esc((w.cluster_labels||[]).join(" × "))}</div>
+            </div>`).join("");
+          bridgeHtml = `<div style="margin-top:10px">
+            <div style="font-size:0.85rem;font-weight:600;margin-bottom:6px">🌉 このジャンルから広がる一冊</div>
+            <div class="recent-row">${cards}</div>
+          </div>`;
+        }
+      } catch (e) { /* noop */ }
+    }
+
+    box.innerHTML = `<div style="background:#f5f2ea;border-radius:10px;padding:14px 16px;margin-bottom:12px">
+      <div style="font-size:0.9rem;line-height:1.6">${esc(info.desc)}</div>
+      <div style="font-size:0.82rem;color:#666;margin-top:6px">👤 ${esc(info.audience)}</div>
+      <div style="font-size:0.82rem;color:#666;margin-top:2px">💡 ${esc(info.tip)}</div>
+      ${bridgeHtml}
+    </div>`;
+    box.style.display = "block";
+    box.querySelectorAll(".mini-card").forEach(el => {
+      el.addEventListener("click", () => openModal(el.dataset.isbn));
+    });
+  } catch (e) {
+    box.style.display = "none";
+  }
 }
 
 // ===== タグ検索 =====
