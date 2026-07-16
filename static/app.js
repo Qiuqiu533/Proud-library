@@ -1193,6 +1193,38 @@ async function _loadGenreInfo(genre) {
     if (box.dataset.genre !== genre) return; // 別ジャンルに切り替わっていたら描画しない
     if (!info.found) { box.style.display = "none"; return; }
 
+    // 2026-07-16: v1.3 Phase2（代表作品・受賞作品・人気作品）。
+    const _genreBookRow = (items, subLabelFn) => items.map(b => `
+      <div class="mini-card" data-isbn="${b.isbn}" role="button" tabindex="0" aria-label="${esc(b.title)}">
+        <div class="mini-card-cover">${_bookCoverHtml(b.isbn, "", "", esc(b.title))}</div>
+        <div class="mini-card-title">${esc(b.title)}</div>
+        <div style="font-size:0.72rem;margin-top:2px;color:#888">${esc(subLabelFn(b))}</div>
+      </div>`).join("");
+
+    let firstBooksHtml = "";
+    if (info.first_books && info.first_books.length) {
+      firstBooksHtml = `<div style="margin-top:10px">
+        <div style="font-size:0.85rem;font-weight:600;margin-bottom:6px">🏆 まずはこの${info.first_books.length}冊</div>
+        <div class="recent-row">${_genreBookRow(info.first_books, b => b.award_label || "")}</div>
+      </div>`;
+    }
+
+    let awardBooksHtml = "";
+    if (info.award_books && info.award_books.length) {
+      awardBooksHtml = `<div style="margin-top:10px">
+        <div style="font-size:0.85rem;font-weight:600;margin-bottom:6px">🏅 このジャンルの受賞作</div>
+        <div class="recent-row">${_genreBookRow(info.award_books, b => b.award_label || "")}</div>
+      </div>`;
+    }
+
+    let popularBooksHtml = "";
+    if (info.popular_books && info.popular_books.length) {
+      popularBooksHtml = `<div style="margin-top:10px">
+        <div style="font-size:0.85rem;font-weight:600;margin-bottom:6px">⭐ このジャンルで人気の本</div>
+        <div class="recent-row">${_genreBookRow(info.popular_books, b => b.score ? `★${b.score.toFixed(1)}` : `♥${b.fav_count}`)}</div>
+      </div>`;
+    }
+
     let bridgeHtml = "";
     if (info.cluster) {
       try {
@@ -1221,6 +1253,9 @@ async function _loadGenreInfo(genre) {
       <div style="font-size:0.9rem;line-height:1.6">${esc(info.desc)}</div>
       <div style="font-size:0.82rem;color:#666;margin-top:6px">👤 ${esc(info.audience)}</div>
       <div style="font-size:0.82rem;color:#666;margin-top:2px">💡 ${esc(info.tip)}</div>
+      ${firstBooksHtml}
+      ${awardBooksHtml}
+      ${popularBooksHtml}
       ${bridgeHtml}
     </div>`;
     box.style.display = "block";

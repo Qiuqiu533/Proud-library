@@ -109,16 +109,96 @@ def api_genres():
     return jsonify([{"genre": r["genre"], "count": r["cnt"]} for r in rows])
 
 
+def _genre_award_books(genre: str, ph: str, con) -> list[dict]:
+    """指定ジャンルの本のうち受賞歴があるものを、受賞数→最新受賞年の順で返す。
+    v1.3 Phase2: 「代表作品」「受賞作品」セクション向け。"""
+    rows = fetchall(con, f"SELECT isbn, title, author, awards FROM genre_books WHERE genre={ph}", (genre,))
+    scored = []
+    for r in rows:
+        raw = r.get("awards")
+        try:
+            awards = json.loads(raw) if isinstance(raw, str) else (raw or [])
+        except Exception:
+            awards = []
+        if not awards:
+            continue
+        years = [int(a.get("year") or 0) for a in awards]
+        label_parts = [f"{a.get('award','')}{a.get('year','')}" for a in awards[:2]]
+        scored.append({
+            "isbn": r["isbn"], "title": r["title"], "author": r.get("author", ""),
+            "award_count": len(awards), "latest_year": max(years) if years else 0,
+            "award_label": "・".join(label_parts),
+        })
+    scored.sort(key=lambda x: (-x["award_count"], -x["latest_year"]))
+    return scored
+
+
+def _genre_popular_books(genre: str, ph: str, con) -> list[dict]:
+    """指定ジャンルの本を、星評価×お気に入り数の合算スコアで人気順に返す。
+    /api/books/popular と同じスコアリングをジャンル限定で適用する。"""
+    rating_rows = fetchall(con, "SELECT isbn, score, votes FROM ratings WHERE votes >= 1 AND score >= 1")
+    rating_map = {r["isbn"]: {"score": r["score"], "votes": r["votes"]} for r in rating_rows}
+    fav_rows = fetchall(con, "SELECT favorites FROM user_accounts WHERE favorites IS NOT NULL AND favorites != '[]'")
+    fav_count: dict[str, int] = {}
+    for row in fav_rows:
+        try:
+            for isbn in json.loads(row["favorites"] or "[]"):
+                if isbn:
+                    fav_count[isbn] = fav_count.get(isbn, 0) + 1
+        except Exception:
+            pass
+
+    all_isbns = set(rating_map) | set(fav_count)
+    if not all_isbns:
+        return []
+    placeholders = ",".join([ph] * len(all_isbns))
+    genre_rows = fetchall(
+        con, f"SELECT isbn, title, author FROM genre_books WHERE genre={ph} AND isbn IN ({placeholders})",
+        (genre, *all_isbns))
+    genre_isbns = {r["isbn"]: r for r in genre_rows}
+
+    scored = []
+    for isbn, book in genre_isbns.items():
+        r = rating_map.get(isbn, {})
+        fav = fav_count.get(isbn, 0)
+        composite = r.get("score", 0) * r.get("votes", 0) * 2 + fav * 0.5
+        if composite <= 0:
+            continue
+        scored.append({
+            "isbn": isbn, "title": book["title"], "author": book.get("author", ""),
+            "score": r.get("score", 0.0), "votes": r.get("votes", 0), "fav_count": fav,
+            "composite": composite,
+        })
+    scored.sort(key=lambda x: -x["composite"])
+    return scored
+
+
 @books_bp.route("/api/genres/info")
 def api_genre_info():
-    """ジャンル紹介文（特徴・おすすめの読者・初めて読むなら）を返す。
-    v1.3 Phase1: ジャンルページを「一覧」から「読書ガイド」へ育てる第一歩。"""
+    """ジャンル紹介文（特徴・おすすめの読者・初めて読むなら）と、
+    代表作品・受賞作品・人気作品をまとめて返す。
+    v1.3: ジャンルページを「一覧」から「読書ガイド」へ育てる。
+    1回のリクエストでジャンルページに必要な情報をすべて取得できるようにし、
+    フロント実装をシンプルに保つ（Phase1のBridge Worksコーナーは既存の
+    /api/plam/bridge-recommend?cluster=X を継続利用し、ここには含めない）。"""
     from config import GENRE_DESCRIPTIONS
     genre = request.args.get("genre", "").strip()
     info = GENRE_DESCRIPTIONS.get(genre)
     if not info:
         return jsonify({"genre": genre, "found": False})
-    return jsonify({"genre": genre, "found": True, **info})
+
+    con = get_con()
+    ph = "%s" if USE_PG else "?"
+    award_books = _genre_award_books(genre, ph, con)
+    popular_books = _genre_popular_books(genre, ph, con)
+    con.close()
+
+    return jsonify({
+        "genre": genre, "found": True, **info,
+        "first_books": award_books[:3],
+        "award_books": award_books[3:8],
+        "popular_books": popular_books[:5],
+    })
 
 
 @books_bp.route("/api/books/batch")
