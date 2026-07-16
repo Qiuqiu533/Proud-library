@@ -98,6 +98,46 @@ def test_award_books(client):
     res = client.get("/api/award-books")
     assert res.status_code == 200
 
+def test_award_books_matches_split_volume_catalog_entries(client, monkeypatch):
+    """2026-07-16: 本番で「世界99（上・下）」（award_books）が、蔵書側に
+    「世界99 <上>」「世界99 <下>」と別レコードで登録されているために
+    in_library=falseと誤判定される事故を発見。routes.awards.api_award_books
+    が巻表記ゆれ（services.awards._strip_volume_suffix）に対応した基底タイトル
+    マッチングでin_library=trueと正しく判定できることを確認する回帰テスト。"""
+    import routes.awards as awards_module
+
+    monkeypatch.setattr(awards_module, "USE_PG", True)
+
+    award_rows = [
+        {"id": 1, "award": "野間文芸賞", "award_no": 78, "award_year": 2025,
+         "title": "世界99（上・下）", "author": "村田沙耶香", "status": "確認済",
+         "isbn13": "", "award_category": "", "summary": "", "created_at": ""},
+    ]
+    catalog_rows = [
+        {"isbn": "9784087718799", "title": "世界99 <上>", "author": "村田 沙耶香"},
+        {"isbn": "9784087700015", "title": "世界99 <下>", "author": "村田 沙耶香"},
+    ]
+
+    def _fake_fetchall(con, sql, params=()):
+        if "award_books" in sql:
+            return award_rows
+        if "genre_books" in sql:
+            return catalog_rows
+        return []
+
+    class _FakeCon:
+        def close(self): pass
+
+    monkeypatch.setattr(awards_module, "fetchall", _fake_fetchall)
+    monkeypatch.setattr(awards_module, "get_con", lambda: _FakeCon())
+
+    res = client.get("/api/award-books")
+    assert res.status_code == 200
+    data = res.get_json()
+    assert len(data) == 1
+    assert data[0]["in_library"] is True
+    assert data[0]["library_isbn"] in ("9784087718799", "9784087700015")
+
 
 # ─── 認証エンドポイント ────────────────────────────────────────────────────
 
