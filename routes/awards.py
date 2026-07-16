@@ -2,8 +2,18 @@ from flask import Blueprint, request, jsonify
 from config import get_board_password, check_password
 from database import get_con, execute, fetchone, fetchall, USE_PG
 from services.audit import log_action
+from services.awards import _strip_volume_suffix
 
 awards_bp = Blueprint("awards", __name__)
+
+# 2026-07-16: award_booksは「1作品につき1レコード」ルールで上下巻を
+# 「タイトル（上・下）」のようにまとめて登録するが、蔵書（genre_books）側は
+# librarylife.netの実データに合わせて「タイトル <上>」「タイトル <下>」と
+# 巻ごとに別レコードになっている。完全一致マッチングだとこの2つが一致せず、
+# 実際は蔵書にある本が「未所蔵」と誤判定される事故が発生した（例:「世界99」）。
+# この巻表記のゆれは services.awards._sync_awards_from_master 側では既に
+# _strip_volume_suffix で対応済みだったが、本APIの受賞作↔蔵書マッチングには
+# 反映されていなかったため、同じユーティリティを再利用して揃える。
 
 
 @awards_bp.route("/api/award-books")
@@ -30,21 +40,30 @@ def api_award_books():
         con2.close()
         lib_map = {}       # (正規化タイトル, 正規化著者) → isbn
         lib_title_map = {} # 正規化タイトルのみ → isbn（著者が異なる場合のフォールバック）
+        lib_base_map = {}  # 巻表記を除いた基底タイトル → isbn（上下巻分割対策）
         for r in lib_rows:
             nt = _norm(r["title"])
             na = _norm(r["author"])
             lib_map[(nt, na)] = r["isbn"]
             if nt not in lib_title_map:
                 lib_title_map[nt] = r["isbn"]
+            base = _norm(_strip_volume_suffix(r["title"] or ""))
+            if base and base != nt and base not in lib_base_map:
+                lib_base_map[base] = r["isbn"]
     except Exception:
         lib_map = {}
         lib_title_map = {}
+        lib_base_map = {}
     result = []
     for r in rows:
         d = dict(r)
         nt = _norm(d.get("title", ""))
         na = _norm(d.get("author", ""))
         isbn = lib_map.get((nt, na)) or lib_title_map.get(nt, "")
+        if not isbn:
+            base = _norm(_strip_volume_suffix(d.get("title", "") or ""))
+            if base != nt:
+                isbn = lib_base_map.get(base, "")
         d["in_library"] = bool(isbn)
         d["library_isbn"] = isbn
         result.append(d)
