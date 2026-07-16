@@ -116,3 +116,56 @@ def test_bridge_recommendations_respects_limit_and_award_count_order(monkeypatch
         execute(con, "DELETE FROM genre_books WHERE isbn IN (?,?)", (_TEST_ISBN_A, _TEST_ISBN_B))
         con.commit()
         con.close()
+
+
+def test_get_connected_genres_groups_by_mapped_genre_and_counts(monkeypatch):
+    """2026-07-16: v1.3 Phase3（ジャンルグラフ）。mysteryクラスタから見て、
+    literary・sfへそれぞれ何件のBridge Worksでつながっているかを正しく
+    集計し、CLUSTER_TO_GENREでジャンル名に変換して返すことを確認する。"""
+    _seed_fixture(monkeypatch)
+    con = get_con()
+    execute(con, "INSERT OR REPLACE INTO genre_books (isbn, title, author, publisher, genre, format) "
+            "VALUES (?,?,?,?,?,?)",
+            (_TEST_ISBN_A, "蔵書内の橋渡し作品A", "著者Y", "テスト出版社", "その他", "その他"))
+    execute(con, "INSERT OR REPLACE INTO genre_books (isbn, title, author, publisher, genre, format) "
+            "VALUES (?,?,?,?,?,?)",
+            (_TEST_ISBN_B, "蔵書内の橋渡し作品B", "著者Z", "テスト出版社", "その他", "その他"))
+    con.commit()
+    con.close()
+    try:
+        result = plam_module.get_connected_genres("mystery")
+        by_genre = {r["genre"]: r for r in result}
+        assert by_genre["文芸小説"]["count"] == 1
+        assert by_genre["ファンタジー・SF"]["count"] == 1
+        assert by_genre["文芸小説"]["sample_works"][0]["title"] == "蔵書内の橋渡し作品A"
+    finally:
+        con = get_con()
+        execute(con, "DELETE FROM genre_books WHERE isbn IN (?,?)", (_TEST_ISBN_A, _TEST_ISBN_B))
+        con.commit()
+        con.close()
+
+
+def test_get_connected_genres_excludes_unmapped_clusters(monkeypatch):
+    """CLUSTER_TO_GENREに存在しないクラスタ（例: horror）への接続は、
+    ジャンルボタンが無いため表示対象から除外されることを確認する。"""
+    fixtures = {
+        "bridge_works.csv": [
+            {"work_id": "BH1", "title": "蔵書内のホラー橋渡し作品", "author": "著者H",
+             "bridge_type": "cross_cluster", "clusters": "mystery horror", "award_count": "1"},
+        ],
+    }
+    monkeypatch.setattr(plam_module, "_read", lambda filename: fixtures.get(filename, []))
+    con = get_con()
+    execute(con, "INSERT OR REPLACE INTO genre_books (isbn, title, author, publisher, genre, format) "
+            "VALUES (?,?,?,?,?,?)",
+            (_TEST_ISBN_A, "蔵書内のホラー橋渡し作品", "著者H", "テスト出版社", "その他", "その他"))
+    con.commit()
+    con.close()
+    try:
+        result = plam_module.get_connected_genres("mystery")
+        assert result == []
+    finally:
+        con = get_con()
+        execute(con, "DELETE FROM genre_books WHERE isbn=?", (_TEST_ISBN_A,))
+        con.commit()
+        con.close()

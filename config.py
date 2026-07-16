@@ -8,7 +8,7 @@ import json
 # style.css/app.js は Cache-Control: immutable（1年）で配信されるため、URLに
 # ?v= を付けてクエリ文字列ごと変えることで、Service Workerのキャッシュ更新を
 # 待たずに新しいCSS/JSを確実に配信する（2026-07-05追加）。
-STATIC_VERSION = "37"
+STATIC_VERSION = "38"
 
 # ── ジャンル別蔵書データ（Excelから事前生成）──────────────────────────────
 _GENRE_MAP_PATH = os.path.join(os.path.dirname(__file__), "static", "genre_map.json")
@@ -191,6 +191,18 @@ GENRE_DESCRIPTIONS = {
         "tip": "学年やこれまでの読書経験に合わせて選ぶと無理なく楽しめます。",
         "cluster": None,
     },
+}
+
+# 2026-07-16: v1.3 Phase3（ジャンルグラフ型ナビゲーション）。GENRE_DESCRIPTIONS
+# のcluster値からジャンル名を逆引きするための対応表。PLAMクラスタは
+# literary/mystery/sf/horror/career/debutの6種あるが、フロントの固定9ジャンル
+# に対応するのはこの3クラスタのみ（horror/career/debutに対応するジャンルボタン
+# は存在しないため、Bridge Worksが繋がっていても遷移先を提示できない場合がある
+# ＝意図的な仕様。無理に対応させず該当ジャンルが無いものは表示しない）。
+CLUSTER_TO_GENRE = {
+    "literary": "文芸小説",
+    "mystery": "ミステリ・推理",
+    "sf": "ファンタジー・SF",
 }
 
 KEYWORD_GENRE = [

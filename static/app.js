@@ -1180,6 +1180,16 @@ async function loadBooksByGenre(genre, page = 1) {
   if (page === 1) _loadGenreInfo(genre);
 }
 
+// 2026-07-16: v1.3 Phase3。ジャンルグラフのチップから別ジャンルへ切り替える
+// （ジャンル選択プルダウンの変更と同じ処理を再利用する）。
+function _switchToGenre(genre) {
+  const sel = document.getElementById("genreSelect");
+  if (!sel) return;
+  sel.value = `${genre}|genre`;
+  sel.dispatchEvent(new Event("change"));
+  document.getElementById("bookGrid")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 // 2026-07-16: v1.3 Phase1（ジャンルから本を発見する体験の強化）。
 // ジャンル選択時に紹介文（特徴・おすすめの読者・初めて読むなら）と、
 // 関連するBridge Works（他ジャンルへの入口）を先頭に表示する。
@@ -1249,10 +1259,25 @@ async function _loadGenreInfo(genre) {
       } catch (e) { /* noop */ }
     }
 
+    // 2026-07-16: v1.3 Phase3（ジャンルグラフ型ナビゲーション）。
+    // Bridge Worksでつながっている他ジャンルへの導線を表示する。
+    let connectedGenresHtml = "";
+    if (info.connected_genres && info.connected_genres.length) {
+      const chips = info.connected_genres.map(g => `
+        <button class="genre-graph-chip" data-genre="${esc(g.genre)}" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;margin:4px 6px 4px 0;border-radius:20px;border:1px solid #3d6b8c;background:#fff;color:#3d6b8c;font-size:0.82rem;cursor:pointer">
+          🧭 ${esc(g.genre)}へ <span style="color:#888">（${g.count}件のBridge Worksでつながっています）</span>
+        </button>`).join("");
+      connectedGenresHtml = `<div style="margin-top:10px">
+        <div style="font-size:0.85rem;font-weight:600;margin-bottom:6px">🧭 このジャンルから広がる読書</div>
+        <div>${chips}</div>
+      </div>`;
+    }
+
     box.innerHTML = `<div style="background:#f5f2ea;border-radius:10px;padding:14px 16px;margin-bottom:12px">
       <div style="font-size:0.9rem;line-height:1.6">${esc(info.desc)}</div>
       <div style="font-size:0.82rem;color:#666;margin-top:6px">👤 ${esc(info.audience)}</div>
       <div style="font-size:0.82rem;color:#666;margin-top:2px">💡 ${esc(info.tip)}</div>
+      ${connectedGenresHtml}
       ${firstBooksHtml}
       ${awardBooksHtml}
       ${popularBooksHtml}
@@ -1261,6 +1286,9 @@ async function _loadGenreInfo(genre) {
     box.style.display = "block";
     box.querySelectorAll(".mini-card").forEach(el => {
       el.addEventListener("click", () => openModal(el.dataset.isbn));
+    });
+    box.querySelectorAll(".genre-graph-chip").forEach(el => {
+      el.addEventListener("click", () => _switchToGenre(el.dataset.genre));
     });
   } catch (e) {
     box.style.display = "none";

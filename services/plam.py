@@ -160,6 +160,42 @@ def get_bridge_recommendations(limit: int = 3, cluster: str | None = None) -> li
     return result
 
 
+def get_connected_genres(cluster: str, samples_per_genre: int = 2) -> list[dict]:
+    """指定クラスタが蔵書内のBridge Worksを通じてどのジャンルにつながっているかを、
+    つながりの強さ（Bridge Works件数）順に返す。
+
+    2026-07-16: v1.3 Phase3（ジャンルグラフ型ナビゲーション）。ルート型・
+    おすすめコース型ではなく、既存のPLAMクラスタ・Bridge Works資産（Phase1で
+    実装済みのcluster絞り込み）をそのまま活用できるジャンルグラフ型を採用。
+    「文芸小説→(Bridge Works 9件)→ミステリ・推理」のように、次に広がる
+    ジャンルとその根拠件数を提示する。対応するジャンルボタンが無いクラスタ
+    （horror/career/debut）への接続は表示しない（CLUSTER_TO_GENRE未定義）。
+    """
+    from config import CLUSTER_TO_GENRE
+
+    works = get_bridge_recommendations(limit=100, cluster=cluster)
+    by_other_cluster: dict[str, list[dict]] = {}
+    for w in works:
+        others = [c for c in w["clusters"] if c != cluster]
+        for oc in others:
+            by_other_cluster.setdefault(oc, []).append(w)
+
+    result = []
+    for oc, items in by_other_cluster.items():
+        genre = CLUSTER_TO_GENRE.get(oc)
+        if not genre:
+            continue
+        result.append({
+            "genre": genre,
+            "cluster": oc,
+            "count": len(items),
+            "sample_works": [{"isbn": i["isbn"], "title": i["title"]} for i in items[:samples_per_genre]],
+        })
+
+    result.sort(key=lambda x: -x["count"])
+    return result
+
+
 import unicodedata
 import re as _re
 

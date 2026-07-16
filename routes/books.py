@@ -193,11 +193,17 @@ def api_genre_info():
     popular_books = _genre_popular_books(genre, ph, con)
     con.close()
 
+    connected_genres = []
+    if info.get("cluster"):
+        from services.plam import get_connected_genres
+        connected_genres = get_connected_genres(info["cluster"])
+
     return jsonify({
         "genre": genre, "found": True, **info,
         "first_books": award_books[:3],
         "award_books": award_books[3:8],
         "popular_books": popular_books[:5],
+        "connected_genres": connected_genres,
     })
 
 
