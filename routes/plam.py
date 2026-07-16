@@ -26,9 +26,12 @@ def api_plam_bridge_works():
 
 @plam_bp.route("/api/plam/bridge-recommend")
 def api_plam_bridge_recommend():
-    """蔵書内のBridge Works（ジャンル横断作品）を発見コーナー向けに返す"""
+    """蔵書内のBridge Works（ジャンル横断作品）を発見コーナー向けに返す。
+    ?cluster=mystery 等を指定すると、そのクラスタに関係する作品だけに絞れる
+    （v1.3 Phase1: ジャンルページのBridge Worksコーナー向け）。"""
     limit = min(int(request.args.get("limit", 3)), 10)
-    return jsonify(get_bridge_recommendations(limit=limit))
+    cluster = request.args.get("cluster", "").strip() or None
+    return jsonify(get_bridge_recommendations(limit=limit, cluster=cluster))
 
 
 @plam_bp.route("/api/plam/related")

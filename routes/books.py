@@ -109,6 +109,18 @@ def api_genres():
     return jsonify([{"genre": r["genre"], "count": r["cnt"]} for r in rows])
 
 
+@books_bp.route("/api/genres/info")
+def api_genre_info():
+    """ジャンル紹介文（特徴・おすすめの読者・初めて読むなら）を返す。
+    v1.3 Phase1: ジャンルページを「一覧」から「読書ガイド」へ育てる第一歩。"""
+    from config import GENRE_DESCRIPTIONS
+    genre = request.args.get("genre", "").strip()
+    info = GENRE_DESCRIPTIONS.get(genre)
+    if not info:
+        return jsonify({"genre": genre, "found": False})
+    return jsonify({"genre": genre, "found": True, **info})
+
+
 @books_bp.route("/api/books/batch")
 def api_books_batch():
     """ISBNリストをDBから一括取得（お気に入り・読書記録用）"""

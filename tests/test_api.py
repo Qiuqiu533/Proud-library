@@ -44,6 +44,23 @@ def test_books_by_genre_keyword(client):
     data = json.loads(res.data)
     assert "books" in data
 
+def test_genre_info_known_genre(client):
+    """2026-07-16: v1.3 Phase1。固定9ジャンルの紹介文（desc/audience/tip）が返る。"""
+    res = client.get("/api/genres/info?genre=文芸小説")
+    assert res.status_code == 200
+    data = json.loads(res.data)
+    assert data["found"] is True
+    assert data["desc"]
+    assert data["audience"]
+    assert data["tip"]
+    assert data["cluster"] == "literary"
+
+def test_genre_info_unknown_genre(client):
+    res = client.get("/api/genres/info?genre=存在しないジャンル")
+    assert res.status_code == 200
+    data = json.loads(res.data)
+    assert data["found"] is False
+
 def test_books_popular(client):
     res = client.get("/api/books/popular")
     assert res.status_code == 200
