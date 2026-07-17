@@ -7,6 +7,15 @@ PLAM Version 1.2 移行スクリプト
 使い方:
   cd /tmp/Proud-library-fresh
   python3 scripts/plam_assign_work_ids.py [--dry-run]
+
+⚠️ 技術的負債（2026-07-17発見・未修正）:
+  本スクリプトが書き出すworks.csvの列は
+  ["work_id","title","author","isbn13","isbn_status","notes"] だが、
+  現行のdata/plam/works.csvは
+  ["work_id","canonical_title","title","author","author_id","isbn13","isbn_status","notes"]
+  という別スキーマ（canonical_title・author_id列を含む）になっている。
+  このままこのスクリプトを実行すると、既存の全work（v1.4時点で1015件）から
+  canonical_title・author_idが失われる。現行スキーマに対応するまで実行禁止。
 """
 from __future__ import annotations
 import argparse, csv, re, sys

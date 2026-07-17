@@ -133,6 +133,12 @@ if __name__ == "__main__":
     targets = sys.argv[1:] if len(sys.argv) > 1 else []
 
     # 引数なしの場合は data/plam/*.csv を全件チェック
+    # ⚠️ 技術的負債（2026-07-17発見・未修正）: awards_master.csv以外にも
+    # award_name列を持たない非賞データCSV（works.csv, award_history.csv,
+    # bridge_works.csv, author_award_summary.csv 等）がdata/plam/直下に
+    # 多数あり、除外リストが不完全なためvalidate()内でKeyError: 'award_name'
+    # となりクラッシュする。plam_build_award_history.pyのEXCLUDEセットを
+    # 参考に、本スクリプトにも同様の除外リストを追加する必要がある。
     if not targets:
         targets = sorted(str(p) for p in Path("data/plam").glob("*.csv")
                          if p.name != "awards_master.csv")
