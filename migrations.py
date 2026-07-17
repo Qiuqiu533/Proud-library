@@ -2778,6 +2778,7 @@ def _run_all_migrations_steps():
         _migrate_resync_awards_v6,                  # 上下巻タイトルの表記揺れ修正後の再マッチング（2026-07-05）
         _migrate_fetch_isbn_ndl,           # NDL API で isbn13 補完（バックグラウンド）
         _migrate_integrity_audit,          # ISBN整合性監査テーブル追加（2026-07-05）
+        _migrate_usage_events,              # 利用状況計測テーブル追加（v1.4 Phase2）
         _migrate_db_indices,               # パフォーマンス用インデックス
         _verify_tables,
     ]
@@ -2901,6 +2902,53 @@ def _migrate_integrity_audit():
         logger.info("[migration] integrity_findings/integrity_log テーブル追加完了")
     except Exception as e:
         logger.error(f"[migration] integrity_audit error: %s", e)
+    finally:
+        con.close()
+
+
+def _migrate_usage_events():
+    """v1.4 Phase2（利用状況計測基盤）。detail_view/search/search_zero/
+    recommendation_click/bridge_click/genre_view 等のイベントログテーブルを追加。
+    住民個人を特定しない匿名session_id（ブラウザのsessionStorageで生成・保持）で
+    セッション単位のみ紐付け、ログイン情報・部屋番号は記録しない。"""
+    if _migration_done("usage_events_v1"):
+        return
+    con = get_con()
+    try:
+        if USE_PG:
+            cur = con.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS usage_events (
+                    id SERIAL PRIMARY KEY,
+                    event_type TEXT NOT NULL,
+                    book_isbn TEXT,
+                    genre TEXT,
+                    plam_cluster TEXT,
+                    source TEXT,
+                    session_id TEXT,
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_usage_events_type ON usage_events(event_type)")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_usage_events_created ON usage_events(created_at)")
+        else:
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS usage_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_type TEXT NOT NULL,
+                    book_isbn TEXT,
+                    genre TEXT,
+                    plam_cluster TEXT,
+                    source TEXT,
+                    session_id TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+        con.commit()
+        _mark_migration_done("usage_events_v1")
+        logger.info("[migration] usage_events テーブル追加完了")
+    except Exception as e:
+        logger.error("[migration] usage_events error: %s", e)
     finally:
         con.close()
 

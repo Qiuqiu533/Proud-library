@@ -102,6 +102,35 @@ function _skeletonGrid(count) {
 let residentSession = null;
 try { residentSession = JSON.parse(sessionStorage.getItem("resident_session") || "null"); } catch {}
 
+// 2026-07-17: v1.4 Phase2（利用状況計測基盤）。個人・部屋番号は記録せず、
+// セッション単位の匿名IDのみをブラウザ側で生成してsessionStorageに保持する。
+let _analyticsSessionId = null;
+try {
+  _analyticsSessionId = sessionStorage.getItem("analytics_session_id");
+  if (!_analyticsSessionId) {
+    _analyticsSessionId = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    sessionStorage.setItem("analytics_session_id", _analyticsSessionId);
+  }
+} catch {}
+
+function _trackEvent(eventType, opts = {}) {
+  try {
+    fetch("/api/track", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event_type: eventType,
+        book_isbn: opts.isbn || "",
+        genre: opts.genre || "",
+        plam_cluster: opts.cluster || "",
+        source: opts.source || "",
+        session_id: _analyticsSessionId || "",
+      }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch (e) { /* noop: 計測失敗でUXを止めない */ }
+}
+
 // ゲストモード
 let isGuest = sessionStorage.getItem("guest_mode") === "1";
 
@@ -981,6 +1010,9 @@ async function loadBooks(keyword = "", page = 1) {
   }
 
   currentTotal = data.total;
+  if (keyword.trim()) {
+    _trackEvent(data.total === 0 ? "search_zero" : "search", { source: keyword.trim() });
+  }
   let books = data.books.map(b => ({ ...b, rating: b.rating || getRating(b.isbn) }));
   if (currentSort === "title") books.sort((a, b) => {
     const noA = !a.author || a.author === "著者不明";
@@ -1162,6 +1194,7 @@ async function loadBooksByGenre(genre, page = 1) {
   const res = await fetch(`/api/books/by-genre?genre=${encodeURIComponent(genre)}&page=${page}&per=${currentPerPage}`);
   const data = await res.json();
   currentTotal = data.total;
+  if (page === 1) _trackEvent("genre_view", { genre });
   let books = data.books.map(b => ({ ...b, rating: b.rating || getRating(b.isbn) }));
   if (currentSort === "title") books.sort((a, b) => {
     const noA = !a.author || a.author === "著者不明";
@@ -1204,8 +1237,9 @@ async function _loadGenreInfo(genre) {
     if (!info.found) { box.style.display = "none"; return; }
 
     // 2026-07-16: v1.3 Phase2（代表作品・受賞作品・人気作品）。
-    const _genreBookRow = (items, subLabelFn) => items.map(b => `
-      <div class="mini-card" data-isbn="${b.isbn}" role="button" tabindex="0" aria-label="${esc(b.title)}">
+    // data-track-* は v1.4 Phase2（利用状況計測）向け。
+    const _genreBookRow = (items, subLabelFn, trackSource) => items.map(b => `
+      <div class="mini-card" data-isbn="${b.isbn}" data-track-type="recommendation_click" data-track-source="${trackSource}" role="button" tabindex="0" aria-label="${esc(b.title)}">
         <div class="mini-card-cover">${_bookCoverHtml(b.isbn, "", "", esc(b.title))}</div>
         <div class="mini-card-title">${esc(b.title)}</div>
         <div style="font-size:0.72rem;margin-top:2px;color:#888">${esc(subLabelFn(b))}</div>
@@ -1215,7 +1249,7 @@ async function _loadGenreInfo(genre) {
     if (info.first_books && info.first_books.length) {
       firstBooksHtml = `<div style="margin-top:10px">
         <div style="font-size:0.85rem;font-weight:600;margin-bottom:6px">🏆 まずはこの${info.first_books.length}冊</div>
-        <div class="recent-row">${_genreBookRow(info.first_books, b => b.award_label || "")}</div>
+        <div class="recent-row">${_genreBookRow(info.first_books, b => b.award_label || "", "genre_first_books")}</div>
       </div>`;
     }
 
@@ -1223,7 +1257,7 @@ async function _loadGenreInfo(genre) {
     if (info.award_books && info.award_books.length) {
       awardBooksHtml = `<div style="margin-top:10px">
         <div style="font-size:0.85rem;font-weight:600;margin-bottom:6px">🏅 このジャンルの受賞作</div>
-        <div class="recent-row">${_genreBookRow(info.award_books, b => b.award_label || "")}</div>
+        <div class="recent-row">${_genreBookRow(info.award_books, b => b.award_label || "", "genre_award_books")}</div>
       </div>`;
     }
 
@@ -1231,7 +1265,7 @@ async function _loadGenreInfo(genre) {
     if (info.popular_books && info.popular_books.length) {
       popularBooksHtml = `<div style="margin-top:10px">
         <div style="font-size:0.85rem;font-weight:600;margin-bottom:6px">⭐ このジャンルで人気の本</div>
-        <div class="recent-row">${_genreBookRow(info.popular_books, b => b.score ? `★${b.score.toFixed(1)}` : `♥${b.fav_count}`)}</div>
+        <div class="recent-row">${_genreBookRow(info.popular_books, b => b.score ? `★${b.score.toFixed(1)}` : `♥${b.fav_count}`, "genre_popular_books")}</div>
       </div>`;
     }
 
@@ -1243,7 +1277,7 @@ async function _loadGenreInfo(genre) {
         if (box.dataset.genre !== genre) return;
         if (items.length) {
           const cards = items.map(w => `
-            <div class="mini-card" data-isbn="${w.isbn}" role="button" tabindex="0" aria-label="${esc(w.title)}">
+            <div class="mini-card" data-isbn="${w.isbn}" data-track-type="bridge_click" data-track-source="genre_page" data-track-cluster="${esc((w.clusters||[]).join(','))}" role="button" tabindex="0" aria-label="${esc(w.title)}">
               <div class="mini-card-cover">
                 <span class="rank-badge" style="background:#3d6b8c" aria-hidden="true">🌉</span>
                 ${_bookCoverHtml(w.isbn, "", "", esc(w.title))}
@@ -1285,7 +1319,12 @@ async function _loadGenreInfo(genre) {
     </div>`;
     box.style.display = "block";
     box.querySelectorAll(".mini-card").forEach(el => {
-      el.addEventListener("click", () => openModal(el.dataset.isbn));
+      el.addEventListener("click", () => {
+        if (el.dataset.trackType) {
+          _trackEvent(el.dataset.trackType, { isbn: el.dataset.isbn, genre, source: el.dataset.trackSource || "", cluster: el.dataset.trackCluster || "" });
+        }
+        openModal(el.dataset.isbn);
+      });
     });
     box.querySelectorAll(".genre-graph-chip").forEach(el => {
       el.addEventListener("click", () => _switchToGenre(el.dataset.genre));
@@ -2166,6 +2205,7 @@ function _updateReviewsSection(isbn, rating) {
 
 let _modalOpener = null;
 async function openModal(isbn, preloadedBook) {
+  _trackEvent("detail_view", { isbn });
   const modal = document.getElementById("modal");
   _modalOpener = document.activeElement;
   modal.style.display = "flex";
@@ -2366,8 +2406,9 @@ async function _loadPlamRelated(workId) {
         <div class="plam-rel-title">${esc(w.title)}</div>
         <div class="plam-rel-award">${esc(w.top_award)}${w.is_bridge ? " 🌉" : ""}</div>
         ${w.reason ? `<div class="plam-rel-reason">${esc(w.reason)}</div>` : ""}`;
+      const trackType = w.is_bridge ? "bridge_click" : "recommendation_click";
       return clickable
-        ? `<div class="plam-rel-card plam-rel-card--link" onclick="openModal('${w.isbn}')" role="button" tabindex="0" aria-label="${esc(w.title)}">${inner}</div>`
+        ? `<div class="plam-rel-card plam-rel-card--link" onclick="_trackEvent('${trackType}', {isbn:'${w.isbn}', source:'modal_related'}); openModal('${w.isbn}')" role="button" tabindex="0" aria-label="${esc(w.title)}">${inner}</div>`
         : `<div class="plam-rel-card">${inner}</div>`;
     };
 
@@ -6312,7 +6353,10 @@ async function loadPopularBooks() {
       </div>`;
     }).join("");
     row.querySelectorAll(".mini-card").forEach(el => {
-      el.addEventListener("click", () => openModal(el.dataset.isbn));
+      el.addEventListener("click", () => {
+        _trackEvent("recommendation_click", { isbn: el.dataset.isbn, source: "home_popular" });
+        openModal(el.dataset.isbn);
+      });
     });
   } catch {}
 }
@@ -6341,7 +6385,10 @@ async function loadBridgeRecommendations() {
       </div>`;
     }).join("");
     row.querySelectorAll(".mini-card").forEach(el => {
-      el.addEventListener("click", () => openModal(el.dataset.isbn));
+      el.addEventListener("click", () => {
+        _trackEvent("bridge_click", { isbn: el.dataset.isbn, source: "home" });
+        openModal(el.dataset.isbn);
+      });
     });
   } catch {}
 }

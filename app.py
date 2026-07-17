@@ -43,6 +43,7 @@ from routes.events import events_bp
 from routes.timeline import timeline_bp
 from routes.newsletter import newsletter_bp
 from routes.plam import plam_bp
+from routes.analytics import analytics_bp
 
 app.register_blueprint(pages_bp)
 app.register_blueprint(auth_bp)
@@ -65,6 +66,7 @@ app.register_blueprint(events_bp)
 app.register_blueprint(timeline_bp)
 app.register_blueprint(newsletter_bp)
 app.register_blueprint(plam_bp)
+app.register_blueprint(analytics_bp)
 
 # ── DBコネクション自動返却 ────────────────────────────────────────────────
 # get_con()のclose()忘れ・例外発生時の接続リークを防ぐため、
