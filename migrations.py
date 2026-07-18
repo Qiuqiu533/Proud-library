@@ -2779,6 +2779,7 @@ def _run_all_migrations_steps():
         _migrate_fetch_isbn_ndl,           # NDL API で isbn13 補完（バックグラウンド）
         _migrate_integrity_audit,          # ISBN整合性監査テーブル追加（2026-07-05）
         _migrate_usage_events,              # 利用状況計測テーブル追加（v1.4 Phase2）
+        _migrate_clear_leaked_credentials, # 緊急対応：漏洩パスワードのDB保存値削除（2026-07-18）
         _migrate_db_indices,               # パフォーマンス用インデックス
         _verify_tables,
     ]
@@ -2951,6 +2952,31 @@ def _migrate_usage_events():
         logger.error("[migration] usage_events error: %s", e)
     finally:
         con.close()
+
+
+def _migrate_clear_leaked_credentials():
+    """緊急対応（2026-07-18）: templates/index.htmlの操作ガイドに平文記載されていた
+    admin/board/residentパスワードが漏洩したため、settingsテーブルのkey='admin_password' /
+    'board_password' / 'resident_password' の行を、値を問わず削除する（キー名ベースの削除で
+    あり、漏洩した値との照合は行わない）。
+    get_setting()はDB保存値をRenderの環境変数より優先して返す実装のため、これらの行を
+    残したままRenderの環境変数だけを新しい値に変更しても、DBに残った値（今回のケースでは
+    漏洩済みの旧パスワード）が有効なままになってしまう。削除後は環境変数の値がフォールバック
+    として使われるようになる。
+    一回限り・冪等に実行される（applied_migrationsフラグで管理）ため、この後に管理画面の
+    「パスワード変更」機能で正規に設定された新しい値を誤って消すことはない。
+    """
+    if _migration_done("clear_leaked_credentials_20260718"):
+        return
+    try:
+        con = get_con()
+        execute(con, "DELETE FROM settings WHERE key IN ('admin_password','board_password','resident_password')")
+        con.commit()
+        con.close()
+        _mark_migration_done("clear_leaked_credentials_20260718")
+        logger.info("[security] admin/board/resident_passwordのDB保存値を削除しました（環境変数へ切替）")
+    except Exception as e:
+        logger.error("[security] clear_leaked_credentials error: %s", e)
 
 
 def _migrate_db_indices():

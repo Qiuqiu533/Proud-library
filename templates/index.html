@@ -2004,7 +2004,7 @@
           <p class="pw-change-note">変更するには現在の管理者パスワードが必要です。</p>
           <div class="pw-group">
             <label for="pwCurrent">現在のパスワード（管理者）</label>
-            <input type="password" id="pwCurrent" placeholder="kanri5533など" />
+            <input type="password" id="pwCurrent" placeholder="現在のパスワードを入力" />
           </div>
           <hr class="pw-divider">
           <div class="pw-group">
@@ -2313,11 +2313,11 @@
           <!-- 3. パスワード -->
           <div class="guide-section" id="guide-passwords">
             <h4 class="guide-section-title">3. パスワード一覧</h4>
-            <div class="guide-warning-box">⚠️ このページは管理者メニュー内にのみ表示されますが、パスワードは別途安全な場所に保管してください。</div>
+            <div class="guide-warning-box">⚠️ このページはHTMLソースとして全訪問者に配信されるため、パスワードそのものは記載しません。現在の値はRenderの環境変数（Environment Variables）またはこのページ下部の「パスワード変更」機能で確認・変更してください。</div>
             <table class="guide-table">
-              <tr><th>種類</th><th>初期値</th><th>用途</th></tr>
-              <tr><td>🏠 住民パスワード</td><td>pfl2525@QQ3</td><td>住民がサイトにログインする際のパスワード</td></tr>
-              <tr><td>🏛️ 管理者パスワード</td><td>kanri5533</td><td>管理者メニューへのログイン・各種操作に使用</td></tr>
+              <tr><th>種類</th><th>設定場所</th><th>用途</th></tr>
+              <tr><td>🏠 住民パスワード</td><td>Render環境変数 <code>RESIDENT_PASSWORD</code></td><td>住民がサイトにログインする際のパスワード</td></tr>
+              <tr><td>🏛️ 管理者パスワード</td><td>Render環境変数 <code>BOARD_PASSWORD</code></td><td>管理者メニューへのログイン・各種操作に使用</td></tr>
             </table>
             <div class="guide-step-box">
               <strong>パスワードを変更する手順：</strong>
