@@ -5529,37 +5529,6 @@ document.getElementById("syncLogoutBtn").addEventListener("click", () => {
 cloudUser = getCloudUser();
 updateSyncUI();
 
-// ===== パスワード変更 =====
-document.getElementById("pwChangeBtn").addEventListener("click", async () => {
-  const current = document.getElementById("pwCurrent").value;
-  const target = document.getElementById("pwTarget").value;
-  const newPw = document.getElementById("pwNew").value;
-  const confirm = document.getElementById("pwConfirm").value;
-  const msg = document.getElementById("pwMsg");
-  if (!current) { msg.textContent = "⚠️ 現在のパスワードを入力してください"; msg.style.color = "#e05"; return; }
-  if (!newPw || newPw.length < 4) { msg.textContent = "⚠️ 新しいパスワードは4文字以上で入力してください"; msg.style.color = "#e05"; return; }
-  if (newPw !== confirm) { msg.textContent = "⚠️ 確認パスワードが一致しません"; msg.style.color = "#e05"; return; }
-  const res = await fetch("/api/admin/change-password", {
-    method: "POST", headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({current_password: current, target, new_password: newPw})
-  });
-  const data = await res.json();
-  if (res.ok) {
-    msg.textContent = "✅ パスワードを変更しました";
-    msg.style.color = "#3d6b4f";
-    document.getElementById("pwCurrent").value = "";
-    document.getElementById("pwNew").value = "";
-    document.getElementById("pwConfirm").value = "";
-    // If board password was changed, update session
-    if (target === "board") {
-      boardPassword = newPw;
-      sessionStorage.setItem("board_pass", newPw);
-    }
-  } else {
-    msg.textContent = "❌ " + (data.error || "変更できませんでした");
-    msg.style.color = "#e05";
-  }
-});
 
 async function loadDbSize() {
   const display = document.getElementById("dbSizeDisplay");

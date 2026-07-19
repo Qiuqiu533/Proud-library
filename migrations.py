@@ -2780,6 +2780,7 @@ def _run_all_migrations_steps():
         _migrate_integrity_audit,          # ISBN整合性監査テーブル追加（2026-07-05）
         _migrate_usage_events,              # 利用状況計測テーブル追加（v1.4 Phase2）
         _migrate_clear_leaked_credentials, # 緊急対応：漏洩パスワードのDB保存値削除（2026-07-18）
+        _migrate_clear_credential_overrides_v2, # 緊急対応フォローアップ：再発したDB上書きの削除（2026-07-18）
         _migrate_db_indices,               # パフォーマンス用インデックス
         _verify_tables,
     ]
@@ -2977,6 +2978,29 @@ def _migrate_clear_leaked_credentials():
         logger.info("[security] admin/board/resident_passwordのDB保存値を削除しました（環境変数へ切替）")
     except Exception as e:
         logger.error("[security] clear_leaked_credentials error: %s", e)
+
+
+def _migrate_clear_credential_overrides_v2():
+    """緊急対応フォローアップ（2026-07-18）: 前回のローテーション作業中に、管理画面の
+    「パスワード変更」フォーム（/api/admin/change-password、target=board）が使われたことで
+    settingsテーブルにboard_password/resident_passwordの値が再度書き込まれ、Renderの
+    環境変数を上書きしてしまった。このフォーム自体を廃止する（/api/admin/change-passwordの
+    board/residentターゲットを削除）のに合わせて、settingsテーブルに残った値を再度削除し、
+    Render環境変数のみを設定元とする運用に戻す。
+    一回限り・冪等（applied_migrationsフラグで管理）。以後はこの経路から再書き込みされない
+    ため、今回限りの復旧処理となる。
+    """
+    if _migration_done("clear_credential_overrides_v2_20260718"):
+        return
+    try:
+        con = get_con()
+        execute(con, "DELETE FROM settings WHERE key IN ('admin_password','board_password','resident_password')")
+        con.commit()
+        con.close()
+        _mark_migration_done("clear_credential_overrides_v2_20260718")
+        logger.info("[security] settings上書き値を再削除しました（Render環境変数のみ運用へ）")
+    except Exception as e:
+        logger.error("[security] clear_credential_overrides_v2 error: %s", e)
 
 
 def _migrate_db_indices():
