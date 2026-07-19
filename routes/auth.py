@@ -134,25 +134,7 @@ def api_admin_users_change_password(target_code):
     return jsonify({"ok": True})
 
 
-@auth_bp.route("/api/admin/change-password", methods=["POST"])
-def api_change_password():
-    body = request.get_json()
-    if not check_password(body.get("current_password"), "board"):
-        return jsonify({"error": "現在のパスワードが違います"}), 401
-    target = body.get("target")
-    new_pw = body.get("new_password", "").strip()
-    if not new_pw or len(new_pw) < 4:
-        return jsonify({"error": "4文字以上で入力してください"}), 400
-    key_map = {"resident": "resident_password", "admin": "admin_password", "board": "board_password"}
-    if target not in key_map:
-        return jsonify({"error": "不正なターゲット"}), 400
-    db_key = key_map[target]
-    from database import USE_PG
-    con = get_con()
-    if USE_PG:
-        execute(con, "INSERT INTO settings (key, value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value",
-                (db_key, new_pw))
-    else:
-        execute(con, "INSERT OR REPLACE INTO settings (key, value) VALUES (?,?)", (db_key, new_pw))
-    con.commit(); con.close()
-    return jsonify({"ok": True})
+# 緊急対応（2026-07-18）: /api/admin/change-password（理事会/住民パスワードをsettingsテーブルへ
+# 保存するエンドポイント）は廃止した。Renderの環境変数が優先されない状態を保つため、理事会・
+# 住民パスワードの変更はRenderのEnvironment Variablesで直接行う運用に統一する
+# （migrations.py の _migrate_clear_credential_overrides_v2 を参照）。
