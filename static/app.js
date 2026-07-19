@@ -5529,6 +5529,17 @@ document.getElementById("syncLogoutBtn").addEventListener("click", () => {
 cloudUser = getCloudUser();
 updateSyncUI();
 
+// ===== ブラウザの理事会パスワード同期（サーバーには保存しない） =====
+document.getElementById("boardSyncBtn")?.addEventListener("click", () => {
+  const v = document.getElementById("boardSyncPass").value;
+  const msg = document.getElementById("boardSyncMsg");
+  if (!v) { msg.style.color = "#e05"; msg.textContent = "⚠️ 理事会パスワードを入力してください"; return; }
+  boardPassword = v;
+  sessionStorage.setItem("board_pass", v);
+  document.getElementById("boardSyncPass").value = "";
+  msg.style.color = "#3d6b4f";
+  msg.textContent = "✅ 同期しました。各タブを開き直してください。";
+});
 
 async function loadDbSize() {
   const display = document.getElementById("dbSizeDisplay");
