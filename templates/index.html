@@ -2007,6 +2007,19 @@
           </p>
         </div>
 
+        <h4 style="margin:28px 0 16px">🔄 このブラウザの理事会パスワードを同期</h4>
+        <div class="pw-change-form">
+          <p class="pw-change-note">
+            「管理者アカウント設定」「ダッシュボード」等が「読み込みに失敗」と表示される場合、このブラウザに保存されている理事会パスワードがRenderの設定値と一致していません。現在の理事会パスワード（Render Environmentの値）を入力して同期してください。<br>
+            <strong>この操作はブラウザ内だけで完結し、サーバーには保存されません。</strong>
+          </p>
+          <div class="pw-group">
+            <input type="password" id="boardSyncPass" placeholder="現在の理事会パスワード" />
+          </div>
+          <button class="btn-primary" id="boardSyncBtn" style="margin-top:6px">🔄 同期する</button>
+          <p id="boardSyncMsg" class="rate-msg" style="margin-top:10px"></p>
+        </div>
+
         <h4 style="margin:28px 0 12px">🗄️ DB使用量</h4>
         <div class="pw-change-form">
           <p class="pw-change-note">Neon無料枠（512MB）に対する現在の使用量です。</p>
