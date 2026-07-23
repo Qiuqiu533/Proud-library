@@ -1,5 +1,4 @@
 from flask import Blueprint, render_template, Response
-from services.utils import auto_cleanup_images
 from config import STATIC_VERSION
 
 pages_bp = Blueprint("pages", __name__)
@@ -25,5 +24,7 @@ def robots_txt():
 
 @pages_bp.route("/ping")
 def ping():
-    auto_cleanup_images()
+    """外形監視・keep-alive専用の単純な死活確認。DBには一切接続しない
+    （2026-07-21: 旧実装がDB接続を伴っていたため、外部監視の高頻度アクセスが
+    Neonのアイドルタイマーを継続的にリセットし、Scale to Zeroを妨げていた）。"""
     return "ok", 200

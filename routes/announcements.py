@@ -2,7 +2,7 @@ import json
 from flask import Blueprint, request, jsonify
 from config import check_password
 from database import get_con, execute, fetchall
-from services.utils import get_pw_from_request as _get_pw
+from services.utils import get_pw_from_request as _get_pw, auto_cleanup_images
 from services.audit import log_action
 
 announcements_bp = Blueprint("announcements", __name__)
@@ -47,6 +47,8 @@ def api_post_announcement():
         (title, text, body.get("category","お知らせ"), json.dumps(images, ensure_ascii=False), event_date))
     con.commit(); con.close()
     log_action("お知らせ投稿", title)
+    if images:
+        auto_cleanup_images()
     return jsonify({"ok": True})
 
 
@@ -65,6 +67,8 @@ def api_update_announcement(ann_id):
         (body.get("title","").strip(), body.get("body","").strip(),
          body.get("category","お知らせ"), json.dumps(images, ensure_ascii=False), event_date, ann_id))
     con.commit(); con.close()
+    if images:
+        auto_cleanup_images()
     return jsonify({"ok": True})
 
 

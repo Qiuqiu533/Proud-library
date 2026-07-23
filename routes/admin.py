@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from config import get_board_password, check_password, get_setting
 from database import get_con, execute, fetchone, fetchall, USE_PG
+from services.utils import auto_cleanup_images
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -37,6 +38,8 @@ def api_staff_chat_post():
     else:
         execute(con, "INSERT INTO staff_chat (sender, message, image_data) VALUES (?, ?, ?)", (sender, message, image_data))
     con.commit(); con.close()
+    if image_data:
+        auto_cleanup_images()
     return jsonify({"ok": True})
 
 
