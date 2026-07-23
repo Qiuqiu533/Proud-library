@@ -435,6 +435,9 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .analytics-sub-btn.active { color: #2a3a6a; border-bottom-color: #2a3a6a; font-weight: 700; }
 .analytics-sub-panel { display: none; }
 .analytics-sub-panel.active { display: block; }
+.usage-period-switch { display: flex; gap: 6px; }
+.usage-period-btn { padding: 5px 14px; border: 1.5px solid #ddd; border-radius: 16px; background: #fff; font-family: inherit; font-size: 0.78rem; color: #666; cursor: pointer; transition: all .2s; font-weight: 500; }
+.usage-period-btn.active { border-color: #3d6b4f; background: #3d6b4f; color: #fff; }
 @media (max-width: 600px) {
   .dash-card-row { grid-template-columns: repeat(2, 1fr); }
   .dash-card-num { font-size: 1.7rem; }
