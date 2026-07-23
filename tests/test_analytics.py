@@ -88,3 +88,43 @@ def test_api_track_endpoint_ignores_unknown_event_type(client):
     rows = fetchall(con, "SELECT * FROM usage_events WHERE session_id=?", ("test-session-001",))
     con.close()
     assert len(rows) == 0
+
+
+def _cleanup_usage_stats_events():
+    con = get_con()
+    execute(con, "DELETE FROM usage_events WHERE session_id=?", ("test-session-usagestats",))
+    con.commit()
+    con.close()
+
+
+def test_usage_stats_requires_board_password(client):
+    res = client.get("/api/admin/usage-stats")
+    assert res.status_code == 401
+
+
+def test_usage_stats_excludes_deploy_verify_but_includes_null_and_other_source(client):
+    try:
+        log_event("detail_view", book_isbn="9784000000010", source="deploy_verify", session_id="test-session-usagestats")
+        log_event("detail_view", book_isbn="9784000000011", session_id="test-session-usagestats")  # source=NULL
+        log_event("detail_view", book_isbn="9784000000012", source="home_popular", session_id="test-session-usagestats")
+
+        res = client.get("/api/admin/usage-stats?period=all", headers={"X-Password": "test-board-pw"})
+        assert res.status_code == 200
+        data = res.get_json()
+
+        isbns = {b["isbn"] for b in data["top_books"]}
+        assert "9784000000010" not in isbns
+        assert "9784000000011" in isbns
+        assert "9784000000012" in isbns
+    finally:
+        _cleanup_usage_stats_events()
+
+
+def test_usage_stats_response_shape(client):
+    res = client.get("/api/admin/usage-stats?period=7d", headers={"X-Password": "test-board-pw"})
+    assert res.status_code == 200
+    data = res.get_json()
+    for key in ("type_counts", "daily_trend", "top_books", "top_genres",
+                "search_total", "search_zero_rate", "detail_view_count",
+                "recommendation_click_count", "bridge_click_count"):
+        assert key in data

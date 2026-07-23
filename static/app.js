@@ -4214,8 +4214,94 @@ function _initAnalyticsSubTabs() {
       if (btn.dataset.asub === "stats") loadStats();
       if (btn.dataset.asub === "opsstats") loadOpsStats();
       if (btn.dataset.asub === "analysis") loadAnalysisReport();
+      if (btn.dataset.asub === "usage") loadUsageStats();
     };
   });
+  document.querySelectorAll(".usage-period-btn").forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll(".usage-period-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      loadUsageStats(btn.dataset.period);
+    };
+  });
+}
+
+const _EVENT_TYPE_LABEL = {
+  detail_view: "本詳細表示",
+  search: "検索実行",
+  search_zero: "検索0件",
+  recommendation_click: "おすすめクリック",
+  bridge_click: "Bridge Worksクリック",
+  genre_view: "ジャンルページ閲覧",
+};
+
+async function loadUsageStats(period) {
+  const el = document.getElementById("usageStatsContent");
+  if (!el) return;
+  period = period || document.querySelector(".usage-period-btn.active")?.dataset.period || "7d";
+  el.innerHTML = '<div class="loading">読み込み中…</div>';
+  const headers = { "X-Password": boardPassword };
+  const res = await fetch(`/api/admin/usage-stats?period=${encodeURIComponent(period)}`, { headers }).catch(() => null);
+  if (!res || !res.ok) { el.innerHTML = '<div class="loading">取得失敗（管理者ログインが必要です）</div>'; return; }
+  const d = await res.json();
+
+  const typeRows = Object.entries(_EVENT_TYPE_LABEL)
+    .map(([key, label]) => `<div style="display:flex;justify-content:space-between;font-size:0.85rem;padding:5px 0;border-bottom:1px solid #f0ede8">
+      <span>${label}</span><span style="font-weight:700;color:#3d6b4f">${d.type_counts[key] || 0}件</span>
+    </div>`).join("");
+
+  const maxDaily = Math.max(1, ...d.daily_trend.map(r => r.cnt));
+  const trendHtml = d.daily_trend.length ? d.daily_trend.map(r => `
+    <div style="display:flex;align-items:center;gap:8px;font-size:0.8rem">
+      <span style="width:80px;color:#555;white-space:nowrap">${r.day}</span>
+      <div style="flex:1;background:#eee;border-radius:3px;height:12px">
+        <div style="background:#5b8dd9;height:12px;border-radius:3px;width:${Math.round(r.cnt / maxDaily * 100)}%"></div></div>
+      <span style="width:40px;text-align:right;color:#444">${r.cnt}</span>
+    </div>`).join("") : '<div style="color:#aaa;font-size:0.85rem">データなし</div>';
+
+  const topBooksHtml = d.top_books.length ? d.top_books.map((b, i) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #f0ede8;font-size:0.83rem">
+      <span style="font-weight:700;color:#5b8dd9;min-width:24px;text-align:right">${i + 1}</span>
+      <div style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(b.title || b.isbn)}</div>
+      <span style="color:#888;white-space:nowrap">${b.cnt}回</span>
+    </div>`).join("") : '<div style="color:#aaa;font-size:0.85rem">データなし</div>';
+
+  const topGenresHtml = d.top_genres.length ? d.top_genres.map((g, i) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #f0ede8;font-size:0.83rem">
+      <span style="font-weight:700;color:#5b8dd9;min-width:24px;text-align:right">${i + 1}</span>
+      <div style="flex:1">${esc(_GENRE_LABEL[g.genre] || g.genre)}</div>
+      <span style="color:#888;white-space:nowrap">${g.cnt}回</span>
+    </div>`).join("") : '<div style="color:#aaa;font-size:0.85rem">データなし</div>';
+
+  el.innerHTML = `
+    <div class="stats-summary" style="flex-wrap:wrap;gap:12px;margin-bottom:20px">
+      <div class="stat-card"><div class="stat-num">${d.detail_view_count}</div><div class="stat-label">📖 本詳細表示</div></div>
+      <div class="stat-card"><div class="stat-num">${d.search_total}</div><div class="stat-label">🔍 検索実行</div></div>
+      <div class="stat-card"><div class="stat-num">${d.search_zero_rate}%</div><div class="stat-label">🚫 検索0件率</div></div>
+      <div class="stat-card"><div class="stat-num">${d.recommendation_click_count}</div><div class="stat-label">✨ おすすめクリック</div></div>
+      <div class="stat-card"><div class="stat-num">${d.bridge_click_count}</div><div class="stat-label">🌉 Bridge Worksクリック</div></div>
+    </div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:20px">
+      <div style="flex:1;min-width:220px">
+        <h4 style="color:#3d6b4f;margin-bottom:10px">📊 イベント種別ごとの件数</h4>
+        ${typeRows}
+      </div>
+      <div style="flex:1;min-width:220px">
+        <h4 style="color:#3d6b4f;margin-bottom:10px">📈 日別推移</h4>
+        <div style="display:flex;flex-direction:column;gap:5px">${trendHtml}</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:20px">
+      <div style="flex:1;min-width:220px">
+        <h4 style="color:#3d6b4f;margin-bottom:10px">📚 人気書籍 TOP10</h4>
+        ${topBooksHtml}
+      </div>
+      <div style="flex:1;min-width:220px">
+        <h4 style="color:#3d6b4f;margin-bottom:10px">📂 人気ジャンル TOP10</h4>
+        ${topGenresHtml}
+      </div>
+    </div>
+  `;
 }
 
 // ===== 統計ドリルダウンモーダル =====
