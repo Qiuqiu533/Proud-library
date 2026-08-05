@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 # 境界判定は誤爆する（2026-07-05に実証済み）。
 AWARD_BOOKS_SEEDS_MIN_ROUND = {"芥川賞": 129, "直木賞": 129}
 
-from database import get_con, execute, fetchone, fetchall, USE_PG
+from database import get_con, db_session, execute, fetchone, fetchall, USE_PG
 from config import GENRE_MAP, OPENBD_API
 from seeds import _AWARDS_SEED, _AWARD_BOOKS_SEED
 from services.utils import _hash_password, _ndc_to_genre, _keyword_genre
@@ -29,367 +29,367 @@ _REQUIRED_TABLES = [
 
 
 def init_db():
-    con = get_con()
-    if USE_PG:
-        cur = con.cursor()
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS ratings (
-                isbn TEXT PRIMARY KEY,
-                score REAL,
-                votes INTEGER,
-                reviews TEXT DEFAULT '[]'
-            )
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS announcements (
-                id SERIAL PRIMARY KEY,
-                title TEXT NOT NULL,
-                body TEXT NOT NULL,
-                category TEXT DEFAULT 'お知らせ',
-                image_url TEXT DEFAULT '',
-                created_at TIMESTAMP DEFAULT NOW()
-            )
-        """)
-        try:
-            cur.execute("ALTER TABLE announcements ADD COLUMN event_date TEXT DEFAULT ''")
-            con.commit()
-        except psycopg2.errors.DuplicateColumn:
-            con.rollback()
-        try:
-            cur.execute("ALTER TABLE genre_books ADD COLUMN description TEXT DEFAULT ''")
-            con.commit()
-        except psycopg2.errors.DuplicateColumn:
-            con.rollback()
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS issues (
-                id SERIAL PRIMARY KEY,
-                title TEXT NOT NULL,
-                body TEXT NOT NULL,
-                priority TEXT DEFAULT '中',
-                status TEXT DEFAULT '未対応',
-                sort_order INTEGER DEFAULT 0,
-                created_at TIMESTAMP DEFAULT NOW()
-            )
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS book_requests (
-                id SERIAL PRIMARY KEY,
-                title TEXT NOT NULL,
-                author TEXT DEFAULT '',
-                reason TEXT DEFAULT '',
-                room TEXT DEFAULT '',
-                status TEXT DEFAULT 'pending',
-                note TEXT DEFAULT '',
-                created_at TIMESTAMP DEFAULT NOW()
-            )
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS calendar_events (
-                id SERIAL PRIMARY KEY,
-                title TEXT NOT NULL,
-                event_date TEXT NOT NULL,
-                body TEXT DEFAULT '',
-                minutes TEXT DEFAULT '',
-                sort_order INTEGER DEFAULT 0,
-                created_at TIMESTAMP DEFAULT NOW()
-            )
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS settings (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL
-            )
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS collections (
-                id SERIAL PRIMARY KEY,
-                title TEXT NOT NULL,
-                description TEXT DEFAULT '',
-                emoji TEXT DEFAULT '📚',
-                isbns TEXT DEFAULT '[]',
-                is_active BOOLEAN DEFAULT TRUE,
-                sort_order INTEGER DEFAULT 0,
-                created_at TIMESTAMP DEFAULT NOW()
-            )
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS user_accounts (
-                room TEXT PRIMARY KEY,
-                pin TEXT NOT NULL,
-                email TEXT DEFAULT '',
-                password_hash TEXT DEFAULT '',
-                password_salt TEXT DEFAULT '',
-                favorites TEXT DEFAULT '[]',
-                reading_log TEXT DEFAULT '{}',
-                library_card_url TEXT DEFAULT '',
-                library_card_image TEXT DEFAULT '',
-                updated_at TIMESTAMP DEFAULT NOW()
-            )
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS password_reset_tokens (
-                token TEXT PRIMARY KEY,
-                room TEXT NOT NULL,
-                expires_at TIMESTAMP NOT NULL,
-                used BOOLEAN DEFAULT FALSE
-            )
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS genre_books (
-                isbn TEXT PRIMARY KEY,
-                genre TEXT DEFAULT '',
-                title TEXT DEFAULT '',
-                author TEXT DEFAULT '',
-                publisher TEXT DEFAULT '',
-                format TEXT DEFAULT ''
-            )
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS new_arrivals (
-                id SERIAL PRIMARY KEY,
-                isbn TEXT NOT NULL,
-                arrived_at DATE NOT NULL,
-                title TEXT DEFAULT '',
-                author TEXT DEFAULT '',
-                publisher TEXT DEFAULT '',
-                cover TEXT DEFAULT '',
-                created_at TIMESTAMP DEFAULT NOW()
-            )
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS availability_cache (
-                isbn TEXT PRIMARY KEY,
-                status TEXT,
-                title TEXT DEFAULT '',
-                author TEXT DEFAULT '',
-                updated_at TIMESTAMP DEFAULT NOW()
-            )
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS staff_chat (
-                id SERIAL PRIMARY KEY,
-                sender TEXT NOT NULL,
-                message TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT NOW()
-            )
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS chat_threads (
-                id SERIAL PRIMARY KEY,
-                title TEXT NOT NULL,
-                created_by TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT NOW()
-            )
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS admin_users (
-                id SERIAL PRIMARY KEY,
-                code TEXT UNIQUE NOT NULL,
-                name TEXT NOT NULL,
-                password_hash TEXT NOT NULL,
-                salt TEXT NOT NULL,
-                role TEXT NOT NULL DEFAULT 'admin',
-                created_at TIMESTAMP DEFAULT NOW()
-            )
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS award_books (
-                id SERIAL PRIMARY KEY,
-                award TEXT NOT NULL,
-                award_no INTEGER,
-                award_year INTEGER,
-                title TEXT NOT NULL,
-                author TEXT DEFAULT '',
-                isbn13 TEXT DEFAULT '',
-                summary TEXT DEFAULT '',
-                status TEXT DEFAULT '確認済',
-                created_at TIMESTAMP DEFAULT NOW()
-            )
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS applied_migrations (
-                name TEXT PRIMARY KEY,
-                applied_at TIMESTAMP DEFAULT NOW()
-            )
-        """)
-        con.commit()
-    else:
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS ratings (
-                isbn TEXT PRIMARY KEY,
-                score REAL,
-                votes INTEGER,
-                reviews TEXT DEFAULT '[]'
-            )
-        """)
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS announcements (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                body TEXT NOT NULL,
-                category TEXT DEFAULT 'お知らせ',
-                image_url TEXT DEFAULT '',
-                created_at TEXT DEFAULT (datetime('now', 'localtime'))
-            )
-        """)
-        try:
-            con.execute("ALTER TABLE announcements ADD COLUMN image_url TEXT DEFAULT ''")
-        except Exception:
-            pass
-        try:
-            con.execute("ALTER TABLE announcements ADD COLUMN event_date TEXT DEFAULT ''")
-        except Exception:
-            pass
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS issues (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                body TEXT NOT NULL,
-                priority TEXT DEFAULT '中',
-                status TEXT DEFAULT '未対応',
-                sort_order INTEGER DEFAULT 0,
-                created_at TEXT DEFAULT (datetime('now', 'localtime'))
-            )
-        """)
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS book_requests (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                author TEXT DEFAULT '',
-                reason TEXT DEFAULT '',
-                room TEXT DEFAULT '',
-                status TEXT DEFAULT 'pending',
-                note TEXT DEFAULT '',
-                created_at TEXT DEFAULT (datetime('now', 'localtime'))
-            )
-        """)
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS calendar_events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                event_date TEXT NOT NULL,
-                body TEXT DEFAULT '',
-                minutes TEXT DEFAULT '',
-                sort_order INTEGER DEFAULT 0,
-                created_at TEXT DEFAULT (datetime('now', 'localtime'))
-            )
-        """)
-        for tbl in ("issues", "calendar_events"):
+    with db_session() as con:
+        if USE_PG:
+            cur = con.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS ratings (
+                    isbn TEXT PRIMARY KEY,
+                    score REAL,
+                    votes INTEGER,
+                    reviews TEXT DEFAULT '[]'
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS announcements (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    body TEXT NOT NULL,
+                    category TEXT DEFAULT 'お知らせ',
+                    image_url TEXT DEFAULT '',
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
             try:
-                con.execute(f"ALTER TABLE {tbl} ADD COLUMN sort_order INTEGER DEFAULT 0")
+                cur.execute("ALTER TABLE announcements ADD COLUMN event_date TEXT DEFAULT ''")
+                con.commit()
+            except psycopg2.errors.DuplicateColumn:
+                con.rollback()
+            try:
+                cur.execute("ALTER TABLE genre_books ADD COLUMN description TEXT DEFAULT ''")
+                con.commit()
+            except psycopg2.errors.DuplicateColumn:
+                con.rollback()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS issues (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    body TEXT NOT NULL,
+                    priority TEXT DEFAULT '中',
+                    status TEXT DEFAULT '未対応',
+                    sort_order INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS book_requests (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    author TEXT DEFAULT '',
+                    reason TEXT DEFAULT '',
+                    room TEXT DEFAULT '',
+                    status TEXT DEFAULT 'pending',
+                    note TEXT DEFAULT '',
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS calendar_events (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    event_date TEXT NOT NULL,
+                    body TEXT DEFAULT '',
+                    minutes TEXT DEFAULT '',
+                    sort_order INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS collections (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    description TEXT DEFAULT '',
+                    emoji TEXT DEFAULT '📚',
+                    isbns TEXT DEFAULT '[]',
+                    is_active BOOLEAN DEFAULT TRUE,
+                    sort_order INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS user_accounts (
+                    room TEXT PRIMARY KEY,
+                    pin TEXT NOT NULL,
+                    email TEXT DEFAULT '',
+                    password_hash TEXT DEFAULT '',
+                    password_salt TEXT DEFAULT '',
+                    favorites TEXT DEFAULT '[]',
+                    reading_log TEXT DEFAULT '{}',
+                    library_card_url TEXT DEFAULT '',
+                    library_card_image TEXT DEFAULT '',
+                    updated_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                    token TEXT PRIMARY KEY,
+                    room TEXT NOT NULL,
+                    expires_at TIMESTAMP NOT NULL,
+                    used BOOLEAN DEFAULT FALSE
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS genre_books (
+                    isbn TEXT PRIMARY KEY,
+                    genre TEXT DEFAULT '',
+                    title TEXT DEFAULT '',
+                    author TEXT DEFAULT '',
+                    publisher TEXT DEFAULT '',
+                    format TEXT DEFAULT ''
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS new_arrivals (
+                    id SERIAL PRIMARY KEY,
+                    isbn TEXT NOT NULL,
+                    arrived_at DATE NOT NULL,
+                    title TEXT DEFAULT '',
+                    author TEXT DEFAULT '',
+                    publisher TEXT DEFAULT '',
+                    cover TEXT DEFAULT '',
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS availability_cache (
+                    isbn TEXT PRIMARY KEY,
+                    status TEXT,
+                    title TEXT DEFAULT '',
+                    author TEXT DEFAULT '',
+                    updated_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS staff_chat (
+                    id SERIAL PRIMARY KEY,
+                    sender TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS chat_threads (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    created_by TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS admin_users (
+                    id SERIAL PRIMARY KEY,
+                    code TEXT UNIQUE NOT NULL,
+                    name TEXT NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    salt TEXT NOT NULL,
+                    role TEXT NOT NULL DEFAULT 'admin',
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS award_books (
+                    id SERIAL PRIMARY KEY,
+                    award TEXT NOT NULL,
+                    award_no INTEGER,
+                    award_year INTEGER,
+                    title TEXT NOT NULL,
+                    author TEXT DEFAULT '',
+                    isbn13 TEXT DEFAULT '',
+                    summary TEXT DEFAULT '',
+                    status TEXT DEFAULT '確認済',
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS applied_migrations (
+                    name TEXT PRIMARY KEY,
+                    applied_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            con.commit()
+        else:
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS ratings (
+                    isbn TEXT PRIMARY KEY,
+                    score REAL,
+                    votes INTEGER,
+                    reviews TEXT DEFAULT '[]'
+                )
+            """)
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS announcements (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    body TEXT NOT NULL,
+                    category TEXT DEFAULT 'お知らせ',
+                    image_url TEXT DEFAULT '',
+                    created_at TEXT DEFAULT (datetime('now', 'localtime'))
+                )
+            """)
+            try:
+                con.execute("ALTER TABLE announcements ADD COLUMN image_url TEXT DEFAULT ''")
             except Exception:
                 pass
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS settings (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL
-            )
-        """)
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS collections (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                description TEXT DEFAULT '',
-                emoji TEXT DEFAULT '📚',
-                isbns TEXT DEFAULT '[]',
-                is_active INTEGER DEFAULT 1,
-                sort_order INTEGER DEFAULT 0,
-                created_at TEXT DEFAULT (datetime('now','localtime'))
-            )
-        """)
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS user_accounts (
-                room TEXT PRIMARY KEY,
-                pin TEXT NOT NULL,
-                email TEXT DEFAULT '',
-                password_hash TEXT DEFAULT '',
-                password_salt TEXT DEFAULT '',
-                favorites TEXT DEFAULT '[]',
-                reading_log TEXT DEFAULT '{}',
-                library_card_url TEXT DEFAULT '',
-                library_card_image TEXT DEFAULT '',
-                updated_at TEXT DEFAULT (datetime('now','localtime'))
-            )
-        """)
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS password_reset_tokens (
-                token TEXT PRIMARY KEY,
-                room TEXT NOT NULL,
-                expires_at TEXT NOT NULL,
-                used INTEGER DEFAULT 0
-            )
-        """)
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS genre_books (
-                isbn TEXT PRIMARY KEY,
-                genre TEXT DEFAULT '',
-                title TEXT DEFAULT '',
-                author TEXT DEFAULT '',
-                publisher TEXT DEFAULT '',
-                format TEXT DEFAULT '',
-                awards TEXT DEFAULT '[]'
-            )
-        """)
-        try:
-            con.execute("ALTER TABLE genre_books ADD COLUMN description TEXT DEFAULT ''")
-        except Exception:
-            pass
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS new_arrivals (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                isbn TEXT NOT NULL,
-                arrived_at TEXT NOT NULL,
-                title TEXT DEFAULT '',
-                author TEXT DEFAULT '',
-                publisher TEXT DEFAULT '',
-                cover TEXT DEFAULT '',
-                created_at TEXT DEFAULT (datetime('now','localtime'))
-            )
-        """)
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS availability_cache (
-                isbn TEXT PRIMARY KEY,
-                status TEXT,
-                title TEXT DEFAULT '',
-                author TEXT DEFAULT '',
-                updated_at TEXT DEFAULT (datetime('now','localtime'))
-            )
-        """)
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS staff_chat (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                sender TEXT NOT NULL,
-                message TEXT NOT NULL,
-                created_at TEXT DEFAULT (datetime('now','localtime'))
-            )
-        """)
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS chat_threads (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                created_by TEXT NOT NULL,
-                created_at TEXT DEFAULT (datetime('now','localtime'))
-            )
-        """)
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS admin_users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                code TEXT UNIQUE NOT NULL,
-                name TEXT NOT NULL,
-                password_hash TEXT NOT NULL,
-                salt TEXT NOT NULL,
-                role TEXT NOT NULL DEFAULT 'admin',
-                created_at TEXT DEFAULT (datetime('now','localtime'))
-            )
-        """)
-        con.execute("""
-            CREATE TABLE IF NOT EXISTS applied_migrations (
-                name TEXT PRIMARY KEY,
-                applied_at TEXT DEFAULT (datetime('now','localtime'))
-            )
-        """)
-        con.commit()
-    con.close()
+            try:
+                con.execute("ALTER TABLE announcements ADD COLUMN event_date TEXT DEFAULT ''")
+            except Exception:
+                pass
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS issues (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    body TEXT NOT NULL,
+                    priority TEXT DEFAULT '中',
+                    status TEXT DEFAULT '未対応',
+                    sort_order INTEGER DEFAULT 0,
+                    created_at TEXT DEFAULT (datetime('now', 'localtime'))
+                )
+            """)
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS book_requests (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    author TEXT DEFAULT '',
+                    reason TEXT DEFAULT '',
+                    room TEXT DEFAULT '',
+                    status TEXT DEFAULT 'pending',
+                    note TEXT DEFAULT '',
+                    created_at TEXT DEFAULT (datetime('now', 'localtime'))
+                )
+            """)
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS calendar_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    event_date TEXT NOT NULL,
+                    body TEXT DEFAULT '',
+                    minutes TEXT DEFAULT '',
+                    sort_order INTEGER DEFAULT 0,
+                    created_at TEXT DEFAULT (datetime('now', 'localtime'))
+                )
+            """)
+            for tbl in ("issues", "calendar_events"):
+                try:
+                    con.execute(f"ALTER TABLE {tbl} ADD COLUMN sort_order INTEGER DEFAULT 0")
+                except Exception:
+                    pass
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+            """)
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS collections (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    description TEXT DEFAULT '',
+                    emoji TEXT DEFAULT '📚',
+                    isbns TEXT DEFAULT '[]',
+                    is_active INTEGER DEFAULT 1,
+                    sort_order INTEGER DEFAULT 0,
+                    created_at TEXT DEFAULT (datetime('now','localtime'))
+                )
+            """)
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS user_accounts (
+                    room TEXT PRIMARY KEY,
+                    pin TEXT NOT NULL,
+                    email TEXT DEFAULT '',
+                    password_hash TEXT DEFAULT '',
+                    password_salt TEXT DEFAULT '',
+                    favorites TEXT DEFAULT '[]',
+                    reading_log TEXT DEFAULT '{}',
+                    library_card_url TEXT DEFAULT '',
+                    library_card_image TEXT DEFAULT '',
+                    updated_at TEXT DEFAULT (datetime('now','localtime'))
+                )
+            """)
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                    token TEXT PRIMARY KEY,
+                    room TEXT NOT NULL,
+                    expires_at TEXT NOT NULL,
+                    used INTEGER DEFAULT 0
+                )
+            """)
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS genre_books (
+                    isbn TEXT PRIMARY KEY,
+                    genre TEXT DEFAULT '',
+                    title TEXT DEFAULT '',
+                    author TEXT DEFAULT '',
+                    publisher TEXT DEFAULT '',
+                    format TEXT DEFAULT '',
+                    awards TEXT DEFAULT '[]'
+                )
+            """)
+            try:
+                con.execute("ALTER TABLE genre_books ADD COLUMN description TEXT DEFAULT ''")
+            except Exception:
+                pass
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS new_arrivals (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    isbn TEXT NOT NULL,
+                    arrived_at TEXT NOT NULL,
+                    title TEXT DEFAULT '',
+                    author TEXT DEFAULT '',
+                    publisher TEXT DEFAULT '',
+                    cover TEXT DEFAULT '',
+                    created_at TEXT DEFAULT (datetime('now','localtime'))
+                )
+            """)
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS availability_cache (
+                    isbn TEXT PRIMARY KEY,
+                    status TEXT,
+                    title TEXT DEFAULT '',
+                    author TEXT DEFAULT '',
+                    updated_at TEXT DEFAULT (datetime('now','localtime'))
+                )
+            """)
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS staff_chat (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    sender TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    created_at TEXT DEFAULT (datetime('now','localtime'))
+                )
+            """)
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS chat_threads (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    created_by TEXT NOT NULL,
+                    created_at TEXT DEFAULT (datetime('now','localtime'))
+                )
+            """)
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS admin_users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    code TEXT UNIQUE NOT NULL,
+                    name TEXT NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    salt TEXT NOT NULL,
+                    role TEXT NOT NULL DEFAULT 'admin',
+                    created_at TEXT DEFAULT (datetime('now','localtime'))
+                )
+            """)
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS applied_migrations (
+                    name TEXT PRIMARY KEY,
+                    applied_at TEXT DEFAULT (datetime('now','localtime'))
+                )
+            """)
+            con.commit()
+        con.close()
 
 
 # ── マイグレーション管理ヘルパー ──────────────────────────────────────────────
@@ -423,53 +423,53 @@ def _mark_migration_done(name: str):
 def _migrate_admin_users():
     """admin_usersテーブルを追加し、マスターアカウントがなければ初期作成する"""
     try:
-        con = get_con()
-        if USE_PG:
-            cur = con.cursor()
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS admin_users (
-                    id SERIAL PRIMARY KEY,
-                    code TEXT UNIQUE NOT NULL,
-                    name TEXT NOT NULL,
-                    password_hash TEXT NOT NULL,
-                    salt TEXT NOT NULL,
-                    role TEXT NOT NULL DEFAULT 'admin',
-                    created_at TIMESTAMP DEFAULT NOW()
-                )
-            """)
-            con.commit()
-            row = fetchone(con, "SELECT id FROM admin_users WHERE role='master' LIMIT 1")
-            if not row:
-                init_pw = get_board_password()
-                if not init_pw:
-                    raise RuntimeError("BOARD_PASSWORD 環境変数が未設定のため管理者初期化できません")
-                h, s = _hash_password(init_pw)
-                execute(con, "INSERT INTO admin_users (code, name, password_hash, salt, role) VALUES (?,?,?,?,?)",
-                        ("A000", "秋山", h, s, "master"))
+        with db_session() as con:
+            if USE_PG:
+                cur = con.cursor()
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS admin_users (
+                        id SERIAL PRIMARY KEY,
+                        code TEXT UNIQUE NOT NULL,
+                        name TEXT NOT NULL,
+                        password_hash TEXT NOT NULL,
+                        salt TEXT NOT NULL,
+                        role TEXT NOT NULL DEFAULT 'admin',
+                        created_at TIMESTAMP DEFAULT NOW()
+                    )
+                """)
                 con.commit()
-        else:
-            con.execute("""
-                CREATE TABLE IF NOT EXISTS admin_users (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    code TEXT UNIQUE NOT NULL,
-                    name TEXT NOT NULL,
-                    password_hash TEXT NOT NULL,
-                    salt TEXT NOT NULL,
-                    role TEXT NOT NULL DEFAULT 'admin',
-                    created_at TEXT DEFAULT (datetime('now','localtime'))
-                )
-            """)
-            con.commit()
-            row = fetchone(con, "SELECT id FROM admin_users WHERE role='master' LIMIT 1")
-            if not row:
-                init_pw = get_board_password()
-                if not init_pw:
-                    raise RuntimeError("BOARD_PASSWORD 環境変数が未設定のため管理者初期化できません")
-                h, s = _hash_password(init_pw)
-                execute(con, "INSERT INTO admin_users (code, name, password_hash, salt, role) VALUES (?,?,?,?,?)",
-                        ("A000", "秋山", h, s, "master"))
+                row = fetchone(con, "SELECT id FROM admin_users WHERE role='master' LIMIT 1")
+                if not row:
+                    init_pw = get_board_password()
+                    if not init_pw:
+                        raise RuntimeError("BOARD_PASSWORD 環境変数が未設定のため管理者初期化できません")
+                    h, s = _hash_password(init_pw)
+                    execute(con, "INSERT INTO admin_users (code, name, password_hash, salt, role) VALUES (?,?,?,?,?)",
+                            ("A000", "秋山", h, s, "master"))
+                    con.commit()
+            else:
+                con.execute("""
+                    CREATE TABLE IF NOT EXISTS admin_users (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        code TEXT UNIQUE NOT NULL,
+                        name TEXT NOT NULL,
+                        password_hash TEXT NOT NULL,
+                        salt TEXT NOT NULL,
+                        role TEXT NOT NULL DEFAULT 'admin',
+                        created_at TEXT DEFAULT (datetime('now','localtime'))
+                    )
+                """)
                 con.commit()
-        con.close()
+                row = fetchone(con, "SELECT id FROM admin_users WHERE role='master' LIMIT 1")
+                if not row:
+                    init_pw = get_board_password()
+                    if not init_pw:
+                        raise RuntimeError("BOARD_PASSWORD 環境変数が未設定のため管理者初期化できません")
+                    h, s = _hash_password(init_pw)
+                    execute(con, "INSERT INTO admin_users (code, name, password_hash, salt, role) VALUES (?,?,?,?,?)",
+                            ("A000", "秋山", h, s, "master"))
+                    con.commit()
+            con.close()
     except Exception as e:
         logger.error(f"admin_users migration error: %s", e)
 
@@ -477,34 +477,34 @@ def _migrate_admin_users():
 def _migrate_add_card_columns():
     """user_accounts に library_card_url/image カラム、genre_books に title_yomi/pubdate カラムを追加"""
     try:
-        con = get_con()
-        if USE_PG:
-            for col in ("library_card_url", "library_card_image"):
-                try:
-                    con.cursor().execute(f"ALTER TABLE user_accounts ADD COLUMN {col} TEXT DEFAULT ''")
-                    con.commit()
-                except Exception:
-                    con.rollback()
-            for col in ("title_yomi", "pubdate"):
-                try:
-                    con.cursor().execute(f"ALTER TABLE genre_books ADD COLUMN {col} TEXT DEFAULT ''")
-                    con.commit()
-                except Exception:
-                    con.rollback()
-        else:
-            for col in ("library_card_url", "library_card_image"):
-                try:
-                    con.execute(f"ALTER TABLE user_accounts ADD COLUMN {col} TEXT DEFAULT ''")
-                    con.commit()
-                except Exception:
-                    pass
-            for col in ("title_yomi", "pubdate"):
-                try:
-                    con.execute(f"ALTER TABLE genre_books ADD COLUMN {col} TEXT DEFAULT ''")
-                    con.commit()
-                except Exception:
-                    pass
-        con.close()
+        with db_session() as con:
+            if USE_PG:
+                for col in ("library_card_url", "library_card_image"):
+                    try:
+                        con.cursor().execute(f"ALTER TABLE user_accounts ADD COLUMN {col} TEXT DEFAULT ''")
+                        con.commit()
+                    except Exception:
+                        con.rollback()
+                for col in ("title_yomi", "pubdate"):
+                    try:
+                        con.cursor().execute(f"ALTER TABLE genre_books ADD COLUMN {col} TEXT DEFAULT ''")
+                        con.commit()
+                    except Exception:
+                        con.rollback()
+            else:
+                for col in ("library_card_url", "library_card_image"):
+                    try:
+                        con.execute(f"ALTER TABLE user_accounts ADD COLUMN {col} TEXT DEFAULT ''")
+                        con.commit()
+                    except Exception:
+                        pass
+                for col in ("title_yomi", "pubdate"):
+                    try:
+                        con.execute(f"ALTER TABLE genre_books ADD COLUMN {col} TEXT DEFAULT ''")
+                        con.commit()
+                    except Exception:
+                        pass
+            con.close()
     except Exception as e:
         logger.error(f"card column migration error: %s", e)
 
@@ -512,46 +512,46 @@ def _migrate_add_card_columns():
 def _migrate_add_user_auth_columns():
     """user_accounts に email/password_hash/password_salt カラムを追加"""
     try:
-        con = get_con()
-        if USE_PG:
-            for col, default in [("email", "''"), ("password_hash", "''"), ("password_salt", "''")]:
+        with db_session() as con:
+            if USE_PG:
+                for col, default in [("email", "''"), ("password_hash", "''"), ("password_salt", "''")]:
+                    try:
+                        con.cursor().execute(f"ALTER TABLE user_accounts ADD COLUMN {col} TEXT DEFAULT {default}")
+                        con.commit()
+                    except Exception:
+                        con.rollback()
                 try:
-                    con.cursor().execute(f"ALTER TABLE user_accounts ADD COLUMN {col} TEXT DEFAULT {default}")
+                    con.cursor().execute("""
+                        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                            token TEXT PRIMARY KEY,
+                            room TEXT NOT NULL,
+                            expires_at TIMESTAMP NOT NULL,
+                            used BOOLEAN DEFAULT FALSE
+                        )
+                    """)
                     con.commit()
                 except Exception:
                     con.rollback()
-            try:
-                con.cursor().execute("""
-                    CREATE TABLE IF NOT EXISTS password_reset_tokens (
-                        token TEXT PRIMARY KEY,
-                        room TEXT NOT NULL,
-                        expires_at TIMESTAMP NOT NULL,
-                        used BOOLEAN DEFAULT FALSE
-                    )
-                """)
-                con.commit()
-            except Exception:
-                con.rollback()
-        else:
-            for col in ("email", "password_hash", "password_salt"):
+            else:
+                for col in ("email", "password_hash", "password_salt"):
+                    try:
+                        con.execute(f"ALTER TABLE user_accounts ADD COLUMN {col} TEXT DEFAULT ''")
+                        con.commit()
+                    except Exception:
+                        pass
                 try:
-                    con.execute(f"ALTER TABLE user_accounts ADD COLUMN {col} TEXT DEFAULT ''")
+                    con.execute("""
+                        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                            token TEXT PRIMARY KEY,
+                            room TEXT NOT NULL,
+                            expires_at TEXT NOT NULL,
+                            used INTEGER DEFAULT 0
+                        )
+                    """)
                     con.commit()
                 except Exception:
                     pass
-            try:
-                con.execute("""
-                    CREATE TABLE IF NOT EXISTS password_reset_tokens (
-                        token TEXT PRIMARY KEY,
-                        room TEXT NOT NULL,
-                        expires_at TEXT NOT NULL,
-                        used INTEGER DEFAULT 0
-                    )
-                """)
-                con.commit()
-            except Exception:
-                pass
-        con.close()
+            con.close()
     except Exception as e:
         logger.error(f"user auth column migration error: %s", e)
 
@@ -681,132 +681,132 @@ def _migrate_title_yomi():
 
 def _migrate_add_staff_chat():
     try:
-        con = get_con()
-        if USE_PG:
-            cur = con.cursor()
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS staff_chat (
-                    id SERIAL PRIMARY KEY,
-                    sender TEXT NOT NULL,
-                    message TEXT NOT NULL DEFAULT '',
-                    image_data TEXT DEFAULT '',
-                    created_at TIMESTAMP DEFAULT NOW()
-                )
-            """)
-            try:
-                cur.execute("ALTER TABLE staff_chat ADD COLUMN image_data TEXT DEFAULT ''")
-            except Exception:
-                con.rollback()
-        else:
-            con.execute("""
-                CREATE TABLE IF NOT EXISTS staff_chat (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    sender TEXT NOT NULL,
-                    message TEXT NOT NULL DEFAULT '',
-                    image_data TEXT DEFAULT '',
-                    created_at TEXT DEFAULT (datetime('now','localtime'))
-                )
-            """)
-            try:
-                con.execute("ALTER TABLE staff_chat ADD COLUMN image_data TEXT DEFAULT ''")
-            except Exception:
-                pass
-        if USE_PG:
-            cur = con.cursor()
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS chat_threads (
-                    id SERIAL PRIMARY KEY,
-                    title TEXT NOT NULL,
-                    created_by TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT NOW()
-                )
-            """)
-            try:
-                cur.execute("ALTER TABLE staff_chat ADD COLUMN thread_id INTEGER REFERENCES chat_threads(id) ON DELETE CASCADE")
-            except Exception:
-                con.rollback()
-        else:
-            con.execute("""
-                CREATE TABLE IF NOT EXISTS chat_threads (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    title TEXT NOT NULL,
-                    created_by TEXT NOT NULL,
-                    created_at TEXT DEFAULT (datetime('now','localtime'))
-                )
-            """)
-            try:
-                con.execute("ALTER TABLE staff_chat ADD COLUMN thread_id INTEGER")
-            except Exception:
-                pass
-        con.commit()
-        con.close()
+        with db_session() as con:
+            if USE_PG:
+                cur = con.cursor()
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS staff_chat (
+                        id SERIAL PRIMARY KEY,
+                        sender TEXT NOT NULL,
+                        message TEXT NOT NULL DEFAULT '',
+                        image_data TEXT DEFAULT '',
+                        created_at TIMESTAMP DEFAULT NOW()
+                    )
+                """)
+                try:
+                    cur.execute("ALTER TABLE staff_chat ADD COLUMN image_data TEXT DEFAULT ''")
+                except Exception:
+                    con.rollback()
+            else:
+                con.execute("""
+                    CREATE TABLE IF NOT EXISTS staff_chat (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        sender TEXT NOT NULL,
+                        message TEXT NOT NULL DEFAULT '',
+                        image_data TEXT DEFAULT '',
+                        created_at TEXT DEFAULT (datetime('now','localtime'))
+                    )
+                """)
+                try:
+                    con.execute("ALTER TABLE staff_chat ADD COLUMN image_data TEXT DEFAULT ''")
+                except Exception:
+                    pass
+            if USE_PG:
+                cur = con.cursor()
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS chat_threads (
+                        id SERIAL PRIMARY KEY,
+                        title TEXT NOT NULL,
+                        created_by TEXT NOT NULL,
+                        created_at TIMESTAMP DEFAULT NOW()
+                    )
+                """)
+                try:
+                    cur.execute("ALTER TABLE staff_chat ADD COLUMN thread_id INTEGER REFERENCES chat_threads(id) ON DELETE CASCADE")
+                except Exception:
+                    con.rollback()
+            else:
+                con.execute("""
+                    CREATE TABLE IF NOT EXISTS chat_threads (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        title TEXT NOT NULL,
+                        created_by TEXT NOT NULL,
+                        created_at TEXT DEFAULT (datetime('now','localtime'))
+                    )
+                """)
+                try:
+                    con.execute("ALTER TABLE staff_chat ADD COLUMN thread_id INTEGER")
+                except Exception:
+                    pass
+            con.commit()
+            con.close()
     except Exception as e:
         logger.error(f"migrate staff_chat error: %s", e)
 
 
 def _migrate_add_votes_column():
     try:
-        con = get_con()
-        if USE_PG:
-            try:
-                con.cursor().execute("ALTER TABLE book_requests ADD COLUMN votes INTEGER DEFAULT 0")
-                con.commit()
-            except Exception:
-                con.rollback()
-        else:
-            try:
-                con.execute("ALTER TABLE book_requests ADD COLUMN votes INTEGER DEFAULT 0")
-                con.commit()
-            except Exception:
-                pass
-        con.close()
+        with db_session() as con:
+            if USE_PG:
+                try:
+                    con.cursor().execute("ALTER TABLE book_requests ADD COLUMN votes INTEGER DEFAULT 0")
+                    con.commit()
+                except Exception:
+                    con.rollback()
+            else:
+                try:
+                    con.execute("ALTER TABLE book_requests ADD COLUMN votes INTEGER DEFAULT 0")
+                    con.commit()
+                except Exception:
+                    pass
+            con.close()
     except Exception as e:
         logger.error(f"migrate votes error: %s", e)
 
 
 def _migrate_add_type_reply_columns():
     try:
-        con = get_con()
-        for col, default in [("type", "'request'"), ("reply", "''")]:
-            try:
-                if USE_PG:
-                    con.cursor().execute(f"ALTER TABLE book_requests ADD COLUMN {col} TEXT DEFAULT {default}")
-                    con.commit()
-                else:
-                    con.execute(f"ALTER TABLE book_requests ADD COLUMN {col} TEXT DEFAULT {default}")
-                    con.commit()
-            except Exception:
-                if USE_PG: con.rollback()
-        con.close()
+        with db_session() as con:
+            for col, default in [("type", "'request'"), ("reply", "''")]:
+                try:
+                    if USE_PG:
+                        con.cursor().execute(f"ALTER TABLE book_requests ADD COLUMN {col} TEXT DEFAULT {default}")
+                        con.commit()
+                    else:
+                        con.execute(f"ALTER TABLE book_requests ADD COLUMN {col} TEXT DEFAULT {default}")
+                        con.commit()
+                except Exception:
+                    if USE_PG: con.rollback()
+            con.close()
     except Exception as e:
         logger.error(f"migrate type/reply error: %s", e)
 
 
 def _migrate_lib_schedule():
     try:
-        con = get_con()
-        if USE_PG:
-            con.cursor().execute("""
-                CREATE TABLE IF NOT EXISTS lib_schedule (
-                    id SERIAL PRIMARY KEY,
-                    title TEXT NOT NULL,
-                    event_date TEXT NOT NULL,
-                    type TEXT NOT NULL DEFAULT 'event',
-                    created_at TIMESTAMP DEFAULT NOW()
-                )
-            """)
-        else:
-            con.execute("""
-                CREATE TABLE IF NOT EXISTS lib_schedule (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    title TEXT NOT NULL,
-                    event_date TEXT NOT NULL,
-                    type TEXT NOT NULL DEFAULT 'event',
-                    created_at TEXT DEFAULT (datetime('now','localtime'))
-                )
-            """)
-        con.commit()
-        con.close()
+        with db_session() as con:
+            if USE_PG:
+                con.cursor().execute("""
+                    CREATE TABLE IF NOT EXISTS lib_schedule (
+                        id SERIAL PRIMARY KEY,
+                        title TEXT NOT NULL,
+                        event_date TEXT NOT NULL,
+                        type TEXT NOT NULL DEFAULT 'event',
+                        created_at TIMESTAMP DEFAULT NOW()
+                    )
+                """)
+            else:
+                con.execute("""
+                    CREATE TABLE IF NOT EXISTS lib_schedule (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        title TEXT NOT NULL,
+                        event_date TEXT NOT NULL,
+                        type TEXT NOT NULL DEFAULT 'event',
+                        created_at TEXT DEFAULT (datetime('now','localtime'))
+                    )
+                """)
+            con.commit()
+            con.close()
     except Exception as e:
         logger.error(f"migrate lib_schedule error: %s", e)
 
@@ -1115,19 +1115,19 @@ def _migrate_pubdate_librarylife():
 def _verify_tables():
     """起動時にテーブル名を検証してミスを早期検出する"""
     try:
-        con = get_con()
-        if USE_PG:
-            rows = fetchall(con, "SELECT tablename FROM pg_tables WHERE schemaname='public'")
-            existing = {r["tablename"] for r in rows}
-        else:
-            rows = fetchall(con, "SELECT name FROM sqlite_master WHERE type='table'")
-            existing = {r["name"] for r in rows}
-        con.close()
-        missing = [t for t in _REQUIRED_TABLES if t not in existing]
-        if missing:
-            logger.warning(f" テーブルが見つかりません: {missing}")
-        else:
-            logger.info(f"[OK] 全テーブル確認済み ({len(_REQUIRED_TABLES)}件)")
+        with db_session() as con:
+            if USE_PG:
+                rows = fetchall(con, "SELECT tablename FROM pg_tables WHERE schemaname='public'")
+                existing = {r["tablename"] for r in rows}
+            else:
+                rows = fetchall(con, "SELECT name FROM sqlite_master WHERE type='table'")
+                existing = {r["name"] for r in rows}
+            con.close()
+            missing = [t for t in _REQUIRED_TABLES if t not in existing]
+            if missing:
+                logger.warning(f" テーブルが見つかりません: {missing}")
+            else:
+                logger.info(f"[OK] 全テーブル確認済み ({len(_REQUIRED_TABLES)}件)")
     except Exception as e:
         logger.error(f"table verify error: %s", e)
 
@@ -3006,26 +3006,26 @@ def _migrate_clear_credential_overrides_v2():
 def _migrate_db_indices():
     """パフォーマンス改善用インデックスを追加する"""
     try:
-        con = get_con()
-        indices = [
-            "CREATE INDEX IF NOT EXISTS idx_genre_books_genre ON genre_books(genre)",
-            "CREATE INDEX IF NOT EXISTS idx_requests_status ON book_requests(status)",
-            "CREATE INDEX IF NOT EXISTS idx_requests_type ON book_requests(type)",
-        ]
-        for sql in indices:
-            try:
-                if USE_PG:
-                    cur = con.cursor()
-                    cur.execute(sql)
-                else:
-                    con.execute(sql)
-                con.commit()
-            except Exception:
+        with db_session() as con:
+            indices = [
+                "CREATE INDEX IF NOT EXISTS idx_genre_books_genre ON genre_books(genre)",
+                "CREATE INDEX IF NOT EXISTS idx_requests_status ON book_requests(status)",
+                "CREATE INDEX IF NOT EXISTS idx_requests_type ON book_requests(type)",
+            ]
+            for sql in indices:
                 try:
-                    con.rollback()
+                    if USE_PG:
+                        cur = con.cursor()
+                        cur.execute(sql)
+                    else:
+                        con.execute(sql)
+                    con.commit()
                 except Exception:
-                    pass
-        con.close()
+                    try:
+                        con.rollback()
+                    except Exception:
+                        pass
+            con.close()
     except Exception as e:
         logger.error("[migration] _migrate_db_indices: %s", e)
 

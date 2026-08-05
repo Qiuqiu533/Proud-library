@@ -23,7 +23,9 @@ _pool: Any = None
 def _get_pool() -> Any:
     global _pool
     if _pool is None:
-        _pool = pg_pool.ThreadedConnectionPool(minconn=1, maxconn=10, dsn=DATABASE_URL)
+        # Do not retain idle client connections, allowing Neon to scale to zero
+        # between database operations. maxconn still limits concurrent connections.
+        _pool = pg_pool.ThreadedConnectionPool(minconn=0, maxconn=10, dsn=DATABASE_URL)
     return _pool
 
 

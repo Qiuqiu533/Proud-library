@@ -486,17 +486,17 @@ def _save_genre_update_time():
     import datetime
     now = datetime.datetime.now().isoformat()
     try:
-        con = get_con()
-        if USE_PG:
-            execute(con,
-                "INSERT INTO settings (key,value) VALUES (?,?) "
-                "ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value",
-                ("genre_last_update", now))
-        else:
-            execute(con,
-                "INSERT OR REPLACE INTO settings (key,value) VALUES (?,?)",
-                ("genre_last_update", now))
-        con.commit(); con.close()
+        with db_session() as con:
+            if USE_PG:
+                execute(con,
+                    "INSERT INTO settings (key,value) VALUES (?,?) "
+                    "ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value",
+                    ("genre_last_update", now))
+            else:
+                execute(con,
+                    "INSERT OR REPLACE INTO settings (key,value) VALUES (?,?)",
+                    ("genre_last_update", now))
+            con.commit()
     except Exception as e:
         logger.error(f"_save_genre_update_time error: %s", e)
 

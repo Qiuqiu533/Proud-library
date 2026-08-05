@@ -205,17 +205,17 @@ def _save_audit_time(checked, found):
     import datetime
     now = datetime.datetime.now().isoformat()
     try:
-        con = get_con()
-        if USE_PG:
-            execute(con,
-                "INSERT INTO settings (key,value) VALUES (?,?) "
-                "ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value",
-                ("integrity_audit_last_run", now))
-        else:
-            execute(con,
-                "INSERT OR REPLACE INTO settings (key,value) VALUES (?,?)",
-                ("integrity_audit_last_run", now))
-        con.commit(); con.close()
+        with db_session() as con:
+            if USE_PG:
+                execute(con,
+                    "INSERT INTO settings (key,value) VALUES (?,?) "
+                    "ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value",
+                    ("integrity_audit_last_run", now))
+            else:
+                execute(con,
+                    "INSERT OR REPLACE INTO settings (key,value) VALUES (?,?)",
+                    ("integrity_audit_last_run", now))
+            con.commit()
     except Exception as e:
         logger.error(f"_save_audit_time error: %s", e)
 
